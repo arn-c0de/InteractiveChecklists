@@ -29,7 +29,7 @@ import com.example.checklist_interactive.ui.checklist.ChecklistViewModel
 @Composable
 fun BrowseScreen(
     assetBrowser: AssetBrowser,
-    startPath: String = "checklists",
+    startPath: String = "",
     onOpenFile: (assetPath: String) -> Unit,
     onBackToHome: (() -> Unit)? = null
     ,
@@ -64,8 +64,8 @@ fun BrowseScreen(
 
                         Spacer(modifier = Modifier.width(6.dp))
 
-                        IconButton(onClick = {
-                            if (currentPath == startPath) {
+                                        IconButton(onClick = {
+                            if (startPath.isNotEmpty() && currentPath == startPath) {
                                 onBackToHome?.invoke()
                             } else {
                                 val segments = currentPath.split('/')
@@ -115,7 +115,7 @@ fun BrowseScreen(
         val popupNodes = remember(popupPath) { assetBrowser.list(popupPath) }
         AlertDialog(
             onDismissRequest = { showFolderPopup = false },
-            title = { Text(popupPath) },
+            title = { Text(popupPath.ifBlank { "Assets" }) },
             text = {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {

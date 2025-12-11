@@ -99,7 +99,7 @@ fun FolderSelectionDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    onFolderSelected(currentPath.ifEmpty { "checklists" })
+                    onFolderSelected(currentPath)
                 }
             ) {
                 Text("Diesen Ordner wählen")

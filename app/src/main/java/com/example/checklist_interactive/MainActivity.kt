@@ -269,7 +269,8 @@ class MainActivity : ComponentActivity() {
                                 onRequestFolderPicker = {
                                     pickDocumentTreeLauncher.launch(null)
                                 },
-                                softwareVersion = softwareVersion
+                                softwareVersion = softwareVersion,
+                                onFilesRefreshed = { refreshTrigger++ }
                             )
                         }
                         openFile != null && !showFileList -> {
@@ -318,6 +319,8 @@ class MainActivity : ComponentActivity() {
                                     }
                                 },
                                 onRefresh = {
+                                    // Re-import bundled assets (copy new/changed files) and refresh view
+                                    fileManager.importAllBundledAssets("")
                                     refreshTrigger++
                                 }
                                 ,

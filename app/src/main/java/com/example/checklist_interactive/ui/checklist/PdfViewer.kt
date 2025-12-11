@@ -1175,6 +1175,7 @@ private fun HintIconButton(
     content: @Composable () -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
+    var showLocalTooltip by remember { mutableStateOf(false) }
 
     Box(
         modifier = modifier
@@ -1184,19 +1185,25 @@ private fun HintIconButton(
                     onPress = {
                         wasLongPressRef[0] = false
                         onHintChange(hint)
+                        // Ensure we don't show a local tooltip on a single tap release
+                        showLocalTooltip = false
                         try {
                             awaitRelease()
                         } finally {
                             if (!wasLongPressRef[0]) onHintChange(null)
+                            showLocalTooltip = false
                         }
                     },
                     onLongPress = {
                         wasLongPressRef[0] = true
                         onHintChange(hint)
+                        // Show bubble tooltip locally
+                        showLocalTooltip = true
                         onLongClick?.invoke()
                         coroutineScope.launch {
                             delay(1500L)
                             onHintChange(null)
+                            showLocalTooltip = false
                         }
                     }
                 )
@@ -1204,6 +1211,23 @@ private fun HintIconButton(
     ) {
         IconButton(onClick = onClick) {
             content()
+        }
+
+        // Local tooltip bubble for long-press: appears above the icon
+        if (showLocalTooltip) {
+            Box(
+                modifier = Modifier
+                    .offset(y = (-40).dp)
+                    .align(Alignment.TopCenter)
+                    .background(MaterialTheme.colorScheme.surfaceVariant, shape = CircleShape)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = hint,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

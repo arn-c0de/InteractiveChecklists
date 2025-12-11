@@ -60,18 +60,49 @@ fun InternalFilesScreen(
     val prefsManager = remember { PreferencesManager(context) }
     val shortcutManager = remember { ShortcutManager(context) }
     
-    val assetAircrafts = remember {
-        context.assets.list("Checklists")?.filter { entry ->
-            try {
-                val arr = context.assets.list("Checklists/$entry")
-                arr != null && arr.isNotEmpty()
-            } catch (e: Exception) {
-                false
-            }
-        }?.toList() ?: emptyList()
+    // Lade alle Top-Level-Ordner aus assets dynamisch
+    val assetTopLevelFolders = remember {
+        try {
+            context.assets.list("")?.filter { entry ->
+                try {
+                    val arr = context.assets.list(entry)
+                    arr != null && arr.isNotEmpty()
+                } catch (e: Exception) {
+                    false
+                }
+            }?.toList() ?: emptyList()
+        } catch (e: Exception) {
+            emptyList()
+        }
     }
+    
+    // Lade alle Aircraft-Unterordner aus dem Checklists-Ordner (case-insensitive, dynamisch)
+    val assetAircrafts = remember {
+        try {
+            val rootEntries = context.assets.list("") ?: emptyArray()
+            val checklistsFolder = rootEntries.firstOrNull { it.equals("Checklists", ignoreCase = true) }
+            if (checklistsFolder != null) {
+                context.assets.list(checklistsFolder)?.filter { entry ->
+                    try {
+                        val arr = context.assets.list("$checklistsFolder/$entry")
+                        arr != null && arr.isNotEmpty()
+                    } catch (e: Exception) {
+                        false
+                    }
+                }?.toList() ?: emptyList()
+            } else {
+                emptyList()
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+    
     // Keep a lowercase set for matching folder nodes which may be lowercased on import
-    val assetAircraftsLower = remember(assetAircrafts, fileManager) { (assetAircrafts + fileManager.getCategories()).map { it.lowercase() }.toSet() }
+    // Kombiniere alle Top-Level-Ordner, Aircraft-Ordner und bereits importierte Kategorien
+    val assetAircraftsLower = remember(assetAircrafts, assetTopLevelFolders, fileManager) { 
+        (assetTopLevelFolders + assetAircrafts + fileManager.getCategories()).map { it.lowercase() }.toSet() 
+    }
     var groupedFiles by remember { mutableStateOf(fileManager.getAllFilesGrouped()) }
     var folderTree by remember { mutableStateOf(fileManager.getFolderTree()) }
     var shortcuts by remember { mutableStateOf(shortcutManager.loadShortcuts()) }
@@ -368,14 +399,15 @@ fun InternalFilesScreen(
 
 /**
  * Filtert rekursiv Aircraft-Unterordner basierend auf Sichtbarkeits-Einstellungen.
- * Top-Level-Ordner werden immer angezeigt. Nur Unterordner innerhalb von "Checklists" werden gefiltert.
+ * Alle Top-Level-Ordner (Checklists, Handbooks, radiocommunication, etc.) werden immer angezeigt.
+ * Nur Aircraft-Unterordner innerhalb von "Checklists" werden nach Sichtbarkeit gefiltert.
  */
 private fun filterAircraftChildren(
     node: InternalFileManager.FolderNode,
     assetAircraftsLower: Set<String>,
     prefsManager: PreferencesManager
 ): InternalFileManager.FolderNode {
-    // Wenn der aktuelle Knoten "Checklists" ist (case-insensitive), filtere seine Kinder
+    // Wenn der aktuelle Knoten "Checklists" ist, filtere Aircraft-Unterordner nach Sichtbarkeit
     return if (node.name.equals("Checklists", ignoreCase = true)) {
         // Filtere die Kinder: Nur sichtbare Aircraft-Ordner behalten
         val filteredChildren = node.children.filter { child ->
@@ -390,7 +422,8 @@ private fun filterAircraftChildren(
         }
         node.copy(children = filteredChildren)
     } else {
-        // Für alle anderen Top-Level-Ordner: Behalte alle Kinder, aber wende Filterung rekursiv an
+        // Für alle anderen Top-Level-Ordner (Handbooks, radiocommunication, etc.): 
+        // Behalte ALLE Kinder, wende Filterung nur rekursiv an
         val filteredChildren = node.children.map { child ->
             filterAircraftChildren(child, assetAircraftsLower, prefsManager)
         }
@@ -460,7 +493,7 @@ private fun FolderNodeItem(
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
-                text = node.name.replaceFirstChar { it.uppercase() },
+                text = node.name.replace('_', ' '),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f)
@@ -528,7 +561,7 @@ private fun CategoryHeader(
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
-                text = category.replaceFirstChar { it.uppercase() },
+                text = category.replace('/', ' ').replace('_', ' '),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f)
@@ -683,12 +716,14 @@ private fun FileListItem(
         },
         trailingContent = {
             Row {
-                IconButton(onClick = onDelete) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = LocalContext.current.getString(R.string.delete),
-                        tint = MaterialTheme.colorScheme.error
-                    )
+                if (!file.isAsset) {
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = LocalContext.current.getString(R.string.delete),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
                 Icon(
                     Icons.Default.ChevronRight,
@@ -715,7 +750,7 @@ private fun CategorySelectionDialog(
         text = {
             LazyColumn {
                 items(categories) { category ->
-                    val displayName = category.replace('/', ' ').replace('_', ' ').replaceFirstChar { it.uppercase() }
+                    val displayName = category.replace('/', ' ').replace('_', ' ')
                     ListItem(
                         headlineContent = { Text(displayName) },
                         leadingContent = {
