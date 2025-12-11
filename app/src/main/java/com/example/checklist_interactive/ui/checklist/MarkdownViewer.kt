@@ -206,8 +206,17 @@ private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int, expan
                                     .padding(bottom = if (isExpanded) 8.dp else 0.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
+                                // Count checked and total checkboxes in this section
+                                val totalCheckboxes = section.content.count { line ->
+                                    line.trim().startsWith("- [ ]") || line.trim().startsWith("- [x]") || line.trim().startsWith("- [X]")
+                                }
+                                val checkedCheckboxes = section.content.count { line ->
+                                    line.trim().startsWith("- [x]") || line.trim().startsWith("- [X]")
+                                }
+                                val countText = if (totalCheckboxes > 0) " | $checkedCheckboxes/$totalCheckboxes" else ""
+
                                 Text(
-                                    text = section.heading.substring(4),
+                                    text = section.heading.substring(4) + countText,
                                     style = MaterialTheme.typography.headlineSmall,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.weight(1f)
@@ -430,8 +439,13 @@ private fun InteractiveMarkdownView(
                                     .padding(bottom = if (isExpanded) 8.dp else 0.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
+                                // Count checked and total checkboxes in this section
+                                val totalCheckboxes = section.items.size
+                                val checkedCheckboxes = section.items.count { it.isChecked }
+                                val countText = if (totalCheckboxes > 0) " | $checkedCheckboxes/$totalCheckboxes" else ""
+
                                 Text(
-                                    text = section.title,
+                                    text = section.title + countText,
                                     style = MaterialTheme.typography.headlineSmall,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.weight(1f)
