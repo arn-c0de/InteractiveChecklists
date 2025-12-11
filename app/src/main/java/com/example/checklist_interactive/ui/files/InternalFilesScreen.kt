@@ -113,15 +113,14 @@ fun InternalFilesScreen(
             selectedCategory?.let { category ->
                 val result = fileManager.importFile(selectedUri, category)
                 result.onSuccess {
-                    // Refresh file list and folder tree
+                    // Refresh file list und filter folderTree nach Sichtbarkeit
                     groupedFiles = fileManager.getAllFilesGrouped()
-                    // Filter folderTree based on visible aircraft preferences
                     folderTree = fileManager.getFolderTree().filter { node ->
-                        // If the node is a known bundled aircraft folder, check prefs; otherwise always show
+                        // Nur Root-Kategorien filtern: Zeige nur, wenn sichtbar
                         if (assetAircraftsLower.contains(node.name.lowercase())) {
                             prefsManager.isAircraftVisible(node.name)
                         } else {
-                            true
+                            true // Nicht-Aircraft-Kategorien immer anzeigen
                         }
                     }
                     onRefresh()

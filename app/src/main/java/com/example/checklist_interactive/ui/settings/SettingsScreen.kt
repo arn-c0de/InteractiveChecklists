@@ -26,7 +26,8 @@ fun SettingsScreen(
     prefsManager: PreferencesManager,
     fileManager: InternalFileManager,
     onBack: () -> Unit,
-    onRequestFolderPicker: () -> Unit
+    onRequestFolderPicker: () -> Unit,
+    softwareVersion: String
 ) {
     val context = LocalContext.current
     var currentFolderUri by remember { mutableStateOf(prefsManager.getImportFolderUri()) }
@@ -37,6 +38,9 @@ fun SettingsScreen(
     val aircraftList = remember(assetAircrafts, internalCategories) { (assetAircrafts + internalCategories).distinctBy { it.lowercase() } }
     val availableAircrafts = remember(aircraftList) { aircraftList }
     
+    // State to trigger refresh when visibility changes
+    var visibilityRefreshKey by remember { mutableStateOf(0) }
+    
     // Update when preference changes
     LaunchedEffect(Unit) {
         currentFolderUri = prefsManager.getImportFolderUri()
@@ -45,7 +49,16 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                title = {
+                    Column {
+                        Text("Settings")
+                        Text(
+                            text = "Version: $softwareVersion",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -194,7 +207,7 @@ fun SettingsScreen(
             // Aircraft visibility dialog
             item {
                 if (showAircraftDialog) {
-                    var selectedSet by remember { mutableStateOf(
+                    var selectedSet by remember(visibilityRefreshKey) { mutableStateOf(
                         prefsManager.getVisibleAircrafts().let { s -> if (s.isEmpty()) availableAircrafts.toSet() else s.toSet() }
                     ) }
 
@@ -246,6 +259,7 @@ fun SettingsScreen(
                     confirmButton = {
                         TextButton(onClick = {
                             prefsManager.setVisibleAircrafts(selectedSet)
+                            visibilityRefreshKey++ // Trigger refresh
                             showAircraftDialog = false
                         }) { Text("Save") }
                     },
@@ -265,6 +279,7 @@ fun SettingsScreen(
                     confirmButton = {
                         TextButton(onClick = {
                             prefsManager.resetVisibleAircrafts()
+                            visibilityRefreshKey++ // Trigger refresh
                             showResetConfirm = false
                         }) { Text("Reset") }
                     },

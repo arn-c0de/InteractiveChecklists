@@ -42,6 +42,11 @@ import com.example.checklist_interactive.ui.settings.SettingsScreen
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+        companion object {
+            const val SOFTWARE_VERSION = "1.0.1"
+        }
+
+        val softwareVersion = SOFTWARE_VERSION
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,7 +68,6 @@ class MainActivity : ComponentActivity() {
                     var showFileList by remember { mutableStateOf(false) }
                     var showSettings by remember { mutableStateOf(false) }
                     var refreshTrigger by remember { mutableStateOf(0) }
-
                     val fileManager = remember { InternalFileManager(this@MainActivity) }
                     val repository = remember { ChecklistRepository(this@MainActivity) }
                     val scope = rememberCoroutineScope()
@@ -264,7 +268,8 @@ class MainActivity : ComponentActivity() {
                                 onBack = { showSettings = false },
                                 onRequestFolderPicker = {
                                     pickDocumentTreeLauncher.launch(null)
-                                }
+                                },
+                                softwareVersion = softwareVersion
                             )
                         }
                         openFile != null && !showFileList -> {
