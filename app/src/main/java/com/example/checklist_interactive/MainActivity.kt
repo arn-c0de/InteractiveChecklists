@@ -40,6 +40,7 @@ import com.example.checklist_interactive.data.checklist.ChecklistRepository
 import com.example.checklist_interactive.data.shortcuts.PageShortcut
 import com.example.checklist_interactive.ui.settings.SettingsScreen
 import kotlinx.coroutines.launch
+import androidx.activity.compose.BackHandler
 
 class MainActivity : ComponentActivity() {
         companion object {
@@ -61,12 +62,25 @@ class MainActivity : ComponentActivity() {
                 isDarkTheme = !isDarkTheme
                 prefsManager.setDarkModeEnabled(isDarkTheme)
             }
+            // State hoisted for back button handling
+            var openFile by remember { mutableStateOf<FileInfo?>(null) }
+            var openPage by remember { mutableStateOf(0) }
+            var showFileList by remember { mutableStateOf(false) }
+            var showSettings by remember { mutableStateOf(false) }
+            val backHandlerEnabled = openFile != null || showSettings
+
+            // Handle Android back button: return to file list instead of closing app
+            BackHandler(enabled = backHandlerEnabled) {
+                if (showSettings) {
+                    showSettings = false
+                } else if (openFile != null) {
+                    openFile = null
+                    openPage = 0
+                    showFileList = true
+                }
+            }
             ChecklistInteractiveTheme(darkTheme = isDarkTheme) {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    var openFile by remember { mutableStateOf<FileInfo?>(null) }
-                    var openPage by remember { mutableStateOf(0) }
-                    var showFileList by remember { mutableStateOf(false) }
-                    var showSettings by remember { mutableStateOf(false) }
                     var refreshTrigger by remember { mutableStateOf(0) }
                     val fileManager = remember { InternalFileManager(this@MainActivity) }
                     val repository = remember { ChecklistRepository(this@MainActivity) }
