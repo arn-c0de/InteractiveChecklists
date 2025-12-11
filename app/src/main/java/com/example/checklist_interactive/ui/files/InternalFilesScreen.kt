@@ -115,13 +115,8 @@ fun InternalFilesScreen(
                 result.onSuccess {
                     // Refresh file list und filter folderTree nach Sichtbarkeit
                     groupedFiles = fileManager.getAllFilesGrouped()
-                    folderTree = fileManager.getFolderTree().filter { node ->
-                        // Nur Root-Kategorien filtern: Zeige nur, wenn sichtbar
-                        if (assetAircraftsLower.contains(node.name.lowercase())) {
-                            prefsManager.isAircraftVisible(node.name)
-                        } else {
-                            true // Nicht-Aircraft-Kategorien immer anzeigen
-                        }
+                    folderTree = fileManager.getFolderTree().map { node ->
+                        filterAircraftChildren(node, assetAircraftsLower, prefsManager)
                     }
                     onRefresh()
                 }.onFailure { error ->
@@ -143,12 +138,8 @@ fun InternalFilesScreen(
                     }
                     IconButton(onClick = {
                         groupedFiles = fileManager.getAllFilesGrouped()
-                        folderTree = fileManager.getFolderTree().filter { node ->
-                            if (assetAircraftsLower.contains(node.name.lowercase())) {
-                                prefsManager.isAircraftVisible(node.name)
-                            } else {
-                                true
-                            }
+                        folderTree = fileManager.getFolderTree().map { node ->
+                            filterAircraftChildren(node, assetAircraftsLower, prefsManager)
                         }
                         onRefresh()
                     }) {
@@ -355,12 +346,8 @@ fun InternalFilesScreen(
     // When parent changes refreshTrigger, update contents
     LaunchedEffect(refreshTrigger) {
         groupedFiles = fileManager.getAllFilesGrouped()
-        folderTree = fileManager.getFolderTree().filter { node ->
-            if (assetAircraftsLower.contains(node.name.lowercase())) {
-                prefsManager.isAircraftVisible(node.name)
-            } else {
-                true
-            }
+        folderTree = fileManager.getFolderTree().map { node ->
+            filterAircraftChildren(node, assetAircraftsLower, prefsManager)
         }
         shortcuts = shortcutManager.loadShortcuts()
     }
@@ -369,18 +356,45 @@ fun InternalFilesScreen(
     DisposableEffect(prefsManager) {
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
             groupedFiles = fileManager.getAllFilesGrouped()
-            folderTree = fileManager.getFolderTree().filter { node ->
-                // Use lowercase set for matching to handle imported/lowercased nodes
-                if (assetAircraftsLower.contains(node.name.lowercase())) {
-                    prefsManager.isAircraftVisible(node.name)
-                } else {
-                    true
-                }
+            folderTree = fileManager.getFolderTree().map { node ->
+                filterAircraftChildren(node, assetAircraftsLower, prefsManager)
             }
             shortcuts = shortcutManager.loadShortcuts()
         }
         prefsManager.registerOnChangeListener(listener)
         onDispose { prefsManager.unregisterOnChangeListener(listener) }
+    }
+}
+
+/**
+ * Filtert rekursiv Aircraft-Unterordner basierend auf Sichtbarkeits-Einstellungen.
+ * Top-Level-Ordner werden immer angezeigt. Nur Unterordner innerhalb von "Checklists" werden gefiltert.
+ */
+private fun filterAircraftChildren(
+    node: InternalFileManager.FolderNode,
+    assetAircraftsLower: Set<String>,
+    prefsManager: PreferencesManager
+): InternalFileManager.FolderNode {
+    // Wenn der aktuelle Knoten "Checklists" ist (case-insensitive), filtere seine Kinder
+    return if (node.name.equals("Checklists", ignoreCase = true)) {
+        // Filtere die Kinder: Nur sichtbare Aircraft-Ordner behalten
+        val filteredChildren = node.children.filter { child ->
+            if (assetAircraftsLower.contains(child.name.lowercase())) {
+                prefsManager.isAircraftVisible(child.name)
+            } else {
+                true // Nicht-Aircraft-Ordner immer anzeigen
+            }
+        }.map { child ->
+            // Rekursiv für Unterordner anwenden
+            filterAircraftChildren(child, assetAircraftsLower, prefsManager)
+        }
+        node.copy(children = filteredChildren)
+    } else {
+        // Für alle anderen Top-Level-Ordner: Behalte alle Kinder, aber wende Filterung rekursiv an
+        val filteredChildren = node.children.map { child ->
+            filterAircraftChildren(child, assetAircraftsLower, prefsManager)
+        }
+        node.copy(children = filteredChildren)
     }
 }
 

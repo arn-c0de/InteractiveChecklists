@@ -34,8 +34,11 @@ fun SettingsScreen(
     var showAircraftDialog by remember { mutableStateOf(false) }
     var showResetConfirm by remember { mutableStateOf(false) }
     val assetAircrafts = remember { context.assets.list("Checklists")?.toList() ?: emptyList() }
-    val internalCategories = remember { fileManager.getCategories() }
-    val aircraftList = remember(assetAircrafts, internalCategories) { (assetAircrafts + internalCategories).distinctBy { it.lowercase() } }
+    val internalAircrafts = remember { 
+        fileManager.getFolderTree().find { it.name.equals("checklists", ignoreCase = true) }
+            ?.children?.map { it.name } ?: emptyList()
+    }
+    val aircraftList = remember(assetAircrafts, internalAircrafts) { (assetAircrafts + internalAircrafts).distinctBy { it.lowercase() } }
     val availableAircrafts = remember(aircraftList) { aircraftList }
     
     // State to trigger refresh when visibility changes
@@ -207,8 +210,9 @@ fun SettingsScreen(
             // Aircraft visibility dialog
             item {
                 if (showAircraftDialog) {
+                    val storedVisible = prefsManager.getVisibleAircrafts()
                     var selectedSet by remember(visibilityRefreshKey) { mutableStateOf(
-                        prefsManager.getVisibleAircrafts().let { s -> if (s.isEmpty()) availableAircrafts.toSet() else s.toSet() }
+                        storedVisible?.toSet() ?: availableAircrafts.toSet()
                     ) }
 
                     AlertDialog(
