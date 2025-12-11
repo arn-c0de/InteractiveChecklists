@@ -43,7 +43,7 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
         companion object {
-            const val SOFTWARE_VERSION = "1.0.1"
+            const val SOFTWARE_VERSION = "1.0.2"
         }
 
         val softwareVersion = SOFTWARE_VERSION
