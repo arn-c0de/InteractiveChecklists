@@ -64,6 +64,7 @@ import com.example.checklist_interactive.R
 import com.example.checklist_interactive.data.shortcuts.PageHighlightManager
 import com.example.checklist_interactive.data.shortcuts.ShortcutManager
 import com.example.checklist_interactive.data.shortcuts.LastPageManager
+import com.example.checklist_interactive.data.prefs.InvertColorPrefManager
 import java.io.File
 import kotlin.math.hypot
 import kotlinx.coroutines.Dispatchers
@@ -137,6 +138,7 @@ fun PdfViewer(
     var shortcutName by remember { mutableStateOf("") }
     val pageAspectRatios = remember { mutableStateMapOf<Int, Float>() }
     var pageHighlights by remember { mutableStateOf<List<Int>>(emptyList()) }
+    val invertColorPrefManager = remember { InvertColorPrefManager(context) }
     var invertColors by remember { mutableStateOf(false) }
     var showTocDialog by remember { mutableStateOf(false) }
     var chapters by remember { mutableStateOf<List<Pair<String, Int>>>(emptyList()) }
@@ -189,6 +191,8 @@ fun PdfViewer(
     val pdfRenderMutex = remember { Mutex() }
 
     LaunchedEffect(pdfPath, isInternalFile) {
+        // Load invert state from prefs
+        invertColors = invertColorPrefManager.isInverted(pdfPath)
         isLoading = true
         errorMessage = null
         try {
@@ -446,7 +450,10 @@ fun PdfViewer(
                         }
                     }
                     HintIconButton(
-                        onClick = { invertColors = !invertColors },
+                        onClick = {
+                            invertColors = !invertColors
+                            invertColorPrefManager.setInverted(pdfPath, invertColors)
+                        },
                         hint = "Farben invertieren",
                         onHintChange = { hoveredHint = it },
                         modifier = Modifier.size(40.dp)
