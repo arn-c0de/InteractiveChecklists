@@ -2,6 +2,7 @@ package com.example.checklist_interactive.data.files
 
 import android.content.Context
 import android.net.Uri
+import com.example.checklist_interactive.data.tags.FileTagManager
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -10,10 +11,11 @@ import java.io.InputStream
  * Verwaltet das interne Dateisystem der App.
  * Erstellt Ordnerstruktur und importiert externe Dateien.
  */
+
 class InternalFileManager(private val context: Context) {
 
-
     private val rootDir: File = File(context.filesDir, "documents")
+    internal val tagManager: FileTagManager by lazy { FileTagManager(context) }
 
     init {
         // Erstelle nur Root-Verzeichnis
@@ -23,6 +25,22 @@ class InternalFileManager(private val context: Context) {
         // Lösche alle leeren Ordner beim Start (z.B. alte Dummy-Ordner)
         deleteEmptyFolders(rootDir)
     }
+    
+    /**
+     * Enriches a FileInfo object with tags from the tag manager
+     */
+    fun enrichWithTags(fileInfo: FileInfo): FileInfo {
+        val tags = tagManager.getTagsForFile(fileInfo.path)
+        return fileInfo.copy(tags = tags)
+    }
+    
+    /**
+     * Enriches a list of FileInfo objects with tags
+     */
+    fun enrichWithTags(fileInfos: List<FileInfo>): List<FileInfo> {
+        return fileInfos.map { enrichWithTags(it) }
+    }
+    
 
     /**
      * Löscht rekursiv alle leeren Ordner (ohne PDF/MD/Markdown-Dateien) im angegebenen Verzeichnis
@@ -745,5 +763,6 @@ data class FileInfo(
     val size: Long,
     val lastModified: Long,
     val extension: String,
-    val isAsset: Boolean = false
+    val isAsset: Boolean = false,
+    val tags: Set<String> = emptySet()
 )

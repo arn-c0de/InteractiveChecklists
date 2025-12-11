@@ -1109,7 +1109,7 @@ fun PdfViewer(
                                         .clickable {
                                             showTocDialog = false
                                             coroutineScope.launch {
-                                                listState.animateScrollToItem(pageIndex)
+                                                listState.scrollToItem(pageIndex)
                                             }
                                         }
                                         .background(

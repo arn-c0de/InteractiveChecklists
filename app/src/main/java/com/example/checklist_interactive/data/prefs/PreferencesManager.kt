@@ -19,6 +19,8 @@ class PreferencesManager(context: Context) {
         private const val DEFAULT_MARKDOWN_FONT_SIZE = 18
         private const val KEY_VISIBLE_AIRCRAFTS = "visible_aircrafts"
         private const val KEY_MARKDOWN_SECTIONS_EXPANDED = "markdown_sections_expanded"
+        private const val KEY_ACTIVE_TAG_FILTERS = "active_tag_filters"
+        private const val KEY_TAG_FILTER_MODE = "tag_filter_mode" // "any" or "all"
     }
     
     /**
@@ -166,6 +168,43 @@ class PreferencesManager(context: Context) {
     fun resetVisibleAircrafts() {
         // Remove the stored preference to return to default behavior (all visible)
         prefs.edit().remove(KEY_VISIBLE_AIRCRAFTS).apply()
+    }
+
+    // Tag filtering preferences
+    
+    /**
+     * Sets the currently active tag filters
+     */
+    fun setActiveTagFilters(tags: Set<String>) {
+        prefs.edit().putStringSet(KEY_ACTIVE_TAG_FILTERS, tags).apply()
+    }
+    
+    /**
+     * Gets the currently active tag filters
+     */
+    fun getActiveTagFilters(): Set<String> {
+        return prefs.getStringSet(KEY_ACTIVE_TAG_FILTERS, emptySet())?.toSet() ?: emptySet()
+    }
+    
+    /**
+     * Clears all tag filters
+     */
+    fun clearTagFilters() {
+        prefs.edit().remove(KEY_ACTIVE_TAG_FILTERS).apply()
+    }
+    
+    /**
+     * Sets the tag filter mode: "any" (files with any of the selected tags) or "all" (files with all selected tags)
+     */
+    fun setTagFilterMode(mode: String) {
+        prefs.edit().putString(KEY_TAG_FILTER_MODE, mode).apply()
+    }
+    
+    /**
+     * Gets the tag filter mode (default: "any")
+     */
+    fun getTagFilterMode(): String {
+        return prefs.getString(KEY_TAG_FILTER_MODE, "any") ?: "any"
     }
 
     /**
