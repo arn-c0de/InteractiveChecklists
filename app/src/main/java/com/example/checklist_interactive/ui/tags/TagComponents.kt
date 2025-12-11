@@ -58,7 +58,9 @@ fun FileTagEditorDialog(
                     )
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(bottom = 16.dp)
+                        modifier = Modifier
+                            .padding(bottom = 16.dp)
+                            .height(32.dp) // fixed height to avoid intrinsic measurement on SubcomposeLayout
                     ) {
                         items(selectedTags.sorted()) { tag ->
                             FilterChip(
@@ -227,15 +229,36 @@ fun TagFilterBar(
         
         Spacer(modifier = Modifier.height(8.dp))
         
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(availableTags.sorted().toList()) { tag ->
-                FilterChip(
-                    selected = selectedTags.contains(tag),
-                    onClick = { onTagToggle(tag) },
-                    label = { Text(tag) }
-                )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Display tags in 3 vertical columns so more tags are visible at once.
+        // Important tags are shown first according to preferred order.
+        val preferredOrder = listOf("startup", "start", "navigation", "landing", "combat", "takeoff", "taxi", "preflight", "postflight")
+        val ordered = (preferredOrder + availableTags).map { it.lowercase() }.distinct()
+        val normalizedAvailable = availableTags.map { it.lowercase() }.toSet()
+        val filteredOrdered = ordered.filter { normalizedAvailable.contains(it) }
+
+        val columns = 3
+        val buckets = List(columns) { mutableListOf<String>() }
+        filteredOrdered.forEachIndexed { idx, tag ->
+            buckets[idx % columns].add(tag)
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            buckets.forEach { col ->
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    col.forEach { tag ->
+                        val originalTag = availableTags.firstOrNull { it.equals(tag, ignoreCase = true) } ?: tag
+                        FilterChip(
+                            selected = selectedTags.contains(originalTag),
+                            onClick = { onTagToggle(originalTag) },
+                            label = { Text(originalTag) }
+                        )
+                    }
+                }
             }
         }
     }
@@ -254,7 +277,7 @@ fun TagChips(
     
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = modifier
+        modifier = modifier.height(28.dp) // chips have fixed height, ensure row has fixed height too
     ) {
         val visibleTags = tags.sorted().take(maxVisible)
         items(visibleTags) { tag ->

@@ -70,6 +70,7 @@ fun SettingsScreen(
 
     var showTagJsonDialog by remember { mutableStateOf(false) }
     var tagJsonContent by remember { mutableStateOf("") }
+    var tagReloadKey by remember { mutableStateOf(0) }
 
     // Launcher for folder picker (SAF)
     val folderPicker = rememberLauncherForActivityResult(
@@ -297,6 +298,42 @@ fun SettingsScreen(
                                 Text("View default asset JSON")
                             }
                         }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(onClick = {
+                            // Import and reload tags from asset file_tags.json
+                            try {
+                                // Overwrite internal file_tags.json with asset version
+                                context.assets.open("file_tags.json").use { input ->
+                                    val outFile = java.io.File(context.filesDir, "file_tags.json")
+                                    outFile.outputStream().use { output -> input.copyTo(output) }
+                                }
+                                tagReloadKey++
+                                onFilesRefreshed()
+                                Toast.makeText(context, "Tags imported and reloaded!", Toast.LENGTH_SHORT).show()
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Import failed: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Default.Refresh, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Tags importieren & neu laden")
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        // Tag statistics
+                        val tagStats = remember(tagReloadKey) {
+                            val tags = fileManager.tagManager.loadFileTags()
+                            val uniqueTags = tags.flatMap { it.tags }.toSet()
+                            val filesWithTags = tags.count { it.tags.isNotEmpty() }
+                            Pair(uniqueTags.size, filesWithTags)
+                        }
+                        Text(
+                            text = "Gesamtzahl unterschiedlicher Tags: ${tagStats.first}",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = "Dateien mit mindestens einem Tag: ${tagStats.second}",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
                     }
                 }
             }
