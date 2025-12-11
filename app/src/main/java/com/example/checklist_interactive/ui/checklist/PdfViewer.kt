@@ -42,6 +42,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+
+import kotlinx.coroutines.delay
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
@@ -120,6 +123,8 @@ fun PdfViewer(
     var selectedColor by remember { mutableStateOf(Color.Red) }
     val strokes = remember { mutableStateListOf<AnnotationStroke>() }
     var currentPage by remember { mutableStateOf(effectiveInitialPage) }
+    // Hover / long-press hint text shown for toolbar icons
+    var hoveredHint by remember { mutableStateOf<String?>(null) }
     var pageCount by remember { mutableStateOf(0) }
     var eraseRadius by remember { mutableStateOf(50f) }
     val pageScales = remember { mutableStateMapOf<Int, Float>() }
@@ -413,17 +418,22 @@ fun PdfViewer(
                 modifier = Modifier.height(48.dp),
                 title = { Text("$title (Page ${currentPage + 1}/$pageCount)", style = MaterialTheme.typography.titleSmall) },
                 navigationIcon = {
-                    IconButton(onClick = {
-                        AnnotationsRepository.save(context, pdfPath, strokes.toList())
-                        lastPageManager.saveLastPage(pdfPath, currentPage)
-                        onBack()
-                    }, modifier = Modifier.size(40.dp)) {
+                    HintIconButton(
+                        onClick = {
+                            AnnotationsRepository.save(context, pdfPath, strokes.toList())
+                            lastPageManager.saveLastPage(pdfPath, currentPage)
+                            onBack()
+                        },
+                        hint = context.getString(R.string.back),
+                        onHintChange = { hoveredHint = it },
+                        modifier = Modifier.size(40.dp)
+                    ) {
                         Icon(Icons.Default.ArrowBack, contentDescription = context.getString(R.string.back), modifier = Modifier.size(18.dp))
                     }
                 },
                 actions = {
                     if (onToggleTheme != null) {
-                        IconButton(onClick = onToggleTheme) {
+                        HintIconButton(onClick = onToggleTheme, hint = context.getString(R.string.toggle_dark_mode), onHintChange = { hoveredHint = it }) {
                             Icon(
                                 imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
                                 contentDescription = context.getString(R.string.toggle_dark_mode),
@@ -489,13 +499,15 @@ fun PdfViewer(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            IconButton(
+                            HintIconButton(
                                 onClick = {
                                     annotateMode = !annotateMode
                                     if (annotateMode) {
                                         eraseMode = false
                                     }
                                 },
+                                hint = "Zeichnen",
+                                onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
@@ -506,8 +518,10 @@ fun PdfViewer(
                                 )
                             }
                             // Inhaltsverzeichnis / Kapitel (TOC) - opens a dialog with chapters
-                            IconButton(
+                            HintIconButton(
                                 onClick = { showTocDialog = true },
+                                hint = "Inhaltsverzeichnis",
+                                onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
@@ -516,7 +530,7 @@ fun PdfViewer(
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
-                            IconButton(
+                            HintIconButton(
                                 onClick = {
                                     highlightMode = !highlightMode
                                     if (highlightMode) {
@@ -524,6 +538,8 @@ fun PdfViewer(
                                         eraseMode = false
                                     }
                                 },
+                                hint = "Markieren",
+                                onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
@@ -533,11 +549,13 @@ fun PdfViewer(
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
-                            IconButton(
+                            HintIconButton(
                                 onClick = {
                                     val isHighlighted = highlightManager.togglePageHighlight(pdfPath, currentPage)
                                     pageHighlights = highlightManager.getHighlightsForFile(pdfPath).map { it.pageNumber }
                                 },
+                                hint = "Seite highlighten",
+                                onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
@@ -547,11 +565,13 @@ fun PdfViewer(
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
-                            IconButton(
+                            HintIconButton(
                                 onClick = {
                                     shortcutName = "$title - Seite ${currentPage + 1}"
                                     showShortcutDialog = true
                                 },
+                                hint = "Shortcut erstellen",
+                                onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
@@ -561,7 +581,7 @@ fun PdfViewer(
                                 )
                             }
                             // Text anzeigen Button
-                            IconButton(
+                            HintIconButton(
                                 onClick = {
                                     pdfFile?.let { file ->
                                         coroutineScope.launch(Dispatchers.IO) {
@@ -573,6 +593,8 @@ fun PdfViewer(
                                         }
                                     }
                                 },
+                                hint = "Text anzeigen",
+                                onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
@@ -581,11 +603,13 @@ fun PdfViewer(
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
-                            IconButton(
+                            HintIconButton(
                                 onClick = {
                                     val idx = strokes.indexOfLast { it.page == currentPage }
                                     if (idx >= 0) strokes.removeAt(idx)
                                 },
+                                hint = "Undo",
+                                onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
@@ -594,10 +618,12 @@ fun PdfViewer(
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
-                            IconButton(
+                            HintIconButton(
                                 onClick = {
                                     strokes.removeAll { it.page == currentPage }
                                 },
+                                hint = "Alle Anmerkungen löschen",
+                                onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
@@ -606,10 +632,12 @@ fun PdfViewer(
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
-                            IconButton(
+                            HintIconButton(
                                 onClick = {
                                     AnnotationsRepository.save(context, pdfPath, strokes.toList())
                                 },
+                                hint = "Speichern",
+                                onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
@@ -626,7 +654,7 @@ fun PdfViewer(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            IconButton(
+                            HintIconButton(
                                 onClick = {
                                     val cur = pageScales[currentPage] ?: 1f
                                     if (cur > 0.5f) {
@@ -635,6 +663,8 @@ fun PdfViewer(
                                         pageOffsetsY[currentPage] = 0f
                                     }
                                 },
+                                hint = "Verkleinern",
+                                onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
@@ -649,13 +679,15 @@ fun PdfViewer(
                                 modifier = Modifier.width(45.dp),
                                 textAlign = TextAlign.Center
                             )
-                            IconButton(
+                            HintIconButton(
                                 onClick = {
                                     val cur = pageScales[currentPage] ?: 1f
                                     if (cur < 3f) {
                                         pageScales[currentPage] = (cur + 0.5f).coerceAtMost(3f)
                                     }
                                 },
+                                hint = "Vergrößern",
+                                onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
@@ -665,7 +697,7 @@ fun PdfViewer(
                                 )
                             }
                             Spacer(modifier = Modifier.width(8.dp))
-                            IconButton(
+                            HintIconButton(
                                 onClick = {
                                     eraseMode = !eraseMode
                                     if (eraseMode) {
@@ -673,6 +705,8 @@ fun PdfViewer(
                                         highlightMode = false
                                     }
                                 },
+                                hint = "Radierer",
+                                onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
@@ -692,6 +726,15 @@ fun PdfViewer(
                                 fontWeight = FontWeight.Bold
                             )
                         }
+                    }
+
+                    // Hover / Long-press hint anzeigen
+                    hoveredHint?.let { hintText ->
+                        Text(
+                            text = hintText,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(start = 8.dp, top = 4.dp)
+                        )
                     }
 
                     // Farb- und Strichbreiten-Kontrolle: nur anzeigen wenn Zeichnen aktiv ist
@@ -718,13 +761,15 @@ fun PdfViewer(
                         }
                         Spacer(modifier = Modifier.width(4.dp))
                         // Radierer-Button hier bei den Farben
-                        IconButton(
+                        HintIconButton(
                             onClick = {
                                 eraseMode = !eraseMode
                                 if (eraseMode) {
                                     highlightMode = false
                                 }
                             },
+                            hint = "Radierer",
+                            onHintChange = { hoveredHint = it },
                             modifier = Modifier.size(36.dp)
                         ) {
                             Icon(
@@ -1116,6 +1161,49 @@ fun PdfViewer(
                     }
                 }
             )
+        }
+    }
+}
+
+@Composable
+private fun HintIconButton(
+    onClick: () -> Unit,
+    hint: String,
+    onHintChange: (String?) -> Unit,
+    modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
+    content: @Composable () -> Unit
+) {
+    val coroutineScope = rememberCoroutineScope()
+
+    Box(
+        modifier = modifier
+            .pointerInput(hint) {
+                val wasLongPressRef = booleanArrayOf(false)
+                detectTapGestures(
+                    onPress = {
+                        wasLongPressRef[0] = false
+                        onHintChange(hint)
+                        try {
+                            awaitRelease()
+                        } finally {
+                            if (!wasLongPressRef[0]) onHintChange(null)
+                        }
+                    },
+                    onLongPress = {
+                        wasLongPressRef[0] = true
+                        onHintChange(hint)
+                        onLongClick?.invoke()
+                        coroutineScope.launch {
+                            delay(1500L)
+                            onHintChange(null)
+                        }
+                    }
+                )
+            }
+    ) {
+        IconButton(onClick = onClick) {
+            content()
         }
     }
 }
