@@ -123,85 +123,75 @@ fun MarkdownViewer(
 }
 
 /**
+ * Datenklasse für eine Markdown-Sektion mit ### Überschrift
+ */
+private data class MarkdownSection(
+    val heading: String,
+    val content: List<String>
+)
+
+/**
  * Einfache Markdown-Ansicht - rendert grundlegendes Markdown
+ * Gruppiert Inhalte zwischen ### Überschriften in Containern
  */
 @Composable
 private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int) {
     val scrollState = rememberScrollState()
-    
+
+    // Parse Markdown in Sektionen
+    val sections = parseMarkdownSections(markdownContent)
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(scrollState)
             .padding(16.dp)
     ) {
-        // Zeile für Zeile durchgehen und rendern
-        markdownContent.lines().forEach { line ->
+        sections.forEach { section ->
             when {
-                line.startsWith("# ") -> {
-                    Text(
-                        text = line.substring(2),
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
+                // Hauptüberschrift (# oder ##) - nicht in Card
+                section.heading.startsWith("# ") || section.heading.startsWith("## ") -> {
+                    // Render Überschrift
+                    RenderMarkdownLine(section.heading, bodyFontSize)
+
+                    // Render Inhalt
+                    section.content.forEach { line ->
+                        RenderMarkdownLine(line, bodyFontSize)
+                    }
                 }
-                line.startsWith("## ") -> {
-                    Text(
-                        text = line.substring(3),
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(vertical = 6.dp)
-                    )
-                }
-                line.startsWith("### ") -> {
-                    Text(
-                        text = line.substring(4),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    )
-                }
-                line.trim().startsWith("- [ ]") || line.trim().startsWith("- [x]") || line.trim().startsWith("- [X]") -> {
-                    // Checkbox-Item
-                    val isChecked = line.trim().startsWith("- [x]") || line.trim().startsWith("- [X]")
-                    val text = line.trim().substring(5).trim()
-                    Row(
-                        modifier = Modifier.padding(vertical = 2.dp),
-                        horizontalArrangement = Arrangement.Start
+                // ### Überschrift - in Card gruppieren
+                section.heading.startsWith("### ") -> {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                        )
                     ) {
-                        Checkbox(
-                            checked = isChecked,
-                            onCheckedChange = null, // Read-only in simple view
-                            enabled = false
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = text,
-                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
-                            modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
-                        )
+                        Column(
+                            modifier = Modifier.padding(12.dp)
+                        ) {
+                            // Render ### Überschrift
+                            Text(
+                                text = section.heading.substring(4),
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+
+                            // Render Inhalt der Sektion
+                            section.content.forEach { line ->
+                                RenderMarkdownLine(line, bodyFontSize)
+                            }
+                        }
                     }
                 }
-                line.trim().startsWith("- ") -> {
-                    // Normaler Listeneintrag
-                    Row(modifier = Modifier.padding(vertical = 2.dp)) {
-                        Text("• ", style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp))
-                        Text(
-                            text = line.trim().substring(2),
-                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp)
-                        )
-                    }
-                }
-                line.isNotBlank() -> {
-                    Text(
-                        text = line,
-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
-                        modifier = Modifier.padding(vertical = 2.dp)
-                    )
-                }
+                // Inhalt ohne Überschrift
                 else -> {
-                    Spacer(modifier = Modifier.height(8.dp))
+                    section.content.forEach { line ->
+                        RenderMarkdownLine(line, bodyFontSize)
+                    }
                 }
             }
         }
@@ -209,8 +199,125 @@ private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int) {
 }
 
 /**
+ * Rendert eine einzelne Markdown-Zeile
+ */
+@Composable
+private fun RenderMarkdownLine(line: String, bodyFontSize: Int) {
+    when {
+        line.startsWith("# ") -> {
+            Text(
+                text = line.substring(2),
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+        }
+        line.startsWith("## ") -> {
+            Text(
+                text = line.substring(3),
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(vertical = 6.dp)
+            )
+        }
+        line.startsWith("### ") -> {
+            Text(
+                text = line.substring(4),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+        }
+        line.trim().startsWith("- [ ]") || line.trim().startsWith("- [x]") || line.trim().startsWith("- [X]") -> {
+            // Checkbox-Item
+            val isChecked = line.trim().startsWith("- [x]") || line.trim().startsWith("- [X]")
+            val text = line.trim().substring(5).trim()
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.padding(vertical = 2.dp),
+                    horizontalArrangement = Arrangement.Start
+                ) {
+                    Checkbox(
+                        checked = isChecked,
+                        onCheckedChange = null, // Read-only in simple view
+                        enabled = false
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
+                        modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
+                    )
+                }
+                HorizontalDivider(
+                    modifier = Modifier.padding(start = 8.dp, end = 8.dp),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                )
+            }
+        }
+        line.trim().startsWith("- ") -> {
+            // Normaler Listeneintrag
+            Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                Text("• ", style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp))
+                Text(
+                    text = line.trim().substring(2),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp)
+                )
+            }
+        }
+        line.isNotBlank() -> {
+            Text(
+                text = line,
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
+                modifier = Modifier.padding(vertical = 2.dp)
+            )
+        }
+        else -> {
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+    }
+}
+
+/**
+ * Parst Markdown-Inhalt in Sektionen basierend auf Überschriften
+ */
+private fun parseMarkdownSections(markdownContent: String): List<MarkdownSection> {
+    val lines = markdownContent.lines()
+    val sections = mutableListOf<MarkdownSection>()
+    var currentHeading = ""
+    var currentContent = mutableListOf<String>()
+
+    lines.forEach { line ->
+        when {
+            // Neue Überschrift gefunden
+            line.startsWith("# ") || line.startsWith("## ") || line.startsWith("### ") -> {
+                // Speichere vorherige Sektion wenn vorhanden
+                if (currentHeading.isNotEmpty() || currentContent.isNotEmpty()) {
+                    sections.add(MarkdownSection(currentHeading, currentContent.toList()))
+                }
+                // Starte neue Sektion
+                currentHeading = line
+                currentContent = mutableListOf()
+            }
+            // Normaler Inhalt
+            else -> {
+                currentContent.add(line)
+            }
+        }
+    }
+
+    // Füge letzte Sektion hinzu
+    if (currentHeading.isNotEmpty() || currentContent.isNotEmpty()) {
+        sections.add(MarkdownSection(currentHeading, currentContent.toList()))
+    }
+
+    return sections
+}
+
+/**
  * Interaktive Markdown-Ansicht mit Checkbox-Unterstützung
  * Zeigt Checkboxen basierend auf dem Checklist-Status an
+ * Gruppiert ### Sektionen in Containern
  */
 @Composable
 private fun InteractiveMarkdownView(
@@ -220,7 +327,7 @@ private fun InteractiveMarkdownView(
     , bodyFontSize: Int
 ) {
     val scrollState = rememberScrollState()
-    
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -237,25 +344,71 @@ private fun InteractiveMarkdownView(
             )
         }
 
-        // Sections mit Checkboxen und Überschriften
+        // Sections mit Checkboxen und Überschriften - gruppiert in Cards
         checklist.sections.forEach { section ->
-            // Section-Überschrift
+            // Section-Überschrift (## level) - ohne Card
             if (section.title.isNotEmpty() && section.title != checklist.title) {
-                Text(
-                    text = section.title,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
-                )
-            }
+                // Prüfe ob es eine ### Überschrift ist (Sub-Section)
+                val isSubSection = section.title.length > 3 && !section.title.contains("Case") && !section.title.contains("Recovery")
 
-            // Checkbox-Items in dieser Section
+                if (isSubSection) {
+                    // ### Überschrift - in Card gruppieren
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp)
+                        ) {
+                            // Section-Überschrift
+                            Text(
+                                text = section.title,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+
+                            // Checkbox-Items in dieser Section
+                            section.items.forEach { item ->
+                                ChecklistItemRow(
+                                    item = item,
+                                    onCheckboxChange = onCheckboxChange,
+                                    bodyFontSize = bodyFontSize
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    // ## Überschrift - ohne Card
+                    Text(
+                        text = section.title,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                    )
+
+                    // Checkbox-Items in dieser Section
+                    section.items.forEach { item ->
+                        ChecklistItemRow(
+                            item = item,
+                            onCheckboxChange = onCheckboxChange,
+                            bodyFontSize = bodyFontSize
+                        )
+                    }
+                }
+            } else {
+                // Keine Überschrift oder Haupttitel
                 section.items.forEach { item ->
                     ChecklistItemRow(
                         item = item,
                         onCheckboxChange = onCheckboxChange,
                         bodyFontSize = bodyFontSize
                     )
+                }
             }
         }
     }
@@ -270,23 +423,29 @@ private fun ChecklistItemRow(
     onCheckboxChange: (itemId: String, checked: Boolean) -> Unit
     , bodyFontSize: Int
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.Start
-    ) {
-        Checkbox(
-            checked = item.isChecked,
-            onCheckedChange = { isChecked ->
-                onCheckboxChange(item.id, isChecked)
-            }
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = item.text,
-            style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
-            modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.Start
+        ) {
+            Checkbox(
+                checked = item.isChecked,
+                onCheckedChange = { isChecked ->
+                    onCheckboxChange(item.id, isChecked)
+                }
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = item.text,
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
+                modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
+            )
+        }
+        HorizontalDivider(
+            modifier = Modifier.padding(start = 8.dp, end = 8.dp),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
         )
     }
 }

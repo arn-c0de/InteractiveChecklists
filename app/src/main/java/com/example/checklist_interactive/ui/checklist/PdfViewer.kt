@@ -126,12 +126,10 @@ fun PdfViewer(
         object : LruCache<Int, Bitmap>(cacheSizeKb) {
             override fun sizeOf(key: Int, value: Bitmap): Int = value.byteCount / 1024
             override fun entryRemoved(evicted: Boolean, key: Int?, oldValue: Bitmap?, newValue: Bitmap?) {
-                // When evicted from cache, also clear the page state
+                // Don't clear the page state immediately - let it be cleared only when we explicitly re-render
+                // This prevents flickering during scroll when cache evicts items
                 key?.let { k ->
-                    coroutineScope.launch(Dispatchers.Main) {
-                        getPageBitmapState(k).value = null
-                        cacheKeys.remove(k)
-                    }
+                    cacheKeys.remove(k)
                 }
                 // Never recycle bitmaps - let GC handle cleanup
             }
@@ -631,7 +629,12 @@ fun PdfViewer(
                         if (curScale != 1f) {
                             // Show only the current page when zoomed — prevents other pages from showing partially.
                             val pageIndex = currentPage
-                            val bitmap = getPageBitmapState(pageIndex).value ?: bitmapCache.get(pageIndex)
+                            val pageBitmapState = getPageBitmapState(pageIndex)
+                            val bitmap = remember(pageIndex, pageBitmapState.value) {
+                                pageBitmapState.value ?: bitmapCache.get(pageIndex)?.also {
+                                    pageBitmapState.value = it
+                                }
+                            }
                             val pageStrokes = remember(strokes.size, pageIndex) { strokes.filter { it.page == pageIndex } }
                             
                             if (bitmap != null) {
@@ -723,9 +726,16 @@ fun PdfViewer(
                                     contentType = { "pdf_page" }
                                 ) { pageIndex ->
                                     // Use individual page state to avoid global recomposition
-                                    val pageBitmap by getPageBitmapState(pageIndex)
-                                    val cachedBitmap = remember(pageIndex) { bitmapCache.get(pageIndex) }
-                                    val bitmap = pageBitmap ?: cachedBitmap
+                                    val pageBitmapState = getPageBitmapState(pageIndex)
+                                    val pageBitmap by pageBitmapState
+
+                                    // Get bitmap from state first, then from cache if state is null
+                                    val bitmap = remember(pageIndex, pageBitmap) {
+                                        pageBitmap ?: bitmapCache.get(pageIndex)?.also {
+                                            // If we found it in cache but not in state, update state to prevent future lookups
+                                            pageBitmapState.value = it
+                                        }
+                                    }
 
                                     val pageScale by remember(pageIndex) {
                                         derivedStateOf { pageScales[pageIndex] ?: 1f }
