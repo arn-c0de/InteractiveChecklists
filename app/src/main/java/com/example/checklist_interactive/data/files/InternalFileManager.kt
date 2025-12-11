@@ -12,37 +12,49 @@ import java.io.InputStream
  */
 class InternalFileManager(private val context: Context) {
 
-    companion object {
-        // Vordefinierte Kategorien
-        val DEFAULT_CATEGORIES = listOf(
-            "checklists",
-            "comms",
-            "charts",
-            "procedures",
-            "manuals"
-        )
-    }
 
     private val rootDir: File = File(context.filesDir, "documents")
 
     init {
-        // Erstelle Root-Verzeichnis und Standardkategorien
-        ensureDirectoryStructure()
+        // Erstelle nur Root-Verzeichnis
+        if (!rootDir.exists()) {
+            rootDir.mkdirs()
+        }
+        // Lösche alle leeren Ordner beim Start (z.B. alte Dummy-Ordner)
+        deleteEmptyFolders(rootDir)
     }
 
     /**
-     * Stellt sicher, dass die Ordnerstruktur existiert
+     * Löscht rekursiv alle leeren Ordner (ohne PDF/MD/Markdown-Dateien) im angegebenen Verzeichnis
+     */
+    private fun deleteEmptyFolders(dir: File) {
+        dir.listFiles()?.forEach { file ->
+            if (file.isDirectory) {
+                deleteEmptyFolders(file)
+                val hasSupportedFiles = file.listFiles()?.any {
+                    it.isFile && (it.extension.equals("pdf", true) || it.extension.equals("md", true) || it.extension.equals("markdown", true))
+                } == true
+                val hasSubDirs = file.listFiles()?.any { it.isDirectory } == true
+                if (!hasSupportedFiles && !hasSubDirs) {
+                    file.delete()
+                }
+            }
+        }
+    }
+
+    /**
+     * Liefert den internen Root-Pfad als String
+     */
+    fun getInternalRootPath(): String {
+        return rootDir.absolutePath
+    }
+
+    /**
+     * Stellt sicher, dass das Root-Verzeichnis existiert
      */
     private fun ensureDirectoryStructure() {
         if (!rootDir.exists()) {
             rootDir.mkdirs()
-        }
-
-        DEFAULT_CATEGORIES.forEach { category ->
-            val categoryDir = File(rootDir, category)
-            if (!categoryDir.exists()) {
-                categoryDir.mkdirs()
-            }
         }
     }
 
@@ -52,10 +64,27 @@ class InternalFileManager(private val context: Context) {
     fun getCategories(): List<String> {
         ensureDirectoryStructure()
         return rootDir.listFiles()
-            ?.filter { it.isDirectory }
+            ?.filter { dir ->
+                dir.isDirectory && hasFilesRecursive(dir)
+            }
             ?.map { it.name }
             ?.sorted()
-            ?: DEFAULT_CATEGORIES
+            ?: emptyList()
+    }
+
+    /**
+     * Prüft rekursiv, ob ein Ordner oder seine Unterordner unterstützte Dateien enthalten
+     */
+    private fun hasFilesRecursive(dir: File): Boolean {
+        dir.listFiles()?.forEach { file ->
+            if (file.isFile && (file.extension.equals("pdf", true) || file.extension.equals("md", true) || file.extension.equals("markdown", true))) {
+                return true
+            }
+            if (file.isDirectory && hasFilesRecursive(file)) {
+                return true
+            }
+        }
+        return false
     }
 
     /**
@@ -74,10 +103,6 @@ class InternalFileManager(private val context: Context) {
      * Löscht eine Kategorie und alle darin enthaltenen Dateien
      */
     fun deleteCategory(categoryName: String): Boolean {
-        if (DEFAULT_CATEGORIES.contains(categoryName)) {
-            // Schütze Standard-Kategorien
-            return false
-        }
         val categoryDir = File(rootDir, categoryName)
         return categoryDir.deleteRecursively()
     }
@@ -90,22 +115,27 @@ class InternalFileManager(private val context: Context) {
         if (!categoryDir.exists() || !categoryDir.isDirectory) {
             return emptyList()
         }
-
-        return categoryDir.listFiles()
-            ?.filter { it.isFile && (it.extension == "pdf" || it.extension == "md" || it.extension == "markdown") }
-            ?.map { file ->
-                FileInfo(
-                    name = file.name,
-                    displayName = file.nameWithoutExtension,
-                    path = file.absolutePath,
-                    category = category,
-                    size = file.length(),
-                    lastModified = file.lastModified(),
-                    extension = file.extension
-                )
+        // Walk recursively to include files inside nested subfolders
+        val results = mutableListOf<FileInfo>()
+        categoryDir.walkTopDown().forEach { file ->
+            if (file.isFile) {
+                val ext = file.extension
+                if (ext == "pdf" || ext == "md" || ext == "markdown") {
+                    results.add(
+                        FileInfo(
+                            name = file.name,
+                            displayName = file.nameWithoutExtension,
+                            path = file.absolutePath,
+                            category = category,
+                            size = file.length(),
+                            lastModified = file.lastModified(),
+                            extension = file.extension
+                        )
+                    )
+                }
             }
-            ?.sortedBy { it.displayName.lowercase() }
-            ?: emptyList()
+        }
+        return results.sortedBy { it.displayName.lowercase() }
     }
 
     /**
@@ -115,6 +145,71 @@ class InternalFileManager(private val context: Context) {
         return getCategories().associateWith { category ->
             getFilesInCategory(category)
         }.filterValues { it.isNotEmpty() }
+    }
+
+    /**
+     * Liefert alle Kategorie-Pfade inklusive verschachtelter Pfade (relative Pfade unter rootDir)
+     */
+    fun getAllCategoryPaths(): List<String> {
+        val nodes = getFolderTree()
+        val result = mutableListOf<String>()
+        fun collect(node: FolderNode) {
+            result.add(node.relativePath)
+            node.children.forEach { collect(it) }
+        }
+        nodes.forEach { collect(it) }
+        return result
+    }
+
+    /**
+     * Repräsentiert einen Ordner- / Kategorie-Knoten mit verschachtelten Unterordnern und Dateien
+     */
+    data class FolderNode(
+        val name: String,
+        val relativePath: String, // relative to rootDir, e.g., "checklists" or "checklists/F-16_Viper"
+        val children: List<FolderNode> = emptyList(),
+        val files: List<FileInfo> = emptyList()
+    )
+
+    /**
+     * Liefert die rekursive Ordnerstruktur des internen Root-Verzeichnisses
+     */
+    fun getFolderTree(): List<FolderNode> {
+        ensureDirectoryStructure()
+        return rootDir.listFiles()
+            ?.filter { it.isDirectory }
+            ?.map { buildFolderNode(it, it.relativeTo(rootDir).path.replace('\\', '/')) }
+            ?: emptyList()
+    }
+
+    private fun buildFolderNode(dir: File, relativePath: String): FolderNode {
+        val children = dir.listFiles()
+            ?.filter { it.isDirectory }
+            ?.map { buildFolderNode(it, File(relativePath, it.name).path.replace('\\', '/')) }
+            ?: emptyList()
+
+        val files = dir.listFiles()
+            ?.filter { it.isFile && (it.extension == "pdf" || it.extension == "md" || it.extension == "markdown") }
+            ?.map { file ->
+                FileInfo(
+                    name = file.name,
+                    displayName = file.nameWithoutExtension,
+                    path = file.absolutePath,
+                    category = relativePath.replace('\\', '/'),
+                    size = file.length(),
+                    lastModified = file.lastModified(),
+                    extension = file.extension
+                )
+            }
+            ?.sortedBy { it.displayName.lowercase() }
+            ?: emptyList()
+
+        return FolderNode(
+            name = dir.name,
+            relativePath = relativePath,
+            children = children,
+            files = files
+        )
     }
 
     /**
@@ -324,12 +419,13 @@ class InternalFileManager(private val context: Context) {
 
     /**
      * Kopiert rekursiv alle unterstützten Checklists (pdf/md) aus den App-Assets ins interne Root-Verzeichnis.
+     * Behält die komplette Ordnerstruktur bei.
      * Returns number of imported files.
      */
-    fun importAllBundledAssets(rootAssetPath: String = "checklists"): Int {
+    fun importAllBundledAssets(rootAssetPath: String = ""): Int {
         var imported = 0
         try {
-            fun walker(path: String) {
+            fun walker(path: String, relativePath: String) {
                 val list = try {
                     context.assets.list(path) ?: emptyArray()
                 } catch (e: Exception) {
@@ -341,21 +437,37 @@ class InternalFileManager(private val context: Context) {
                     // Check if it's a directory by trying to list children
                     val sub = try { context.assets.list(childPath) ?: emptyArray() } catch (e: Exception) { emptyArray() }
                     if (sub.isNotEmpty()) {
-                        walker(childPath)
+                        // It's a directory - recurse
+                        val nextRel = if (relativePath.isEmpty()) child.lowercase() else "$relativePath/${child.lowercase()}"
+                        walker(childPath, nextRel)
                     } else {
-                        // only copy pdf/md/markdown
+                        // It's a file - check if it's a supported type
                         if (child.lowercase().endsWith(".pdf") || child.lowercase().endsWith(".md") || child.lowercase().endsWith(".markdown")) {
-                            // decide category: use top-level folder (e.g., "checklists") or folder that directly contains the file
-                            val segments = childPath.split('/')
-                            val category = if (segments.size > 1) segments[segments.size - 2] else rootAssetPath
-                            val assetRelative = childPath
-                            val res = importAssetFile(assetRelative, category)
-                            if (res.isSuccess) imported++
+                            try {
+                                // Create destination directory with full path structure
+                                val destDir = if (relativePath.isEmpty()) rootDir else File(rootDir, relativePath)
+                                if (!destDir.exists()) {
+                                    destDir.mkdirs()
+                                }
+                                
+                                val destFile = File(destDir, child)
+                                if (!destFile.exists()) {
+                                    // Copy from assets to internal storage
+                                    context.assets.open(childPath).use { input ->
+                                        java.io.FileOutputStream(destFile).use { output ->
+                                            input.copyTo(output)
+                                        }
+                                    }
+                                    imported++
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
                         }
                     }
                 }
             }
-            walker(rootAssetPath)
+            walker(rootAssetPath, "")
         } catch (e: Exception) {
             // ignore, return count
         }
@@ -414,33 +526,34 @@ class InternalFileManager(private val context: Context) {
     private fun importFromFolder(folder: File): Int {
         var imported = 0
         try {
-            folder.listFiles()?.forEach { categoryFolder ->
-                if (categoryFolder.isDirectory) {
-                    val categoryName = categoryFolder.name.lowercase()
-                    
-                    // Erstelle Kategorie falls noch nicht vorhanden
-                    createCategory(categoryName)
-                    
-                    // Importiere alle Dateien in dieser Kategorie
-                    categoryFolder.listFiles()?.forEach { file ->
-                        if (file.isFile) {
-                            val extension = file.extension.lowercase()
-                            if (extension in listOf("pdf", "md", "markdown")) {
-                                // Prüfe ob Datei schon existiert
-                                val destFile = File(File(rootDir, categoryName), file.name)
-                                if (!destFile.exists()) {
-                                    try {
-                                        file.copyTo(destFile, overwrite = false)
-                                        imported++
-                                    } catch (e: Exception) {
-                                        e.printStackTrace()
-                                    }
+            fun walker(currentFolder: File, relativePath: String) {
+                currentFolder.listFiles()?.forEach { child ->
+                    if (child.isDirectory) {
+                        val nextRel = if (relativePath.isEmpty()) child.name.lowercase() else "$relativePath/${child.name.lowercase()}"
+                        walker(child, nextRel)
+                    } else if (child.isFile) {
+                        val ext = child.extension.lowercase()
+                        if (ext in listOf("pdf", "md", "markdown")) {
+                            try {
+                                // Zielverzeichnis in INTERNAL rootDir anlegen: rootDir/<relativePath>
+                                val destDir = if (relativePath.isEmpty()) rootDir else File(rootDir, relativePath)
+                                if (!destDir.exists()) {
+                                    destDir.mkdirs()
                                 }
+
+                                val destFile = File(destDir, child.name)
+                                if (!destFile.exists()) {
+                                    child.copyTo(destFile, overwrite = false)
+                                    imported++
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
                             }
                         }
                     }
                 }
             }
+            walker(folder, "")
         } catch (e: Exception) {
             e.printStackTrace()
         }

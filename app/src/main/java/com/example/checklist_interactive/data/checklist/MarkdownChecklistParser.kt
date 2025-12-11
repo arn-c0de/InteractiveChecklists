@@ -1,133 +1,177 @@
 package com.example.checklist_interactive.data.checklist
 
-import org.commonmark.Extension
 import org.commonmark.ext.task.list.items.TaskListItemsExtension
 import org.commonmark.node.*
 import org.commonmark.parser.Parser
+import org.commonmark.ext.task.list.items.TaskListItemMarker
 
 class MarkdownChecklistParser {
-    private val extensions: List<Extension> = listOf(TaskListItemsExtension.create())
-    private val parser: Parser = Parser.builder().extensions(extensions).build()
+
+    private val parser: Parser = Parser.builder()
+        .extensions(listOf(TaskListItemsExtension.create()))
+        .build()
 
     fun parse(id: String, markdown: String): Checklist {
-        val document = parser.parse(markdown)
+        val document = parser.parse(markdown.trim())
+
+        var checklistTitle = findMainTitle(document)
         val sections = mutableListOf<ChecklistSection>()
         var currentSectionTitle = ""
-        var itemIndex = 0
+        var currentItems = mutableListOf<ChecklistItem>()
+        var itemCounter = 0
 
-        // We'll traverse the top-level nodes in document
-        var node: Node? = document.firstChild
-        while (node != null) {
-            when (node) {
-                is Heading -> {
-                    currentSectionTitle = collectText(node)
-                    sections.add(ChecklistSection(currentSectionTitle, mutableListOf()))
-                }
-                is ListBlock -> {
-                    // Iterate list items in this list block
-                    var itemNode: Node? = node.firstChild
-                    while (itemNode != null) {
-                        if (itemNode is ListItem) {
-                            val text = collectText(itemNode).trim()
-                            val isTaskItem = hasTaskItem(itemNode)
-                            val (cleanText, checkedFlag) = if (isTaskItem) extractTaskMarker(text) else Pair(text, false)
-                            val itemId = "$id-$itemIndex"
-                            val checklistItem = ChecklistItem(itemId, cleanText, 0, checkedFlag)
-                            appendItemToLastSection(sections, checklistItem)
-                            itemIndex++
-                        }
-                        itemNode = itemNode.next
-                    }
-                }
-                is Paragraph -> {
-                    // Plain paragraph; turn into a section heading if there hasn't been a heading
-                    if (sections.isEmpty()) {
-                        currentSectionTitle = collectText(node)
-                        sections.add(ChecklistSection(currentSectionTitle, mutableListOf()))
-                    }
-                }
+        // Default section if we start directly with items
+        fun ensureSection() {
+            if (currentSectionTitle.isEmpty()) {
+                currentSectionTitle = checklistTitle.ifEmpty { "General" }
             }
-            node = node.next
         }
 
-        // Ensure at least one section
-        if (sections.isEmpty()) {
-            sections.add(ChecklistSection("Checklist", emptyList()))
-        }
-
-        // Convert mutables to immutables
-        val fixedSections = sections.map { s -> s.copy(items = s.items.toList()) }
-        val title = if (fixedSections.isNotEmpty()) fixedSections.first().title else "Checklist"
-        return Checklist(id, title, fixedSections)
-    }
-
-    private fun appendItemToLastSection(sections: MutableList<ChecklistSection>, item: ChecklistItem) {
-        if (sections.isEmpty()) {
-            sections.add(ChecklistSection("Checklist", mutableListOf(item)))
-        } else {
-            val last = sections.last()
-            val updated = ChecklistSection(last.title, (last.items.toMutableList().apply { add(item) }))
-            sections[sections.size - 1] = updated
-        }
-    }
-
-    private fun collectText(node: Node): String {
-        val sb = StringBuilder()
-        node.accept(object : AbstractVisitor() {
-            override fun visit(text: Text) {
-                sb.append(text.literal)
-            }
-
-            override fun visit(softLineBreak: SoftLineBreak) {
-                sb.append(" ")
-            }
-
-            override fun visit(hardLineBreak: HardLineBreak) {
-                sb.append(" ")
-            }
-
-            override fun visit(code: Code) {
-                sb.append(code.literal)
-            }
+        document.accept(object : AbstractVisitor() {
 
             override fun visit(heading: Heading) {
-                visitChildren(heading)
-            }
+                // Finish previous section
+                if (currentItems.isNotEmpty()) {
+                    sections.add(ChecklistSection(currentSectionTitle, currentItems.toList()))
+                    currentItems.clear()
+                }
 
-            override fun visit(paragraph: Paragraph) {
-                visitChildren(paragraph)
+                val title = heading.collectText()
+                if (heading.level == 1 && checklistTitle.isEmpty()) {
+                    checklistTitle = title
+                }
+
+                // Only create a section for H2+ (or H1 if not used as global title)
+                if (heading.level >= 2 || (heading.level == 1 && sections.isNotEmpty())) {
+                    currentSectionTitle = title
+                }
             }
 
             override fun visit(listItem: ListItem) {
-                visitChildren(listItem)
+                ensureSection()
+
+                val (text, checked) = extractTaskItemTextAndState(listItem)
+
+                if (text.isNotBlank()) {
+                    val itemId = "$id-${itemCounter++}"
+                    currentItems.add(ChecklistItem(itemId, text, 0, checked))
+                }
+
+                // Continue traversal
+                super.visit(listItem)
             }
         })
-        return sb.toString()
+
+        // Add remaining items
+        if (currentItems.isNotEmpty()) {
+            sections.add(ChecklistSection(currentSectionTitle.ifEmpty { checklistTitle.ifEmpty { "General" } }, currentItems))
+        }
+
+        // Fallback: if nothing was parsed, try line-by-line regex
+        if (sections.isEmpty() || sections.all { it.items.isEmpty() }) {
+            val fallback = parseWithSimpleRegex(id, markdown, checklistTitle)
+            if (fallback.sections.isNotEmpty()) return fallback
+        }
+
+        // Ensure at least one section exists
+        if (sections.isEmpty()) {
+            val title = checklistTitle.ifEmpty { "Checklist" }
+            sections.add(ChecklistSection(title, emptyList()))
+        }
+
+        if (checklistTitle.isEmpty()) {
+            checklistTitle = sections.firstOrNull()?.title ?: "Checklist"
+        }
+
+        return Checklist(id, checklistTitle, sections)
     }
 
-    private fun hasTaskItem(node: ListItem): Boolean {
-        // CommonMark task list has a first child that is a Paragraph. The TaskListItems extension wraps it.
-        // The extension doesn't add a dedicated node type but adds a TaskListItemMarker to the list item.
-        var child = node.firstChild
-        while (child != null) {
-            if (child is Paragraph) {
-                // Inspect literal children for a '[ ]' or '[x]' prefix
-                val text = collectText(child)
-                if (text.startsWith("[ ]") || text.startsWith("[x]") || text.startsWith("[X]")) {
-                    return true
+    private fun findMainTitle(node: Node): String {
+        val visitor = object : AbstractVisitor() {
+            var title = ""
+            override fun visit(heading: Heading) {
+                if (heading.level == 1 && title.isEmpty()) {
+                    title = heading.collectText()
                 }
             }
-            child = child.next
         }
-        return false
+        node.accept(visitor)
+        return visitor.title
     }
 
-    private fun extractTaskMarker(text: String): Pair<String, Boolean> {
-        val trimmed = text.trimStart()
-        return when {
-            trimmed.startsWith("[x]", true) || trimmed.startsWith("[X]") -> Pair(trimmed.drop(3).trimStart(), true)
-            trimmed.startsWith("[ ]") -> Pair(trimmed.drop(3).trimStart(), false)
-            else -> Pair(text, false)
+    private fun extractTaskItemTextAndState(listItem: ListItem): Pair<String, Boolean> {
+        // 1. Preferred: TaskListItemMarker from the extension
+        val marker = listItem.findDescendant<TaskListItemMarker>()
+        if (marker != null) {
+            val textNode = marker.next
+            val text = textNode?.collectText() ?: ""
+            return text.trim() to marker.isChecked
+        }
+
+        // 2. Fallback: look for checkbox in the first paragraph's text
+        val firstParagraph = listItem.firstChild as? Paragraph
+        val rawText = firstParagraph?.collectText() ?: listItem.collectText()
+
+        val regex = Regex("""^\s*\[([ xX])\]\s*(.*)""")
+        val match = regex.find(rawText)
+        return if (match != null) {
+            val checked = match.groupValues[1].equals("x", ignoreCase = true)
+            val text = match.groupValues[2].trim()
+            text to checked
+        } else {
+            rawText.trim() to false
         }
     }
+
+    private fun parseWithSimpleRegex(id: String, markdown: String, suggestedTitle: String): Checklist {
+        val items = mutableListOf<ChecklistItem>()
+        var counter = 0
+
+        markdown.lines().forEach { line ->
+            val match = Regex("""^\s*[-*]?\s*\[([ xX])\]\s*(.*)""").find(line)
+                ?: Regex("""^\s*\[([ xX])\]\s*(.*)""").find(line) ?: return@forEach
+
+            val checked = match.groupValues[1].equals("x", ignoreCase = true)
+            val text = match.groupValues[2].trim()
+            if (text.isNotBlank()) {
+                items.add(ChecklistItem("$id-fb-${counter++}", text, 0, checked))
+            }
+        }
+
+        if (items.isEmpty()) return Checklist(id, suggestedTitle.ifEmpty { "Checklist" }, emptyList())
+
+        val title = suggestedTitle.ifEmpty { "Checklist" }
+        return Checklist(id, title, listOf(ChecklistSection(title, items)))
+    }
+}
+
+// Helper extensions
+private fun Node.collectText(): String {
+    val sb = StringBuilder()
+    accept(object : AbstractVisitor() {
+        override fun visit(text: Text) { sb.append(text.literal) }
+        override fun visit(softLineBreak: SoftLineBreak) { sb.append(" ") }
+        override fun visit(hardLineBreak: HardLineBreak) { sb.append(" ") }
+        override fun visit(code: Code) { sb.append(code.literal) }
+    })
+    return sb.toString()
+}
+
+private inline fun <reified T : Node> Node.findDescendant(): T? {
+    var cur: Node? = this
+    while (cur != null) {
+        if (cur is T) return cur
+        // Prefer going down to children
+        if (cur.firstChild != null) {
+            cur = cur.firstChild
+            continue
+        }
+        // Otherwise, walk horizontally to the next or up and to the next
+        var next: Node? = cur
+        while (next != null && next.next == null) {
+            next = next.parent
+        }
+        cur = next?.next
+    }
+    return null
 }

@@ -1,47 +1,105 @@
 package com.example.checklist_interactive.ui.checklist
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.compose.runtime.mutableStateOf
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.checklist_interactive.data.checklist.Checklist
+import com.example.checklist_interactive.data.checklist.ChecklistItem
 import com.example.checklist_interactive.data.checklist.ChecklistRepository
-import com.example.checklist_interactive.data.checklist.ChecklistSection
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class ChecklistViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository = ChecklistRepository(application.applicationContext)
-    private val _checklist = MutableStateFlow<Checklist?>(null)
-    val checklist: StateFlow<Checklist?> = _checklist
+class ChecklistViewModel(
+    private val repository: ChecklistRepository,
+    private val initialChecklist: Checklist
+) : ViewModel() {
 
-    fun loadChecklist(assetPath: String, id: String) {
+    private val _checklistState = MutableStateFlow(initialChecklist)
+    val checklistState: StateFlow<Checklist> = _checklistState.asStateFlow()
+
+    init {
+        loadChecklistState()
+    }
+
+    private fun loadChecklistState() {
         viewModelScope.launch {
-            val c = repository.loadChecklistFromAssets(assetPath, id)
-            _checklist.value = c
+            val savedStates = repository.getChecklistState(initialChecklist.id)
+            val updatedSections = initialChecklist.sections.map { section ->
+                val updatedItems = section.items.map { item ->
+                    item.copy(isChecked = savedStates[item.id] ?: item.isChecked)
+                }
+                section.copy(items = updatedItems)
+            }
+            _checklistState.value = initialChecklist.copy(sections = updatedSections)
         }
     }
 
-    fun toggleItem(checklistId: String, itemId: String, checked: Boolean) {
+    fun onCheckboxChange(itemId: String, isChecked: Boolean) {
         viewModelScope.launch {
-            repository.toggleItem(checklistId, itemId, checked)
-            // update in-memory
-            _checklist.value = _checklist.value?.copy(sections = _checklist.value?.sections?.map { section ->
-                section.copy(items = section.items.map { item -> if (item.id == itemId) item.copy(isChecked = checked) else item })
-            } ?: emptyList())
+            // Update local state immediately for UI responsiveness
+            val updatedSections = _checklistState.value.sections.map { section ->
+                val updatedItems = section.items.map { item ->
+                    if (item.id == itemId) {
+                        item.copy(isChecked = isChecked)
+                    } else {
+                        item
+                    }
+                }
+                section.copy(items = updatedItems)
+            }
+            _checklistState.value = _checklistState.value.copy(sections = updatedSections)
+            
+            // Save the state to the repository
+            repository.saveChecklistItemState(initialChecklist.id, itemId, isChecked)
         }
     }
 
-    fun resetChecklist(checklistId: String) {
+    fun resetChecklist() {
         viewModelScope.launch {
-            repository.resetChecklist(checklistId)
-            // reload to reflect reset
-            _checklist.value?.let { c -> loadChecklist("checklists/$checklistId.pdf", c.id) }
+            // Clear saved state from repository
+            repository.clearChecklistState(initialChecklist.id)
+
+            // Reset the state to the initial default state from the markdown file
+            val updatedSections = initialChecklist.sections.map { section ->
+                val updatedItems = section.items.map { item ->
+                    item.copy(isChecked = false) // Or use the original parsed state if it can be checked by default
+                }
+                section.copy(items = updatedItems)
+            }
+             _checklistState.value = initialChecklist.copy(sections = updatedSections)
         }
     }
 
-    fun exportChecklistMarkdown(): String? {
-        val c = _checklist.value ?: return null
-        return repository.exportChecklistToMarkdown(c)
+    fun exportChecklistMarkdown(): String {
+        val checklist = _checklistState.value
+        val sb = StringBuilder()
+        sb.append("# ").append(checklist.title).append("\n\n")
+        checklist.sections.forEach { section ->
+            sb.append("## ").append(section.title).append("\n\n")
+            section.items.forEach { item ->
+                val checkbox = if (item.isChecked) "[x]" else "[ ]"
+                val indent = "    ".repeat(item.indent)
+                sb.append(indent).append("- ").append(checkbox).append(" ").append(item.text).append("\n")
+            }
+            sb.append("\n")
+        }
+        return sb.toString()
+    }
+}
+
+class ChecklistViewModelFactory(
+    private val repository: ChecklistRepository,
+    private val checklist: Checklist
+) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(ChecklistViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return ChecklistViewModel(repository, checklist) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }

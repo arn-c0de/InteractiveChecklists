@@ -73,7 +73,8 @@ fun PdfViewer(
     isInternalFile: Boolean = false,
     isDarkTheme: Boolean = false,
     onToggleTheme: (() -> Unit)? = null,
-    initialPage: Int = 0
+    initialPage: Int = 0,
+    onPageChange: ((Int) -> Unit)? = null
 ) {
     val context = LocalContext.current
     var isLoading by remember { mutableStateOf(true) }
@@ -165,6 +166,7 @@ fun PdfViewer(
     // Aktuelle Seite basierend auf Scroll-Position
     LaunchedEffect(listState.firstVisibleItemIndex) {
         currentPage = listState.firstVisibleItemIndex
+        onPageChange?.invoke(currentPage)
     }
 
     Scaffold(

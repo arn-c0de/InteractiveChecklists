@@ -35,6 +35,7 @@ import com.example.checklist_interactive.data.shortcuts.ShortcutManager
 import com.example.checklist_interactive.data.shortcuts.PageShortcut
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Settings
 
 import com.example.checklist_interactive.R
 import androidx.compose.ui.graphics.Color
@@ -50,14 +51,17 @@ fun InternalFilesScreen(
     onFileOpen: (FileInfo) -> Unit,
     onShortcutOpen: (PageShortcut) -> Unit,
     onRefresh: () -> Unit,
+    refreshTrigger: Int,
     isDarkTheme: Boolean,
-    onToggleTheme: () -> Unit
+    onToggleTheme: () -> Unit,
+    onShowSettings: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val prefsManager = remember { PreferencesManager(context) }
     val shortcutManager = remember { ShortcutManager(context) }
     
     var groupedFiles by remember { mutableStateOf(fileManager.getAllFilesGrouped()) }
+    var folderTree by remember { mutableStateOf(fileManager.getFolderTree()) }
     var shortcuts by remember { mutableStateOf(shortcutManager.loadShortcuts()) }
     var showImportDialog by remember { mutableStateOf(false) }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
@@ -71,9 +75,21 @@ fun InternalFilesScreen(
     val expandedCategories = remember {
         mutableStateMapOf<String, Boolean>().apply {
             groupedFiles.keys.forEach { category ->
-                put(category, prefsManager.isCategoryExpanded(category))
+                put(category, prefsManager.isCategoryExpanded(category) ?: false)
             }
-            put("shortcuts", prefsManager.isCategoryExpanded("shortcuts"))
+            // Also seed expanded state from folderTree nodes
+            folderTree.forEach { node ->
+                put(node.relativePath, prefsManager.isCategoryExpanded(node.relativePath) ?: false)
+                // include nested children
+                fun seedChildren(n: InternalFileManager.FolderNode) {
+                    n.children.forEach {
+                        put(it.relativePath, prefsManager.isCategoryExpanded(it.relativePath) ?: false)
+                        seedChildren(it)
+                    }
+                }
+                seedChildren(node)
+            }
+            put("shortcuts", prefsManager.isCategoryExpanded("shortcuts") ?: false)
         }
     }
 
@@ -85,8 +101,9 @@ fun InternalFilesScreen(
             selectedCategory?.let { category ->
                 val result = fileManager.importFile(selectedUri, category)
                 result.onSuccess {
-                    // Refresh file list
+                    // Refresh file list and folder tree
                     groupedFiles = fileManager.getAllFilesGrouped()
+                    folderTree = fileManager.getFolderTree()
                     onRefresh()
                 }.onFailure { error ->
                     // TODO: Show error to user
@@ -107,6 +124,7 @@ fun InternalFilesScreen(
                     }
                     IconButton(onClick = {
                         groupedFiles = fileManager.getAllFilesGrouped()
+                        folderTree = fileManager.getFolderTree()
                         onRefresh()
                     }) {
                         Icon(Icons.Default.Refresh, contentDescription = context.getString(R.string.refresh))
@@ -117,11 +135,14 @@ fun InternalFilesScreen(
                             contentDescription = context.getString(R.string.toggle_dark_mode)
                         )
                     }
+                    IconButton(onClick = onShowSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    }
                 }
             )
         }
     ) { padding ->
-        if (groupedFiles.isEmpty() && shortcuts.isEmpty()) {
+        if (folderTree.isEmpty() && shortcuts.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -188,40 +209,23 @@ fun InternalFilesScreen(
                     }
                 }
                 
-                groupedFiles.forEach { (category, files) ->
-                    item {
-                        CategoryHeader(
-                            category = category,
-                            fileCount = files.size,
-                            isExpanded = expandedCategories[category] ?: true,
-                            onToggleExpanded = {
-                                val newState = !(expandedCategories[category] ?: true)
-                                expandedCategories[category] = newState
-                                prefsManager.setCategoryExpanded(category, newState)
+                // Show folder tree once (it contains all categories and nested folders)
+                item {
+                    Column {
+                        FolderTree(
+                            nodes = folderTree,
+                            expanded = expandedCategories,
+                            onToggleExpanded = { key, newState ->
+                                expandedCategories[key] = newState
+                                prefsManager.setCategoryExpanded(key, newState)
                             },
-                            onImport = {
-                                selectedCategory = category
-                                showImportDialog = true
-                            }
+                            onFileOpen = onFileOpen,
+                            onDelete = { file ->
+                                fileToDelete = file
+                                showDeleteConfirm = true
+                            },
+                            level = 0
                         )
-                    }
-
-                    // Nur Dateien anzeigen wenn Kategorie ausgeklappt ist
-                    if (expandedCategories[category] == true) {
-                        items(files) { file ->
-                            FileListItem(
-                                file = file,
-                                onClick = { onFileOpen(file) },
-                                onDelete = {
-                                    fileToDelete = file
-                                    showDeleteConfirm = true
-                                }
-                            )
-                        }
-
-                        item {
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
                     }
                 }
             }
@@ -231,7 +235,7 @@ fun InternalFilesScreen(
     // Import Dialog
     if (showImportDialog) {
         CategorySelectionDialog(
-            categories = fileManager.getCategories(),
+            categories = fileManager.getAllCategoryPaths(),
             selectedCategory = selectedCategory,
             onCategorySelected = { category ->
                 selectedCategory = category
@@ -254,11 +258,12 @@ fun InternalFilesScreen(
             title = { Text(context.getString(R.string.delete_file)) },
             text = { Text(context.getString(R.string.delete_confirm, fileToDelete?.displayName ?: "")) },
             confirmButton = {
-                TextButton(
+                        TextButton(
                     onClick = {
                         fileToDelete?.let { file ->
                             fileManager.deleteFile(file.path)
                             groupedFiles = fileManager.getAllFilesGrouped()
+                                    folderTree = fileManager.getFolderTree()
                             onRefresh()
                         }
                         showDeleteConfirm = false
@@ -320,6 +325,116 @@ fun InternalFilesScreen(
                 }
             }
         )
+    }
+
+    // When parent changes refreshTrigger, update contents
+    LaunchedEffect(refreshTrigger) {
+        groupedFiles = fileManager.getAllFilesGrouped()
+        folderTree = fileManager.getFolderTree()
+        shortcuts = shortcutManager.loadShortcuts()
+    }
+}
+
+@Composable
+private fun FolderTree(
+    nodes: List<InternalFileManager.FolderNode>,
+    expanded: MutableMap<String, Boolean>,
+    onToggleExpanded: (String, Boolean) -> Unit,
+    onFileOpen: (FileInfo) -> Unit,
+    onDelete: (FileInfo) -> Unit,
+    level: Int
+) {
+    nodes.forEach { node ->
+        FolderNodeItem(
+            node = node,
+            expanded = expanded,
+            onToggleExpanded = onToggleExpanded,
+            onFileOpen = onFileOpen,
+            onDelete = onDelete,
+            level = level
+        )
+    }
+}
+
+private fun countFiles(node: InternalFileManager.FolderNode): Int {
+    var count = node.files.size
+    node.children.forEach { child ->
+        count += countFiles(child)
+    }
+    return count
+}
+
+@Composable
+private fun FolderNodeItem(
+    node: InternalFileManager.FolderNode,
+    expanded: MutableMap<String, Boolean>,
+    onToggleExpanded: (String, Boolean) -> Unit,
+    onFileOpen: (FileInfo) -> Unit,
+    onDelete: (FileInfo) -> Unit,
+    level: Int
+) {
+    val key = node.relativePath
+    val isExpanded = expanded[key] ?: true
+    val fileCount = countFiles(node)
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onToggleExpanded(key, !isExpanded) },
+        color = MaterialTheme.colorScheme.surfaceVariant
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Spacer(modifier = Modifier.width((level * 12).dp))
+            Icon(
+                Icons.Default.Folder,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = node.name.replaceFirstChar { it.uppercase() },
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            val localContext = LocalContext.current
+            Text(
+                text = "$fileCount ${if (fileCount == 1) localContext.getString(R.string.file) else localContext.getString(R.string.files)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            IconButton(onClick = { onToggleExpanded(key, !isExpanded) }) {
+                Icon(
+                    if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (isExpanded) localContext.getString(R.string.collapse) else localContext.getString(R.string.expand)
+                )
+            }
+        }
+    }
+
+    if (isExpanded) {
+        // Show files for this node
+        node.files.forEach { file ->
+            FileListItem(file = file, onClick = { onFileOpen(file) }, onDelete = { onDelete(file) })
+        }
+
+        // Recurse into children nodes
+        node.children.forEach { child ->
+            FolderNodeItem(
+                node = child,
+                expanded = expanded,
+                onToggleExpanded = onToggleExpanded,
+                onFileOpen = onFileOpen,
+                onDelete = onDelete,
+                level = level + 1
+            )
+        }
     }
 }
 
@@ -537,8 +652,9 @@ private fun CategorySelectionDialog(
         text = {
             LazyColumn {
                 items(categories) { category ->
+                    val displayName = category.replace('/', ' ').replace('_', ' ').replaceFirstChar { it.uppercase() }
                     ListItem(
-                        headlineContent = { Text(category.replaceFirstChar { it.uppercase() }) },
+                        headlineContent = { Text(displayName) },
                         leadingContent = {
                             Icon(
                                 Icons.Default.Folder,

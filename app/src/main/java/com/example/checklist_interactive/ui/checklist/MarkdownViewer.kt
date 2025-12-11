@@ -80,12 +80,19 @@ fun MarkdownViewer(
             }
             else -> {
                 if (checklist != null && onCheckboxChange != null) {
-                    // Interaktive Ansicht mit Checkboxen
-                    InteractiveMarkdownView(
-                        markdownContent = markdownContent,
-                        checklist = checklist,
-                        onCheckboxChange = onCheckboxChange
-                    )
+                    // Prüfe ob die Checklist Items hat
+                    val hasItems = checklist.sections.any { it.items.isNotEmpty() }
+                    if (hasItems) {
+                        // Interaktive Ansicht mit Checkboxen
+                        InteractiveMarkdownView(
+                            markdownContent = markdownContent,
+                            checklist = checklist,
+                            onCheckboxChange = onCheckboxChange
+                        )
+                    } else {
+                        // Keine Checkboxen gefunden, zeige einfache Ansicht
+                        SimpleMarkdownView(markdownContent = markdownContent)
+                    }
                 } else {
                     // Einfache Markdown-Ansicht ohne Interaktion
                     SimpleMarkdownView(markdownContent = markdownContent)
@@ -199,25 +206,29 @@ private fun InteractiveMarkdownView(
             .verticalScroll(scrollState)
             .padding(16.dp)
     ) {
-        // Überschrift
-        checklist.sections.firstOrNull()?.let { firstSection ->
+        // Zeige Checklist-Titel als Hauptüberschrift
+        if (checklist.title.isNotEmpty()) {
             Text(
-                text = firstSection.title,
-                style = MaterialTheme.typography.headlineMedium,
+                text = checklist.title,
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
         }
 
-        // Sections mit Checkboxen
+        // Sections mit Checkboxen und Überschriften
         checklist.sections.forEach { section ->
-            if (section != checklist.sections.first()) {
+            // Section-Überschrift
+            if (section.title.isNotEmpty() && section.title != checklist.title) {
                 Text(
                     text = section.title,
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
                 )
             }
 
+            // Checkbox-Items in dieser Section
             section.items.forEach { item ->
                 ChecklistItemRow(
                     item = item,
