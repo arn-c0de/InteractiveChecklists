@@ -96,7 +96,7 @@ fun PdfViewer(
     val strokes = remember { mutableStateListOf<AnnotationStroke>() }
     var currentPage by remember { mutableStateOf(initialPage) }
     var pageCount by remember { mutableStateOf(0) }
-    var eraseRadius by remember { mutableStateOf(32f) }
+    var eraseRadius by remember { mutableStateOf(50f) }
     val pageScales = remember { mutableStateMapOf<Int, Float>() }
     val pageOffsetsX = remember { mutableStateMapOf<Int, Float>() }
     val pageOffsetsY = remember { mutableStateMapOf<Int, Float>() }
@@ -600,8 +600,9 @@ fun PdfViewer(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 8.dp),
-                            horizontalArrangement = Arrangement.Start
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.Start,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                         val colors = listOf(Color.Red, Color.Yellow, Color.Green, Color.Blue, Color.Magenta)
                         colors.forEach { c ->
@@ -610,17 +611,48 @@ fun PdfViewer(
                                     .size(28.dp)
                                     .padding(4.dp)
                                     .background(c, CircleShape)
-                                    .clickable { selectedColor = c }
+                                    .clickable {
+                                        selectedColor = c
+                                        eraseMode = false
+                                    }
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                        // Radierer-Button hier bei den Farben
+                        IconButton(
+                            onClick = {
+                                eraseMode = !eraseMode
+                                if (eraseMode) {
+                                    highlightMode = false
+                                }
+                            },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = "Radierer",
+                                tint = if (eraseMode) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Breite:", modifier = Modifier.align(Alignment.CenterVertically))
-                        Slider(
-                            value = strokeWidth,
-                            onValueChange = { strokeWidth = it },
-                            valueRange = 1f..30f,
-                            modifier = Modifier.width(120.dp).padding(start = 8.dp)
-                        )
+                        if (eraseMode) {
+                            Text("Radierer:", style = MaterialTheme.typography.labelSmall)
+                            Slider(
+                                value = eraseRadius,
+                                onValueChange = { eraseRadius = it },
+                                valueRange = 20f..100f,
+                                modifier = Modifier.width(120.dp).padding(start = 8.dp)
+                            )
+                        } else {
+                            Text("Breite:", style = MaterialTheme.typography.labelSmall)
+                            Slider(
+                                value = strokeWidth,
+                                onValueChange = { strokeWidth = it },
+                                valueRange = 1f..30f,
+                                modifier = Modifier.width(120.dp).padding(start = 8.dp)
+                            )
+                        }
                         }
                     }
 
@@ -944,6 +976,7 @@ private fun PdfPageWithAnnotations(
 ) {
     var overlaySize by remember { mutableStateOf(IntSize(0, 0)) }
     var currentStroke by remember(pageIndex) { mutableStateOf<AnnotationStroke?>(null) }
+    var eraserPosition by remember(pageIndex) { mutableStateOf<Offset?>(null) }
     val isCurrentPage = pageIndex == currentPage
 
     Box(
@@ -983,8 +1016,8 @@ private fun PdfPageWithAnnotations(
             modifier = Modifier
                 .fillMaxSize()
                 .onSizeChanged { overlaySize = it }
-                // Custom pointer handling: Pan/Zoom. Active for multi-touch, or single-touch when zoomed.
-                .pointerInput(pageIndex, isCurrentPage, scale) {
+                // Custom pointer handling: Pan/Zoom. Active for multi-touch, or single-touch when zoomed (but not in drawing mode).
+                .pointerInput(pageIndex, isCurrentPage, scale, annotateMode, eraseMode) {
                     if (!isCurrentPage) return@pointerInput
 
                     awaitPointerEventScope {
@@ -1026,8 +1059,8 @@ private fun PdfPageWithAnnotations(
                                 continue
                             }
 
-                                // Single-finger drag: only handle panning if zoomed (scale != 1f), otherwise let parent handle scroll
-                            if (pressedPointers.size == 1 && scale != 1f) {
+                                // Single-finger drag: only handle panning if zoomed AND not in drawing/erase mode, otherwise let parent handle scroll or let drawing handle it
+                            if (pressedPointers.size == 1 && scale != 1f && !annotateMode && !eraseMode) {
                                 val pointerId = pressedPointers[0].id
                                 var prevPos = pressedPointers[0].position
                                 var active = true
@@ -1049,19 +1082,20 @@ private fun PdfPageWithAnnotations(
                                 continue
                             }
 
-                            // No multi-touch and either scale == 1f or no pointers pressed: do nothing to allow LazyColumn to handle scrolls.
+                            // No multi-touch and either scale == 1f or no pointers pressed or in drawing mode: do nothing to allow LazyColumn to handle scrolls or drawing to handle it.
                         }
                     }
                 }
-                // Custom pointer handling: Draw/Erase. Active for single-touch when NOT zoomed.
-                .pointerInput(annotateMode, eraseMode, pageIndex, isCurrentPage, scale) {
-                    // This block handles drawing/erasing. It should only be active when NOT zoomed.
-                    if (!isCurrentPage || scale != 1f) return@pointerInput
+                // Custom pointer handling: Draw/Erase. Active when drawing or erase mode is enabled.
+                .pointerInput(annotateMode, eraseMode, pageIndex, isCurrentPage) {
+                    // This block handles drawing/erasing. Active when drawing/erase mode is on.
+                    if (!isCurrentPage) return@pointerInput
                     if (!annotateMode && !eraseMode) return@pointerInput
 
                     detectDragGestures(
                         onDragStart = { offset ->
                             if (eraseMode) {
+                                eraserPosition = offset
                                 val toErase = strokes.filter { stroke ->
                                     stroke.points.any { p ->
                                         val px = p.first * scale + offsetX
@@ -1087,12 +1121,13 @@ private fun PdfPageWithAnnotations(
                                     isHighlight = highlightMode
                                 )
                                 currentStroke = newStroke
-                                onStrokeAdd(newStroke)
+                                // NICHT zur Liste hinzufügen während des Zeichnens - wird erst bei onDragEnd hinzugefügt
                             }
                         },
                         onDrag = { change, _ ->
                             if (eraseMode && isCurrentPage) {
                                 val offset = change.position
+                                eraserPosition = offset
                                 val toErase = strokes.filter { stroke ->
                                     stroke.points.any { p ->
                                         val px = p.first * scale + offsetX
@@ -1117,13 +1152,18 @@ private fun PdfPageWithAnnotations(
                                         add(Pair(docX, docY))
                                     }
                                     val updatedStroke = stroke.copy(points = newPoints)
-                                    onStrokeUpdate(stroke, updatedStroke)
+                                    // Aktualisiere nur currentStroke, nicht die Liste
                                     currentStroke = updatedStroke
                                 }
                             }
                         },
                         onDragEnd = {
+                            if (eraseMode && isCurrentPage) {
+                                eraserPosition = null
+                            }
                             if (annotateMode && isCurrentPage) {
+                                // Jetzt zur Liste hinzufügen nach dem Zeichnen
+                                currentStroke?.let { onStrokeAdd(it) }
                                 currentStroke = null
                                 onSave()
                             }
@@ -1146,6 +1186,41 @@ private fun PdfPageWithAnnotations(
                     color = Color(stroke.color.toULong()),
                     style = Stroke(width = widthPx),
                     alpha = if (stroke.isHighlight) 0.18f else 1f
+                )
+            }
+
+            // Zeichne den aktuellen Stroke live während des Zeichnens
+            currentStroke?.let { stroke ->
+                if (stroke.points.isNotEmpty()) {
+                    val path = Path().apply {
+                        stroke.points.forEachIndexed { i, p ->
+                            val x = p.first * scale + offsetX
+                            val y = p.second * scale + offsetY
+                            if (i == 0) moveTo(x, y) else lineTo(x, y)
+                        }
+                    }
+                    val widthPx = maxOf(1f, stroke.strokeWidth * scale)
+                    drawPath(
+                        path = path,
+                        color = Color(stroke.color.toULong()),
+                        style = Stroke(width = widthPx),
+                        alpha = if (stroke.isHighlight) 0.18f else 1f
+                    )
+                }
+            }
+
+            // Zeichne den Radierer-Cursor wenn Radierer-Modus aktiv ist
+            if (eraseMode && eraserPosition != null && isCurrentPage) {
+                drawCircle(
+                    color = Color.Red.copy(alpha = 0.3f),
+                    radius = eraseRadius,
+                    center = eraserPosition!!,
+                    style = Stroke(width = 2f)
+                )
+                drawCircle(
+                    color = Color.Red.copy(alpha = 0.1f),
+                    radius = eraseRadius,
+                    center = eraserPosition!!
                 )
             }
         }
