@@ -631,7 +631,7 @@ class InternalFileManager(private val context: Context) {
         var imported = 0
         
         // Define allowed top-level asset folders to import
-        val allowedAssetFolders = setOf("checklists", "handbooks", "radiocommunication")
+        val allowedAssetFolders = setOf("checklists", "handbooks", "radiocommunication", "charts")
         
         try {
             fun walker(path: String, relativePath: String, isTopLevel: Boolean = false) {

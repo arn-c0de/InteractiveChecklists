@@ -21,6 +21,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_MARKDOWN_SECTIONS_EXPANDED = "markdown_sections_expanded"
         private const val KEY_ACTIVE_TAG_FILTERS = "active_tag_filters"
         private const val KEY_TAG_FILTER_MODE = "tag_filter_mode" // "any" or "all"
+        private const val KEY_LAST_IMPORTED_VERSION = "last_imported_version"
     }
     
     /**
@@ -216,5 +217,19 @@ class PreferencesManager(context: Context) {
 
     fun unregisterOnChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
         prefs.unregisterOnSharedPreferenceChangeListener(listener)
+    }
+
+    /**
+     * Gets the last imported app version
+     */
+    fun getLastImportedVersion(): String? {
+        return prefs.getString(KEY_LAST_IMPORTED_VERSION, null)
+    }
+
+    /**
+     * Sets the last imported app version
+     */
+    fun setLastImportedVersion(version: String) {
+        prefs.edit().putString(KEY_LAST_IMPORTED_VERSION, version).apply()
     }
 }
