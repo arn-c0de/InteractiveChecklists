@@ -576,7 +576,7 @@ fun PdfViewer(
                         LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
                             items(chapters) { (titleText, pageIndex) ->
                                 ListItem(
-                                    headlineText = { Text(titleText) },
+                                    headlineContent = { Text(titleText) },
                                     modifier = Modifier.clickable {
                                         showTocDialog = false
                                         coroutineScope.launch {

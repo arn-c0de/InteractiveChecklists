@@ -82,6 +82,7 @@ fun InternalFileViewer(
             }
 
             val viewModel: ChecklistViewModel = viewModel(
+                key = fileInfo.path,
                 factory = ChecklistViewModelFactory(checklistRepository, parsedChecklist)
             )
 
