@@ -3,11 +3,11 @@ package com.example.checklist_interactive.ui.checklist
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
+import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,33 +30,38 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.launch
+import com.example.checklist_interactive.R
+import com.example.checklist_interactive.data.shortcuts.PageHighlightManager
+import com.example.checklist_interactive.data.shortcuts.ShortcutManager
 import java.io.File
 import kotlin.math.hypot
-
-import androidx.compose.ui.platform.LocalContext
-import com.example.checklist_interactive.R
-import com.example.checklist_interactive.data.shortcuts.ShortcutManager
-import com.example.checklist_interactive.data.shortcuts.PageHighlightManager
-import androidx.compose.material.icons.filled.Bookmark
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.ViewList
 
 /**
  * Eigener PDF-Viewer ohne externe Abhängigkeiten.
@@ -89,11 +94,12 @@ fun PdfViewer(
     var currentPage by remember { mutableStateOf(initialPage) }
     var pageCount by remember { mutableStateOf(0) }
     var eraseRadius by remember { mutableStateOf(32f) }
-    var scale by remember { mutableStateOf(1f) }
-    var offsetX by remember { mutableStateOf(0f) }
-    var offsetY by remember { mutableStateOf(0f) }
+    val pageScales = remember { mutableStateMapOf<Int, Float>() }
+    val pageOffsetsX = remember { mutableStateMapOf<Int, Float>() }
+    val pageOffsetsY = remember { mutableStateMapOf<Int, Float>() }
     var showShortcutDialog by remember { mutableStateOf(false) }
     var shortcutName by remember { mutableStateOf("") }
+    val pageAspectRatios = remember { mutableStateMapOf<Int, Float>() }
 
     val shortcutManager = remember { ShortcutManager(context) }
     val highlightManager = remember { PageHighlightManager(context) }
@@ -102,10 +108,55 @@ fun PdfViewer(
     var chapters by remember { mutableStateOf<List<Pair<String, Int>>>(emptyList()) }
 
     val pageBitmaps = remember { mutableStateMapOf<Int, Bitmap>() }
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialPage)
     val coroutineScope = rememberCoroutineScope()
+    val safeRecycleDelayMs = 300L
+    fun scheduleRecycle(bitmap: Bitmap?) {
+        if (bitmap == null) return
+        coroutineScope.launch(Dispatchers.IO) {
+            kotlinx.coroutines.delay(safeRecycleDelayMs)
+            try {
+                val stillReferenced = withContext(Dispatchers.Main) {
+                    pageBitmaps.values.any { it == bitmap }
+                }
+                // Do not call bitmap.recycle() — Compose may still hold references; instead, let GC cleanup later
+                // If it is still referenced, we keep it; otherwise, nothing keeps a reference and it will be GC'd.
+            } catch (_: Exception) {
+            }
+        }
+    }
+    // LruCache for rendered bitmaps (in KB)
+    val maxMemoryKb = (Runtime.getRuntime().maxMemory() / 1024).toInt()
+    val cacheSizeKb = maxMemoryKb / 8
+    val cacheKeys = remember { mutableStateListOf<Int>() }
+    val bitmapCache = remember {
+        object : LruCache<Int, Bitmap>(cacheSizeKb) {
+            override fun sizeOf(key: Int, value: Bitmap): Int = value.byteCount / 1024
+            override fun entryRemoved(evicted: Boolean, key: Int?, oldValue: Bitmap?, newValue: Bitmap?) {
+                // Do not immediately recycle — schedule delayed safe recycle to avoid racing with Compose drawing
+                oldValue?.let { scheduleRecycle(it) }
+                key?.let { k ->
+                    // Keep pageBitmaps in sync when something is evicted
+                    coroutineScope.launch(Dispatchers.Main) {
+                        pageBitmaps.remove(k)
+                        cacheKeys.remove(k)
+                    }
+                }
+            }
+        }
+    }
+    // Track the scale at which we last rendered each page
+    val renderScaleMap = remember { mutableStateMapOf<Int, Float>() }
+    // Debounce mechanism for re-rendering on zoom
+    var zoomRenderJob by remember { mutableStateOf<Job?>(null) }
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialPage)
+    val configuration = LocalConfiguration.current
+    val screenWidthPx = with(LocalDensity.current) { configuration.screenWidthDp.dp.roundToPx() }
 
-    // PDF laden
+    // PDF laden: open once, but render pages lazily.
+    var fileDescriptor by remember { mutableStateOf<ParcelFileDescriptor?>(null) }
+    var pdfRenderer by remember { mutableStateOf<PdfRenderer?>(null) }
+    val pdfRenderMutex = remember { Mutex() }
+
     LaunchedEffect(pdfPath, isInternalFile) {
         isLoading = true
         errorMessage = null
@@ -125,28 +176,53 @@ fun PdfViewer(
                     tempFile
                 }
 
-                val fileDescriptor = ParcelFileDescriptor.open(
-                    pdfFile,
-                    ParcelFileDescriptor.MODE_READ_ONLY
-                )
-                val pdfRenderer = PdfRenderer(fileDescriptor)
-                pageCount = pdfRenderer.pageCount
+                fileDescriptor = ParcelFileDescriptor.open(pdfFile, ParcelFileDescriptor.MODE_READ_ONLY)
+                pdfRenderer = PdfRenderer(fileDescriptor!!)
+                pageCount = pdfRenderer!!.pageCount
 
-                // Alle Seiten rendern
-                for (pageIndex in 0 until pageCount) {
-                    val page = pdfRenderer.openPage(pageIndex)
-                    val bitmap = Bitmap.createBitmap(
-                        page.width * 2,
-                        page.height * 2,
-                        Bitmap.Config.ARGB_8888
-                    )
-                    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                    pageBitmaps[pageIndex] = bitmap
+                // Pre-calculate all page aspect ratios to prevent layout jumping on scroll
+                (0 until pageCount).forEach { index ->
+                    val page = pdfRenderer!!.openPage(index)
+                    pageAspectRatios[index] = page.width.toFloat() / page.height.toFloat()
                     page.close()
                 }
 
-                pdfRenderer.close()
-                fileDescriptor.close()
+                // Render only an initial subset of pages (initialPage and nearby), rest are loaded on demand.
+                val initialIndices = listOf(initialPage - 1, initialPage, initialPage + 1).distinct().filter { it in 0 until pageCount }
+                for (pageIndex in initialIndices) {
+                    // Use a helper function to render pages to a cache-friendly size.
+                    val page = pdfRenderer!!.openPage(pageIndex)
+                        val renderWidth = screenWidthPx
+                        val renderHeight = (renderWidth.toFloat() * page.height / page.width).toInt()
+                        // Try RGB_565 (lower memory) first; fallback to ARGB_8888 when necessary.
+                        var bitmap: Bitmap? = null
+                        try {
+                            bitmap = Bitmap.createBitmap(renderWidth, renderHeight, Bitmap.Config.RGB_565)
+                            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                        } catch (e: Throwable) {
+                            bitmap?.let { if (!it.isRecycled) it.recycle() }
+                            bitmap = try { Bitmap.createBitmap(renderWidth, renderHeight, Bitmap.Config.ARGB_8888) } catch (_: Throwable) { null }
+                            bitmap?.let { page.render(it, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY) }
+                        }
+                        withContext(Dispatchers.Main) {
+                            bitmap?.let { bmp ->
+                                val oldBmp = pageBitmaps[pageIndex]
+                                    if (oldBmp != null && oldBmp != bmp) scheduleRecycle(oldBmp)
+                                pageBitmaps[pageIndex] = bmp
+                            }
+                        }
+                        bitmap?.let { bmp ->
+                            bitmapCache.put(pageIndex, bmp)
+                            renderScaleMap[pageIndex] = 1f
+                            cacheKeys.add(pageIndex)
+                        }
+                        if (bitmap == null) {
+                            withContext(Dispatchers.Main) {
+                                errorMessage = context.getString(R.string.error_loading_pdf, "Unsupported pixel format for page ${pageIndex + 1}")
+                            }
+                        }
+                        page.close()
+                }
 
                 // Nur temporäre Dateien löschen
                 if (!isInternalFile) {
@@ -159,6 +235,63 @@ fun PdfViewer(
         } catch (e: Exception) {
             errorMessage = context.getString(R.string.error_loading_pdf, e.message ?: "")
             isLoading = false
+        }
+    }
+
+    // Close PDF renderer and file descriptor when composable leaves scope
+    DisposableEffect(pdfPath) {
+        onDispose {
+            try {
+                pdfRenderer?.close()
+            } catch (_: Exception) {}
+            try {
+                fileDescriptor?.close()
+            } catch (_: Exception) {}
+            // Clear cache and recycle bitmaps
+            cacheKeys.forEach { k -> bitmapCache.remove(k) }
+            pageBitmaps.clear()
+        }
+    }
+
+    // Helper: render a page to bitmap cache at a target width in pixels
+    suspend fun renderPageToCache(pageIndex: Int, targetWidthPx: Int, renderedScale: Float = 1f) {
+        withContext(Dispatchers.IO) {
+            val pdf = pdfRenderer ?: return@withContext
+            // Serialize calls to PdfRenderer to avoid crashes (PdfRenderer isn't guaranteed to be thread-safe across multiple concurrent page rendering)
+            pdfRenderMutex.withLock {
+                val page = try { pdf.openPage(pageIndex) } catch (_: Exception) { null }
+                page?.let {
+                    val renderWidth = targetWidthPx.coerceAtLeast(1)
+                    val renderHeight = (renderWidth.toFloat() * page.height / page.width).toInt().coerceAtLeast(1)
+                    // Try RGB_565 (lower memory) first; fallback to ARGB_8888 when necessary.
+                    var bitmap: Bitmap? = null
+                    try {
+                        bitmap = Bitmap.createBitmap(renderWidth, renderHeight, Bitmap.Config.RGB_565)
+                        page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                    } catch (e: Throwable) {
+                        // If rendering fails due to unsupported pixel format, try ARGB_8888
+                        bitmap?.let { if (!it.isRecycled) it.recycle() }
+                        bitmap = try { Bitmap.createBitmap(renderWidth, renderHeight, Bitmap.Config.ARGB_8888) } catch (_: Throwable) { null }
+                        bitmap?.let { page.render(it, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY) }
+                    }
+                    page.close()
+                    bitmap?.let { bmp ->
+                        bitmapCache.put(pageIndex, bmp)
+                        renderScaleMap[pageIndex] = renderedScale
+                        cacheKeys.add(pageIndex)
+                        withContext(Dispatchers.Main) {
+                            val oldBmp = pageBitmaps[pageIndex]
+                                if (oldBmp != null && oldBmp != bmp) scheduleRecycle(oldBmp)
+                            pageBitmaps[pageIndex] = bmp
+                        }
+                    }
+                    if (bitmap == null) {
+                        withContext(Dispatchers.Main) {
+                            errorMessage = context.getString(R.string.error_loading_pdf, "Unsupported pixel format for page ${pageIndex + 1}")
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -175,6 +308,49 @@ fun PdfViewer(
     LaunchedEffect(listState.firstVisibleItemIndex) {
         currentPage = listState.firstVisibleItemIndex
         onPageChange?.invoke(currentPage)
+    }
+
+    // Prefetch some neighbor pages when the user scrolls to improve perceived performance
+    LaunchedEffect(listState.firstVisibleItemIndex, pdfRenderer) {
+        val cur = listState.firstVisibleItemIndex
+        val indices = (cur - 2..cur + 2).filter { it in 0 until pageCount }
+        // Use screen width as target width
+            for (idx in indices) {
+            if (bitmapCache.get(idx) == null && pageBitmaps[idx] == null) {
+                try {
+                    renderPageToCache(idx, screenWidthPx, renderedScale = 1f)
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
+    // Debounced re-render on zoom change for current page
+    LaunchedEffect(pageScales[currentPage], currentPage) {
+        // We re-render only if scale increased enough relative to the last rendered scale for this page.
+        zoomRenderJob?.cancel()
+        val currentScale = pageScales[currentPage] ?: 1f
+        // Only attempt to re-render if we have a renderer ready and a page visible
+        val renderedScale = renderScaleMap[currentPage] ?: 0f
+        // If scale is close to the renderedScale, skip
+        if (renderedScale > 0f && currentScale <= renderedScale * 1.15f) return@LaunchedEffect
+        if (pdfRenderer == null) return@LaunchedEffect
+        // Wait a bit to avoid over-rendering while the user is still pinching
+        zoomRenderJob = coroutineScope.launch {
+            kotlinx.coroutines.delay(350L)
+            // Determine desired pixel width to render for the current scale
+            val currentScale = pageScales[currentPage] ?: 1f
+            val baseBitmap = pageBitmaps[currentPage] ?: bitmapCache.get(currentPage)
+            val baseWidth = baseBitmap?.width ?: screenWidthPx
+            val targetWidth = (baseWidth * currentScale).toInt().coerceAtMost(screenWidthPx * 3)
+            // Only render if significant increase in required resolution
+            val prevScale = renderScaleMap[currentPage] ?: 1f
+            val requestedScaleForRender = targetWidth.toFloat() / baseWidth
+            if (requestedScaleForRender > prevScale * 1.15f) {
+                try {
+                    renderPageToCache(currentPage, targetWidth, renderedScale = requestedScaleForRender)
+                } catch (_: Exception) {}
+            }
+        }
     }
 
     Scaffold(
@@ -248,7 +424,7 @@ fun PdfViewer(
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    Icons.Default.Create, 
+                                    Icons.Default.Create,
                                     contentDescription = "Zeichnen",
                                     tint = if (annotateMode) MaterialTheme.colorScheme.primary else LocalContentColor.current,
                                     modifier = Modifier.size(20.dp)
@@ -260,7 +436,7 @@ fun PdfViewer(
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    Icons.Default.Bookmark, // use bookmark as chapter/icon fallback
+                                    Icons.Default.ViewList, // visible chapter/list icon
                                     contentDescription = "Inhaltsverzeichnis",
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -276,7 +452,7 @@ fun PdfViewer(
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    Icons.Default.Highlight, 
+                                    Icons.Default.Highlight,
                                     contentDescription = "Markieren",
                                     tint = if (highlightMode) MaterialTheme.colorScheme.primary else LocalContentColor.current,
                                     modifier = Modifier.size(20.dp)
@@ -290,7 +466,7 @@ fun PdfViewer(
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    Icons.Default.Star, 
+                                    Icons.Default.Star,
                                     contentDescription = "Seite highlighten",
                                     tint = if (pageHighlights.contains(currentPage)) Color.Yellow else LocalContentColor.current,
                                     modifier = Modifier.size(20.dp)
@@ -304,7 +480,7 @@ fun PdfViewer(
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    Icons.Default.Bookmark, 
+                                    Icons.Default.BookmarkAdd,
                                     contentDescription = "Shortcut",
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -317,7 +493,7 @@ fun PdfViewer(
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    Icons.Default.Undo, 
+                                    Icons.Default.Undo,
                                     contentDescription = "Undo",
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -329,7 +505,7 @@ fun PdfViewer(
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    Icons.Default.Delete, 
+                                    Icons.Default.Delete,
                                     contentDescription = "Clear",
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -341,13 +517,13 @@ fun PdfViewer(
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    Icons.Default.Save, 
+                                    Icons.Default.Save,
                                     contentDescription = "Save",
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
                         }
-                        
+
                         // Zweite Reihe: Zoom & Radierer
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -356,36 +532,38 @@ fun PdfViewer(
                         ) {
                             IconButton(
                                 onClick = {
-                                    if (scale > 0.5f) {
-                                        scale -= 0.5f
-                                        offsetX = 0f
-                                        offsetY = 0f
+                                    val cur = pageScales[currentPage] ?: 1f
+                                    if (cur > 0.5f) {
+                                        pageScales[currentPage] = (cur - 0.5f).coerceAtLeast(0.5f)
+                                        pageOffsetsX[currentPage] = 0f
+                                        pageOffsetsY[currentPage] = 0f
                                     }
                                 },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    Icons.Default.ZoomOut, 
+                                    Icons.Default.ZoomOut,
                                     contentDescription = "Zoom Out",
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
                             Text(
-                                text = "${(scale * 100).toInt()}%",
+                                text = "${(((pageScales[currentPage] ?: 1f) * 100).toInt())}%",
                                 style = MaterialTheme.typography.labelSmall,
                                 modifier = Modifier.width(45.dp),
                                 textAlign = TextAlign.Center
                             )
                             IconButton(
                                 onClick = {
-                                    if (scale < 3f) {
-                                        scale += 0.5f
+                                    val cur = pageScales[currentPage] ?: 1f
+                                    if (cur < 3f) {
+                                        pageScales[currentPage] = (cur + 0.5f).coerceAtMost(3f)
                                     }
                                 },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    Icons.Default.ZoomIn, 
+                                    Icons.Default.ZoomIn,
                                     contentDescription = "Zoom In",
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -402,7 +580,7 @@ fun PdfViewer(
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    Icons.Default.Delete, 
+                                    Icons.Default.Delete,
                                     contentDescription = "Radierer",
                                     tint = if (eraseMode) MaterialTheme.colorScheme.primary else LocalContentColor.current,
                                     modifier = Modifier.size(20.dp)
@@ -410,9 +588,9 @@ fun PdfViewer(
                             }
                             Spacer(modifier = Modifier.weight(1f))
                             Text(
-                                text = if (eraseMode) "Radierer" 
+                                text = if (eraseMode) "Radierer"
                                        else if (annotateMode && highlightMode) "Highlight"
-                                       else if (annotateMode) "Zeichnen" 
+                                       else if (annotateMode) "Zeichnen"
                                        else "Ansicht",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold
@@ -449,20 +627,20 @@ fun PdfViewer(
                         }
                     }
 
-                    // PDF-Seiten mit Annotationen
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .weight(1f),
-                        // Only allow page scroll when not in annotate/erase mode AND at default zoom (1f).
-                        // When zoomed in we want vertical swipes to pan the page, not change pages.
-                        userScrollEnabled = !(annotateMode || eraseMode) && scale == 1f
-                    ) {
-                        items(pageCount) { pageIndex ->
-                            val bitmap = pageBitmaps[pageIndex]
+                    // Main content area: uses weight to fill remaining space, preventing overlap with toolbars.
+                    Box(modifier = Modifier.weight(1f)) {
+                        val curScale = pageScales[currentPage] ?: 1f
+                        if (curScale != 1f) {
+                            // Show only the current page when zoomed — prevents other pages from showing partially.
+                            val pageIndex = currentPage
+                            val bitmapFromState = pageBitmaps[pageIndex]
+                            val cachedFromLru = bitmapCache.get(pageIndex)
+                            val bitmap = bitmapFromState ?: cachedFromLru
                             if (bitmap != null) {
+                                if (bitmapFromState == null) pageBitmaps[pageIndex] = bitmap
+                                if (cachedFromLru != null && !cacheKeys.contains(pageIndex)) cacheKeys.add(pageIndex)
                                 PdfPageWithAnnotations(
+                                    modifier = Modifier.fillMaxSize(),
                                     bitmap = bitmap,
                                     pageIndex = pageIndex,
                                     currentPage = currentPage,
@@ -473,57 +651,177 @@ fun PdfViewer(
                                     strokeWidth = strokeWidth,
                                     highlightMode = highlightMode,
                                     eraseRadius = eraseRadius,
-                                    scale = scale,
-                                    offsetX = offsetX,
-                                    offsetY = offsetY,
+                                    scale = pageScales[pageIndex] ?: 1f,
+                                    offsetX = pageOffsetsX[pageIndex] ?: 0f,
+                                    offsetY = pageOffsetsY[pageIndex] ?: 0f,
                                     isPageHighlighted = pageHighlights.contains(pageIndex),
-                                    onStrokeAdd = { stroke ->
-                                        strokes.add(stroke)
-                                    },
+                                    onStrokeAdd = { stroke -> strokes.add(stroke) },
                                     onStrokeUpdate = { oldStroke, newStroke ->
                                         val idx = strokes.indexOf(oldStroke)
-                                        if (idx >= 0) {
-                                            strokes[idx] = newStroke
-                                        }
+                                        if (idx >= 0) strokes[idx] = newStroke
                                     },
-                                    onStrokesErase = { erasedStrokes ->
-                                        strokes.removeAll(erasedStrokes)
-                                    },
+                                    onStrokesErase = { erasedStrokes -> strokes.removeAll(erasedStrokes) },
                                     onScaleChange = { newScale, centroid, overlaySize ->
-                                        val oldScale = scale
-                                        if (oldScale != 0f) {
-                                            val scaleFactor = newScale / oldScale
-                                            // Preserve focus point under the centroid while zooming
-                                            offsetX = offsetX - (centroid.x - offsetX) * (scaleFactor - 1f)
-                                            offsetY = offsetY - (centroid.y - offsetY) * (scaleFactor - 1f)
-                                        }
-
-                                        // Clamp offsets so the page stays within bounds
-                                        val minOffsetX = minOf(0f, overlaySize.width - overlaySize.width * newScale)
-                                        val minOffsetY = minOf(0f, overlaySize.height - overlaySize.height * newScale)
-                                        offsetX = offsetX.coerceIn(minOffsetX, 0f)
-                                        offsetY = offsetY.coerceIn(minOffsetY, 0f)
-                                        scale = newScale
+                                        val oldScale = pageScales[pageIndex] ?: 1f
+                                        val oldOffsetX = pageOffsetsX[pageIndex] ?: 0f
+                                        val oldOffsetY = pageOffsetsY[pageIndex] ?: 0f
+                                        val contentX = (centroid.x - oldOffsetX) / oldScale
+                                        val contentY = (centroid.y - oldOffsetY) / oldScale
+                                        var newOffsetX = centroid.x - contentX * newScale
+                                        var newOffsetY = centroid.y - contentY * newScale
+                                        val maxOffsetX = 0f
+                                        val minOffsetX = overlaySize.width * (1f - newScale)
+                                        val maxOffsetY = 0f
+                                        val minOffsetY = overlaySize.height * (1f - newScale)
+                                        newOffsetX = newOffsetX.coerceIn(minOffsetX, maxOffsetX)
+                                        newOffsetY = newOffsetY.coerceIn(minOffsetY, maxOffsetY)
+                                        pageScales[pageIndex] = newScale
+                                        pageOffsetsX[pageIndex] = newOffsetX
+                                        pageOffsetsY[pageIndex] = newOffsetY
                                     },
                                     onOffsetChange = { dx, dy, overlaySize ->
-                                        offsetX += dx
-                                        offsetY += dy
-                                        val minOffsetX = minOf(0f, overlaySize.width - overlaySize.width * scale)
-                                        val minOffsetY = minOf(0f, overlaySize.height - overlaySize.height * scale)
-                                        offsetX = offsetX.coerceIn(minOffsetX, 0f)
-                                        offsetY = offsetY.coerceIn(minOffsetY, 0f)
+                                        val currentScale = pageScales[pageIndex] ?: 1f
+                                        val currentOffsetX = pageOffsetsX[pageIndex] ?: 0f
+                                        val currentOffsetY = pageOffsetsY[pageIndex] ?: 0f
+                                        var newOffsetX = currentOffsetX + dx
+                                        var newOffsetY = currentOffsetY + dy
+                                        val maxOffsetX = 0f
+                                        val minOffsetX = overlaySize.width * (1f - currentScale)
+                                        val maxOffsetY = 0f
+                                        val minOffsetY = overlaySize.height * (1f - currentScale)
+                                        newOffsetX = newOffsetX.coerceIn(minOffsetX, maxOffsetX)
+                                        newOffsetY = newOffsetY.coerceIn(minOffsetY, maxOffsetY)
+                                        pageOffsetsX[pageIndex] = newOffsetX
+                                        pageOffsetsY[pageIndex] = newOffsetY
                                     },
-                                    onSave = {
-                                        AnnotationsRepository.save(context, pdfPath, strokes.toList())
-                                    }
+                                    onSave = { AnnotationsRepository.save(context, pdfPath, strokes.toList()) }
                                 )
+                            } else {
+                                val aspectRatio = pageAspectRatios[pageIndex] ?: (1f / 1.41f) // A4 fallback
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .aspectRatio(aspectRatio)
+                                        .padding(8.dp)
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                        .align(Alignment.Center)
+                                    ) {
+                                    if (!isLoading) CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                                }
+                                LaunchedEffect(pageIndex, pdfRenderer) {
+                                    if (pdfRenderer == null) return@LaunchedEffect
+                                    try { renderPageToCache(pageIndex, screenWidthPx) } catch (_: Exception) {}
+                                }
+                            }
+                        } else {
+                            // default: full list
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier.fillMaxSize(), // Weight is now on the parent Box
+                                userScrollEnabled = !(annotateMode || eraseMode)
+                            ) {
+                                items(pageCount) { pageIndex ->
+                                    // Try to fetch from state map first, otherwise try LRU cache
+                                    val bitmapFromState = pageBitmaps[pageIndex]
+                                    val cachedFromLru = bitmapCache.get(pageIndex)
+                                    val bitmap = bitmapFromState ?: cachedFromLru
+                                    if (bitmap != null) {
+                                        if (bitmapFromState == null) pageBitmaps[pageIndex] = bitmap
+                                        if (cachedFromLru != null && !cacheKeys.contains(pageIndex)) cacheKeys.add(pageIndex)
+                                        PdfPageWithAnnotations(
+                                            modifier = Modifier.fillMaxWidth().aspectRatio(bitmap.width.toFloat() / bitmap.height.toFloat()),
+                                            bitmap = bitmap,
+                                            pageIndex = pageIndex,
+                                            currentPage = currentPage,
+                                            strokes = strokes.filter { it.page == pageIndex },
+                                            annotateMode = annotateMode,
+                                            eraseMode = eraseMode,
+                                            selectedColor = selectedColor,
+                                            strokeWidth = strokeWidth,
+                                            highlightMode = highlightMode,
+                                            eraseRadius = eraseRadius,
+                                            scale = pageScales[pageIndex] ?: 1f,
+                                            offsetX = pageOffsetsX[pageIndex] ?: 0f,
+                                            offsetY = pageOffsetsY[pageIndex] ?: 0f,
+                                            isPageHighlighted = pageHighlights.contains(pageIndex),
+                                            onStrokeAdd = { stroke ->
+                                                strokes.add(stroke)
+                                            },
+                                            onStrokeUpdate = { oldStroke, newStroke ->
+                                                val idx = strokes.indexOf(oldStroke)
+                                                if (idx >= 0) {
+                                                    strokes[idx] = newStroke
+                                                }
+                                            },
+                                            onStrokesErase = { erasedStrokes ->
+                                                strokes.removeAll(erasedStrokes)
+                                            },
+                                            onScaleChange = { newScale, centroid, overlaySize ->
+                                                val oldScale = pageScales[pageIndex] ?: 1f
+                                                val oldOffsetX = pageOffsetsX[pageIndex] ?: 0f
+                                                val oldOffsetY = pageOffsetsY[pageIndex] ?: 0f
+                                                val contentX = (centroid.x - oldOffsetX) / oldScale
+                                                val contentY = (centroid.y - oldOffsetY) / oldScale
+                                                var newOffsetX = centroid.x - contentX * newScale
+                                                var newOffsetY = centroid.y - contentY * newScale
+                                                val maxOffsetX = 0f
+                                                val minOffsetX = overlaySize.width * (1f - newScale)
+                                                val maxOffsetY = 0f
+                                                val minOffsetY = overlaySize.height * (1f - newScale)
+                                                newOffsetX = newOffsetX.coerceIn(minOffsetX, maxOffsetX)
+                                                newOffsetY = newOffsetY.coerceIn(minOffsetY, maxOffsetY)
+                                                pageScales[pageIndex] = newScale
+                                                pageOffsetsX[pageIndex] = newOffsetX
+                                                pageOffsetsY[pageIndex] = newOffsetY
+                                            },
+                                            onOffsetChange = { dx, dy, overlaySize ->
+                                                val currentScale = pageScales[pageIndex] ?: 1f
+                                                val currentOffsetX = pageOffsetsX[pageIndex] ?: 0f
+                                                val currentOffsetY = pageOffsetsY[pageIndex] ?: 0f
+                                                var newOffsetX = currentOffsetX + dx
+                                                var newOffsetY = currentOffsetY + dy
+                                                val maxOffsetX = 0f
+                                                val minOffsetX = overlaySize.width * (1f - currentScale)
+                                                val maxOffsetY = 0f
+                                                val minOffsetY = overlaySize.height * (1f - currentScale)
+                                                newOffsetX = newOffsetX.coerceIn(minOffsetX, maxOffsetX)
+                                                newOffsetY = newOffsetY.coerceIn(minOffsetY, maxOffsetY)
+                                                pageOffsetsX[pageIndex] = newOffsetX
+                                                pageOffsetsY[pageIndex] = newOffsetY
+                                            },
+                                            onSave = {
+                                                AnnotationsRepository.save(context, pdfPath, strokes.toList())
+                                            }
+                                        )
+                                    } else {
+                                        val aspectRatio = pageAspectRatios[pageIndex] ?: (1f / 1.41f) // A4 fallback
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .aspectRatio(aspectRatio)
+                                                .padding(8.dp)
+                                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                        ) {
+                                            if (!isLoading) {
+                                                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                                            }
+                                        }
+                                        LaunchedEffect(pageIndex, pdfRenderer) {
+                                            if (pdfRenderer == null) return@LaunchedEffect
+                                            try {
+                                                renderPageToCache(pageIndex, screenWidthPx)
+                                            } catch (_: Exception) {
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
         }
-        
+
         // Shortcut-Dialog
         if (showShortcutDialog) {
             AlertDialog(
@@ -598,6 +896,7 @@ fun PdfViewer(
 
 @Composable
 private fun PdfPageWithAnnotations(
+    modifier: Modifier = Modifier,
     bitmap: Bitmap,
     pageIndex: Int,
     currentPage: Int,
@@ -623,11 +922,10 @@ private fun PdfPageWithAnnotations(
     var currentStroke by remember { mutableStateOf<AnnotationStroke?>(null) }
 
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(bitmap.width.toFloat() / bitmap.height.toFloat())
+        modifier = modifier
             .padding(8.dp)
             .background(Color.White) // PDF always on white background regardless of dark mode
+            .clip(RectangleShape)
     ) {
         // PDF-Seite als Bitmap
         Image(
@@ -641,9 +939,10 @@ private fun PdfPageWithAnnotations(
                     translationX = offsetX,
                     translationY = offsetY
                 ),
-            contentScale = ContentScale.Fit
+            contentScale = ContentScale.Fit,
+            alignment = Alignment.Center
         )
-        
+
         // Seiten-Highlight (wenn aktiviert)
         if (isPageHighlighted) {
             Box(
