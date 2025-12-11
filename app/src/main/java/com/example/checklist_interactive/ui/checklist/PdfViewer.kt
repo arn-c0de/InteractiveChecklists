@@ -35,6 +35,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
@@ -71,6 +73,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import androidx.compose.material.icons.filled.BookmarkAdd
+import androidx.compose.material.icons.filled.InvertColors
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material.icons.filled.CenterFocusWeak
@@ -134,6 +137,7 @@ fun PdfViewer(
     var shortcutName by remember { mutableStateOf("") }
     val pageAspectRatios = remember { mutableStateMapOf<Int, Float>() }
     var pageHighlights by remember { mutableStateOf<List<Int>>(emptyList()) }
+    var invertColors by remember { mutableStateOf(false) }
     var showTocDialog by remember { mutableStateOf(false) }
     var chapters by remember { mutableStateOf<List<Pair<String, Int>>>(emptyList()) }
 
@@ -440,6 +444,14 @@ fun PdfViewer(
                                 modifier = Modifier.size(18.dp)
                             )
                         }
+                    }
+                    HintIconButton(
+                        onClick = { invertColors = !invertColors },
+                        hint = "Farben invertieren",
+                        onHintChange = { hoveredHint = it },
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(Icons.Default.InvertColors, contentDescription = "Invert Colors", modifier = Modifier.size(18.dp))
                     }
                 }
             )
@@ -830,7 +842,8 @@ fun PdfViewer(
                                     scale = pageScales[pageIndex] ?: 1f,
                                     offsetX = pageOffsetsX[pageIndex] ?: 0f,
                                     offsetY = pageOffsetsY[pageIndex] ?: 0f,
-                                    isPageHighlighted = pageHighlights.contains(pageIndex),
+                                        isPageHighlighted = pageHighlights.contains(pageIndex),
+                                        invertColors = invertColors,
                                     onStrokeAdd = { stroke -> strokes.add(stroke) },
                                     onStrokeUpdate = { oldStroke, newStroke ->
                                         val idx = strokes.indexOf(oldStroke)
@@ -958,6 +971,7 @@ fun PdfViewer(
                                             offsetX = pageOffsetX,
                                             offsetY = pageOffsetY,
                                             isPageHighlighted = isHighlighted,
+                                            invertColors = invertColors,
                                             onStrokeAdd = { strokes.add(it) },
                                             onStrokeUpdate = { old, new ->
                                                 val idx = strokes.indexOf(old)
@@ -1249,6 +1263,7 @@ private fun PdfPageWithAnnotations(
     offsetX: Float,
     offsetY: Float,
     isPageHighlighted: Boolean,
+    invertColors: Boolean,
     onStrokeAdd: (AnnotationStroke) -> Unit,
     onStrokeUpdate: (AnnotationStroke, AnnotationStroke) -> Unit,
     onStrokesErase: (List<AnnotationStroke>) -> Unit,
@@ -1266,9 +1281,23 @@ private fun PdfPageWithAnnotations(
     Box(
         modifier = modifier
             .padding(8.dp)
-            .background(Color.White) // PDF always on white background regardless of dark mode
+            .background(if (invertColors) Color.Black else Color.White)
             .clip(RectangleShape)
     ) {
+        val colorFilter = remember(invertColors) {
+            if (invertColors) ColorFilter.colorMatrix(
+                ColorMatrix(
+                    floatArrayOf(
+                        -1f, 0f, 0f, 0f, 255f,
+                        0f, -1f, 0f, 0f, 255f,
+                        0f, 0f, -1f, 0f, 255f,
+                        0f, 0f, 0f, 1f, 0f
+                    )
+                )
+            ) else null
+        }
+
+        fun invertColor(c: Color) = Color(1f - c.red, 1f - c.green, 1f - c.blue, c.alpha)
         // PDF-Seite als Bitmap
         Image(
             bitmap = remember(bitmap) { bitmap.asImageBitmap() },
@@ -1283,15 +1312,17 @@ private fun PdfPageWithAnnotations(
                     transformOrigin = TransformOrigin(0f, 0f)
                 ),
             contentScale = ContentScale.Fit,
-            alignment = Alignment.Center
+            alignment = Alignment.Center,
+            colorFilter = colorFilter
         )
 
         // Seiten-Highlight (wenn aktiviert)
         if (isPageHighlighted) {
+            val highlightCol = if (invertColors) invertColor(Color.Yellow).copy(alpha = 0.2f) else Color.Yellow.copy(alpha = 0.2f)
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Yellow.copy(alpha = 0.2f))
+                    .background(highlightCol)
             )
         }
 
@@ -1490,9 +1521,11 @@ private fun PdfPageWithAnnotations(
                 } else {
                     maxOf(1f, stroke.strokeWidth * scale)
                 }
+                val strokeBaseColor = Color(stroke.color.toULong())
+                val strokeDrawColor = if (invertColors) invertColor(strokeBaseColor) else strokeBaseColor
                 drawPath(
                     path = path,
-                    color = Color(stroke.color.toULong()),
+                    color = strokeDrawColor,
                     style = Stroke(width = widthPx),
                     alpha = if (stroke.isHighlight) 0.4f else 1f
                 )
@@ -1514,9 +1547,11 @@ private fun PdfPageWithAnnotations(
                     } else {
                         maxOf(1f, stroke.strokeWidth * scale)
                     }
+                    val strokeBaseColor = Color(stroke.color.toULong())
+                    val strokeDrawColor = if (invertColors) invertColor(strokeBaseColor) else strokeBaseColor
                     drawPath(
                         path = path,
-                        color = Color(stroke.color.toULong()),
+                        color = strokeDrawColor,
                         style = Stroke(width = widthPx),
                         alpha = if (stroke.isHighlight) 0.4f else 1f
                     )
@@ -1525,14 +1560,16 @@ private fun PdfPageWithAnnotations(
 
             // Zeichne den Radierer-Cursor wenn Radierer-Modus aktiv ist
             if (eraseMode && eraserPosition != null && isCurrentPage) {
+                val eraserOuter = if (invertColors) invertColor(Color.Red.copy(alpha = 0.3f)) else Color.Red.copy(alpha = 0.3f)
+                val eraserInner = if (invertColors) invertColor(Color.Red.copy(alpha = 0.1f)) else Color.Red.copy(alpha = 0.1f)
                 drawCircle(
-                    color = Color.Red.copy(alpha = 0.3f),
+                    color = eraserOuter,
                     radius = eraseRadius,
                     center = eraserPosition!!,
                     style = Stroke(width = 2f)
                 )
                 drawCircle(
-                    color = Color.Red.copy(alpha = 0.1f),
+                    color = eraserInner,
                     radius = eraseRadius,
                     center = eraserPosition!!
                 )
@@ -1549,15 +1586,17 @@ private fun PdfPageWithAnnotations(
                 }
 
                 // Äußerer Ring in der ausgewählten Farbe
+                val selOuter = if (invertColors) invertColor(selectedColor.copy(alpha = 0.5f)) else selectedColor.copy(alpha = 0.5f)
+                val selInner = if (invertColors) invertColor(selectedColor.copy(alpha = if (highlightMode) 0.3f else 0.2f)) else selectedColor.copy(alpha = if (highlightMode) 0.3f else 0.2f)
                 drawCircle(
-                    color = selectedColor.copy(alpha = 0.5f),
+                    color = selOuter,
                     radius = brushRadius,
                     center = brushPosition!!,
                     style = Stroke(width = 2f)
                 )
                 // Innerer gefüllter Kreis
                 drawCircle(
-                    color = selectedColor.copy(alpha = if (highlightMode) 0.3f else 0.2f),
+                    color = selInner,
                     radius = brushRadius,
                     center = brushPosition!!
                 )
