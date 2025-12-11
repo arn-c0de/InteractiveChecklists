@@ -55,6 +55,7 @@ dependencies {
     implementation(libs.commonmark)
     implementation(libs.commonmark.ext.task.list.items)
     implementation(libs.kotlinx.serialization.json)
+    implementation("androidx.documentfile:documentfile:1.0.1")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

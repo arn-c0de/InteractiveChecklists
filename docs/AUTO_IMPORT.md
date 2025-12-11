@@ -24,6 +24,7 @@ Erstelle einen `Imports/` Ordner an einem der folgenden Orte:
 ## Kategorie-System
 
 Jeder Unterordner im `Imports/` Ordner wird automatisch zu einer Kategorie in "My Files".
+Verschachtelte Unterordner werden in der App beibehalten und als aufklappbare Ordner angezeigt (z. B. `Checklists/F-16_Viper`).
 
 ### Beispiel-Struktur:
 

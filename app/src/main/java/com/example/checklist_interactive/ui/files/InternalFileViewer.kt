@@ -16,6 +16,19 @@ import com.example.checklist_interactive.data.files.FileInfo
 import com.example.checklist_interactive.ui.checklist.MarkdownViewer
 import com.example.checklist_interactive.ui.checklist.PdfViewer
 
+import androidx.compose.material.icons.filled.Refresh
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.checklist_interactive.data.checklist.ChecklistRepository
+import com.example.checklist_interactive.data.prefs.PreferencesManager
+import com.example.checklist_interactive.data.checklist.MarkdownChecklistParser
+import com.example.checklist_interactive.ui.checklist.ChecklistViewModel
+import com.example.checklist_interactive.ui.checklist.ChecklistViewModelFactory
+import java.io.File
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.example.checklist_interactive.R
 
@@ -32,20 +45,47 @@ fun InternalFileViewer(
     isDarkTheme: Boolean,
     onToggleTheme: () -> Unit
 ) {
+    val context = LocalContext.current
+
     when (fileInfo.extension.lowercase()) {
         "pdf" -> {
+            val prefsManager = remember { PreferencesManager(context) }
+            val lastPage = remember(fileInfo.path) { prefsManager.getInt("pdf_last_page_${fileInfo.path}", 0) }
+            var currentPage by remember { mutableStateOf(lastPage) }
             PdfViewer(
                 pdfPath = fileInfo.path,
                 title = fileInfo.displayName,
-                onBack = onBack,
+                onBack = {
+                    prefsManager.setInt("pdf_last_page_${fileInfo.path}", currentPage)
+                    onBack()
+                },
                 onShowFileList = onShowFileList,
                 isDarkTheme = isDarkTheme,
                 onToggleTheme = onToggleTheme,
                 isInternalFile = true,
-                initialPage = initialPage
+                initialPage = currentPage,
+                onPageChange = { page -> currentPage = page }
             )
         }
         "md", "markdown" -> {
+            val checklistRepository = remember { ChecklistRepository(context) }
+            val markdownContent = remember(fileInfo.path) {
+                try {
+                    File(fileInfo.path).readText()
+                } catch (e: Exception) {
+                    "" // Return empty on error
+                }
+            }
+            val parsedChecklist = remember(markdownContent) {
+                MarkdownChecklistParser().parse(fileInfo.path, markdownContent)
+            }
+
+            val viewModel: ChecklistViewModel = viewModel(
+                factory = ChecklistViewModelFactory(checklistRepository, parsedChecklist)
+            )
+
+            val checklistState by viewModel.checklistState.collectAsState()
+
             Scaffold(
                 topBar = {
                     TopAppBar(
@@ -56,6 +96,9 @@ fun InternalFileViewer(
                             }
                         },
                         actions = {
+                            IconButton(onClick = { viewModel.resetChecklist() }) {
+                                Icon(Icons.Default.Refresh, contentDescription = "Reset Checklist")
+                            }
                             IconButton(onClick = onToggleTheme) {
                                 Icon(
                                     imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
@@ -76,8 +119,8 @@ fun InternalFileViewer(
             ) { padding ->
                 MarkdownViewer(
                     assetPath = fileInfo.path,
-                    checklist = null,
-                    onCheckboxChange = null,
+                    checklist = checklistState,
+                    onCheckboxChange = viewModel::onCheckboxChange,
                     modifier = Modifier.padding(padding),
                     isInternalFile = true
                 )

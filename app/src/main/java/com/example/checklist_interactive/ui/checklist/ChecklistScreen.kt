@@ -27,6 +27,7 @@ import com.example.checklist_interactive.data.checklist.Checklist
 import com.example.checklist_interactive.data.checklist.ChecklistItem
 import com.example.checklist_interactive.data.checklist.ChecklistSection
 import com.example.checklist_interactive.data.checklist.AssetBrowser
+import com.example.checklist_interactive.data.checklist.AssetNode
 
 import androidx.compose.ui.platform.LocalContext
 import com.example.checklist_interactive.R
@@ -34,7 +35,7 @@ import com.example.checklist_interactive.R
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChecklistScreen(viewModel: ChecklistViewModel, checklistId: String, onBack: (() -> Unit)? = null, onExport: ((String) -> Unit)? = null, assetBrowser: AssetBrowser? = null, onOpenFile: ((String) -> Unit)? = null, onThemeChange: ((Boolean) -> Unit)? = null, initialIsDark: Boolean = false) {
-    val checklistState by viewModel.checklist.collectAsState()
+    val checklistState by viewModel.checklistState.collectAsState()
     val checklist = checklistState
 
     var showFolderPopup by remember { mutableStateOf(false) }
@@ -44,7 +45,7 @@ fun ChecklistScreen(viewModel: ChecklistViewModel, checklistId: String, onBack: 
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text(text = checklist?.title ?: LocalContext.current.getString(R.string.checklist)) }, navigationIcon = {
+            TopAppBar(title = { Text(text = checklist.title) }, navigationIcon = {
                 Row {
                     Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)) {
                         IconButton(onClick = {
@@ -72,7 +73,7 @@ fun ChecklistScreen(viewModel: ChecklistViewModel, checklistId: String, onBack: 
                                 }
                                 Divider()
                                 LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
-                                    items(popupNodes) { node ->
+                                    items(popupNodes) { node: AssetNode ->
                                         ListItem(headlineContent = { Text(node.name) }, leadingContent = {
                                             if (node.isDirectory) Icon(Icons.Default.Folder, contentDescription = "folder")
                                             else Icon(Icons.Default.InsertDriveFile, contentDescription = "file")
@@ -89,7 +90,6 @@ fun ChecklistScreen(viewModel: ChecklistViewModel, checklistId: String, onBack: 
                             }
                         }, confirmButton = {
                             TextButton(onClick = {
-                                // set checklist to selected folder — not all items are checklists; parent should handle
                                 onOpenFile?.invoke(popupPath)
                                 showFolderPopup = false
                             }) { Text(LocalContext.current.getString(R.string.open)) }
@@ -105,7 +105,7 @@ fun ChecklistScreen(viewModel: ChecklistViewModel, checklistId: String, onBack: 
                     }
                 }
             }, actions = {
-                IconButton(onClick = { checklist?.let { viewModel.resetChecklist(it.id) } }) {
+                IconButton(onClick = { viewModel.resetChecklist() }) {
                     Icon(Icons.Default.Refresh, contentDescription = LocalContext.current.getString(R.string.reset))
                 }
                 IconButton(onClick = {
@@ -120,15 +120,13 @@ fun ChecklistScreen(viewModel: ChecklistViewModel, checklistId: String, onBack: 
             })
         }
     ) { padding ->
-        checklist?.let { c ->
+        val c: Checklist = checklist
             LazyColumn(modifier = Modifier.padding(padding)) {
-                items(c.sections) { section ->
+                items(c.sections) { section: ChecklistSection ->
                     ChecklistSectionComposable(section = section, checklistId = c.id, viewModel = viewModel)
                 }
             }
-        } ?: Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
-            Text(LocalContext.current.getString(R.string.loading))
-        }
+        
     }
     ThemeSettingsDialog(open = showSettingsDialog, isDark = isDarkTheme, onDismiss = { showSettingsDialog = false }) { toggled ->
         isDarkTheme = toggled
@@ -141,8 +139,8 @@ fun ChecklistSectionComposable(section: ChecklistSection, checklistId: String, v
     Column(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
         Text(text = section.title, style = MaterialTheme.typography.titleMedium)
         Spacer(modifier = Modifier.height(8.dp))
-        section.items.forEach { item ->
-            ChecklistItemComposable(item = item, checklistId = checklistId, viewModel = viewModel)
+            section.items.forEach { item: ChecklistItem ->
+                ChecklistItemComposable(item = item, checklistId = checklistId, viewModel = viewModel)
         }
     }
 }
@@ -151,9 +149,9 @@ fun ChecklistSectionComposable(section: ChecklistSection, checklistId: String, v
 fun ChecklistItemComposable(item: ChecklistItem, checklistId: String, viewModel: ChecklistViewModel) {
     Row(modifier = Modifier
         .fillMaxWidth()
-        .clickable { viewModel.toggleItem(checklistId, item.id, !item.isChecked) }
+        .clickable { viewModel.onCheckboxChange(item.id, !item.isChecked) }
         .padding(4.dp), horizontalArrangement = Arrangement.Start) {
-        Checkbox(checked = item.isChecked, onCheckedChange = { checked -> viewModel.toggleItem(checklistId, item.id, checked) })
+        Checkbox(checked = item.isChecked, onCheckedChange = { checked -> viewModel.onCheckboxChange(item.id, checked) })
         Spacer(modifier = Modifier.width(8.dp))
         Text(text = item.text, modifier = Modifier.weight(1f), textDecoration = if (item.isChecked) TextDecoration.LineThrough else TextDecoration.None)
     }
