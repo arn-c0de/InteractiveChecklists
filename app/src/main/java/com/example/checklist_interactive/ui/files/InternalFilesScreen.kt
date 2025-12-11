@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.LocalContentColor
 import com.example.checklist_interactive.data.files.FileInfo
 import com.example.checklist_interactive.data.files.InternalFileManager
 import com.example.checklist_interactive.data.prefs.PreferencesManager
@@ -36,9 +37,13 @@ import com.example.checklist_interactive.data.shortcuts.PageShortcut
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.FilterList
 
 import com.example.checklist_interactive.R
 import androidx.compose.ui.graphics.Color
+import com.example.checklist_interactive.ui.tags.FileTagEditorDialog
+import com.example.checklist_interactive.ui.tags.TagFilterBar
+import com.example.checklist_interactive.ui.tags.TagChips
 
 /**
  * Hauptscreen für interne Dateiverwaltung
@@ -114,6 +119,35 @@ fun InternalFilesScreen(
     var showRenameDialog by remember { mutableStateOf(false) }
     var renameText by remember { mutableStateOf("") }
     
+    // Tag-related state
+    val tagManager = remember { fileManager.tagManager }
+    var fileToEditTags by remember { mutableStateOf<FileInfo?>(null) }
+    var showTagEditor by remember { mutableStateOf(false) }
+    var showTagFilter by remember { mutableStateOf(false) }
+    var selectedTagFilters by remember { mutableStateOf(prefsManager.getActiveTagFilters()) }
+    var tagFilterMode by remember { mutableStateOf(prefsManager.getTagFilterMode()) }
+    val allUsedTags = remember(refreshTrigger) { tagManager.getAllUsedTags() }
+    
+    // Function to refresh and enrich files with tags
+    fun refreshFilesWithTags() {
+        val rawGroupedFiles = fileManager.getAllFilesGrouped()
+        groupedFiles = rawGroupedFiles.mapValues { (_, files) ->
+            val enrichedFiles = fileManager.enrichWithTags(files)
+            if (selectedTagFilters.isEmpty()) {
+                enrichedFiles
+            } else if (tagFilterMode == "all") {
+                enrichedFiles.filter { file -> selectedTagFilters.all { tag -> file.tags.contains(tag) } }
+            } else {
+                enrichedFiles.filter { file -> file.tags.any { tag -> selectedTagFilters.contains(tag) } }
+            }
+        }.filterValues { it.isNotEmpty() }
+        
+        val rawTree = fileManager.getFolderTree().map { node ->
+            filterAircraftChildren(node, assetAircraftsLower, prefsManager)
+        }
+        folderTree = rawTree.map { node -> enrichNodeWithTags(node, fileManager, selectedTagFilters, tagFilterMode) }
+    }
+    
     // Expanded state für jede Kategorie + Shortcuts
     val expandedCategories = remember {
         mutableStateMapOf<String, Boolean>().apply {
@@ -145,10 +179,7 @@ fun InternalFilesScreen(
                 val result = fileManager.importFile(selectedUri, category)
                 result.onSuccess {
                     // Refresh file list und filter folderTree nach Sichtbarkeit
-                    groupedFiles = fileManager.getAllFilesGrouped()
-                    folderTree = fileManager.getFolderTree().map { node ->
-                        filterAircraftChildren(node, assetAircraftsLower, prefsManager)
-                    }
+                    refreshFilesWithTags()
                     onRefresh()
                 }.onFailure { error ->
                     // TODO: Show error to user
@@ -164,14 +195,22 @@ fun InternalFilesScreen(
             TopAppBar(
                 title = { Text(context.getString(R.string.title_my_files)) },
                 actions = {
+                    // Tag filter toggle
+                    IconButton(onClick = { showTagFilter = !showTagFilter }) {
+                        Icon(
+                            imageVector = Icons.Default.FilterList,
+                            contentDescription = "Filter by tags",
+                            tint = if (selectedTagFilters.isNotEmpty()) 
+                                MaterialTheme.colorScheme.primary 
+                            else 
+                                LocalContentColor.current
+                        )
+                    }
                     IconButton(onClick = { showImportDialog = true }) {
                         Icon(Icons.Default.Add, contentDescription = context.getString(R.string.import_file))
                     }
                     IconButton(onClick = {
-                        groupedFiles = fileManager.getAllFilesGrouped()
-                        folderTree = fileManager.getFolderTree().map { node ->
-                            filterAircraftChildren(node, assetAircraftsLower, prefsManager)
-                        }
+                        refreshFilesWithTags()
                         onRefresh()
                     }) {
                         Icon(Icons.Default.Refresh, contentDescription = context.getString(R.string.refresh))
@@ -223,6 +262,43 @@ fun InternalFilesScreen(
                     .fillMaxSize()
                     .padding(padding)
             ) {
+                // Tag filter bar
+                if (showTagFilter && allUsedTags.isNotEmpty()) {
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
+                            TagFilterBar(
+                                availableTags = allUsedTags,
+                                selectedTags = selectedTagFilters,
+                                filterMode = tagFilterMode,
+                                onTagToggle = { tag ->
+                                    selectedTagFilters = if (selectedTagFilters.contains(tag)) {
+                                        selectedTagFilters - tag
+                                    } else {
+                                        selectedTagFilters + tag
+                                    }
+                                    prefsManager.setActiveTagFilters(selectedTagFilters)
+                                    refreshFilesWithTags()
+                                },
+                                onClearAll = {
+                                    selectedTagFilters = emptySet()
+                                    prefsManager.clearTagFilters()
+                                    refreshFilesWithTags()
+                                },
+                                onFilterModeChange = { mode ->
+                                    tagFilterMode = mode
+                                    prefsManager.setTagFilterMode(mode)
+                                    refreshFilesWithTags()
+                                },
+                                modifier = Modifier.padding(16.dp)
+                            )
+                        }
+                    }
+                }
+                
                 // Shortcuts-Kategorie (immer zuerst)
                 if (shortcuts.isNotEmpty()) {
                     item {
@@ -270,8 +346,10 @@ fun InternalFilesScreen(
                             onDelete = { file ->
                                 fileToDelete = file
                                 showDeleteConfirm = true
-                            },
-                            level = 0
+                            },                            onEditTags = { file ->
+                                fileToEditTags = file
+                                showTagEditor = true
+                            },                            level = 0
                         )
                     }
                 }
@@ -309,8 +387,8 @@ fun InternalFilesScreen(
                     onClick = {
                         fileToDelete?.let { file ->
                             fileManager.deleteFile(file.path)
-                            groupedFiles = fileManager.getAllFilesGrouped()
-                                    folderTree = fileManager.getFolderTree()
+                            tagManager.removeFileFromTags(file.path)
+                            refreshFilesWithTags()
                             onRefresh()
                         }
                         showDeleteConfirm = false
@@ -373,28 +451,65 @@ fun InternalFilesScreen(
             }
         )
     }
+    
+    // Tag Editor Dialog
+    if (showTagEditor && fileToEditTags != null) {
+        FileTagEditorDialog(
+            fileName = fileToEditTags!!.displayName,
+            currentTags = fileToEditTags!!.tags,
+            allUsedTags = allUsedTags,
+            onDismiss = {
+                showTagEditor = false
+                fileToEditTags = null
+            },
+            onSave = { newTags ->
+                fileToEditTags?.let { file ->
+                    tagManager.setTagsForFile(file.path, newTags)
+                    refreshFilesWithTags()
+                }
+                showTagEditor = false
+                fileToEditTags = null
+            }
+        )
+    }
 
     // When parent changes refreshTrigger, update contents
     LaunchedEffect(refreshTrigger) {
-        groupedFiles = fileManager.getAllFilesGrouped()
-        folderTree = fileManager.getFolderTree().map { node ->
-            filterAircraftChildren(node, assetAircraftsLower, prefsManager)
-        }
+        refreshFilesWithTags()
         shortcuts = shortcutManager.loadShortcuts()
     }
 
     // Listen for preference changes and update filtering when visible aircrafts change
     DisposableEffect(prefsManager) {
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
-            groupedFiles = fileManager.getAllFilesGrouped()
-            folderTree = fileManager.getFolderTree().map { node ->
-                filterAircraftChildren(node, assetAircraftsLower, prefsManager)
-            }
+            refreshFilesWithTags()
             shortcuts = shortcutManager.loadShortcuts()
         }
         prefsManager.registerOnChangeListener(listener)
         onDispose { prefsManager.unregisterOnChangeListener(listener) }
     }
+}
+
+// Top-level helper to enrich folder nodes with tags (must be outside composable for visibility)
+private fun enrichNodeWithTags(
+    node: InternalFileManager.FolderNode,
+    fileManager: InternalFileManager,
+    selectedTagFilters: Set<String>,
+    tagFilterMode: String
+): InternalFileManager.FolderNode {
+    // Helper to apply tag filters
+    fun applyTagFilters(files: List<FileInfo>): List<FileInfo> {
+        if (selectedTagFilters.isEmpty()) return files
+        val enrichedFiles = fileManager.enrichWithTags(files)
+        return if (tagFilterMode == "all") {
+            enrichedFiles.filter { file -> selectedTagFilters.all { tag -> file.tags.contains(tag) } }
+        } else {
+            enrichedFiles.filter { file -> file.tags.any { tag -> selectedTagFilters.contains(tag) } }
+        }
+    }
+    val enrichedFiles = fileManager.enrichWithTags(applyTagFilters(node.files))
+    val enrichedChildren = node.children.map { enrichNodeWithTags(it, fileManager, selectedTagFilters, tagFilterMode) }
+    return node.copy(files = enrichedFiles, children = enrichedChildren)
 }
 
 /**
@@ -438,6 +553,7 @@ private fun FolderTree(
     onToggleExpanded: (String, Boolean) -> Unit,
     onFileOpen: (FileInfo) -> Unit,
     onDelete: (FileInfo) -> Unit,
+    onEditTags: (FileInfo) -> Unit,
     level: Int
 ) {
     nodes.forEach { node ->
@@ -447,6 +563,7 @@ private fun FolderTree(
             onToggleExpanded = onToggleExpanded,
             onFileOpen = onFileOpen,
             onDelete = onDelete,
+            onEditTags = onEditTags,
             level = level
         )
     }
@@ -467,6 +584,7 @@ private fun FolderNodeItem(
     onToggleExpanded: (String, Boolean) -> Unit,
     onFileOpen: (FileInfo) -> Unit,
     onDelete: (FileInfo) -> Unit,
+    onEditTags: (FileInfo) -> Unit,
     level: Int
 ) {
     val key = node.relativePath
@@ -517,7 +635,12 @@ private fun FolderNodeItem(
     if (isExpanded) {
         // Show files for this node
         node.files.forEach { file ->
-            FileListItem(file = file, onClick = { onFileOpen(file) }, onDelete = { onDelete(file) })
+            FileListItem(
+                file = file, 
+                onClick = { onFileOpen(file) }, 
+                onDelete = { onDelete(file) },
+                onEditTags = { onEditTags(file) }
+            )
         }
 
         // Recurse into children nodes
@@ -528,6 +651,7 @@ private fun FolderNodeItem(
                 onToggleExpanded = onToggleExpanded,
                 onFileOpen = onFileOpen,
                 onDelete = onDelete,
+                onEditTags = onEditTags,
                 level = level + 1
             )
         }
@@ -686,7 +810,8 @@ private fun ShortcutListItem(
 private fun FileListItem(
     file: FileInfo,
     onClick: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onEditTags: () -> Unit
 ) {
     val fileIcon = when (file.extension.lowercase()) {
         "pdf" -> Icons.Default.PictureAsPdf
@@ -699,42 +824,59 @@ private fun FileListItem(
         else -> MaterialTheme.colorScheme.primary
     }
 
-    ListItem(
-        headlineContent = { Text(file.displayName) },
-        supportingContent = {
-            Text(
-                file.extension.uppercase(),
-                style = MaterialTheme.typography.labelSmall
-            )
-        },
-        leadingContent = {
-            Icon(
-                fileIcon,
-                contentDescription = null,
-                tint = fileColor
-            )
-        },
-        trailingContent = {
-            Row {
-                if (!file.isAsset) {
-                    IconButton(onClick = onDelete) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = LocalContext.current.getString(R.string.delete),
-                            tint = MaterialTheme.colorScheme.error
-                        )
+    Column(modifier = Modifier.clickable(onClick = onClick)) {
+        ListItem(
+            headlineContent = { Text(file.displayName) },
+            supportingContent = {
+                Column {
+                    Text(
+                        file.extension.uppercase(),
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                    if (file.tags.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        TagChips(tags = file.tags, maxVisible = 3)
                     }
                 }
+            },
+            leadingContent = {
                 Icon(
-                    Icons.Default.ChevronRight,
+                    fileIcon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.outline
+                    tint = fileColor
                 )
+            },
+            trailingContent = {
+                Row {
+                    IconButton(onClick = onEditTags) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = "Edit tags",
+                            tint = if (file.tags.isNotEmpty()) 
+                                MaterialTheme.colorScheme.primary 
+                            else 
+                                MaterialTheme.colorScheme.outline
+                        )
+                    }
+                    if (!file.isAsset) {
+                        IconButton(onClick = onDelete) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = LocalContext.current.getString(R.string.delete),
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                    Icon(
+                        Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.outline
+                    )
+                }
             }
-        },
-        modifier = Modifier.clickable(onClick = onClick)
-    )
-    HorizontalDivider()
+        )
+        HorizontalDivider()
+    }
 }
 
 @Composable

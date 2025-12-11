@@ -1,24 +1,40 @@
+
 package com.example.checklist_interactive.ui.settings
 
+import android.widget.Toast
 import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
 import com.example.checklist_interactive.data.prefs.PreferencesManager
 import com.example.checklist_interactive.data.files.InternalFileManager
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.layout.Arrangement
+import kotlinx.serialization.json.Json
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.text.font.FontFamily
+import com.example.checklist_interactive.data.tags.FileTag
+
+// The list of available aircraft folders is loaded from the assets/Checklists directory
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,65 +42,69 @@ fun SettingsScreen(
     prefsManager: PreferencesManager,
     fileManager: InternalFileManager,
     onBack: () -> Unit,
-    onRequestFolderPicker: () -> Unit,
     softwareVersion: String,
     onFilesRefreshed: () -> Unit = {}
 ) {
-    val context = LocalContext.current
+    var importExpanded by remember { mutableStateOf(false) }
     var currentFolderUri by remember { mutableStateOf(prefsManager.getImportFolderUri()) }
+    var showWipeConfirm by remember { mutableStateOf(false) }
+
     var showAircraftDialog by remember { mutableStateOf(false) }
     var showResetConfirm by remember { mutableStateOf(false) }
-    var showWipeConfirm by remember { mutableStateOf(false) }
-    
-    // Dynamisch alle Aircraft aus allen Quellen laden
-    val assetAircrafts = remember {
-        try {
-            val rootNames = context.assets.list("") ?: emptyArray()
-            val checklists = rootNames.firstOrNull { it.equals("Checklists", ignoreCase = true) }
-            checklists?.let { context.assets.list(it)?.toList() } ?: emptyList()
-        } catch (e: Exception) { emptyList() }
+    var visibilityRefreshKey by remember { mutableIntStateOf(0) }
+
+    val context = LocalContext.current
+    // Load available aircraft from assets/Checklists (subfolders)
+    var availableAircrafts by remember { mutableStateOf(listOf<String>()) }
+    LaunchedEffect(context) {
+        val list = try {
+            context.assets.list("Checklists")
+                ?.filter { it.isNotBlank() && !it.contains('.') }
+                ?.sorted() ?: emptyList()
+        } catch (e: Exception) {
+            emptyList()
+        }
+        availableAircrafts = list
     }
-    
-    val internalAircrafts = remember { 
-        fileManager.getFolderTree()
-            .flatMap { topNode ->
-                if (topNode.name.equals("checklists", ignoreCase = true)) {
-                    topNode.children.map { it.name }
-                } else {
-                    emptyList()
-                }
-            }
+    val rotation by animateFloatAsState(targetValue = if (importExpanded) 180f else 0f)
+
+    var showTagJsonDialog by remember { mutableStateOf(false) }
+    var tagJsonContent by remember { mutableStateOf("") }
+
+    // Launcher for folder picker (SAF)
+    val folderPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        uri?.let {
+            context.contentResolver.takePersistableUriPermission(
+                it,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+            prefsManager.setImportFolderUri(it.toString())
+            currentFolderUri = it.toString()
+        }
     }
-    
-    val aircraftList = remember(assetAircrafts, internalAircrafts) { 
-        (assetAircrafts + internalAircrafts).distinctBy { it.lowercase() } 
+
+    fun handleReimport() {
+        val imported = fileManager.importAllBundledAssets("")
+        Toast.makeText(context, "Imported $imported files", Toast.LENGTH_SHORT).show()
+        onFilesRefreshed()
     }
-    val availableAircrafts = remember(aircraftList) { aircraftList }
-    
-    // State to trigger refresh when visibility changes
-    var visibilityRefreshKey by remember { mutableStateOf(0) }
-    
-    // Update when preference changes
-    LaunchedEffect(Unit) {
-        currentFolderUri = prefsManager.getImportFolderUri()
+
+    fun handleWipeAndReimport() {
+        fileManager.wipeInternalRoot()
+        val imported = fileManager.importAllBundledAssets("")
+        Toast.makeText(context, "Wiped and imported $imported files", Toast.LENGTH_SHORT).show()
+        onFilesRefreshed()
     }
-    
+
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Settings")
-                        Text(
-                            text = "Version: $softwareVersion",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
+            CenterAlignedTopAppBar(
+                title = { Text("Settings") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
@@ -94,177 +114,29 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
+                .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // ...existing code before...
-            // About section
+            // === Import Settings Section ===
             item {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "About",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(vertical = 8.dp)
+                ImportSettingsSection(
+                    importExpanded = importExpanded,
+                    onExpandToggle = { importExpanded = !importExpanded },
+                    rotation = rotation,
+                    currentFolderUri = currentFolderUri,
+                    onRequestFolderPicker = { folderPicker.launch(null) },
+                    onRemoveImportFolder = {
+                        prefsManager.setImportFolderUri(null)
+                        currentFolderUri = null
+                    },
+                    onReimport = { handleReimport() },
+                    showWipeConfirm = showWipeConfirm,
+                    onShowWipeConfirm = { showWipeConfirm = it },
+                    onWipeAndReimport = { handleWipeAndReimport() }
                 )
             }
 
-            // Contributor mentions section
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "Contributors",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-            }
-            item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "Special thanks to our contributors:",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "• Design, Development, Documentation, and DevOps",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(vertical = 2.dp)
-                        )
-                    }
-                }
-            }
-
-            // Import Settings section (moved below Contributors)
-            item {
-                Text(
-                    text = "Import Settings",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-            }
-            item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onRequestFolderPicker() }
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = if (currentFolderUri != null) Icons.Default.FolderOpen else Icons.Default.Folder,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "External Import Folder",
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = if (currentFolderUri != null) {
-                                    "Folder selected"
-                                } else {
-                                    "No folder selected - tap to choose"
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            }
-            item {
-                if (currentFolderUri != null) {
-                    Button(
-                        onClick = {
-                            prefsManager.setImportFolderUri(null)
-                            currentFolderUri = null
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                            contentColor = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    ) {
-                        Text("Remove Import Folder")
-                    }
-                }
-            }
-            item {
-                Spacer(modifier = Modifier.height(12.dp))
-                Button(onClick = {
-                    val imported = fileManager.importAllBundledAssets("")
-                    android.widget.Toast.makeText(context, "Imported $imported files", android.widget.Toast.LENGTH_SHORT).show()
-                    onFilesRefreshed()
-                }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Re-import bundled assets")
-                }
-            }
-            item {
-                Column {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = { showWipeConfirm = true },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                            contentColor = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    ) {
-                        Text("Reset bundled imports (wipe + reimport)")
-                    }
-                    // Confirm wipe
-                    if (showWipeConfirm) {
-                        AlertDialog(
-                            onDismissRequest = { showWipeConfirm = false },
-                            title = { Text("Reset bundled imports") },
-                            text = { Text("This will delete all files and folders from the app's internal storage and re-import bundled assets. Continue?") },
-                            confirmButton = {
-                                TextButton(onClick = {
-                                    showWipeConfirm = false
-                                    fileManager.wipeInternalRoot()
-                                    val imported = fileManager.importAllBundledAssets("")
-                                    android.widget.Toast.makeText(context, "Wiped and imported $imported files", android.widget.Toast.LENGTH_SHORT).show()
-                                    onFilesRefreshed()
-                                }) { Text("Yes") }
-                            },
-                            dismissButton = {
-                                TextButton(onClick = { showWipeConfirm = false }) { Text("Cancel") }
-                            }
-                        )
-                    }
-                }
-            }
-            item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "Import Settings Help",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Select an external folder to automatically import PDF and Markdown files from. The app will remember this location and check for new files on startup.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-            // ...existing code after...
-
+            // === Aircraft Visibility ===
             item {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
@@ -281,18 +153,18 @@ fun SettingsScreen(
                         Text(
                             text = "Aircraft visibility",
                             style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                            fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Choose which bundled aircraft categories are visible in My Files. If an aircraft is not owned, you can hide it here.",
+                            text = "Choose which bundled aircraft categories are visible in My Files.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Button(onClick = { showAircraftDialog = true }) {
-                                Text("Select visible aircrafts")
+                                Text("Select visible aircraft")
                             }
                             OutlinedButton(onClick = { showResetConfirm = true }) {
                                 Text("Reset to defaults")
@@ -302,94 +174,7 @@ fun SettingsScreen(
                 }
             }
 
-            // Aircraft visibility dialog
-            item {
-                if (showAircraftDialog) {
-                    val storedVisible = prefsManager.getVisibleAircrafts()
-                    var selectedSet by remember(visibilityRefreshKey) { mutableStateOf(
-                        storedVisible?.toSet() ?: availableAircrafts.toSet()
-                    ) }
-
-                    AlertDialog(
-                    onDismissRequest = { showAircraftDialog = false },
-                    title = { Text("Select visible aircrafts") },
-                    text = {
-                        Column {
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                TextButton(onClick = { selectedSet = availableAircrafts.toSet() }) {
-                                    Text("Select all")
-                                }
-                                TextButton(onClick = { selectedSet = emptySet() }) {
-                                    Text("Select none")
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            LazyColumn {
-                                items(availableAircrafts) { aircraft ->
-                                    val displayName = aircraft.replace('_', ' ')
-                                    val checked = selectedSet.contains(aircraft)
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                selectedSet = selectedSet.toMutableSet().apply {
-                                                    if (checked) remove(aircraft) else add(aircraft)
-                                                }.toSet()
-                                            }
-                                            .padding(vertical = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.Start
-                                    ) {
-                                        Checkbox(
-                                            checked = checked,
-                                            onCheckedChange = { new ->
-                                                selectedSet = selectedSet.toMutableSet().apply {
-                                                    if (new) add(aircraft) else remove(aircraft)
-                                                }.toSet()
-                                            }
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(displayName, style = MaterialTheme.typography.bodyMedium)
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            prefsManager.setVisibleAircrafts(selectedSet)
-                            visibilityRefreshKey++ // Trigger refresh
-                            showAircraftDialog = false
-                        }) { Text("Save") }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showAircraftDialog = false }) { Text("Cancel") }
-                    }
-                    )
-                }
-            }
-
-            item {
-            if (showResetConfirm) {
-                AlertDialog(
-                    onDismissRequest = { showResetConfirm = false },
-                    title = { Text("Reset visibility to defaults") },
-                    text = { Text("This will show all bundled/internal aircraft categories in My Files. Continue?") },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            prefsManager.resetVisibleAircrafts()
-                            visibilityRefreshKey++ // Trigger refresh
-                            showResetConfirm = false
-                        }) { Text("Reset") }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showResetConfirm = false }) { Text("Cancel") }
-                    }
-                )
-            }
-            }
-
-            // Markdown settings
+            // === Markdown Settings ===
             item {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
@@ -406,11 +191,13 @@ fun SettingsScreen(
                         Text(
                             text = "Markdown font size",
                             style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                            fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(8.dp))
+
                         var currentFontSize by remember { mutableStateOf(prefsManager.getMarkdownFontSize()) }
                         val sizes = listOf(14, 16, 18, 20, 22)
+
                         Column {
                             sizes.forEach { size ->
                                 Row(
@@ -420,20 +207,366 @@ fun SettingsScreen(
                                             prefsManager.setMarkdownFontSize(size)
                                             currentFontSize = size
                                         }
-                                        .padding(vertical = 4.dp),
+                                        .padding(vertical = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     RadioButton(
-                                        selected = (size == currentFontSize),
+                                        selected = size == currentFontSize,
                                         onClick = {
                                             prefsManager.setMarkdownFontSize(size)
                                             currentFontSize = size
                                         }
                                     )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(text = "$size sp", style = MaterialTheme.typography.bodyMedium)
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text("$size sp")
                                 }
                             }
+                        }
+                    }
+                }
+            }
+
+            // === Version Info ===
+            item {
+                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "Version: $softwareVersion",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+            }
+
+            // === Tags ===
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Tags",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Internal tags JSON",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "View or copy the internal tag JSON currently stored by the app.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Button(onClick = {
+                                // Load tags and display JSON
+                                try {
+                                    val tags = fileManager.tagManager.loadFileTags()
+                                    val jsonStr = Json { prettyPrint = true }.encodeToString(
+                                        kotlinx.serialization.builtins.ListSerializer(FileTag.serializer()),
+                                        tags
+                                    )
+                                    tagJsonContent = jsonStr
+                                } catch (e: Exception) {
+                                    tagJsonContent = "Error loading tags: ${e.message}"
+                                }
+                                showTagJsonDialog = true
+                            }) {
+                                Text("View internal tag JSON")
+                            }
+                            OutlinedButton(onClick = {
+                                // Show asset default file as JSON if present
+                                try {
+                                    val stream = context.assets.open("file_tags.json")
+                                    val content = stream.bufferedReader().use { it.readText() }
+                                    tagJsonContent = content
+                                } catch (e: Exception) {
+                                    tagJsonContent = "No default tags asset found."
+                                }
+                                showTagJsonDialog = true
+                            }) {
+                                Text("View default asset JSON")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // === Aircraft Selection Dialog ===
+    if (showAircraftDialog) {
+        val storedVisible = prefsManager.getVisibleAircrafts()
+        var selectedSet by remember(visibilityRefreshKey, availableAircrafts) {
+            mutableStateOf(storedVisible?.toSet() ?: availableAircrafts.toSet())
+        }
+
+        AlertDialog(
+            onDismissRequest = { showAircraftDialog = false },
+            title = { Text("Select visible aircraft") },
+            text = {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        TextButton(onClick = { selectedSet = availableAircrafts.toSet() }) {
+                            Text("Select all")
+                        }
+                        TextButton(onClick = { selectedSet = emptySet() }) {
+                            Text("Select none")
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LazyColumn {
+                        items(availableAircrafts) { aircraft ->
+                            val displayName = aircraft.replace('_', ' ')
+                            val checked = selectedSet.contains(aircraft)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        selectedSet = if (checked) {
+                                            selectedSet - aircraft
+                                        } else {
+                                            selectedSet + aircraft
+                                        }
+                                    }
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = checked,
+                                    onCheckedChange = { isChecked ->
+                                        selectedSet = if (isChecked) {
+                                            selectedSet + aircraft
+                                        } else {
+                                            selectedSet - aircraft
+                                        }
+                                    }
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(displayName)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton({
+                    prefsManager.setVisibleAircrafts(selectedSet)
+                    visibilityRefreshKey++
+                    showAircraftDialog = false
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton({ showAircraftDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showTagJsonDialog) {
+        AlertDialog(
+            onDismissRequest = { showTagJsonDialog = false },
+            title = { Text("Tag JSON") },
+            text = {
+                Box(modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 80.dp, max = 420.dp)
+                    .verticalScroll(rememberScrollState())) {
+                    Text(
+                        text = tagJsonContent.ifBlank { "(empty)" },
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showTagJsonDialog = false }) { Text("Close") }
+            },
+            dismissButton = {
+                TextButton(onClick = { 
+                    // Copy to clipboard
+                    try {
+                        val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
+                        val clip = android.content.ClipData.newPlainText("tags_json", tagJsonContent)
+                        clipboard.setPrimaryClip(clip)
+                        Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                    } catch (_: Exception) { }
+                }) { Text("Copy") }
+            }
+        )
+    }
+
+    // === Reset Visibility Confirmation ===
+    if (showResetConfirm) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirm = false },
+            title = { Text("Reset visibility to defaults") },
+            text = { Text("This will show all bundled aircraft categories. Continue?") },
+            confirmButton = {
+                TextButton({
+                    prefsManager.resetVisibleAircrafts()
+                    visibilityRefreshKey++
+                    showResetConfirm = false
+                }) { Text("Reset") }
+            },
+            dismissButton = {
+                TextButton({ showResetConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+// Reusable Import Settings Section
+@Composable
+private fun ImportSettingsSection(
+    importExpanded: Boolean,
+    onExpandToggle: () -> Unit,
+    rotation: Float,
+    currentFolderUri: String?,
+    onRequestFolderPicker: () -> Unit,
+    onRemoveImportFolder: () -> Unit,
+    onReimport: () -> Unit,
+    showWipeConfirm: Boolean,
+    onShowWipeConfirm: (Boolean) -> Unit,
+    onWipeAndReimport: () -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onExpandToggle() }
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Import Settings",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    imageVector = Icons.Default.ArrowDropDown,
+                    contentDescription = null,
+                    modifier = Modifier.rotate(rotation)
+                )
+            }
+
+            AnimatedVisibility(
+                visible = importExpanded,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 16.dp)) {
+                    // Folder Picker Card
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onRequestFolderPicker() }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = if (currentFolderUri != null) Icons.Default.FolderOpen else Icons.Default.Folder,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("External Import Folder", style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    text = if (currentFolderUri != null) "Folder selected" else "No folder selected – tap to choose",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (currentFolderUri != null) {
+                        Button(
+                            onClick = onRemoveImportFolder,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        ) {
+                            Text("Remove Import Folder")
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+
+                    Button(onClick = onReimport, modifier = Modifier.fillMaxWidth()) {
+                        Text("Re-import bundled assets")
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Column {
+                        Button(
+                            onClick = { onShowWipeConfirm(true) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        ) {
+                            Text("Reset bundled imports (wipe + reimport)")
+                        }
+
+                        if (showWipeConfirm) {
+                            AlertDialog(
+                                onDismissRequest = { onShowWipeConfirm(false) },
+                                title = { Text("Reset bundled imports") },
+                                text = {
+                                    Text("This will delete all files from internal storage and re-import bundled assets. Continue?")
+                                },
+                                confirmButton = {
+                                    TextButton({
+                                        onShowWipeConfirm(false)
+                                        onWipeAndReimport()
+                                    }) { Text("Yes") }
+                                },
+                                dismissButton = {
+                                    TextButton({ onShowWipeConfirm(false) }) { Text("Cancel") }
+                                }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = "Import Settings Help",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Select an external folder to automatically import PDF and Markdown files from. The app remembers this location and checks for new files on startup.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }

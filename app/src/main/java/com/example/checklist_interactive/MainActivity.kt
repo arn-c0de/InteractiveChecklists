@@ -266,9 +266,6 @@ class MainActivity : ComponentActivity() {
                                 prefsManager = prefsManager,
                                 fileManager = fileManager,
                                 onBack = { showSettings = false },
-                                onRequestFolderPicker = {
-                                    pickDocumentTreeLauncher.launch(null)
-                                },
                                 softwareVersion = softwareVersion,
                                 onFilesRefreshed = { refreshTrigger++ }
                             )
