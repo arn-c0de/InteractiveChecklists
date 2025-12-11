@@ -141,26 +141,31 @@ class PreferencesManager(context: Context) {
         prefs.edit().putStringSet(KEY_VISIBLE_AIRCRAFTS, aircrafts).apply()
     }
 
-    fun getVisibleAircrafts(): Set<String> {
-        // Return a copy to avoid accidental mutation
-        return prefs.getStringSet(KEY_VISIBLE_AIRCRAFTS, null)?.toSet() ?: emptySet()
+    /**
+     * Returns the stored visible aircrafts, or null if no preference has been set yet.
+     * A null value means "use default behavior" (show all bundled aircrafts).
+     * An empty set means the user explicitly selected "show none".
+     */
+    fun getVisibleAircrafts(): Set<String>? {
+        return prefs.getStringSet(KEY_VISIBLE_AIRCRAFTS, null)?.toSet()
     }
 
     fun isAircraftVisible(name: String): Boolean {
         val set = getVisibleAircrafts()
-        if (set.isEmpty()) return true // default: visible
+        if (set == null) return true // default: visible
+        if (set.isEmpty()) return false // explicit: none visible
         return set.any { it.equals(name, ignoreCase = true) }
     }
 
     fun setAircraftVisible(name: String, visible: Boolean) {
-        val current = getVisibleAircrafts().toMutableSet()
+        val current = getVisibleAircrafts()?.toMutableSet() ?: mutableSetOf()
         if (visible) current.add(name) else current.removeIf { it.equals(name, ignoreCase = true) }
         setVisibleAircrafts(current)
     }
 
     fun resetVisibleAircrafts() {
-        // Clearing the stored set returns to default behavior (all visible)
-        setVisibleAircrafts(emptySet())
+        // Remove the stored preference to return to default behavior (all visible)
+        prefs.edit().remove(KEY_VISIBLE_AIRCRAFTS).apply()
     }
 
     /**
