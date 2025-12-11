@@ -281,7 +281,52 @@ fun InternalFilesScreen(
                                         selectedTagFilters + tag
                                     }
                                     prefsManager.setActiveTagFilters(selectedTagFilters)
-                                    refreshFilesWithTags()
+                                        refreshFilesWithTags()
+
+                                    // Expand folders that contain files matching the selected tags,
+                                    // but do not expand aircraft folders that are deselected in settings.
+                                    fun nodeHasMatchingFiles(node: InternalFileManager.FolderNode): Boolean {
+                                        // Check files in this node
+                                        val enriched = fileManager.enrichWithTags(node.files)
+                                        val fileMatches = enriched.any { file ->
+                                            if (selectedTagFilters.isEmpty()) return@any false
+                                            if (tagFilterMode == "all") {
+                                                selectedTagFilters.all { tag -> file.tags.contains(tag) }
+                                            } else {
+                                                file.tags.any { t -> selectedTagFilters.contains(t) }
+                                            }
+                                        }
+                                        if (fileMatches) return true
+                                        // Check children recursively
+                                        return node.children.any { child -> nodeHasMatchingFiles(child) }
+                                    }
+
+                                    fun expandAncestors(path: String) {
+                                        var p = path
+                                        while (p.isNotBlank()) {
+                                            expandedCategories[p] = true
+                                            p = p.substringBeforeLast('/', "")
+                                        }
+                                    }
+
+                                    if (selectedTagFilters.isNotEmpty()) {
+                                        // Iterate top-level nodes and expand matches
+                                        folderTree.forEach { rootNode ->
+                                            if (rootNode.name.equals("Checklists", ignoreCase = true)) {
+                                                // Only consider visible aircraft folders
+                                                rootNode.children.forEach { aircraftNode ->
+                                                    if (!prefsManager.isAircraftVisible(aircraftNode.name)) return@forEach
+                                                    if (nodeHasMatchingFiles(aircraftNode)) {
+                                                        expandAncestors(aircraftNode.relativePath)
+                                                    }
+                                                }
+                                            } else {
+                                                if (nodeHasMatchingFiles(rootNode)) {
+                                                    expandAncestors(rootNode.relativePath)
+                                                }
+                                            }
+                                        }
+                                    }
                                 },
                                 onClearAll = {
                                     selectedTagFilters = emptySet()
@@ -387,7 +432,9 @@ fun InternalFilesScreen(
                     onClick = {
                         fileToDelete?.let { file ->
                             fileManager.deleteFile(file.path)
-                            tagManager.removeFileFromTags(file.path)
+                            // Convert to relative path for tag removal
+                            val relativePath = fileManager.getRelativePath(file.path)
+                            tagManager.removeFileFromTags(relativePath)
                             refreshFilesWithTags()
                             onRefresh()
                         }
@@ -464,7 +511,9 @@ fun InternalFilesScreen(
             },
             onSave = { newTags ->
                 fileToEditTags?.let { file ->
-                    tagManager.setTagsForFile(file.path, newTags)
+                    // Convert absolute path to relative path
+                    val relativePath = fileManager.getRelativePath(file.path)
+                    tagManager.setTagsForFile(relativePath, newTags)
                     refreshFilesWithTags()
                 }
                 showTagEditor = false
@@ -889,8 +938,8 @@ private fun CategorySelectionDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Kategorie wählen") },
-        text = {
-            LazyColumn {
+            text = {
+            LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
                 items(categories) { category ->
                     val displayName = category.replace('/', ' ').replace('_', ' ')
                     ListItem(

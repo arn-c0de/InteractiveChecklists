@@ -82,15 +82,30 @@ class FileTagManager(private val context: Context) {
      * Gets tags for a specific file
      */
     fun getTagsForFile(filePath: String): Set<String> {
-        return loadFileTags().find { it.filePath == filePath }?.tags ?: emptySet()
+        val normalized = normalizePath(filePath)
+        val all = loadFileTags()
+        // Exact match first
+        val exact = all.find { normalizePath(it.filePath) == normalized }
+        if (exact != null) return exact.tags
+
+        // Fallback: match by filename or suffix (case-insensitive)
+        val fileName = normalized.substringAfterLast('/')
+        val matches = all.filter { stored ->
+            val s = normalizePath(stored.filePath).lowercase()
+            s.endsWith("/${normalized}".lowercase()) || s.endsWith(fileName.lowercase()) || s == normalized.lowercase() || s == fileName.lowercase()
+        }
+        if (matches.isEmpty()) return emptySet()
+        // Return union of tags from all matches as fallback
+        return matches.flatMap { it.tags }.toSet()
     }
     
     /**
      * Sets tags for a specific file
      */
     fun setTagsForFile(filePath: String, tags: Set<String>) {
+        val normalized = normalizePath(filePath)
         val allTags = loadFileTags().toMutableList()
-        val existingIndex = allTags.indexOfFirst { it.filePath == filePath }
+        val existingIndex = allTags.indexOfFirst { normalizePath(it.filePath) == normalized }
         
         if (tags.isEmpty()) {
             // Remove the entry if no tags
@@ -99,7 +114,7 @@ class FileTagManager(private val context: Context) {
             }
         } else {
             // Update or add the entry
-            val fileTag = FileTag(filePath, tags)
+            val fileTag = FileTag(normalized, tags)
             if (existingIndex != -1) {
                 allTags[existingIndex] = fileTag
             } else {
@@ -141,7 +156,7 @@ class FileTagManager(private val context: Context) {
     fun getFilesWithTag(tag: String): List<String> {
         return loadFileTags()
             .filter { it.tags.contains(tag) }
-            .map { it.filePath }
+            .map { normalizePath(it.filePath) }
     }
     
     /**
@@ -151,7 +166,7 @@ class FileTagManager(private val context: Context) {
         if (tags.isEmpty()) return emptyList()
         return loadFileTags()
             .filter { fileTag -> fileTag.tags.any { it in tags } }
-            .map { it.filePath }
+            .map { normalizePath(it.filePath) }
     }
     
     /**
@@ -161,7 +176,7 @@ class FileTagManager(private val context: Context) {
         if (tags.isEmpty()) return emptyList()
         return loadFileTags()
             .filter { fileTag -> tags.all { it in fileTag.tags } }
-            .map { it.filePath }
+            .map { normalizePath(it.filePath) }
     }
     
     /**
@@ -180,6 +195,13 @@ class FileTagManager(private val context: Context) {
             removeFileFromTags(oldPath)
             setTagsForFile(newPath, tags)
         }
+    }
+
+    private fun normalizePath(path: String): String {
+        var p = path
+        // Strip asset scheme
+        if (p.startsWith("asset://")) p = p.removePrefix("asset://")
+        return p.replace('\\', '/').trimStart('/')
     }
     
     /**

@@ -27,10 +27,31 @@ class InternalFileManager(private val context: Context) {
     }
     
     /**
+     * Public method to get relative path for external access
+     */
+    fun getRelativePath(absolutePath: String): String {
+        // Handle asset paths
+        if (absolutePath.startsWith("asset://")) {
+            return absolutePath.removePrefix("asset://").removePrefix("/").replace('\\', '/')
+        }
+        val file = File(absolutePath)
+        return if (file.absolutePath.startsWith(rootDir.absolutePath)) {
+            file.absolutePath.removePrefix(rootDir.absolutePath)
+                .removePrefix(File.separator)
+                .replace('\\', '/') // Normalize to forward slashes
+        } else {
+            // For other paths just normalize separators
+            absolutePath.replace('\\', '/')
+        }
+    }
+    
+    /**
      * Enriches a FileInfo object with tags from the tag manager
      */
     fun enrichWithTags(fileInfo: FileInfo): FileInfo {
-        val tags = tagManager.getTagsForFile(fileInfo.path)
+        // Convert absolute path to relative path from root directory
+        val relativePath = getRelativePath(fileInfo.path)
+        val tags = tagManager.getTagsForFile(relativePath)
         return fileInfo.copy(tags = tags)
     }
     
@@ -472,6 +493,11 @@ class InternalFileManager(private val context: Context) {
 
             // Datei verschieben
             if (sourceFile.renameTo(destFile)) {
+                // Update tags with new path
+                val oldRelativePath = getRelativePath(sourceFile.absolutePath)
+                val newRelativePath = getRelativePath(destFile.absolutePath)
+                tagManager.updateFilePath(oldRelativePath, newRelativePath)
+                
                 val fileInfo = FileInfo(
                     name = destFile.name,
                     displayName = destFile.nameWithoutExtension,
@@ -509,6 +535,11 @@ class InternalFileManager(private val context: Context) {
             }
 
             if (sourceFile.renameTo(destFile)) {
+                // Update tags with new path
+                val oldRelativePath = getRelativePath(sourceFile.absolutePath)
+                val newRelativePath = getRelativePath(destFile.absolutePath)
+                tagManager.updateFilePath(oldRelativePath, newRelativePath)
+                
                 val category = sourceFile.parentFile?.name ?: "unknown"
                 val fileInfo = FileInfo(
                     name = destFile.name,
