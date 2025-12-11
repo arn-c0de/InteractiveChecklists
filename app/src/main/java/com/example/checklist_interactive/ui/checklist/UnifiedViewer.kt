@@ -4,12 +4,21 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import com.example.checklist_interactive.data.checklist.Checklist
 import androidx.compose.ui.platform.LocalContext
+import com.example.checklist_interactive.data.prefs.PreferencesManager
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.checklist_interactive.data.checklist.ChecklistRepository
+import com.example.checklist_interactive.data.checklist.MarkdownChecklistParser
+import com.example.checklist_interactive.ui.checklist.ChecklistViewModel
+import com.example.checklist_interactive.ui.checklist.ChecklistViewModelFactory
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import com.example.checklist_interactive.R
 
 /**
@@ -33,15 +42,40 @@ fun UnifiedViewer(
 ) {
     val fileExtension = assetPath.substringAfterLast('.', "").lowercase()
     
+    val context = LocalContext.current
     when (fileExtension) {
         "md", "markdown" -> {
             // Markdown-Viewer verwenden
-            MarkdownViewer(
-                assetPath = assetPath,
-                checklist = checklist,
-                onCheckboxChange = onCheckboxChange,
-                modifier = modifier
-            )
+            val prefsManager = remember { PreferencesManager(context) }
+            if (checklist != null) {
+                // For interactive checklists, create a viewmodel so states persist
+                val checklistRepository = remember { ChecklistRepository(context) }
+                val markdownContent = remember(assetPath) {
+                    try {
+                        context.assets.open(assetPath).bufferedReader().use { it.readText() }
+                    } catch (e: Exception) {
+                        "" // Return empty on error
+                    }
+                }
+                val parsedChecklist = remember(markdownContent) { MarkdownChecklistParser().parse(assetPath, markdownContent) }
+                val viewModel: ChecklistViewModel = viewModel(factory = ChecklistViewModelFactory(checklistRepository, parsedChecklist))
+                val checklistState by viewModel.checklistState.collectAsState()
+                MarkdownViewer(
+                    assetPath = assetPath,
+                    checklist = checklistState,
+                    onCheckboxChange = viewModel::onCheckboxChange,
+                    modifier = modifier,
+                    prefsManager = prefsManager
+                )
+            } else {
+                MarkdownViewer(
+                    assetPath = assetPath,
+                    checklist = checklist,
+                    onCheckboxChange = onCheckboxChange,
+                    modifier = modifier,
+                    prefsManager = prefsManager
+                )
+            }
         }
         "pdf" -> {
             // PDF-Viewer wird in UnifiedViewerScreen verwendet

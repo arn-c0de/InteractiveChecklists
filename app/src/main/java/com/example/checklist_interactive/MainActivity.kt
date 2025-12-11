@@ -260,6 +260,7 @@ class MainActivity : ComponentActivity() {
                             // Settings screen
                             SettingsScreen(
                                 prefsManager = prefsManager,
+                                fileManager = fileManager,
                                 onBack = { showSettings = false },
                                 onRequestFolderPicker = {
                                     pickDocumentTreeLauncher.launch(null)

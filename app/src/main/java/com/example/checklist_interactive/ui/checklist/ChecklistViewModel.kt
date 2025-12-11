@@ -66,7 +66,7 @@ class ChecklistViewModel(
             // Reset the state to the initial default state from the markdown file
             val updatedSections = initialChecklist.sections.map { section ->
                 val updatedItems = section.items.map { item ->
-                    item.copy(isChecked = false) // Or use the original parsed state if it can be checked by default
+                    item.copy(isChecked = item.isChecked) // Restore to original parsed state
                 }
                 section.copy(items = updatedItems)
             }

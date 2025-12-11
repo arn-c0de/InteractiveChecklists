@@ -60,6 +60,18 @@ fun InternalFilesScreen(
     val prefsManager = remember { PreferencesManager(context) }
     val shortcutManager = remember { ShortcutManager(context) }
     
+    val assetAircrafts = remember {
+        context.assets.list("Checklists")?.filter { entry ->
+            try {
+                val arr = context.assets.list("Checklists/$entry")
+                arr != null && arr.isNotEmpty()
+            } catch (e: Exception) {
+                false
+            }
+        }?.toList() ?: emptyList()
+    }
+    // Keep a lowercase set for matching folder nodes which may be lowercased on import
+    val assetAircraftsLower = remember(assetAircrafts, fileManager) { (assetAircrafts + fileManager.getCategories()).map { it.lowercase() }.toSet() }
     var groupedFiles by remember { mutableStateOf(fileManager.getAllFilesGrouped()) }
     var folderTree by remember { mutableStateOf(fileManager.getFolderTree()) }
     var shortcuts by remember { mutableStateOf(shortcutManager.loadShortcuts()) }
@@ -103,7 +115,15 @@ fun InternalFilesScreen(
                 result.onSuccess {
                     // Refresh file list and folder tree
                     groupedFiles = fileManager.getAllFilesGrouped()
-                    folderTree = fileManager.getFolderTree()
+                    // Filter folderTree based on visible aircraft preferences
+                    folderTree = fileManager.getFolderTree().filter { node ->
+                        // If the node is a known bundled aircraft folder, check prefs; otherwise always show
+                        if (assetAircraftsLower.contains(node.name.lowercase())) {
+                            prefsManager.isAircraftVisible(node.name)
+                        } else {
+                            true
+                        }
+                    }
                     onRefresh()
                 }.onFailure { error ->
                     // TODO: Show error to user
@@ -124,7 +144,13 @@ fun InternalFilesScreen(
                     }
                     IconButton(onClick = {
                         groupedFiles = fileManager.getAllFilesGrouped()
-                        folderTree = fileManager.getFolderTree()
+                        folderTree = fileManager.getFolderTree().filter { node ->
+                            if (assetAircraftsLower.contains(node.name.lowercase())) {
+                                prefsManager.isAircraftVisible(node.name)
+                            } else {
+                                true
+                            }
+                        }
                         onRefresh()
                     }) {
                         Icon(Icons.Default.Refresh, contentDescription = context.getString(R.string.refresh))
@@ -330,8 +356,31 @@ fun InternalFilesScreen(
     // When parent changes refreshTrigger, update contents
     LaunchedEffect(refreshTrigger) {
         groupedFiles = fileManager.getAllFilesGrouped()
-        folderTree = fileManager.getFolderTree()
+        folderTree = fileManager.getFolderTree().filter { node ->
+            if (assetAircraftsLower.contains(node.name.lowercase())) {
+                prefsManager.isAircraftVisible(node.name)
+            } else {
+                true
+            }
+        }
         shortcuts = shortcutManager.loadShortcuts()
+    }
+
+    // Listen for preference changes and update filtering when visible aircrafts change
+    DisposableEffect(prefsManager) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+            groupedFiles = fileManager.getAllFilesGrouped()
+            folderTree = fileManager.getFolderTree().filter { node ->
+                if (assetAircrafts.contains(node.name)) {
+                    prefsManager.isAircraftVisible(node.name)
+                } else {
+                    true
+                }
+            }
+            shortcuts = shortcutManager.loadShortcuts()
+        }
+        prefsManager.registerOnChangeListener(listener)
+        onDispose { prefsManager.unregisterOnChangeListener(listener) }
     }
 }
 

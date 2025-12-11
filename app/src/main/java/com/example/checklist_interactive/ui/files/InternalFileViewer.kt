@@ -67,7 +67,8 @@ fun InternalFileViewer(
                 onPageChange = { page -> currentPage = page }
             )
         }
-        "md", "markdown" -> {
+            "md", "markdown" -> {
+            val prefsManager = remember { PreferencesManager(context) }
             val checklistRepository = remember { ChecklistRepository(context) }
             val markdownContent = remember(fileInfo.path) {
                 try {
@@ -122,7 +123,8 @@ fun InternalFileViewer(
                     checklist = checklistState,
                     onCheckboxChange = viewModel::onCheckboxChange,
                     modifier = Modifier.padding(padding),
-                    isInternalFile = true
+                    isInternalFile = true,
+                    prefsManager = prefsManager
                 )
             }
         }
