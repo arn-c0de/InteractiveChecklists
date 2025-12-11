@@ -102,7 +102,16 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Settings") },
+                title = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Settings")
+                        Text(
+                            text = "Version: $softwareVersion",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -228,18 +237,7 @@ fun SettingsScreen(
             }
 
             // === Version Info ===
-            item {
-                Spacer(modifier = Modifier.height(24.dp))
-                Spacer(modifier = Modifier.height(8.dp))
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "Version: $softwareVersion",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.align(Alignment.Center)
-                    )
-                }
-            }
+            // (Version now shown in the top bar)
 
             // === Tags ===
             item {
