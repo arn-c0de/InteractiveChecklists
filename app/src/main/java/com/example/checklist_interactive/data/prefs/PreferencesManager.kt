@@ -15,6 +15,9 @@ class PreferencesManager(context: Context) {
         private const val KEY_FIRST_LAUNCH = "first_launch"
         private const val KEY_IMPORT_FOLDER_URI = "import_folder_uri"
         private const val KEY_IMPORT_DIALOG_SHOWN = "import_dialog_shown"
+        private const val KEY_MARKDOWN_FONT_SIZE = "markdown_font_size"
+        private const val DEFAULT_MARKDOWN_FONT_SIZE = 18
+        private const val KEY_VISIBLE_AIRCRAFTS = "visible_aircrafts"
     }
     
     /**
@@ -107,5 +110,54 @@ class PreferencesManager(context: Context) {
      */
     fun getInt(key: String, defaultValue: Int): Int {
         return prefs.getInt(key, defaultValue)
+    }
+
+    /**
+     * Markdown font size preference (in sp)
+     */
+    fun setMarkdownFontSize(sp: Int) {
+        setInt(KEY_MARKDOWN_FONT_SIZE, sp)
+    }
+
+    fun getMarkdownFontSize(): Int {
+        return getInt(KEY_MARKDOWN_FONT_SIZE, DEFAULT_MARKDOWN_FONT_SIZE)
+    }
+
+    // Aircraft visibility settings: stored as a StringSet in SharedPreferences
+    fun setVisibleAircrafts(aircrafts: Set<String>) {
+        prefs.edit().putStringSet(KEY_VISIBLE_AIRCRAFTS, aircrafts).apply()
+    }
+
+    fun getVisibleAircrafts(): Set<String> {
+        // Return a copy to avoid accidental mutation
+        return prefs.getStringSet(KEY_VISIBLE_AIRCRAFTS, null)?.toSet() ?: emptySet()
+    }
+
+    fun isAircraftVisible(name: String): Boolean {
+        val set = getVisibleAircrafts()
+        if (set.isEmpty()) return true // default: visible
+        return set.any { it.equals(name, ignoreCase = true) }
+    }
+
+    fun setAircraftVisible(name: String, visible: Boolean) {
+        val current = getVisibleAircrafts().toMutableSet()
+        if (visible) current.add(name) else current.removeIf { it.equals(name, ignoreCase = true) }
+        setVisibleAircrafts(current)
+    }
+
+    fun resetVisibleAircrafts() {
+        // Clearing the stored set returns to default behavior (all visible)
+        setVisibleAircrafts(emptySet())
+    }
+
+    /**
+     * Allows registering a SharedPreferences change listener to react on updates.
+     */
+    fun registerOnChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+    }
+
+    fun unregisterOnChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
+        prefs.unregisterOnSharedPreferenceChangeListener(listener)
     }
 }

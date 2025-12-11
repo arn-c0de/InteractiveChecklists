@@ -12,8 +12,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.checklist_interactive.data.checklist.Checklist
+import com.example.checklist_interactive.data.prefs.PreferencesManager
 import com.example.checklist_interactive.data.checklist.ChecklistItem
 import kotlinx.coroutines.Dispatchers
+import android.content.SharedPreferences
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -32,6 +34,7 @@ fun MarkdownViewer(
     onCheckboxChange: ((itemId: String, checked: Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier,
     isInternalFile: Boolean = false
+    , prefsManager: PreferencesManager? = null
 ) {
     val context = LocalContext.current
     var markdownContent by remember { mutableStateOf("") }
@@ -53,6 +56,22 @@ fun MarkdownViewer(
             errorMessage = "Fehler beim Laden: ${e.message}"
         } finally {
             isLoading = false
+        }
+    }
+
+    val effectivePrefs = prefsManager ?: remember { PreferencesManager(context) }
+    val initialFontSize = effectivePrefs.getMarkdownFontSize()
+    var fontSizeState by remember { mutableStateOf(initialFontSize) }
+
+    // Listen for preference changes and update font size in real time
+    DisposableEffect(effectivePrefs) {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+            val updated = effectivePrefs.getMarkdownFontSize()
+            if (updated != fontSizeState) fontSizeState = updated
+        }
+        effectivePrefs.registerOnChangeListener(listener)
+        onDispose {
+            effectivePrefs.unregisterOnChangeListener(listener)
         }
     }
 
@@ -87,15 +106,16 @@ fun MarkdownViewer(
                         InteractiveMarkdownView(
                             markdownContent = markdownContent,
                             checklist = checklist,
-                            onCheckboxChange = onCheckboxChange
+                            onCheckboxChange = onCheckboxChange,
+                            bodyFontSize = fontSizeState
                         )
                     } else {
                         // Keine Checkboxen gefunden, zeige einfache Ansicht
-                        SimpleMarkdownView(markdownContent = markdownContent)
+                        SimpleMarkdownView(markdownContent = markdownContent, bodyFontSize = fontSizeState)
                     }
                 } else {
                     // Einfache Markdown-Ansicht ohne Interaktion
-                    SimpleMarkdownView(markdownContent = markdownContent)
+                    SimpleMarkdownView(markdownContent = markdownContent, bodyFontSize = fontSizeState)
                 }
             }
         }
@@ -106,7 +126,7 @@ fun MarkdownViewer(
  * Einfache Markdown-Ansicht - rendert grundlegendes Markdown
  */
 @Composable
-private fun SimpleMarkdownView(markdownContent: String) {
+private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int) {
     val scrollState = rememberScrollState()
     
     Column(
@@ -158,7 +178,7 @@ private fun SimpleMarkdownView(markdownContent: String) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = text,
-                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 18.sp),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
                             modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
                         )
                     }
@@ -166,17 +186,17 @@ private fun SimpleMarkdownView(markdownContent: String) {
                 line.trim().startsWith("- ") -> {
                     // Normaler Listeneintrag
                     Row(modifier = Modifier.padding(vertical = 2.dp)) {
-                        Text("• ", style = MaterialTheme.typography.bodyMedium.copy(fontSize = 18.sp))
+                        Text("• ", style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp))
                         Text(
                             text = line.trim().substring(2),
-                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 18.sp)
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp)
                         )
                     }
                 }
                 line.isNotBlank() -> {
                     Text(
                         text = line,
-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 18.sp),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
                         modifier = Modifier.padding(vertical = 2.dp)
                     )
                 }
@@ -197,6 +217,7 @@ private fun InteractiveMarkdownView(
     markdownContent: String,
     checklist: Checklist,
     onCheckboxChange: (itemId: String, checked: Boolean) -> Unit
+    , bodyFontSize: Int
 ) {
     val scrollState = rememberScrollState()
     
@@ -229,11 +250,12 @@ private fun InteractiveMarkdownView(
             }
 
             // Checkbox-Items in dieser Section
-            section.items.forEach { item ->
-                ChecklistItemRow(
-                    item = item,
-                    onCheckboxChange = onCheckboxChange
-                )
+                section.items.forEach { item ->
+                    ChecklistItemRow(
+                        item = item,
+                        onCheckboxChange = onCheckboxChange,
+                        bodyFontSize = bodyFontSize
+                    )
             }
         }
     }
@@ -246,6 +268,7 @@ private fun InteractiveMarkdownView(
 private fun ChecklistItemRow(
     item: ChecklistItem,
     onCheckboxChange: (itemId: String, checked: Boolean) -> Unit
+    , bodyFontSize: Int
 ) {
     Row(
         modifier = Modifier
@@ -262,7 +285,7 @@ private fun ChecklistItemRow(
         Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = item.text,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
             modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
         )
     }

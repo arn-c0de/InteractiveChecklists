@@ -16,16 +16,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.checklist_interactive.data.prefs.PreferencesManager
+import com.example.checklist_interactive.data.files.InternalFileManager
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.Arrangement
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     prefsManager: PreferencesManager,
+    fileManager: InternalFileManager,
     onBack: () -> Unit,
     onRequestFolderPicker: () -> Unit
 ) {
     val context = LocalContext.current
     var currentFolderUri by remember { mutableStateOf(prefsManager.getImportFolderUri()) }
+    var showAircraftDialog by remember { mutableStateOf(false) }
+    var showResetConfirm by remember { mutableStateOf(false) }
+    val assetAircrafts = remember { context.assets.list("Checklists")?.toList() ?: emptyList() }
+    val internalCategories = remember { fileManager.getCategories() }
+    val aircraftList = remember(assetAircrafts, internalCategories) { (assetAircrafts + internalCategories).distinctBy { it.lowercase() } }
+    val availableAircrafts = remember(aircraftList) { aircraftList }
     
     // Update when preference changes
     LaunchedEffect(Unit) {
@@ -140,6 +150,177 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                }
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Visibility",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Aircraft visibility",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Choose which bundled aircraft categories are visible in My Files. If an aircraft is not owned, you can hide it here.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Button(onClick = { showAircraftDialog = true }) {
+                                Text("Select visible aircrafts")
+                            }
+                            OutlinedButton(onClick = { showResetConfirm = true }) {
+                                Text("Reset to defaults")
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Aircraft visibility dialog
+            item {
+                if (showAircraftDialog) {
+                    var selectedSet by remember { mutableStateOf(
+                        prefsManager.getVisibleAircrafts().let { s -> if (s.isEmpty()) availableAircrafts.toSet() else s.toSet() }
+                    ) }
+
+                    AlertDialog(
+                    onDismissRequest = { showAircraftDialog = false },
+                    title = { Text("Select visible aircrafts") },
+                    text = {
+                        Column {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                TextButton(onClick = { selectedSet = availableAircrafts.toSet() }) {
+                                    Text("Select all")
+                                }
+                                TextButton(onClick = { selectedSet = emptySet() }) {
+                                    Text("Select none")
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            LazyColumn {
+                                items(availableAircrafts) { aircraft ->
+                                    val displayName = aircraft.replace('_', ' ').replaceFirstChar { it.uppercase() }
+                                    val checked = selectedSet.contains(aircraft)
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                selectedSet = selectedSet.toMutableSet().apply {
+                                                    if (checked) remove(aircraft) else add(aircraft)
+                                                }.toSet()
+                                            }
+                                            .padding(vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Start
+                                    ) {
+                                        Checkbox(
+                                            checked = checked,
+                                            onCheckedChange = { new ->
+                                                selectedSet = selectedSet.toMutableSet().apply {
+                                                    if (new) add(aircraft) else remove(aircraft)
+                                                }.toSet()
+                                            }
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(displayName, style = MaterialTheme.typography.bodyMedium)
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            prefsManager.setVisibleAircrafts(selectedSet)
+                            showAircraftDialog = false
+                        }) { Text("Save") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showAircraftDialog = false }) { Text("Cancel") }
+                    }
+                    )
+                }
+            }
+
+            item {
+            if (showResetConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showResetConfirm = false },
+                    title = { Text("Reset visibility to defaults") },
+                    text = { Text("This will show all bundled/internal aircraft categories in My Files. Continue?") },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            prefsManager.resetVisibleAircrafts()
+                            showResetConfirm = false
+                        }) { Text("Reset") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showResetConfirm = false }) { Text("Cancel") }
+                    }
+                )
+            }
+            }
+
+            // Markdown settings
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Markdown",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Markdown font size",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        var currentFontSize by remember { mutableStateOf(prefsManager.getMarkdownFontSize()) }
+                        val sizes = listOf(14, 16, 18, 20, 22)
+                        Column {
+                            sizes.forEach { size ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            prefsManager.setMarkdownFontSize(size)
+                                            currentFontSize = size
+                                        }
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    RadioButton(
+                                        selected = (size == currentFontSize),
+                                        onClick = {
+                                            prefsManager.setMarkdownFontSize(size)
+                                            currentFontSize = size
+                                        }
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(text = "$size sp", style = MaterialTheme.typography.bodyMedium)
+                                }
+                            }
+                        }
                     }
                 }
             }

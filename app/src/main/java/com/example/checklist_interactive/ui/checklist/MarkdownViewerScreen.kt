@@ -5,10 +5,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.example.checklist_interactive.data.checklist.Checklist
+import com.example.checklist_interactive.data.checklist.ChecklistRepository
+import com.example.checklist_interactive.data.checklist.MarkdownChecklistParser
+import com.example.checklist_interactive.ui.checklist.ChecklistViewModel
+import com.example.checklist_interactive.ui.checklist.ChecklistViewModelFactory
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import com.example.checklist_interactive.data.prefs.PreferencesManager
+import androidx.compose.ui.platform.LocalContext
 
 /**
  * MarkdownViewerScreen - Screen-Komponente für die Markdown-Anzeige
@@ -35,6 +46,25 @@ fun MarkdownViewerScreen(
         assetPath.substringAfterLast('/').substringBeforeLast('.')
     }
 
+    // Create optional checklist view model for persisting checkbox states
+    val context = LocalContext.current
+    val prefsManager = remember { PreferencesManager(context) }
+    val checklistRepository = remember { ChecklistRepository(context) }
+    val markdownContent = remember(assetPath) {
+        try {
+            context.assets.open(assetPath).bufferedReader().use { it.readText() }
+        } catch (e: Exception) {
+            "" // Return empty on error
+        }
+    }
+    val parsedChecklist = remember(markdownContent) { MarkdownChecklistParser().parse(assetPath, markdownContent) }
+    val viewModel: ChecklistViewModel? = if (checklist != null) {
+        viewModel(factory = ChecklistViewModelFactory(checklistRepository, parsedChecklist))
+    } else null
+    val checklistState: Checklist? = viewModel?.let { vm ->
+        vm.checklistState.collectAsState().value
+    } ?: checklist
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -48,6 +78,11 @@ fun MarkdownViewerScreen(
                     }
                 },
                 actions = {
+                    if (viewModel != null) {
+                        IconButton(onClick = { viewModel.resetChecklist() }) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Reset Checklist")
+                        }
+                    }
                     if (onSettings != null) {
                         IconButton(onClick = onSettings) {
                             Icon(
@@ -70,11 +105,16 @@ fun MarkdownViewerScreen(
             }
         }
     ) { paddingValues ->
+        // Use previously prepared context/prefs/viewmodel
+        val checkedStateForViewer = checklistState
+        val handler: ((itemId: String, checked: Boolean) -> Unit)? = viewModel?.let { it::onCheckboxChange } ?: onCheckboxChange
+
         MarkdownViewer(
             assetPath = assetPath,
-            checklist = checklist,
-            onCheckboxChange = onCheckboxChange,
-            modifier = Modifier.padding(paddingValues)
+            checklist = checkedStateForViewer,
+            onCheckboxChange = handler,
+            modifier = Modifier.padding(paddingValues),
+            prefsManager = prefsManager
         )
     }
 }

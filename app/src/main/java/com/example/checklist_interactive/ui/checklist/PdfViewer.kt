@@ -171,21 +171,30 @@ fun PdfViewer(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("$title (Page ${currentPage + 1}/$pageCount)") }, navigationIcon = {
-                IconButton(onClick = {
-                    AnnotationsRepository.save(context, pdfPath, strokes.toList())
-                    onBack()
-                }) { Icon(Icons.Default.ArrowBack, contentDescription = context.getString(R.string.back)) }
-            }, actions = {
-                if (onToggleTheme != null) {
-                    IconButton(onClick = onToggleTheme) {
-                        Icon(
-                            imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                            contentDescription = context.getString(R.string.toggle_dark_mode)
-                        )
+            // Use a smaller TopAppBar variant by setting height and reduced sizes
+            TopAppBar(
+                modifier = Modifier.height(48.dp),
+                title = { Text("$title (Page ${currentPage + 1}/$pageCount)", style = MaterialTheme.typography.titleSmall) },
+                navigationIcon = {
+                    IconButton(onClick = {
+                        AnnotationsRepository.save(context, pdfPath, strokes.toList())
+                        onBack()
+                    }, modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = context.getString(R.string.back), modifier = Modifier.size(18.dp))
+                    }
+                },
+                actions = {
+                    if (onToggleTheme != null) {
+                        IconButton(onClick = onToggleTheme) {
+                            Icon(
+                                imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
+                                contentDescription = context.getString(R.string.toggle_dark_mode),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
-            })
+            )
         },
         floatingActionButton = {
             if (onShowFileList != null) {
@@ -392,13 +401,14 @@ fun PdfViewer(
                         }
                     }
 
-                    // Farb- und Strichbreiten-Kontrolle
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp),
-                        horizontalArrangement = Arrangement.Start
-                    ) {
+                    // Farb- und Strichbreiten-Kontrolle: nur anzeigen wenn Zeichnen aktiv ist
+                    if (annotateMode) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp),
+                            horizontalArrangement = Arrangement.Start
+                        ) {
                         val colors = listOf(Color.Red, Color.Yellow, Color.Green, Color.Blue, Color.Magenta)
                         colors.forEach { c ->
                             Box(
@@ -417,6 +427,7 @@ fun PdfViewer(
                             valueRange = 1f..30f,
                             modifier = Modifier.width(120.dp).padding(start = 8.dp)
                         )
+                        }
                     }
 
                     // PDF-Seiten mit Annotationen
@@ -425,7 +436,7 @@ fun PdfViewer(
                         modifier = Modifier
                             .fillMaxSize()
                             .weight(1f),
-                        userScrollEnabled = true
+                        userScrollEnabled = !(annotateMode || eraseMode)
                     ) {
                         items(pageCount) { pageIndex ->
                             val bitmap = pageBitmaps[pageIndex]
@@ -548,6 +559,7 @@ private fun PdfPageWithAnnotations(
             .fillMaxWidth()
             .aspectRatio(bitmap.width.toFloat() / bitmap.height.toFloat())
             .padding(8.dp)
+            .background(Color.White) // PDF always on white background regardless of dark mode
     ) {
         // PDF-Seite als Bitmap
         Image(
@@ -578,15 +590,71 @@ private fun PdfPageWithAnnotations(
             modifier = Modifier
                 .fillMaxSize()
                 .onSizeChanged { overlaySize = it }
-                .pointerInput(pageIndex, currentPage, annotateMode, eraseMode) {
-                    // Zoom mit 2-Finger-Pinch (immer verfügbar wenn nicht im Zeichen/Radierer-Modus)
-                    if (pageIndex == currentPage && !annotateMode && !eraseMode) {
-                        detectTransformGestures { _, pan, zoom, _ ->
-                            // Nur zoomen wenn zoom != 1.0 (also echte Pinch-Geste)
-                            if (zoom != 1f) {
-                                onScaleChange((scale * zoom).coerceIn(0.5f, 3f))
-                                onOffsetChange(pan.x, pan.y)
+                // Custom pointer handling: detect two-finger pinch/transform and single-finger pan when zoomed.
+                .pointerInput(pageIndex, currentPage, annotateMode, eraseMode, scale) {
+                    if (pageIndex != currentPage || annotateMode || eraseMode) return@pointerInput
+
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val pressedPointers = event.changes.filter { it.pressed }
+
+                            // Multi-touch (>= 2 pointers): implement pinch zoom + pan
+                            if (pressedPointers.size >= 2) {
+                                // Initialize previous positions
+                                var prevPos1 = pressedPointers[0].position
+                                var prevPos2 = pressedPointers[1].position
+                                var prevDist = (prevPos1 - prevPos2).getDistance()
+                                var prevCentroid = (prevPos1 + prevPos2) / 2f
+
+                                // Loop until one of the pointers released
+                                while (pressedPointers.all { it.pressed }) {
+                                    val nextEvent = awaitPointerEvent()
+                                    val changes = nextEvent.changes
+                                    val active = changes.filter { it.pressed }
+                                    if (active.size < 2) break
+                                    val pos1 = active[0].position
+                                    val pos2 = if (active.size >= 2) active[1].position else active[0].position
+
+                                    val newDist = (pos1 - pos2).getDistance()
+                                    val newCentroid = (pos1 + pos2) / 2f
+                                    val zoom = if (prevDist != 0f) newDist / prevDist else 1f
+                                    val pan = newCentroid - prevCentroid
+
+                                    if (zoom != 1f) {
+                                        onScaleChange((scale * zoom).coerceIn(0.5f, 3f))
+                                    }
+                                    onOffsetChange(pan.x, pan.y)
+
+                                    prevDist = newDist
+                                    prevCentroid = newCentroid
+                                }
+                                continue
                             }
+
+                            // Single-finger drag: only handle panning if zoomed (scale != 1f), otherwise let parent handle scroll
+                            if (pressedPointers.size == 1 && scale != 1f) {
+                                val pointerId = pressedPointers[0].id
+                                var prevPos = pressedPointers[0].position
+                                var active = true
+                                while (active) {
+                                    val nextEvent = awaitPointerEvent()
+                                    val change = nextEvent.changes.firstOrNull { it.id == pointerId }
+                                    if (change == null || !change.pressed) {
+                                        active = false
+                                        break
+                                    }
+                                    val newPos = change.position
+                                    val drag = newPos - prevPos
+                                    if (drag.x != 0f || drag.y != 0f) {
+                                        onOffsetChange(drag.x, drag.y)
+                                    }
+                                    prevPos = newPos
+                                }
+                                continue
+                            }
+
+                            // No multi-touch and either scale == 1f or no pointers pressed: do nothing to allow LazyColumn to handle scrolls.
                         }
                     }
                 }
