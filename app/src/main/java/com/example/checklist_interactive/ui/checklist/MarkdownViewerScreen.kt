@@ -6,6 +6,8 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.UnfoldMore
+import androidx.compose.material.icons.filled.UnfoldLess
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -65,6 +67,9 @@ fun MarkdownViewerScreen(
         vm.checklistState.collectAsState().value
     } ?: checklist
 
+    // State für Expand/Collapse All
+    var expandAllSections by remember { mutableStateOf(prefsManager.areMarkdownSectionsExpandedByDefault()) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -82,6 +87,16 @@ fun MarkdownViewerScreen(
                         IconButton(onClick = { viewModel.resetChecklist() }) {
                             Icon(Icons.Default.Refresh, contentDescription = "Reset Checklist")
                         }
+                    }
+                    // Expand/Collapse All Button
+                    IconButton(onClick = {
+                        expandAllSections = !expandAllSections
+                        prefsManager.setMarkdownSectionsExpandedByDefault(expandAllSections)
+                    }) {
+                        Icon(
+                            imageVector = if (expandAllSections) Icons.Default.UnfoldLess else Icons.Default.UnfoldMore,
+                            contentDescription = if (expandAllSections) "Alle einklappen" else "Alle ausklappen"
+                        )
                     }
                     if (onSettings != null) {
                         IconButton(onClick = onSettings) {

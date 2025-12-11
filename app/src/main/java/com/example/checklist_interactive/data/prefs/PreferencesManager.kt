@@ -18,6 +18,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_MARKDOWN_FONT_SIZE = "markdown_font_size"
         private const val DEFAULT_MARKDOWN_FONT_SIZE = 18
         private const val KEY_VISIBLE_AIRCRAFTS = "visible_aircrafts"
+        private const val KEY_MARKDOWN_SECTIONS_EXPANDED = "markdown_sections_expanded"
     }
     
     /**
@@ -121,6 +122,18 @@ class PreferencesManager(context: Context) {
 
     fun getMarkdownFontSize(): Int {
         return getInt(KEY_MARKDOWN_FONT_SIZE, DEFAULT_MARKDOWN_FONT_SIZE)
+    }
+
+    /**
+     * Markdown sections expanded state preference
+     * true = all sections expanded by default, false = all sections collapsed by default
+     */
+    fun setMarkdownSectionsExpandedByDefault(expanded: Boolean) {
+        prefs.edit().putBoolean(KEY_MARKDOWN_SECTIONS_EXPANDED, expanded).apply()
+    }
+
+    fun areMarkdownSectionsExpandedByDefault(): Boolean {
+        return prefs.getBoolean(KEY_MARKDOWN_SECTIONS_EXPANDED, false) // Default: collapsed
     }
 
     // Aircraft visibility settings: stored as a StringSet in SharedPreferences

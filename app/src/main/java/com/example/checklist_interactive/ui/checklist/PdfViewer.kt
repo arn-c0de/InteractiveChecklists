@@ -236,7 +236,8 @@ fun PdfViewer(
                 fileDescriptor?.close()
             } catch (_: Exception) {}
             // Clear cache and bitmap states
-            cacheKeys.forEach { k -> bitmapCache.remove(k) }
+            bitmapCache.evictAll()
+            cacheKeys.clear()
             pageBitmapStates.values.forEach { it.value = null }
             pageBitmapStates.clear()
         }
