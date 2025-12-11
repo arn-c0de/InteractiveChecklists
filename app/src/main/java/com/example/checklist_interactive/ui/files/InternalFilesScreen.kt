@@ -371,7 +371,8 @@ fun InternalFilesScreen(
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
             groupedFiles = fileManager.getAllFilesGrouped()
             folderTree = fileManager.getFolderTree().filter { node ->
-                if (assetAircrafts.contains(node.name)) {
+                // Use lowercase set for matching to handle imported/lowercased nodes
+                if (assetAircraftsLower.contains(node.name.lowercase())) {
                     prefsManager.isAircraftVisible(node.name)
                 } else {
                     true
