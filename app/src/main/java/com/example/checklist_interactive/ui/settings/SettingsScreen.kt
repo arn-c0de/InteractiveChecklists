@@ -27,18 +27,38 @@ fun SettingsScreen(
     fileManager: InternalFileManager,
     onBack: () -> Unit,
     onRequestFolderPicker: () -> Unit,
-    softwareVersion: String
+    softwareVersion: String,
+    onFilesRefreshed: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var currentFolderUri by remember { mutableStateOf(prefsManager.getImportFolderUri()) }
     var showAircraftDialog by remember { mutableStateOf(false) }
     var showResetConfirm by remember { mutableStateOf(false) }
-    val assetAircrafts = remember { context.assets.list("Checklists")?.toList() ?: emptyList() }
-    val internalAircrafts = remember { 
-        fileManager.getFolderTree().find { it.name.equals("checklists", ignoreCase = true) }
-            ?.children?.map { it.name } ?: emptyList()
+    var showWipeConfirm by remember { mutableStateOf(false) }
+    
+    // Dynamisch alle Aircraft aus allen Quellen laden
+    val assetAircrafts = remember {
+        try {
+            val rootNames = context.assets.list("") ?: emptyArray()
+            val checklists = rootNames.firstOrNull { it.equals("Checklists", ignoreCase = true) }
+            checklists?.let { context.assets.list(it)?.toList() } ?: emptyList()
+        } catch (e: Exception) { emptyList() }
     }
-    val aircraftList = remember(assetAircrafts, internalAircrafts) { (assetAircrafts + internalAircrafts).distinctBy { it.lowercase() } }
+    
+    val internalAircrafts = remember { 
+        fileManager.getFolderTree()
+            .flatMap { topNode ->
+                if (topNode.name.equals("checklists", ignoreCase = true)) {
+                    topNode.children.map { it.name }
+                } else {
+                    emptyList()
+                }
+            }
+    }
+    
+    val aircraftList = remember(assetAircrafts, internalAircrafts) { 
+        (assetAircrafts + internalAircrafts).distinctBy { it.lowercase() } 
+    }
     val availableAircrafts = remember(aircraftList) { aircraftList }
     
     // State to trigger refresh when visibility changes
@@ -77,6 +97,48 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // ...existing code before...
+            // About section
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "About",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+
+            // Contributor mentions section
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Contributors",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Special thanks to our contributors:",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "• Design, Development, Documentation, and DevOps",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+
+            // Import Settings section (moved below Contributors)
             item {
                 Text(
                     text = "Import Settings",
@@ -85,7 +147,6 @@ fun SettingsScreen(
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
             }
-            
             item {
                 Card(
                     modifier = Modifier
@@ -123,7 +184,6 @@ fun SettingsScreen(
                     }
                 }
             }
-            
             item {
                 if (currentFolderUri != null) {
                     Button(
@@ -141,17 +201,51 @@ fun SettingsScreen(
                     }
                 }
             }
-            
             item {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "About",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(onClick = {
+                    val imported = fileManager.importAllBundledAssets("")
+                    android.widget.Toast.makeText(context, "Imported $imported files", android.widget.Toast.LENGTH_SHORT).show()
+                    onFilesRefreshed()
+                }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Re-import bundled assets")
+                }
             }
-            
+            item {
+                Column {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = { showWipeConfirm = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    ) {
+                        Text("Reset bundled imports (wipe + reimport)")
+                    }
+                    // Confirm wipe
+                    if (showWipeConfirm) {
+                        AlertDialog(
+                            onDismissRequest = { showWipeConfirm = false },
+                            title = { Text("Reset bundled imports") },
+                            text = { Text("This will delete all files and folders from the app's internal storage and re-import bundled assets. Continue?") },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    showWipeConfirm = false
+                                    fileManager.wipeInternalRoot()
+                                    val imported = fileManager.importAllBundledAssets("")
+                                    android.widget.Toast.makeText(context, "Wiped and imported $imported files", android.widget.Toast.LENGTH_SHORT).show()
+                                    onFilesRefreshed()
+                                }) { Text("Yes") }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showWipeConfirm = false }) { Text("Cancel") }
+                            }
+                        )
+                    }
+                }
+            }
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
@@ -169,6 +263,7 @@ fun SettingsScreen(
                     }
                 }
             }
+            // ...existing code after...
 
             item {
                 Spacer(modifier = Modifier.height(16.dp))
@@ -231,7 +326,7 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.height(8.dp))
                             LazyColumn {
                                 items(availableAircrafts) { aircraft ->
-                                    val displayName = aircraft.replace('_', ' ').replaceFirstChar { it.uppercase() }
+                                    val displayName = aircraft.replace('_', ' ')
                                     val checked = selectedSet.contains(aircraft)
                                     Row(
                                         modifier = Modifier

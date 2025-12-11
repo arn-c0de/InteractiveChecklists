@@ -39,7 +39,7 @@ fun ChecklistScreen(viewModel: ChecklistViewModel, checklistId: String, onBack: 
     val checklist = checklistState
 
     var showFolderPopup by remember { mutableStateOf(false) }
-    var popupPath by remember { mutableStateOf("checklists") }
+    var popupPath by remember { mutableStateOf("") }
     var showSettingsDialog by remember { mutableStateOf(false) }
     var isDarkTheme by remember { mutableStateOf(initialIsDark) }
 
@@ -50,7 +50,7 @@ fun ChecklistScreen(viewModel: ChecklistViewModel, checklistId: String, onBack: 
                     Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)) {
                         IconButton(onClick = {
                             showFolderPopup = !showFolderPopup
-                            if (showFolderPopup) popupPath = "checklists"
+                            if (showFolderPopup) popupPath = ""
                         }) {
                             Icon(Icons.Default.Folder, contentDescription = LocalContext.current.getString(R.string.open_folders))
                         }
@@ -61,15 +61,15 @@ fun ChecklistScreen(viewModel: ChecklistViewModel, checklistId: String, onBack: 
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                                     IconButton(onClick = {
-                                        if (popupPath != "checklists") {
+                                        if (popupPath.isNotEmpty()) {
                                             val segments = popupPath.split('/')
                                             val parent = segments.dropLast(1).joinToString("/")
-                                            popupPath = if (parent.isEmpty()) "checklists" else parent
+                                            popupPath = if (parent.isEmpty()) "" else parent
                                         }
                                     }) {
                                         Icon(Icons.Default.ArrowBack, contentDescription = LocalContext.current.getString(R.string.up))
                                     }
-                                    Text(popupPath, modifier = Modifier.padding(start = 8.dp))
+                                    Text(popupPath.ifBlank { "Assets" }, modifier = Modifier.padding(start = 8.dp))
                                 }
                                 Divider()
                                 LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {

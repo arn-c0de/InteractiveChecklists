@@ -63,13 +63,21 @@ class InternalFileManager(private val context: Context) {
      */
     fun getCategories(): List<String> {
         ensureDirectoryStructure()
-        return rootDir.listFiles()
-            ?.filter { dir ->
-                dir.isDirectory && hasFilesRecursive(dir)
-            }
+        val internal = rootDir.listFiles()
+            ?.filter { dir -> dir.isDirectory }
             ?.map { it.name }
-            ?.sorted()
             ?: emptyList()
+
+        val assetTop = try {
+            context.assets.list("")?.filter { entry ->
+                try {
+                    val arr = context.assets.list(entry)
+                    arr != null && arr.isNotEmpty()
+                } catch (e: Exception) { false }
+            }?.toList() ?: emptyList()
+        } catch (e: Exception) { emptyList() }
+
+        return (internal + assetTop).distinctBy { it.lowercase() }.sortedBy { it.lowercase() }
     }
 
     /**
@@ -111,30 +119,37 @@ class InternalFileManager(private val context: Context) {
      * Gibt alle Dateien in einer Kategorie zurück
      */
     fun getFilesInCategory(category: String): List<FileInfo> {
-        val categoryDir = File(rootDir, category)
-        if (!categoryDir.exists() || !categoryDir.isDirectory) {
-            return emptyList()
-        }
-        // Walk recursively to include files inside nested subfolders
         val results = mutableListOf<FileInfo>()
-        categoryDir.walkTopDown().forEach { file ->
-            if (file.isFile) {
-                val ext = file.extension
-                if (ext == "pdf" || ext == "md" || ext == "markdown") {
-                    results.add(
-                        FileInfo(
-                            name = file.name,
-                            displayName = file.nameWithoutExtension,
-                            path = file.absolutePath,
-                            category = category,
-                            size = file.length(),
-                            lastModified = file.lastModified(),
-                            extension = file.extension
+
+        // Internal files
+        val categoryDir = File(rootDir, category)
+        if (categoryDir.exists() && categoryDir.isDirectory) {
+            categoryDir.walkTopDown().forEach { file ->
+                if (file.isFile) {
+                    val ext = file.extension
+                    if (ext == "pdf" || ext == "md" || ext == "markdown") {
+                        results.add(
+                            FileInfo(
+                                name = file.name,
+                                displayName = file.nameWithoutExtension,
+                                path = file.absolutePath,
+                                category = category,
+                                size = file.length(),
+                                lastModified = file.lastModified(),
+                                extension = file.extension,
+                                isAsset = false
+                            )
                         )
-                    )
+                    }
                 }
             }
         }
+
+        // Asset files (case-insensitive match)
+        findAssetPathForCategory(category)?.let { assetPath ->
+            results.addAll(listAssetFiles(assetPath, category))
+        }
+
         return results.sortedBy { it.displayName.lowercase() }
     }
 
@@ -161,6 +176,60 @@ class InternalFileManager(private val context: Context) {
         return result
     }
 
+    // Find the actual asset path that matches the category path, performing case-insensitive matching
+    private fun findAssetPathForCategory(category: String): String? {
+        if (category.isBlank()) return null
+        val allowedAssetFolders = setOf("checklists", "handbooks", "radiocommunication")
+        val parts = category.split('/').filter { it.isNotBlank() }
+        if (parts.isEmpty() || !allowedAssetFolders.contains(parts[0].lowercase())) return null
+        var currentPath = parts[0]
+        var found = true
+        for (i in 1 until parts.size) {
+            val listParent = try { context.assets.list(currentPath) ?: emptyArray() } catch (e: Exception) { emptyArray() }
+            val match = listParent.firstOrNull { it.equals(parts[i], ignoreCase = true) }
+            if (match == null) { found = false; break }
+            currentPath = "$currentPath/$match"
+        }
+        return if (found) currentPath else null
+    }
+
+    // Recursively lists supported files from assets under assetPath and maps to FileInfo with isAsset=true
+    private fun listAssetFiles(assetPath: String, category: String): List<FileInfo> {
+        val allowedAssetFolders = setOf("checklists", "handbooks", "radiocommunication")
+        val topLevel = assetPath.split('/').firstOrNull()?.lowercase() ?: ""
+        if (!allowedAssetFolders.contains(topLevel)) return emptyList()
+        val results = mutableListOf<FileInfo>()
+        try {
+            val list = context.assets.list(assetPath) ?: emptyArray()
+            for (entry in list) {
+                val childPath = if (assetPath.isEmpty()) entry else "$assetPath/$entry"
+                val sub = try { context.assets.list(childPath) ?: emptyArray() } catch (e: Exception) { emptyArray() }
+                if (sub.isNotEmpty()) {
+                    results.addAll(listAssetFiles(childPath, category))
+                } else {
+                    val lower = entry.lowercase()
+                    if (lower.endsWith(".pdf") || lower.endsWith(".md") || lower.endsWith(".markdown")) {
+                        results.add(
+                            FileInfo(
+                                name = entry,
+                                displayName = entry.substringBeforeLast('.'),
+                                path = "asset://$childPath",
+                                category = category,
+                                size = 0L,
+                                lastModified = 0L,
+                                extension = entry.substringAfterLast('.', ""),
+                                isAsset = true
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            // ignore
+        }
+        return results
+    }
+
     /**
      * Repräsentiert einen Ordner- / Kategorie-Knoten mit verschachtelten Unterordnern und Dateien
      */
@@ -174,12 +243,38 @@ class InternalFileManager(private val context: Context) {
     /**
      * Liefert die rekursive Ordnerstruktur des internen Root-Verzeichnisses
      */
+    /**
+     * Liefert die rekursive Ordnerstruktur des internen Root-Verzeichnisses
+     * Zeigt ALLE Ordner aus dem internen Speicher an (auch leere)
+     */
     fun getFolderTree(): List<FolderNode> {
         ensureDirectoryStructure()
-        return rootDir.listFiles()
+        val internalNodes = rootDir.listFiles()
             ?.filter { it.isDirectory }
             ?.map { buildFolderNode(it, it.relativeTo(rootDir).path.replace('\\', '/')) }
             ?: emptyList()
+
+        // Build asset folder nodes - only from allowed top-level folders
+        val allowedAssetFolders = setOf("checklists", "handbooks", "radiocommunication")
+        val assetNodes = try {
+            context.assets.list("")?.filter { entry ->
+                // Only process allowed top-level folders
+                if (!allowedAssetFolders.contains(entry.lowercase())) return@filter false
+                // Check if it's a directory (has children)
+                try { context.assets.list(entry)?.isNotEmpty() == true } catch (e: Exception) { false }
+            }?.map { top -> buildAssetFolderNode(top, top) } ?: emptyList()
+        } catch (e: Exception) { emptyList() }
+
+        // Merge internal and asset nodes by relativePath (case-insensitive)
+        val merged = mutableMapOf<String, FolderNode>()
+        fun keyOf(path: String) = path.replace('\\', '/').lowercase()
+
+        (internalNodes + assetNodes).forEach { node ->
+            val k = keyOf(node.relativePath)
+            val existing = merged[k]
+            merged[k] = if (existing == null) node else mergeFolderNodes(existing, node)
+        }
+        return merged.values.sortedBy { it.name.lowercase() }
     }
 
     private fun buildFolderNode(dir: File, relativePath: String): FolderNode {
@@ -210,6 +305,67 @@ class InternalFileManager(private val context: Context) {
             children = children,
             files = files
         )
+    }
+
+    // Build a FolderNode from assets
+    private fun buildAssetFolderNode(assetPath: String, relativePath: String): FolderNode {
+        // Define allowed top-level asset folders
+        val allowedAssetFolders = setOf("checklists", "handbooks", "radiocommunication")
+        
+        // Check if we should skip this folder (only at top level)
+        if (!assetPath.contains("/") && !allowedAssetFolders.contains(assetPath.lowercase())) {
+            return FolderNode(name = assetPath, relativePath = relativePath, children = emptyList(), files = emptyList())
+        }
+        
+        val children = try {
+            context.assets.list(assetPath)?.filter { entry ->
+                try { context.assets.list("$assetPath/$entry")?.isNotEmpty() == true } catch (e: Exception) { false }
+            }?.map { child ->
+                val childRel = if (relativePath.isEmpty()) child else "$relativePath/$child"
+                buildAssetFolderNode("$assetPath/$child", childRel)
+            } ?: emptyList()
+        } catch (e: Exception) { emptyList() }
+
+        val files = try {
+            context.assets.list(assetPath)?.filter { entry ->
+                val l = entry.lowercase()
+                l.endsWith(".pdf") || l.endsWith(".md") || l.endsWith(".markdown")
+            }?.map { fileName ->
+                val fullAssetPath = if (assetPath.isEmpty()) fileName else "$assetPath/$fileName"
+                FileInfo(
+                    name = fileName,
+                    displayName = fileName.substringBeforeLast('.'),
+                    path = "asset://$fullAssetPath",
+                    category = relativePath.replace('\\', '/'),
+                    size = 0L,
+                    lastModified = 0L,
+                    extension = fileName.substringAfterLast('.', ""),
+                    isAsset = true
+                )
+            } ?: emptyList()
+        } catch (e: Exception) { emptyList() }
+
+        val nodeName = assetPath.substringAfterLast('/')
+        return FolderNode(
+            name = nodeName,
+            relativePath = relativePath.replace('\\', '/'),
+            children = children,
+            files = files.sortedBy { it.displayName.lowercase() }
+        )
+    }
+
+    private fun mergeFolderNodes(a: FolderNode, b: FolderNode): FolderNode {
+        // Merge children
+        val childrenMap = mutableMapOf<String, FolderNode>()
+        (a.children + b.children).forEach { child ->
+            val k = child.relativePath.replace('\\', '/').lowercase()
+            val existing = childrenMap[k]
+            childrenMap[k] = if (existing == null) child else mergeFolderNodes(existing, child)
+        }
+        // Merge files, prefer internal (a) over asset (b)
+        val filesMap = mutableMapOf<String, FileInfo>()
+        (a.files + b.files).forEach { f -> if (!filesMap.containsKey(f.name)) filesMap[f.name] = f }
+        return FolderNode(name = a.name.ifBlank { b.name }, relativePath = a.relativePath.ifBlank { b.relativePath }, children = childrenMap.values.sortedBy { it.name.lowercase() }, files = filesMap.values.sortedBy { it.displayName.lowercase() })
     }
 
     /**
@@ -424,8 +580,12 @@ class InternalFileManager(private val context: Context) {
      */
     fun importAllBundledAssets(rootAssetPath: String = ""): Int {
         var imported = 0
+        
+        // Define allowed top-level asset folders to import
+        val allowedAssetFolders = setOf("checklists", "handbooks", "radiocommunication")
+        
         try {
-            fun walker(path: String, relativePath: String) {
+            fun walker(path: String, relativePath: String, isTopLevel: Boolean = false) {
                 val list = try {
                     context.assets.list(path) ?: emptyArray()
                 } catch (e: Exception) {
@@ -433,13 +593,18 @@ class InternalFileManager(private val context: Context) {
                 }
                 if (list.isEmpty()) return
                 for (child in list) {
+                    // Skip unwanted top-level folders
+                    if (isTopLevel && !allowedAssetFolders.contains(child.lowercase())) {
+                        continue
+                    }
+                    
                     val childPath = if (path.isEmpty()) child else "$path/$child"
                     // Check if it's a directory by trying to list children
                     val sub = try { context.assets.list(childPath) ?: emptyArray() } catch (e: Exception) { emptyArray() }
                     if (sub.isNotEmpty()) {
                         // It's a directory - recurse
                         val nextRel = if (relativePath.isEmpty()) child.lowercase() else "$relativePath/${child.lowercase()}"
-                        walker(childPath, nextRel)
+                        walker(childPath, nextRel, false)
                     } else {
                         // It's a file - check if it's a supported type
                         if (child.lowercase().endsWith(".pdf") || child.lowercase().endsWith(".md") || child.lowercase().endsWith(".markdown")) {
@@ -467,11 +632,19 @@ class InternalFileManager(private val context: Context) {
                     }
                 }
             }
-            walker(rootAssetPath, "")
+            walker(rootAssetPath, "", true)
         } catch (e: Exception) {
             // ignore, return count
         }
         return imported
+    }
+
+    /**
+     * Löscht alle Dateien und Ordner unter dem internen Root (Reset), behält Root-Ordner selbst bei.
+     */
+    fun wipeInternalRoot() {
+        rootDir.listFiles()?.forEach { it.deleteRecursively() }
+        ensureDirectoryStructure()
     }
     
     /**
@@ -571,5 +744,6 @@ data class FileInfo(
     val category: String,
     val size: Long,
     val lastModified: Long,
-    val extension: String
+    val extension: String,
+    val isAsset: Boolean = false
 )

@@ -54,8 +54,29 @@ fun InternalFileViewer(
             val prefsManager = remember { PreferencesManager(context) }
             val lastPage = remember(fileInfo.path) { prefsManager.getInt("pdf_last_page_${fileInfo.path}", 0) }
             var currentPage by remember { mutableStateOf(lastPage) }
+
+            val isAsset = fileInfo.isAsset || fileInfo.path.startsWith("asset://")
+            val pdfPath = if (isAsset) {
+                val assetPath = fileInfo.path.removePrefix("asset://")
+                // Copy asset to cache once
+                val safeName = assetPath.replace('/', '_')
+                val tmp = File(context.cacheDir, "asset_$safeName")
+                if (!tmp.exists()) {
+                    try {
+                        context.assets.open(assetPath).use { input ->
+                            tmp.outputStream().use { output -> input.copyTo(output) }
+                        }
+                    } catch (e: Exception) {
+                        // fallback: try without copying (will fail later)
+                    }
+                }
+                tmp.absolutePath
+            } else {
+                fileInfo.path
+            }
+
             PdfViewer(
-                pdfPath = fileInfo.path,
+                pdfPath = pdfPath,
                 title = fileInfo.displayName,
                 onBack = {
                     prefsManager.setInt("pdf_last_page_${fileInfo.path}", currentPage)
@@ -72,9 +93,15 @@ fun InternalFileViewer(
             "md", "markdown" -> {
             val prefsManager = remember { PreferencesManager(context) }
             val checklistRepository = remember { ChecklistRepository(context) }
+            val isAsset = fileInfo.isAsset || fileInfo.path.startsWith("asset://")
+            val assetPath = if (isAsset) fileInfo.path.removePrefix("asset://") else fileInfo.path
             val markdownContent = remember(fileInfo.path) {
                 try {
-                    File(fileInfo.path).readText()
+                    if (isAsset) {
+                        context.assets.open(assetPath).bufferedReader().use { it.readText() }
+                    } else {
+                        File(fileInfo.path).readText()
+                    }
                 } catch (e: Exception) {
                     "" // Return empty on error
                 }
@@ -89,6 +116,8 @@ fun InternalFileViewer(
             )
 
             val checklistState by viewModel.checklistState.collectAsState()
+
+            val displayAssetAsInternal = !isAsset
 
             // State für Expand/Collapse All
             var expandAllSections by remember { mutableStateOf(prefsManager.areMarkdownSectionsExpandedByDefault()) }
@@ -135,11 +164,11 @@ fun InternalFileViewer(
                 }
             ) { padding ->
                 MarkdownViewer(
-                    assetPath = fileInfo.path,
+                    assetPath = assetPath,
                     checklist = checklistState,
                     onCheckboxChange = viewModel::onCheckboxChange,
                     modifier = Modifier.padding(padding),
-                    isInternalFile = true,
+                    isInternalFile = !isAsset,
                     prefsManager = prefsManager
                 )
             }
