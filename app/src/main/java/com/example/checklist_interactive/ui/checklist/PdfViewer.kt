@@ -51,9 +51,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.ui.text.TextStyle
 import com.example.checklist_interactive.R
 import com.example.checklist_interactive.data.shortcuts.PageHighlightManager
 import com.example.checklist_interactive.data.shortcuts.ShortcutManager
+import com.example.checklist_interactive.data.shortcuts.LastPageManager
 import java.io.File
 import kotlin.math.hypot
 import kotlinx.coroutines.Dispatchers
@@ -65,6 +70,11 @@ import kotlinx.coroutines.withContext
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.ViewList
+import androidx.compose.material.icons.filled.CenterFocusWeak
+import androidx.compose.material.icons.filled.ContentCopy
+import android.content.ClipboardManager
+import android.content.ClipData
+import android.content.Context
 
 /**
  * Eigener PDF-Viewer ohne externe Abhängigkeiten.
@@ -86,6 +96,21 @@ fun PdfViewer(
     onPageChange: ((Int) -> Unit)? = null
 ) {
     val context = LocalContext.current
+
+    // Manager für Shortcuts, Highlights und letzte Seite
+    val shortcutManager = remember { ShortcutManager(context) }
+    val highlightManager = remember { PageHighlightManager(context) }
+    val lastPageManager = remember { LastPageManager(context) }
+
+    // Lade zuletzt geöffnete Seite, falls initialPage nicht explizit gesetzt wurde
+    val effectiveInitialPage = remember(pdfPath) {
+        if (initialPage == 0) {
+            lastPageManager.getLastPage(pdfPath).coerceAtLeast(0)
+        } else {
+            initialPage
+        }
+    }
+
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var annotateMode by remember { mutableStateOf(false) }
@@ -94,7 +119,7 @@ fun PdfViewer(
     var strokeWidth by remember { mutableStateOf(4f) }
     var selectedColor by remember { mutableStateOf(Color.Red) }
     val strokes = remember { mutableStateListOf<AnnotationStroke>() }
-    var currentPage by remember { mutableStateOf(initialPage) }
+    var currentPage by remember { mutableStateOf(effectiveInitialPage) }
     var pageCount by remember { mutableStateOf(0) }
     var eraseRadius by remember { mutableStateOf(50f) }
     val pageScales = remember { mutableStateMapOf<Int, Float>() }
@@ -103,12 +128,16 @@ fun PdfViewer(
     var showShortcutDialog by remember { mutableStateOf(false) }
     var shortcutName by remember { mutableStateOf("") }
     val pageAspectRatios = remember { mutableStateMapOf<Int, Float>() }
-
-    val shortcutManager = remember { ShortcutManager(context) }
-    val highlightManager = remember { PageHighlightManager(context) }
     var pageHighlights by remember { mutableStateOf<List<Int>>(emptyList()) }
     var showTocDialog by remember { mutableStateOf(false) }
     var chapters by remember { mutableStateOf<List<Pair<String, Int>>>(emptyList()) }
+
+    // Text-Extraktion
+    val textExtractor = remember { PdfTextExtractor(context) }
+    val pageTextBlocks = remember { mutableStateMapOf<Int, List<PdfTextBlock>>() }
+    var textSelectionEnabled by remember { mutableStateOf(true) }
+    var showTextDialog by remember { mutableStateOf(false) }
+    var dialogPageText by remember { mutableStateOf("") }
 
     // Use individual states per page instead of StateMap to prevent global recomposition
     val pageBitmapStates = remember { mutableMapOf<Int, MutableState<Bitmap?>>() }
@@ -139,7 +168,7 @@ fun PdfViewer(
     val renderScaleMap = remember { mutableStateMapOf<Int, Float>() }
     // Debounce mechanism for re-rendering on zoom
     var zoomRenderJob by remember { mutableStateOf<Job?>(null) }
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialPage)
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = effectiveInitialPage)
     val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
     val configuration = LocalConfiguration.current
     val screenWidthPx = with(LocalDensity.current) { configuration.screenWidthDp.dp.roundToPx() }
@@ -147,6 +176,7 @@ fun PdfViewer(
     // PDF laden: open once, but render pages lazily.
     var fileDescriptor by remember { mutableStateOf<ParcelFileDescriptor?>(null) }
     var pdfRenderer by remember { mutableStateOf<PdfRenderer?>(null) }
+    var pdfFile by remember { mutableStateOf<File?>(null) }
     val pdfRenderMutex = remember { Mutex() }
 
     LaunchedEffect(pdfPath, isInternalFile) {
@@ -154,7 +184,7 @@ fun PdfViewer(
         errorMessage = null
         try {
             withContext(Dispatchers.IO) {
-                val pdfFile = if (isInternalFile) {
+                val loadedPdfFile = if (isInternalFile) {
                     // Interne Datei direkt verwenden
                     File(pdfPath)
                 } else {
@@ -168,7 +198,8 @@ fun PdfViewer(
                     tempFile
                 }
 
-                fileDescriptor = ParcelFileDescriptor.open(pdfFile, ParcelFileDescriptor.MODE_READ_ONLY)
+                pdfFile = loadedPdfFile
+                fileDescriptor = ParcelFileDescriptor.open(loadedPdfFile, ParcelFileDescriptor.MODE_READ_ONLY)
                 pdfRenderer = PdfRenderer(fileDescriptor!!)
                 pageCount = pdfRenderer!!.pageCount
 
@@ -179,8 +210,8 @@ fun PdfViewer(
                     page.close()
                 }
 
-                // Render only an initial subset of pages (initialPage and nearby), rest are loaded on demand.
-                val initialIndices = listOf(initialPage - 1, initialPage, initialPage + 1).distinct().filter { it in 0 until pageCount }
+                // Render only an initial subset of pages (effectiveInitialPage and nearby), rest are loaded on demand.
+                val initialIndices = listOf(effectiveInitialPage - 1, effectiveInitialPage, effectiveInitialPage + 1).distinct().filter { it in 0 until pageCount }
                 for (pageIndex in initialIndices) {
                     // Use a helper function to render pages to a cache-friendly size.
                     val page = pdfRenderer!!.openPage(pageIndex)
@@ -214,7 +245,7 @@ fun PdfViewer(
 
                 // Nur temporäre Dateien löschen
                 if (!isInternalFile) {
-                    pdfFile.delete()
+                    loadedPdfFile.delete()
                 }
             }
             isLoading = false
@@ -319,6 +350,31 @@ fun PdfViewer(
         val cur = currentPage
         val indices = listOf(cur - 1, cur, cur + 1).filter { it in 0 until pageCount }
         for (idx in indices) maybeRequestRender(idx, screenWidthPx)
+
+        // Extrahiere Text für sichtbare Seiten
+        pdfFile?.let { file ->
+            for (idx in indices) {
+                if (!pageTextBlocks.containsKey(idx)) {
+                    coroutineScope.launch(Dispatchers.IO) {
+                        try {
+                            val textBlocks = textExtractor.extractTextBlocks(file, idx)
+                            withContext(Dispatchers.Main) {
+                                pageTextBlocks[idx] = textBlocks
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Speichere die aktuelle Seite bei jedem Seitenwechsel
+    LaunchedEffect(currentPage) {
+        if (pageCount > 0) {
+            lastPageManager.saveLastPage(pdfPath, currentPage)
+        }
     }
 
     // Debounced re-render on zoom change for current page
@@ -359,6 +415,7 @@ fun PdfViewer(
                 navigationIcon = {
                     IconButton(onClick = {
                         AnnotationsRepository.save(context, pdfPath, strokes.toList())
+                        lastPageManager.saveLastPage(pdfPath, currentPage)
                         onBack()
                     }, modifier = Modifier.size(40.dp)) {
                         Icon(Icons.Default.ArrowBack, contentDescription = context.getString(R.string.back), modifier = Modifier.size(18.dp))
@@ -378,12 +435,33 @@ fun PdfViewer(
             )
         },
         floatingActionButton = {
-            if (onShowFileList != null) {
-                FloatingActionButton(
-                    onClick = onShowFileList,
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                ) {
-                    Icon(Icons.Default.Menu, contentDescription = context.getString(R.string.file_list))
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalAlignment = Alignment.End
+            ) {
+                // Zoom Reset FAB - nur anzeigen wenn gezoomt
+                val currentScale = pageScales[currentPage] ?: 1f
+                if (currentScale != 1f) {
+                    FloatingActionButton(
+                        onClick = {
+                            pageScales[currentPage] = 1f
+                            pageOffsetsX[currentPage] = 0f
+                            pageOffsetsY[currentPage] = 0f
+                        },
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                    ) {
+                        Icon(Icons.Default.CenterFocusWeak, contentDescription = "Zoom zurücksetzen")
+                    }
+                }
+
+                // Menu FAB - nur anzeigen wenn onShowFileList gesetzt ist
+                if (onShowFileList != null) {
+                    FloatingActionButton(
+                        onClick = onShowFileList,
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Icon(Icons.Default.Menu, contentDescription = context.getString(R.string.file_list))
+                    }
                 }
             }
         }
@@ -479,6 +557,27 @@ fun PdfViewer(
                                 Icon(
                                     Icons.Default.BookmarkAdd,
                                     contentDescription = "Shortcut",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            // Text anzeigen Button
+                            IconButton(
+                                onClick = {
+                                    pdfFile?.let { file ->
+                                        coroutineScope.launch(Dispatchers.IO) {
+                                            val pageText = textExtractor.extractPageText(file, currentPage)
+                                            withContext(Dispatchers.Main) {
+                                                dialogPageText = pageText
+                                                showTextDialog = true
+                                            }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.ContentCopy,
+                                    contentDescription = "Text anzeigen",
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -726,6 +825,11 @@ fun PdfViewer(
                                         pageOffsetsX[pageIndex] = newOffsetX
                                         pageOffsetsY[pageIndex] = newOffsetY
                                     },
+                                    onScaleAndOffsetChange = { newScale, newOffsetX, newOffsetY ->
+                                        pageScales[pageIndex] = newScale
+                                        pageOffsetsX[pageIndex] = newOffsetX
+                                        pageOffsetsY[pageIndex] = newOffsetY
+                                    },
                                     onSave = { AnnotationsRepository.save(context, pdfPath, strokes.toList()) }
                                 )
                             } else {
@@ -848,6 +952,11 @@ fun PdfViewer(
                                                 pageOffsetsX[pageIndex] = newOffsetX
                                                 pageOffsetsY[pageIndex] = newOffsetY
                                             },
+                                            onScaleAndOffsetChange = { newScale, newOffsetX, newOffsetY ->
+                                                pageScales[pageIndex] = newScale
+                                                pageOffsetsX[pageIndex] = newOffsetX
+                                                pageOffsetsY[pageIndex] = newOffsetY
+                                            },
                                             onSave = { AnnotationsRepository.save(context, pdfPath, strokes.toList()) }
                                         )
                                     } else {
@@ -919,6 +1028,17 @@ fun PdfViewer(
         }
         // Inhaltsverzeichnis / Kapitel-Dialog
         if (showTocDialog) {
+            // LazyListState für TOC, startet bei aktueller Seite
+            val tocListState = rememberLazyListState()
+
+            // Scrolle beim Öffnen zur aktuellen Seite und zentriere sie
+            LaunchedEffect(Unit) {
+                if (chapters.isNotEmpty()) {
+                    val targetIndex = currentPage.coerceIn(0, chapters.size - 1)
+                    tocListState.scrollToItem(targetIndex)
+                }
+            }
+
             AlertDialog(
                 onDismissRequest = { showTocDialog = false },
                 title = { Text("Inhaltsverzeichnis") },
@@ -927,16 +1047,32 @@ fun PdfViewer(
                         if (chapters.isEmpty()) {
                             Text("Keine Kapitel gefunden. Zeige Seitenliste als Fallback.")
                         }
-                        LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
+                        LazyColumn(
+                            modifier = Modifier.heightIn(max = 400.dp),
+                            state = tocListState
+                        ) {
                             items(chapters) { (titleText, pageIndex) ->
+                                val isCurrentPage = pageIndex == currentPage
                                 ListItem(
-                                    headlineContent = { Text(titleText) },
-                                    modifier = Modifier.clickable {
-                                        showTocDialog = false
-                                        coroutineScope.launch {
-                                            listState.animateScrollToItem(pageIndex)
+                                    headlineContent = {
+                                        Text(
+                                            text = titleText,
+                                            fontWeight = if (isCurrentPage) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    },
+                                    modifier = Modifier
+                                        .clickable {
+                                            showTocDialog = false
+                                            coroutineScope.launch {
+                                                listState.animateScrollToItem(pageIndex)
+                                            }
                                         }
-                                    }
+                                        .background(
+                                            if (isCurrentPage)
+                                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                            else
+                                                Color.Transparent
+                                        )
                                 )
                             }
                         }
@@ -944,6 +1080,40 @@ fun PdfViewer(
                 },
                 confirmButton = {
                     TextButton(onClick = { showTocDialog = false }) { Text("Schließen") }
+                }
+            )
+        }
+
+        // Text-Anzeige-Dialog
+        if (showTextDialog) {
+            AlertDialog(
+                onDismissRequest = { showTextDialog = false },
+                title = { Text("Seitentext (Seite ${currentPage + 1})") },
+                text = {
+                    SelectionContainer {
+                        LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
+                            item {
+                                Text(
+                                    text = dialogPageText.ifEmpty { "Kein Text auf dieser Seite gefunden." },
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        val clip = ClipData.newPlainText("PDF Text", dialogPageText)
+                        clipboard.setPrimaryClip(clip)
+                    }) {
+                        Text("Kopieren")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showTextDialog = false }) {
+                        Text("Schließen")
+                    }
                 }
             )
         }
@@ -972,11 +1142,13 @@ private fun PdfPageWithAnnotations(
     onStrokesErase: (List<AnnotationStroke>) -> Unit,
     onScaleChange: (Float, Offset, IntSize) -> Unit,
     onOffsetChange: (Float, Float, IntSize) -> Unit,
+    onScaleAndOffsetChange: (Float, Float, Float) -> Unit,
     onSave: () -> Unit
 ) {
     var overlaySize by remember { mutableStateOf(IntSize(0, 0)) }
     var currentStroke by remember(pageIndex) { mutableStateOf<AnnotationStroke?>(null) }
     var eraserPosition by remember(pageIndex) { mutableStateOf<Offset?>(null) }
+    var brushPosition by remember(pageIndex) { mutableStateOf<Offset?>(null) }
     val isCurrentPage = pageIndex == currentPage
 
     Box(
@@ -1027,11 +1199,15 @@ private fun PdfPageWithAnnotations(
 
                             // Multi-touch (>= 2 pointers): implement pinch zoom + pan
                             if (pressedPointers.size >= 2) {
-                                // Initialize previous positions
-                                var prevPos1 = pressedPointers[0].position
-                                var prevPos2 = pressedPointers[1].position
-                                var prevDist = hypot((prevPos1.x - prevPos2.x).toDouble(), (prevPos1.y - prevPos2.y).toDouble()).toFloat()
-                                var prevCentroid = (prevPos1 + prevPos2) / 2f
+                                // Initialize previous positions and capture initial state
+                                val initialPos1 = pressedPointers[0].position
+                                val initialPos2 = pressedPointers[1].position
+                                val initialDist = hypot((initialPos1.x - initialPos2.x).toDouble(), (initialPos1.y - initialPos2.y).toDouble()).toFloat()
+                                val initialCentroid = (initialPos1 + initialPos2) / 2f
+                                val initialScale = scale
+                                val initialOffsetX = offsetX
+                                val initialOffsetY = offsetY
+
                                 // Loop until one of the pointers released
                                 while (true) {
                                     val nextEvent = awaitPointerEvent()
@@ -1040,21 +1216,34 @@ private fun PdfPageWithAnnotations(
                                     changes.forEach { it.consume() }
                                     val active = changes.filter { it.pressed }
                                     if (active.size < 2) break
-                                    val pos1 = active[0].position
-                                    val pos2 = if (active.size >= 2) active[1].position else active[0].position
-                                    val newDist = hypot((pos1.x - pos2.x).toDouble(), (pos1.y - pos2.y).toDouble()).toFloat()
-                                    val newCentroid = (pos1 + pos2) / 2f
-                                    val zoom = if (prevDist != 0f) newDist / prevDist else 1f
-                                    val pan = newCentroid - prevCentroid
 
-                                    if (zoom != 1f) {
-                                        val newScale = (scale * zoom).coerceIn(0.5f, 3f)
-                                        onScaleChange(newScale, prevCentroid, overlaySize)
-                                    }
-                                    onOffsetChange(pan.x, pan.y, overlaySize)
+                                    val currentPos1 = active[0].position
+                                    val currentPos2 = if (active.size >= 2) active[1].position else active[0].position
+                                    val currentDist = hypot((currentPos1.x - currentPos2.x).toDouble(), (currentPos1.y - currentPos2.y).toDouble()).toFloat()
+                                    val currentCentroid = (currentPos1 + currentPos2) / 2f
 
-                                    prevDist = newDist
-                                    prevCentroid = newCentroid
+                                    // Calculate zoom factor relative to initial state
+                                    val zoomFactor = if (initialDist != 0f) currentDist / initialDist else 1f
+                                    val newScale = (initialScale * zoomFactor).coerceIn(0.5f, 3f)
+
+                                    // Calculate the content point under the initial centroid
+                                    val contentX = (initialCentroid.x - initialOffsetX) / initialScale
+                                    val contentY = (initialCentroid.y - initialOffsetY) / initialScale
+
+                                    // Calculate new offsets to keep that content point under the current centroid
+                                    val newOffsetX = currentCentroid.x - contentX * newScale
+                                    val newOffsetY = currentCentroid.y - contentY * newScale
+
+                                    // Apply bounds
+                                    val maxOffsetX = 0f
+                                    val minOffsetX = overlaySize.width * (1f - newScale)
+                                    val maxOffsetY = 0f
+                                    val minOffsetY = overlaySize.height * (1f - newScale)
+                                    val boundedOffsetX = newOffsetX.coerceIn(minOffsetX, maxOffsetX)
+                                    val boundedOffsetY = newOffsetY.coerceIn(minOffsetY, maxOffsetY)
+
+                                    // Update scale and offsets in one go
+                                    onScaleAndOffsetChange(newScale, boundedOffsetX, boundedOffsetY)
                                 }
                                 continue
                             }
@@ -1111,6 +1300,7 @@ private fun PdfPageWithAnnotations(
                             }
 
                             if (annotateMode) {
+                                brushPosition = offset
                                 val docX = (offset.x - offsetX) / scale
                                 val docY = (offset.y - offsetY) / scale
                                 val newStroke = AnnotationStroke(
@@ -1144,8 +1334,9 @@ private fun PdfPageWithAnnotations(
 
                             if (annotateMode && isCurrentPage) {
                                 change.consume()
+                                val offset = change.position
+                                brushPosition = offset
                                 currentStroke?.let { stroke ->
-                                    val offset = change.position
                                     val docX = (offset.x - offsetX) / scale
                                     val docY = (offset.y - offsetY) / scale
                                     val newPoints = stroke.points.toMutableList().apply {
@@ -1162,6 +1353,7 @@ private fun PdfPageWithAnnotations(
                                 eraserPosition = null
                             }
                             if (annotateMode && isCurrentPage) {
+                                brushPosition = null
                                 // Jetzt zur Liste hinzufügen nach dem Zeichnen
                                 currentStroke?.let { onStrokeAdd(it) }
                                 currentStroke = null
@@ -1180,12 +1372,17 @@ private fun PdfPageWithAnnotations(
                         if (i == 0) moveTo(x, y) else lineTo(x, y)
                     }
                 }
-                val widthPx = maxOf(1f, stroke.strokeWidth * scale)
+                // Highlight-Modus: dicker Pinsel (5x breiter), halbtransparent
+                val widthPx = if (stroke.isHighlight) {
+                    maxOf(15f, stroke.strokeWidth * scale * 5f)
+                } else {
+                    maxOf(1f, stroke.strokeWidth * scale)
+                }
                 drawPath(
                     path = path,
                     color = Color(stroke.color.toULong()),
                     style = Stroke(width = widthPx),
-                    alpha = if (stroke.isHighlight) 0.18f else 1f
+                    alpha = if (stroke.isHighlight) 0.4f else 1f
                 )
             }
 
@@ -1199,12 +1396,17 @@ private fun PdfPageWithAnnotations(
                             if (i == 0) moveTo(x, y) else lineTo(x, y)
                         }
                     }
-                    val widthPx = maxOf(1f, stroke.strokeWidth * scale)
+                    // Highlight-Modus: dicker Pinsel (5x breiter), halbtransparent
+                    val widthPx = if (stroke.isHighlight) {
+                        maxOf(15f, stroke.strokeWidth * scale * 5f)
+                    } else {
+                        maxOf(1f, stroke.strokeWidth * scale)
+                    }
                     drawPath(
                         path = path,
                         color = Color(stroke.color.toULong()),
                         style = Stroke(width = widthPx),
-                        alpha = if (stroke.isHighlight) 0.18f else 1f
+                        alpha = if (stroke.isHighlight) 0.4f else 1f
                     )
                 }
             }
@@ -1221,6 +1423,31 @@ private fun PdfPageWithAnnotations(
                     color = Color.Red.copy(alpha = 0.1f),
                     radius = eraseRadius,
                     center = eraserPosition!!
+                )
+            }
+
+            // Zeichne den Pinsel-Cursor wenn Zeichnen-Modus aktiv ist
+            if (annotateMode && !eraseMode && brushPosition != null && isCurrentPage) {
+                val brushRadius = if (highlightMode) {
+                    // Highlight: dicker Pinsel
+                    maxOf(7.5f, strokeWidth * scale * 2.5f)
+                } else {
+                    // Normal: normaler Pinsel
+                    maxOf(2f, strokeWidth * scale / 2f)
+                }
+
+                // Äußerer Ring in der ausgewählten Farbe
+                drawCircle(
+                    color = selectedColor.copy(alpha = 0.5f),
+                    radius = brushRadius,
+                    center = brushPosition!!,
+                    style = Stroke(width = 2f)
+                )
+                // Innerer gefüllter Kreis
+                drawCircle(
+                    color = selectedColor.copy(alpha = if (highlightMode) 0.3f else 0.2f),
+                    radius = brushRadius,
+                    center = brushPosition!!
                 )
             }
         }
