@@ -58,7 +58,7 @@ fun UnifiedViewer(
                     }
                 }
                 val parsedChecklist = remember(markdownContent) { MarkdownChecklistParser().parse(assetPath, markdownContent) }
-                val viewModel: ChecklistViewModel = viewModel(factory = ChecklistViewModelFactory(checklistRepository, parsedChecklist))
+                val viewModel: ChecklistViewModel = viewModel(key = assetPath, factory = ChecklistViewModelFactory(checklistRepository, parsedChecklist))
                 val checklistState by viewModel.checklistState.collectAsState()
                 MarkdownViewer(
                     assetPath = assetPath,

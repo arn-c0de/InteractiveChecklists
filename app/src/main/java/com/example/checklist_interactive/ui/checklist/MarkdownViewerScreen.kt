@@ -59,7 +59,7 @@ fun MarkdownViewerScreen(
     }
     val parsedChecklist = remember(markdownContent) { MarkdownChecklistParser().parse(assetPath, markdownContent) }
     val viewModel: ChecklistViewModel? = if (checklist != null) {
-        viewModel(factory = ChecklistViewModelFactory(checklistRepository, parsedChecklist))
+        viewModel(key = assetPath, factory = ChecklistViewModelFactory(checklistRepository, parsedChecklist))
     } else null
     val checklistState: Checklist? = viewModel?.let { vm ->
         vm.checklistState.collectAsState().value
