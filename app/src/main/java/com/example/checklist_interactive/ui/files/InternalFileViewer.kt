@@ -6,6 +6,8 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.UnfoldMore
+import androidx.compose.material.icons.filled.UnfoldLess
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -88,6 +90,9 @@ fun InternalFileViewer(
 
             val checklistState by viewModel.checklistState.collectAsState()
 
+            // State für Expand/Collapse All
+            var expandAllSections by remember { mutableStateOf(prefsManager.areMarkdownSectionsExpandedByDefault()) }
+
             Scaffold(
                 topBar = {
                     TopAppBar(
@@ -100,6 +105,16 @@ fun InternalFileViewer(
                         actions = {
                             IconButton(onClick = { viewModel.resetChecklist() }) {
                                 Icon(Icons.Default.Refresh, contentDescription = "Reset Checklist")
+                            }
+                            // Expand/Collapse All Button
+                            IconButton(onClick = {
+                                expandAllSections = !expandAllSections
+                                prefsManager.setMarkdownSectionsExpandedByDefault(expandAllSections)
+                            }) {
+                                Icon(
+                                    imageVector = if (expandAllSections) Icons.Default.UnfoldLess else Icons.Default.UnfoldMore,
+                                    contentDescription = if (expandAllSections) "Alle einklappen" else "Alle ausklappen"
+                                )
                             }
                             IconButton(onClick = onToggleTheme) {
                                 Icon(

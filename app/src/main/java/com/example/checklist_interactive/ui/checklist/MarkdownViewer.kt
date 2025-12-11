@@ -4,6 +4,10 @@ import android.content.Context
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -63,11 +67,18 @@ fun MarkdownViewer(
     val initialFontSize = effectivePrefs.getMarkdownFontSize()
     var fontSizeState by remember { mutableStateOf(initialFontSize) }
 
-    // Listen for preference changes and update font size in real time
+    // Expand/Collapse all sections state
+    val initialExpandState = effectivePrefs.areMarkdownSectionsExpandedByDefault()
+    var expandAllState by remember { mutableStateOf(initialExpandState) }
+
+    // Listen for preference changes and update font size and expand state in real time
     DisposableEffect(effectivePrefs) {
-        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
-            val updated = effectivePrefs.getMarkdownFontSize()
-            if (updated != fontSizeState) fontSizeState = updated
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            val updatedFontSize = effectivePrefs.getMarkdownFontSize()
+            if (updatedFontSize != fontSizeState) fontSizeState = updatedFontSize
+
+            val updatedExpandState = effectivePrefs.areMarkdownSectionsExpandedByDefault()
+            if (updatedExpandState != expandAllState) expandAllState = updatedExpandState
         }
         effectivePrefs.registerOnChangeListener(listener)
         onDispose {
@@ -107,15 +118,16 @@ fun MarkdownViewer(
                             markdownContent = markdownContent,
                             checklist = checklist,
                             onCheckboxChange = onCheckboxChange,
-                            bodyFontSize = fontSizeState
+                            bodyFontSize = fontSizeState,
+                            expandAll = expandAllState
                         )
                     } else {
                         // Keine Checkboxen gefunden, zeige einfache Ansicht
-                        SimpleMarkdownView(markdownContent = markdownContent, bodyFontSize = fontSizeState)
+                        SimpleMarkdownView(markdownContent = markdownContent, bodyFontSize = fontSizeState, expandAll = expandAllState)
                     }
                 } else {
                     // Einfache Markdown-Ansicht ohne Interaktion
-                    SimpleMarkdownView(markdownContent = markdownContent, bodyFontSize = fontSizeState)
+                    SimpleMarkdownView(markdownContent = markdownContent, bodyFontSize = fontSizeState, expandAll = expandAllState)
                 }
             }
         }
@@ -135,11 +147,23 @@ private data class MarkdownSection(
  * Gruppiert Inhalte zwischen ### Überschriften in Containern
  */
 @Composable
-private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int) {
+private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int, expandAll: Boolean = false) {
     val scrollState = rememberScrollState()
 
     // Parse Markdown in Sektionen
     val sections = parseMarkdownSections(markdownContent)
+
+    // State für expandierte Sektionen - Key ist der Index der Sektion
+    val expandedSections = remember { mutableStateMapOf<Int, Boolean>() }
+
+    // Wenn expandAll sich ändert, aktualisiere alle Sektionen
+    LaunchedEffect(expandAll) {
+        sections.indices.forEach { index ->
+            if (sections[index].heading.startsWith("### ")) {
+                expandedSections[index] = expandAll
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -147,7 +171,7 @@ private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int) {
             .verticalScroll(scrollState)
             .padding(16.dp)
     ) {
-        sections.forEach { section ->
+        sections.forEachIndexed { index, section ->
             when {
                 // Hauptüberschrift (# oder ##) - nicht in Card
                 section.heading.startsWith("# ") || section.heading.startsWith("## ") -> {
@@ -159,8 +183,10 @@ private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int) {
                         RenderMarkdownLine(line, bodyFontSize)
                     }
                 }
-                // ### Überschrift - in Card gruppieren
+                // ### Überschrift - in Card gruppieren mit Collapsible-Funktion
                 section.heading.startsWith("### ") -> {
+                    val isExpanded = expandedSections[index] ?: false // Default: collapsed
+
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -172,17 +198,31 @@ private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int) {
                         Column(
                             modifier = Modifier.padding(12.dp)
                         ) {
-                            // Render ### Überschrift
-                            Text(
-                                text = section.heading.substring(4),
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
+                            // Clickable Header mit Icon
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { expandedSections[index] = !isExpanded }
+                                    .padding(bottom = if (isExpanded) 8.dp else 0.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = section.heading.substring(4),
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Icon(
+                                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = if (isExpanded) "Einklappen" else "Ausklappen"
+                                )
+                            }
 
-                            // Render Inhalt der Sektion
-                            section.content.forEach { line ->
-                                RenderMarkdownLine(line, bodyFontSize)
+                            // Render Inhalt der Sektion nur wenn expanded
+                            if (isExpanded) {
+                                section.content.forEach { line ->
+                                    RenderMarkdownLine(line, bodyFontSize)
+                                }
                             }
                         }
                     }
@@ -325,8 +365,24 @@ private fun InteractiveMarkdownView(
     checklist: Checklist,
     onCheckboxChange: (itemId: String, checked: Boolean) -> Unit
     , bodyFontSize: Int
+    , expandAll: Boolean = false
 ) {
     val scrollState = rememberScrollState()
+
+    // State für expandierte Sektionen - Key ist der Section-Title
+    val expandedSections = remember { mutableStateMapOf<String, Boolean>() }
+
+    // Wenn expandAll sich ändert, aktualisiere alle Sektionen
+    LaunchedEffect(expandAll) {
+        checklist.sections.forEach { section ->
+            if (section.title.isNotEmpty()) {
+                val isSubSection = section.title.length > 3 && !section.title.contains("Case") && !section.title.contains("Recovery")
+                if (isSubSection) {
+                    expandedSections[section.title] = expandAll
+                }
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -352,7 +408,9 @@ private fun InteractiveMarkdownView(
                 val isSubSection = section.title.length > 3 && !section.title.contains("Case") && !section.title.contains("Recovery")
 
                 if (isSubSection) {
-                    // ### Überschrift - in Card gruppieren
+                    val isExpanded = expandedSections[section.title] ?: false // Default: collapsed
+
+                    // ### Überschrift - in Card gruppieren mit Collapsible-Funktion
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -364,21 +422,35 @@ private fun InteractiveMarkdownView(
                         Column(
                             modifier = Modifier.padding(12.dp)
                         ) {
-                            // Section-Überschrift
-                            Text(
-                                text = section.title,
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
-
-                            // Checkbox-Items in dieser Section
-                            section.items.forEach { item ->
-                                ChecklistItemRow(
-                                    item = item,
-                                    onCheckboxChange = onCheckboxChange,
-                                    bodyFontSize = bodyFontSize
+                            // Clickable Header mit Icon
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { expandedSections[section.title] = !isExpanded }
+                                    .padding(bottom = if (isExpanded) 8.dp else 0.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = section.title,
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.weight(1f)
                                 )
+                                Icon(
+                                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = if (isExpanded) "Einklappen" else "Ausklappen"
+                                )
+                            }
+
+                            // Checkbox-Items in dieser Section nur wenn expanded
+                            if (isExpanded) {
+                                section.items.forEach { item ->
+                                    ChecklistItemRow(
+                                        item = item,
+                                        onCheckboxChange = onCheckboxChange,
+                                        bodyFontSize = bodyFontSize
+                                    )
+                                }
                             }
                         }
                     }
