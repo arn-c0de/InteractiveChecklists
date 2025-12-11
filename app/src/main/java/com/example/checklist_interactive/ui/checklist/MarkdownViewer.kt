@@ -158,7 +158,7 @@ private fun SimpleMarkdownView(markdownContent: String) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = text,
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 18.sp),
                             modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
                         )
                     }
@@ -166,17 +166,17 @@ private fun SimpleMarkdownView(markdownContent: String) {
                 line.trim().startsWith("- ") -> {
                     // Normaler Listeneintrag
                     Row(modifier = Modifier.padding(vertical = 2.dp)) {
-                        Text("• ", style = MaterialTheme.typography.bodyMedium)
+                        Text("• ", style = MaterialTheme.typography.bodyMedium.copy(fontSize = 18.sp))
                         Text(
                             text = line.trim().substring(2),
-                            style = MaterialTheme.typography.bodyMedium
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 18.sp)
                         )
                     }
                 }
                 line.isNotBlank() -> {
                     Text(
                         text = line,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 18.sp),
                         modifier = Modifier.padding(vertical = 2.dp)
                     )
                 }

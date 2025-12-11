@@ -1,141 +1,53 @@
-# F-16 Viper Startup Checklist
+# F-16C Viper Startup Checklist
 
-## Before Entering Cockpit
+## 1. Pre-Start
 
-- [ ] Exterior preflight inspection - Complete
-- [ ] Wheel chocks - In place
-- [ ] Intake danger zone - Clear
-- [ ] External power - Connected if required
-- [ ] Ladder - Secured
+- [ ] **MAIN PWR** - Set to BAT.
+- [ ] **FLCS PWR TEST SW** - Set to TEST/OFF.
+- [ ] **MAIN PWR** - Set to MAIN PWR.
+- [ ] **Parking Brake** - Engage.
+- [ ] **Right Console Switches** - Turn ON all switches except for MAP and MIDS LVT (data link).
+- [ ] **INS Switch** - Set to STORED HEADING for a quick 1.5-minute alignment, or NORM for a full 8-minute alignment.
+- [ ] **IFF Master** - Set to NORM.
+- [ ] **RWR** - Turn ON using the power button and switch.
+- [ ] **JMR Switch** - Turn ON.
+- [ ] **Chaff and Flare Dispensers** - Turn ON.
+- [ ] **Chaff/Flare Mode** - Set to MANUAL (or BYPASS).
+- [ ] **Stores Config** - Set as required (e.g., CAT I for air-to-air, CAT III for air-to-ground).
+- [ ] **UHF Mode Selector** - Set to BOTH.
+- [ ] **UHF Frequency** - Set the desired ATC frequency.
+- [ ] **ATC/Request Engine Start** - Transmit on UHF.
 
-## Cockpit Entry
+## 2. Engine Start
 
-- [ ] Ejection seat safety pins - Check installed
-- [ ] Seat position - Adjust
-- [ ] Rudder pedals - Adjust
-- [ ] Harness - Connect and tighten
-- [ ] Helmet and oxygen mask - Don
+- [ ] **EPU PMG** - Check for LIGHT OFF.
+- [ ] **Canopy** - Close using the canopy switch.
+- [ ] **Canopy Handle** - Press to SAFE.
+- [ ] **ENG & JET START / JET FUEL Switch** - Set to START 2.
+- [ ] **RPM** - Check that RPM is >= 20%.
+- [ ] **Throttle** - Move to IDLE POSITION (in DCS, this is typically Right Shift + Home).
+- [ ] **Caution Light Panel** - Check for any active caution lights.
 
-## Interior Check
+## 3. After Start / Initial Systems
 
-- [ ] Forms and publications - Check aboard
-- [ ] Circuit breakers - Check in
-- [ ] Throttle - OFF
-- [ ] Landing gear handle - DOWN
-- [ ] Emergency gear handle - Check down and guarded
-- [ ] Parking brake - SET
+- [ ] **Altimeter** - Set to the correct barometric pressure.
+- [ ] **Bingo Fuel** - Set the bingo fuel level.
+- [ ] **TACAN** - Turn ON and set the desired channel.
+- [ ] **EGI/INS** - Ensure alignment is in progress or complete.
+- [ ] **FLCS** - Cycle and check the Flight Control System.
+- [ ] **Lights** - Turn ON lights as required (e.g., Taxi Lights).
+- [ ] **Standby Altimeter** - Set to AL (press and hold until PNU disappears).
+- [ ] **SAI** - Uncage the Standby Attitude Indicator and bring it to the horizon.
 
-## Power Up
+## 4. HMCS Alignment (DCS Specific)
 
-- [ ] Main power switch - MAIN PWR
-- [ ] FLCS PWR - Check on (FLCS RLY light off)
-- [ ] Avionics power switch - MMC
-- [ ] INS - ALIGN
-- [ ] IFF master - STBY
-- [ ] DTE - Check operational
-- [ ] UFC - Set frequency
-
-## Engine Start
-
-- [ ] Fire extinguisher - Available
-- [ ] Area clear - Ground crew advised
-- [ ] JFS switch - START 2
-- [ ] RPM - Monitor acceleration
-- [ ] Throttle - IDLE (at 20% RPM)
-- [ ] Oil pressure - Check rising
-- [ ] Nozzle position - Check
-- [ ] RPM - Stabilize at idle (60-80%)
-- [ ] FTIT - Monitor (check not exceeding 1000°C)
-- [ ] Generator - Check online
-- [ ] Caution lights - Check cleared
-- [ ] Hydraulic pressure - Check (A and B systems)
-
-## After Engine Start
-
-- [ ] INS - Continue alignment
-- [ ] Avionics - Complete initialization
-- [ ] Air source knob - NORM
-- [ ] Canopy - Close and lock
-- [ ] Ejection seat pins - Remove and stow
-- [ ] Seat - ARMED
-- [ ] Harness - Check tight
-- [ ] NWS - Check engaged (light on)
-- [ ] Flight controls - Check FLCS test
-- [ ] Trim - Test
-- [ ] Speed brake - Check
-- [ ] Stores stations - Check armed as required
-
-## Before Taxi
-
-- [ ] INS alignment - Complete
-- [ ] Altimeter - Set QNH
-- [ ] HMCS - Check aligned
-- [ ] Radar - Check BIT complete
-- [ ] MFD pages - Set as required
-- [ ] DED - Set takeoff data
-- [ ] Fuel quantity - Check
-- [ ] Oxygen - Check flow and quantity
-- [ ] Canopy warning - Check clear
-- [ ] Parking brake - Release
-- [ ] Ground crew - Signal ready to taxi
-
-## Taxi
-
-- [ ] Brakes - Test
-- [ ] NWS - Engaged (check steering)
-- [ ] Flight controls - Check full movement
-- [ ] Leading edge flaps - Check extend
-- [ ] Trailing edge flaps - Check extend/retract
-- [ ] Speedbrake - Check extend/retract
-- [ ] Engine instruments - Monitor
-- [ ] FTIT - Normal range
-- [ ] RPM - Check response to throttle
-- [ ] Nozzle - Check position
-
-## Before Takeoff
-
-- [ ] Canopy - Locked down
-- [ ] Seat - ARMED
-- [ ] Harness - Locked and tight
-- [ ] HMCS - Check
-- [ ] Stores - Check armed/safe as required
-- [ ] Master arm - As briefed
-- [ ] Fuel quantity - Check sufficient
-- [ ] DED - Takeoff data confirmed
-- [ ] Leading edge flaps - AUTO
-- [ ] Trim - Check for takeoff
-- [ ] Flight controls - Free and correct
-- [ ] Oxygen - 100%
-- [ ] Takeoff clearance - Obtained
-
-## Takeoff
-
-- [ ] Brakes - Hold
-- [ ] Throttle - MIL power
-- [ ] Engine instruments - Check
-- [ ] FTIT - Normal
-- [ ] RPM - 100%
-- [ ] Nozzle - Check position
-- [ ] Brakes - Release
-- [ ] Afterburner - Engage if required
-- [ ] RPM - Check increase with AB
-- [ ] Rudder - Use as needed for centerline
-- [ ] Airspeed - Monitor acceleration
-- [ ] Rotate - 140-150 KIAS
-- [ ] Climb - Establish positive rate
-- [ ] Landing gear - UP
-- [ ] Trim - Adjust as needed
-
-## After Takeoff
-
-- [ ] Landing gear - Check up and locked
-- [ ] Leading edge flaps - Check retracted
-- [ ] NWS - Disengage (automatically)
-- [ ] Radar - As required
-- [ ] Master arm - As required
-- [ ] Departure frequency - Contact
-- [ ] Climb speed - 350 KIAS / 0.9 Mach
-- [ ] Throttle - Adjust for climb schedule
-- [ ] Engine instruments - Monitor
-- [ ] Fuel flow - Monitor
-- [ ] Flight plan - Execute
+- [ ] On the ICP, press **LIST**, then **0** (for Miscellaneous).
+- [ ] Press **RCL** (for the Helmet Mounting Queuing System menu).
+- [ ] Press **SEQUENCE** to go to the HMCS Align page.
+- [ ] Press **0** on the ICP to start the alignment process.
+- [ ] Align the small cross with the large cross on the HMD/HUD.
+- [ ] Press and hold the **Enable Switch**.
+- [ ] Release the **Enable Switch**.
+- [ ] Press **0** on the ICP again.
+- [ ] Using the Radar Cursor Switch, align the smaller crosses with the large one.
+- [ ] Press **0** on the ICP to finalize the alignment.
