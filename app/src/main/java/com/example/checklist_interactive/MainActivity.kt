@@ -161,19 +161,15 @@ class MainActivity : ComponentActivity() {
                         }
                         val importedFromExternal = fileManager.importFromExternalImportsFolder()
                         
-                        // 2. Wenn keine Dateien vorhanden, importiere gebündelte Assets
-                        val allCategories = fileManager.getCategories()
-                        var hasAnyFiles = false
-                        allCategories.forEach { category ->
-                            if (fileManager.getFilesInCategory(category).isNotEmpty()) {
-                                hasAnyFiles = true
-                            }
-                        }
+                        // 2. Check if app was updated and import new assets automatically
+                        val lastImportedVersion = prefsManager.getLastImportedVersion()
+                        val currentVersion = SOFTWARE_VERSION
                         
-                        if (!hasAnyFiles) {
-                            // Copy all bundled assets from assets/ into internal storage
-                            // This includes Checklists/ and radiocommunication/ folders with full structure
+                        if (lastImportedVersion != currentVersion) {
+                            // App was updated or first launch - import all bundled assets
+                            // This will only copy new files that don't exist yet
                             val imported = fileManager.importAllBundledAssets("")
+                            prefsManager.setLastImportedVersion(currentVersion)
                         }
                         
                         // 3. Versuche letzte geöffnete Datei zu laden

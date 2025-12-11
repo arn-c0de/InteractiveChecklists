@@ -122,5 +122,9 @@
   {
     "filePath": "radiocommunication/Ivana-Francetic-Radiotelephoy-Communications-Handbook.pdf",
     "tags": ["communications", "reference", "training"]
+  },
+  {
+    "filePath": "Charts/Caucasus - Aerodrome Chart - DAY.pdf",
+    "tags": ["charts", "navigation", "reference", "caucasus"]
   }
 ]
