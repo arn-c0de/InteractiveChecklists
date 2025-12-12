@@ -2,6 +2,62 @@
 
 All relevant changes are summarized here by version.
 
+## [1.0.4] - 2025-12-12
+### Added
+- **Room Database integration** for QuickNotes with proper data persistence
+- **Repository pattern** implementation for clean architecture and separation of concerns
+- **Asynchronous operations** using Kotlin Coroutines for all database operations
+- **Search functionality** for notes with real-time filtering by title and content
+- **Automatic data migration** from SharedPreferences to Room Database
+- **Type-safe database operations** with Room entities and DAOs
+- **Flow-based reactive updates** for real-time UI synchronization
+- **Comprehensive error handling** and logging throughout the QuickNotes system
+- **Database versioning** and migration support
+- **Optimized database queries** with indexed searches
+- **Modern Material Design 3 UI** for QuickNotes with improved user experience
+- **Horizontal scrollable note tabs** with FilterChips for better navigation
+- **In-app search bar** for quick note filtering (appears when multiple notes exist)
+- **Status indicators** showing save state and note count
+- **Improved markdown editor** with syntax hints and clickable internal links
+- **Quick text input field** for rapid note additions
+- **Enhanced dialog designs** with icons and better UX
+- **Smart UI behaviors** (auto-hide search when single note, disable delete on last note)
+
+### Changed
+- **QuickNoteManager refactored** to use Room Database instead of SharedPreferences
+- **Data persistence layer** completely restructured using modern Android best practices
+- **Database schema** now uses proper relational structure with entities
+- **StateFlow emissions** now driven by Room's reactive Flow observers
+- **All note operations** now execute asynchronously on background threads
+- **QuickAccessSheet UI completely redesigned** with Material Design 3 components
+- **Note tabs switched from buttons to FilterChips** for better visual hierarchy
+- **Editor modes now use FilterChips** for cleaner mode switching
+- **Removed redundant LinkedDocuments feature** - fully replaced by markdown links
+
+### Improved
+- **Performance** significantly improved with indexed database queries
+- **Data integrity** enhanced with Room's compile-time SQL verification
+- **Scalability** improved to handle thousands of notes efficiently
+- **Code maintainability** enhanced through separation of concerns
+- **Testing capability** improved with repository abstraction layer
+- **UI responsiveness** with better state management and reactive updates
+- **Visual consistency** across all note-taking components
+- **Touch targets** optimized for mobile use
+- **Code cleanliness** by removing ~500 lines of unused LinkedDocuments code
+- **User workflow** streamlined with auto-save and better feedback
+
+### Technical Details
+- Added Room dependencies (version 2.6.1) and KSP compiler plugin
+- Created `QuickNoteEntity`, `LinkedDocumentEntity` with TypeConverters
+- Implemented `QuickNoteDao` with comprehensive query methods
+- Built `QuickNoteDatabase` with singleton pattern
+- Developed `QuickNoteRepository` with Result-based error handling
+- Maintained backward compatibility with existing API surface
+- Refactored UI to use LazyRow for horizontal scrolling performance
+- Implemented conditional UI rendering based on note count
+- Cleaned up imports and removed deprecated code paths
+- Added proper spacing and alignment using Material Design guidelines
+
 ## [1.0.3] - 2025-12-12
 ### Added
 - Notes FAB integration
