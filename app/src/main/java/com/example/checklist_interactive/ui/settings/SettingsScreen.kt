@@ -29,6 +29,9 @@ import androidx.compose.ui.text.font.FontWeight
 import com.example.checklist_interactive.data.prefs.PreferencesManager
 import com.example.checklist_interactive.data.files.InternalFileManager
 import kotlinx.serialization.json.Json
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.example.checklist_interactive.data.prefs.SourceEntry
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -56,6 +59,8 @@ fun SettingsScreen(
     var visibilityRefreshKey by remember { mutableIntStateOf(0) }
 
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    var isImporting by remember { mutableStateOf(false) }
     // Load available aircraft from assets/Checklists (subfolders)
     var availableAircrafts by remember { mutableStateOf(listOf<String>()) }
     LaunchedEffect(context) {
@@ -103,16 +108,46 @@ fun SettingsScreen(
     }
 
     fun handleReimport() {
-        val imported = fileManager.importAllBundledAssets("")
-        Toast.makeText(context, "Imported $imported files", Toast.LENGTH_SHORT).show()
-        onFilesRefreshed()
+        coroutineScope.launch {
+            isImporting = true
+            try {
+                val imported = withContext(Dispatchers.IO) {
+                    fileManager.importAllBundledAssets("")
+                }
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Imported $imported files", Toast.LENGTH_SHORT).show()
+                    onFilesRefreshed()
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Import failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            } finally {
+                isImporting = false
+            }
+        }
     }
 
     fun handleWipeAndReimport() {
-        fileManager.wipeInternalRoot()
-        val imported = fileManager.importAllBundledAssets("")
-        Toast.makeText(context, "Wiped and imported $imported files", Toast.LENGTH_SHORT).show()
-        onFilesRefreshed()
+        coroutineScope.launch {
+            isImporting = true
+            try {
+                val imported = withContext(Dispatchers.IO) {
+                    fileManager.wipeInternalRoot()
+                    fileManager.importAllBundledAssets("")
+                }
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Wiped and imported $imported files", Toast.LENGTH_SHORT).show()
+                    onFilesRefreshed()
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Wipe/Import failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            } finally {
+                isImporting = false
+            }
+        }
     }
 
     Scaffold(
@@ -158,7 +193,8 @@ fun SettingsScreen(
                     onReimport = { handleReimport() },
                     showWipeConfirm = showWipeConfirm,
                     onShowWipeConfirm = { showWipeConfirm = it },
-                    onWipeAndReimport = { handleWipeAndReimport() }
+                    onWipeAndReimport = { handleWipeAndReimport() },
+                    isImporting = isImporting
                 )
             }
 
@@ -777,7 +813,8 @@ private fun ImportSettingsSection(
     onReimport: () -> Unit,
     showWipeConfirm: Boolean,
     onShowWipeConfirm: (Boolean) -> Unit,
-    onWipeAndReimport: () -> Unit
+    onWipeAndReimport: () -> Unit,
+    isImporting: Boolean = false
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column {
@@ -852,8 +889,23 @@ private fun ImportSettingsSection(
                         Spacer(modifier = Modifier.height(12.dp))
                     }
 
-                    Button(onClick = onReimport, modifier = Modifier.fillMaxWidth()) {
-                        Text("Re-import bundled assets")
+                    Button(
+                        onClick = onReimport,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isImporting
+                    ) {
+                        if (isImporting) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Importing...")
+                            }
+                        } else {
+                            Text("Re-import bundled assets")
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -862,12 +914,25 @@ private fun ImportSettingsSection(
                         Button(
                             onClick = { onShowWipeConfirm(true) },
                             modifier = Modifier.fillMaxWidth(),
+                            enabled = !isImporting,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.errorContainer,
                                 contentColor = MaterialTheme.colorScheme.onErrorContainer
                             )
                         ) {
-                            Text("Reset bundled imports (wipe + reimport)")
+                            if (isImporting) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Processing...")
+                                }
+                            } else {
+                                Text("Reset bundled imports (wipe + reimport)")
+                            }
                         }
 
                         if (showWipeConfirm) {
