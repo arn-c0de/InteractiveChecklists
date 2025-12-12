@@ -110,5 +110,37 @@
   {
     "filePath": "asset://Checklists/P-51_Mustang/taxi.md",
     "tags": ["taxi"]
+  },
+  {
+    "filePath": "asset://radiocommunication/ICAO-Doc-9432-Manual-of-Radiotelephony-4th-ed.-2007.pdf",
+    "tags": ["communications", "reference", "icao"]
+  },
+  {
+    "filePath": "asset://radiocommunication/Ivana-Francetic-Radiotelephoy-Communications-Handbook.pdf",
+    "tags": ["communications", "reference", "handbook"]
+  },
+  {
+    "filePath": "asset://radiocommunication/cap-413-radiotelephony.pdf",
+    "tags": ["communications", "reference", "cap-413"]
+  },
+  {
+    "filePath": "asset://Checklists/AH-64D/AH-64D Quick Checklist.pdf",
+    "tags": ["checklist", "quick", "ah-64d"]
+  },
+  {
+    "filePath": "asset://Checklists/AH-64D/AH-64D Quick Checklist-Night Ops.pdf",
+    "tags": ["checklist", "night", "ah-64d"]
+  },
+  {
+    "filePath": "asset://Checklists/FA-18_Hornet/FA18C-Checklist-v2-OFS.pdf",
+    "tags": ["checklist", "operations", "fa-18c"]
+  },
+  {
+    "filePath": "asset://Charts/GND_and_VAD_Charts_v405.pdf",
+    "tags": ["charts", "ground"]
+  },
+  {
+    "filePath": "asset://Charts/Caucasus - Aerodrome Chart - DAY.pdf",
+    "tags": ["charts", "aerodrome", "caucasus"]
   }
 ]
