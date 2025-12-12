@@ -39,6 +39,7 @@ This is a standard Android project. You can build it using Android Studio or by 
 
 ## Important Links
 
+* [Changelog](CHANGELOG.md)
 * [Documentation Navigation](docs/docnavigation.md)
 * [Security Policy](SECURITY.md)
 * [License](LICENSE)
