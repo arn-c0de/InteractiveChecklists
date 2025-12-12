@@ -1,4 +1,6 @@
-﻿# Kotlin Code Structure
+﻿[Home](../README.md) | [Documentation Navigation](docnavigation.md)
+
+# Kotlin Code Structure
 
 ## C:\Users\arn\AndroidStudioProjects\ChecklistInteractive\app\src\main\java\com\example\checklist_interactive\MainActivity.kt
 
