@@ -145,7 +145,8 @@ fun QuickAccessSheet(
     var showRenameDialog by remember { mutableStateOf(false) }
     var renameText by remember { mutableStateOf("") }
     var renameTargetId by remember { mutableStateOf<String?>(null) }
-    var previewMode by remember { mutableStateOf(false) }
+    var showAdvancedEditor by remember { mutableStateOf(false) }
+    var newTextInput by remember { mutableStateOf("") }
 
     // Update currentNote when savedNote changes
     LaunchedEffect(savedNote) {
@@ -298,77 +299,133 @@ fun QuickAccessSheet(
             }
 
             // Quick Note Section
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = { previewMode = !previewMode }) {
-                    Text(if (previewMode) "Bearbeiten" else "Vorschau")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Schnellnotiz",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Row {
+                    TextButton(onClick = { showAdvancedEditor = !showAdvancedEditor }) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(if (showAdvancedEditor) "Normal" else "Erweitert", style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
-            Text(
-                text = "Schnellnotiz",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
 
             OutlinedCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f, fill = false)
             ) {
-                if (previewMode) {
-                    // Preview mode: clickable links inside read-only view
-                    val ann = buildAnnotatedStringWithLinks(currentNote)
-                    ClickableText(
-                        text = ann,
-                        style = MaterialTheme.typography.bodyMedium,
+                if (showAdvancedEditor) {
+                    // Advanced mode: full markdown editor with raw links
+                    OutlinedTextField(
+                        value = currentNote,
+                        onValueChange = {
+                            currentNote = it
+                            hasChanges = true
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 200.dp, max = 400.dp)
                             .verticalScroll(rememberScrollState()),
-                        onClick = { offset: Int ->
-                            ann.getStringAnnotations("OPEN_LINK", offset, offset)
-                                .firstOrNull()?.let { span ->
-                                    val value = span.item
-                                    val parts = value.split("|")
-                                    val file = URLDecoder.decode(parts.getOrNull(0) ?: "", "UTF-8")
-                                    val page = parts.getOrNull(1)?.toIntOrNull()
-                                    if (onOpenDocument != null) {
-                                        onOpenDocument.invoke(file, page)
-                                    } else {
-                                        try {
-                                            val f = File(file)
-                                            val uri: Uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", f)
-                                            val intent = Intent(Intent.ACTION_VIEW)
-                                            intent.setDataAndType(uri, if (file.endsWith(".pdf", true)) "application/pdf" else "*/*")
-                                            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                            context.startActivity(intent)
-                                        } catch (e: Exception) {
-                                            // ignore
-                                        }
-                                    }
-                                }
-                        }
+                        placeholder = {
+                            Text("Markdown-Editor\n\nLinks: [Text](internal://open?file=...)")
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                        ),
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
                     )
                 } else {
-                    OutlinedTextField(
-                    value = currentNote,
-                    onValueChange = {
-                        currentNote = it
-                        hasChanges = true
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 200.dp, max = 400.dp)
-                        .verticalScroll(rememberScrollState()),
-                    placeholder = {
-                        Text("Notizen hier eingeben...\n\nTipps, Checklisten, wichtige Infos, etc.")
-                    },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                    ),
-                    textStyle = MaterialTheme.typography.bodyMedium
-                )
+                    // Normal mode: clickable links + editable text
+                    val ann = buildAnnotatedStringWithLinks(currentNote)
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        ClickableText(
+                            text = ann,
+                            style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 200.dp, max = 400.dp)
+                                .padding(16.dp)
+                                .verticalScroll(rememberScrollState()),
+                            onClick = { offset: Int ->
+                                ann.getStringAnnotations("OPEN_LINK", offset, offset)
+                                    .firstOrNull()?.let { span ->
+                                        val value = span.item
+                                        val parts = value.split("|")
+                                        val file = URLDecoder.decode(parts.getOrNull(0) ?: "", "UTF-8")
+                                        val page = parts.getOrNull(1)?.toIntOrNull()
+                                        if (onOpenDocument != null) {
+                                            onOpenDocument.invoke(file, page)
+                                            onDismiss()
+                                        } else {
+                                            try {
+                                                val f = File(file)
+                                                val uri: Uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", f)
+                                                val intent = Intent(Intent.ACTION_VIEW)
+                                                intent.setDataAndType(uri, if (file.endsWith(".pdf", true)) "application/pdf" else "*/*")
+                                                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                context.startActivity(intent)
+                                            } catch (e: Exception) {
+                                                // ignore
+                                            }
+                                        }
+                                    }
+                            }
+                        )
+                        // Editable text area below for adding new content
+                        if (currentNote.isNotEmpty()) {
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = newTextInput,
+                                onValueChange = { newTextInput = it },
+                                modifier = Modifier.weight(1f),
+                                placeholder = { Text("Text hinzufügen...") },
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                                ),
+                                textStyle = MaterialTheme.typography.bodyMedium,
+                                maxLines = 3
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            IconButton(
+                                onClick = {
+                                    if (newTextInput.isNotEmpty()) {
+                                        currentNote = if (currentNote.isEmpty()) {
+                                            newTextInput
+                                        } else {
+                                            "$currentNote\n$newTextInput"
+                                        }
+                                        newTextInput = ""
+                                        hasChanges = true
+                                    }
+                                },
+                                enabled = newTextInput.isNotEmpty()
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "Hinzufügen")
+                            }
+                        }
+                    }
                 }
             }
 

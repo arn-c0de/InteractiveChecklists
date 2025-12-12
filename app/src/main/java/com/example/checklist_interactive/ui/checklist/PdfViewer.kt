@@ -156,6 +156,16 @@ fun PdfViewer(
     var textSelectionEnabled by remember { mutableStateOf(true) }
     var showTextDialog by remember { mutableStateOf(false) }
     var dialogPageText by remember { mutableStateOf("") }
+    val textExtractionJobs = remember { mutableMapOf<Int, Job>() }
+
+    // Cleanup textExtractor beim Verlassen
+    DisposableEffect(Unit) {
+        onDispose {
+            textExtractionJobs.values.forEach { it.cancel() }
+            textExtractionJobs.clear()
+            textExtractor.cleanup()
+        }
+    }
 
     // Use individual states per page instead of StateMap to prevent global recomposition
     val pageBitmapStates = remember { mutableMapOf<Int, MutableState<Bitmap?>>() }
@@ -375,16 +385,22 @@ fun PdfViewer(
         pdfFile?.let { file ->
             for (idx in indices) {
                 if (!pageTextBlocks.containsKey(idx)) {
-                    coroutineScope.launch(Dispatchers.IO) {
+                    // Abbrechen eines laufenden Jobs für diese Seite
+                    textExtractionJobs[idx]?.cancel()
+
+                    val job = coroutineScope.launch(Dispatchers.IO) {
                         try {
                             val textBlocks = textExtractor.extractTextBlocks(file, idx)
                             withContext(Dispatchers.Main) {
                                 pageTextBlocks[idx] = textBlocks
+                                textExtractionJobs.remove(idx)
                             }
                         } catch (e: Exception) {
                             e.printStackTrace()
+                            textExtractionJobs.remove(idx)
                         }
                     }
+                    textExtractionJobs[idx] = job
                 }
             }
         }
