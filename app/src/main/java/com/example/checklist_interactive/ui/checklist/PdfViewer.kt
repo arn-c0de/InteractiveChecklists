@@ -1438,6 +1438,38 @@ private fun PdfPageWithAnnotations(
     val renderOffsetX = transientOffsetX
     val renderOffsetY = transientOffsetY
 
+    // Calculate actual bitmap display bounds within the overlay (accounting for ContentScale.Fit)
+    val bitmapDisplayBounds = remember(bitmap, overlaySize, renderScale) {
+        if (overlaySize.width == 0 || overlaySize.height == 0) {
+            return@remember IntSize(0, 0) to Offset(0f, 0f)
+        }
+
+        val containerWidth = overlaySize.width.toFloat()
+        val containerHeight = overlaySize.height.toFloat()
+        val bitmapAspect = bitmap.width.toFloat() / bitmap.height.toFloat()
+        val containerAspect = containerWidth / containerHeight
+
+        val (displayWidth, displayHeight, paddingX, paddingY) = if (bitmapAspect > containerAspect) {
+            // Bitmap is wider - fit to width, pad top/bottom
+            val w = containerWidth
+            val h = containerWidth / bitmapAspect
+            val px = 0f
+            val py = (containerHeight - h) / 2f
+            listOf(w, h, px, py)
+        } else {
+            // Bitmap is taller - fit to height, pad left/right
+            val h = containerHeight
+            val w = containerHeight * bitmapAspect
+            val px = (containerWidth - w) / 2f
+            val py = 0f
+            listOf(w, h, px, py)
+        }
+
+        IntSize(displayWidth.toInt(), displayHeight.toInt()) to Offset(paddingX, paddingY)
+    }
+
+    val (bitmapDisplaySize, bitmapDisplayOffset) = bitmapDisplayBounds
+
     Box(
         modifier = modifier
             .padding(8.dp)
@@ -1633,8 +1665,9 @@ private fun PdfPageWithAnnotations(
                                 eraserPosition = offset
                                 val toErase = strokes.filter { stroke ->
                                     stroke.points.any { p ->
-                                        val px = p.first * renderScale + renderOffsetX
-                                        val py = p.second * renderScale + renderOffsetY
+                                        // Transform document coords to screen coords with bitmap bounds
+                                        val px = p.first * renderScale + renderOffsetX + bitmapDisplayOffset.x
+                                        val py = p.second * renderScale + renderOffsetY + bitmapDisplayOffset.y
                                         hypot(
                                             (px - offset.x).toDouble(),
                                             (py - offset.y).toDouble()
@@ -1647,8 +1680,9 @@ private fun PdfPageWithAnnotations(
 
                             if (annotateMode) {
                                 brushPosition = offset
-                                val docX = (offset.x - renderOffsetX) / renderScale
-                                val docY = (offset.y - renderOffsetY) / renderScale
+                                // Transform screen coords to document coords accounting for bitmap bounds
+                                val docX = (offset.x - bitmapDisplayOffset.x - renderOffsetX) / renderScale
+                                val docY = (offset.y - bitmapDisplayOffset.y - renderOffsetY) / renderScale
                                 val newStroke = AnnotationStroke(
                                     page = pageIndex,
                                     color = selectedColor.value.toLong(),
@@ -1666,8 +1700,9 @@ private fun PdfPageWithAnnotations(
                                 eraserPosition = offset
                                 val toErase = strokes.filter { stroke ->
                                     stroke.points.any { p ->
-                                        val px = p.first * renderScale + renderOffsetX
-                                        val py = p.second * renderScale + renderOffsetY
+                                        // Transform document coords to screen coords with bitmap bounds
+                                        val px = p.first * renderScale + renderOffsetX + bitmapDisplayOffset.x
+                                        val py = p.second * renderScale + renderOffsetY + bitmapDisplayOffset.y
                                         hypot(
                                             (px - offset.x).toDouble(),
                                             (py - offset.y).toDouble()
@@ -1683,8 +1718,9 @@ private fun PdfPageWithAnnotations(
                                 val offset = change.position
                                 brushPosition = offset
                                 currentStroke?.let { stroke ->
-                                    val docX = (offset.x - renderOffsetX) / renderScale
-                                    val docY = (offset.y - renderOffsetY) / renderScale
+                                    // Transform screen coords to document coords accounting for bitmap bounds
+                                    val docX = (offset.x - bitmapDisplayOffset.x - renderOffsetX) / renderScale
+                                    val docY = (offset.y - bitmapDisplayOffset.y - renderOffsetY) / renderScale
                                     val newPoints = stroke.points.toMutableList().apply {
                                         add(Pair(docX, docY))
                                     }
@@ -1713,8 +1749,9 @@ private fun PdfPageWithAnnotations(
             for (stroke in strokes) {
                 val path = Path().apply {
                     stroke.points.forEachIndexed { i, p ->
-                        val x = p.first * renderScale + renderOffsetX
-                        val y = p.second * renderScale + renderOffsetY
+                        // Transform document coords to screen coords with bitmap bounds
+                        val x = p.first * renderScale + renderOffsetX + bitmapDisplayOffset.x
+                        val y = p.second * renderScale + renderOffsetY + bitmapDisplayOffset.y
                         if (i == 0) moveTo(x, y) else lineTo(x, y)
                     }
                 }
@@ -1739,8 +1776,9 @@ private fun PdfPageWithAnnotations(
                 if (stroke.points.isNotEmpty()) {
                     val path = Path().apply {
                         stroke.points.forEachIndexed { i, p ->
-                            val x = p.first * renderScale + renderOffsetX
-                            val y = p.second * renderScale + renderOffsetY
+                            // Transform document coords to screen coords with bitmap bounds
+                            val x = p.first * renderScale + renderOffsetX + bitmapDisplayOffset.x
+                            val y = p.second * renderScale + renderOffsetY + bitmapDisplayOffset.y
                             if (i == 0) moveTo(x, y) else lineTo(x, y)
                         }
                     }
