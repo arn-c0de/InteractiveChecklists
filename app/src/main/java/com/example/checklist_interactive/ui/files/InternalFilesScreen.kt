@@ -116,6 +116,8 @@ fun InternalFilesScreen(
     }
     var groupedFiles by remember { mutableStateOf<Map<String, List<FileInfo>>>(emptyMap()) }
     var folderTree by remember { mutableStateOf<List<InternalFileManager.FolderNode>>(emptyList()) }
+    // Cache of enriched files by path to avoid repeated enrichWithTags calls
+    var enrichedFileMap by remember { mutableStateOf<Map<String, FileInfo>>(emptyMap()) }
     var shortcuts by remember { mutableStateOf<List<PageShortcut>>(emptyList()) }
     var showImportDialog by remember { mutableStateOf(false) }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
@@ -143,32 +145,33 @@ fun InternalFilesScreen(
 
     // Suspended function to refresh and enrich files with tags (IO-heavy - keep suspended)
     suspend fun refreshFilesWithTags() {
-        val rawGroupedFiles = withContext(Dispatchers.IO) {
-            fileManager.getAllFilesGrouped()
-        }
-        val newGrouped = withContext(Dispatchers.IO) {
-            rawGroupedFiles.mapValues { (_, files) ->
-                val enrichedFiles = fileManager.enrichWithTags(files)
-                if (selectedTagFilters.isEmpty()) {
-                    enrichedFiles
-                } else if (tagFilterMode == "all") {
-                    enrichedFiles.filter { file -> selectedTagFilters.all { tag -> file.tags.contains(tag) } }
-                } else {
-                    enrichedFiles.filter { file -> file.tags.any { tag -> selectedTagFilters.contains(tag) } }
-                }
-            }.filterValues { it.isNotEmpty() }
-        }
+        android.util.Log.i("InternalFiles", "refreshFilesWithTags: start")
+        val rawGroupedFiles = withContext(Dispatchers.IO) { fileManager.getAllFilesGrouped() }
+        // Build a single flat list of unique files to enrich once
+        val allFiles = rawGroupedFiles.values.flatten().distinctBy { it.path }
+        val enrichedAll = withContext(Dispatchers.IO) { fileManager.enrichWithTags(allFiles) }
+        val newEnrichedMap = enrichedAll.associateBy { it.path }
+        val newGrouped = rawGroupedFiles.mapValues { (_, files) ->
+            val enrichedFiles = files.map { newEnrichedMap[it.path] ?: it }
+            if (selectedTagFilters.isEmpty()) {
+                enrichedFiles
+            } else if (tagFilterMode == "all") {
+                enrichedFiles.filter { file -> selectedTagFilters.all { tag -> file.tags.contains(tag) } }
+            } else {
+                enrichedFiles.filter { file -> file.tags.any { tag -> selectedTagFilters.contains(tag) } }
+            }
+        }.filterValues { it.isNotEmpty() }
+        enrichedFileMap = newEnrichedMap
+        android.util.Log.i("InternalFiles", "refreshFilesWithTags: enriched ${enrichedFileMap.size} files, grouped ${newGrouped.size} categories")
         if (newGrouped != groupedFiles) groupedFiles = newGrouped
         
         val rawTree = withContext(Dispatchers.IO) {
-            fileManager.getFolderTree().map { node ->
-                filterAircraftChildren(node, assetAircraftsLower, prefsManager)
-            }
+            fileManager.getFolderTree().map { node -> filterAircraftChildren(node, assetAircraftsLower, prefsManager) }
         }
-        val newTree = withContext(Dispatchers.IO) {
-            rawTree.map { node -> enrichNodeWithTags(node, fileManager, selectedTagFilters, tagFilterMode) }
-        }
+        val newTree = withContext(Dispatchers.IO) { rawTree.map { node -> enrichNodeWithTags(node, enrichedFileMap, selectedTagFilters, tagFilterMode) } }
         if (newTree != folderTree) folderTree = newTree
+        android.util.Log.i("InternalFiles", "refreshFilesWithTags: tree nodes ${folderTree.size}")
+        android.util.Log.i("InternalFiles", "refreshFilesWithTags: done")
     }
 
     
@@ -386,9 +389,9 @@ fun InternalFilesScreen(
                                     coroutineScope.launch {
                                         refreshFilesWithTags()
                                         val nodesToExpand = withContext(Dispatchers.IO) {
-                                            // Compute which folder nodes contain matching files
+                                            // Compute which folder nodes contain matching files using cached enrichedFileMap
                                             fun nodeHasMatchingFiles(node: InternalFileManager.FolderNode): Boolean {
-                                                val enriched = fileManager.enrichWithTags(node.files)
+                                                val enriched = node.files.map { enrichedFileMap[it.path] ?: it }
                                                 val fileMatches = enriched.any { file ->
                                                     if (selectedTagFilters.isEmpty()) return@any false
                                                     if (tagFilterMode == "all") {
@@ -428,8 +431,8 @@ fun InternalFilesScreen(
                                     // Expand folders that contain files matching the selected tags,
                                     // but do not expand aircraft folders that are deselected in settings.
                                     fun nodeHasMatchingFiles(node: InternalFileManager.FolderNode): Boolean {
-                                        // Check files in this node
-                                        val enriched = fileManager.enrichWithTags(node.files)
+                                        // Check files in this node (use cached enriched files)
+                                        val enriched = node.files.map { enrichedFileMap[it.path] ?: it }
                                         val fileMatches = enriched.any { file ->
                                             if (selectedTagFilters.isEmpty()) return@any false
                                             if (tagFilterMode == "all") {
@@ -703,22 +706,22 @@ fun InternalFilesScreen(
 // Top-level helper to enrich folder nodes with tags (must be outside composable for visibility)
 private fun enrichNodeWithTags(
     node: InternalFileManager.FolderNode,
-    fileManager: InternalFileManager,
+    enrichedMap: Map<String, FileInfo>,
     selectedTagFilters: Set<String>,
     tagFilterMode: String
 ): InternalFileManager.FolderNode {
     // Helper to apply tag filters
     fun applyTagFilters(files: List<FileInfo>): List<FileInfo> {
         if (selectedTagFilters.isEmpty()) return files
-        val enrichedFiles = fileManager.enrichWithTags(files)
+        val enrichedFiles = files.map { enrichedMap[it.path] ?: it }
         return if (tagFilterMode == "all") {
             enrichedFiles.filter { file -> selectedTagFilters.all { tag -> file.tags.contains(tag) } }
         } else {
             enrichedFiles.filter { file -> file.tags.any { tag -> selectedTagFilters.contains(tag) } }
         }
     }
-    val enrichedFiles = fileManager.enrichWithTags(applyTagFilters(node.files))
-    val enrichedChildren = node.children.map { enrichNodeWithTags(it, fileManager, selectedTagFilters, tagFilterMode) }
+    val enrichedFiles = applyTagFilters(node.files).map { enrichedMap[it.path] ?: it }
+    val enrichedChildren = node.children.map { enrichNodeWithTags(it, enrichedMap, selectedTagFilters, tagFilterMode) }
     return node.copy(files = enrichedFiles, children = enrichedChildren)
 }
 
