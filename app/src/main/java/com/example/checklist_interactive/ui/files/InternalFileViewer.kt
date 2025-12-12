@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material.icons.filled.UnfoldLess
+import androidx.compose.material.icons.filled.NoteAdd
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -17,6 +18,8 @@ import androidx.compose.ui.unit.dp
 import com.example.checklist_interactive.data.files.FileInfo
 import com.example.checklist_interactive.ui.checklist.MarkdownViewer
 import com.example.checklist_interactive.ui.checklist.PdfViewer
+import com.example.checklist_interactive.ui.quickaccess.QuickAccessSheet
+import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
 
 import androidx.compose.material.icons.filled.Refresh
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -45,7 +48,8 @@ fun InternalFileViewer(
     onBack: () -> Unit,
     onShowFileList: () -> Unit,
     isDarkTheme: Boolean,
-    onToggleTheme: () -> Unit
+    onToggleTheme: () -> Unit,
+    onOpenLinkedDocument: ((filePath: String, pageNumber: Int?) -> Unit)? = null
 ) {
     val context = LocalContext.current
 
@@ -87,12 +91,14 @@ fun InternalFileViewer(
                 onToggleTheme = onToggleTheme,
                 isInternalFile = true,
                 initialPage = currentPage,
-                onPageChange = { page -> currentPage = page }
+                onPageChange = { page -> currentPage = page },
+                onOpenLinkedDocument = onOpenLinkedDocument
             )
         }
             "md", "markdown" -> {
             val prefsManager = remember { PreferencesManager(context) }
             val checklistRepository = remember { ChecklistRepository(context) }
+            val quickNoteManager = remember { QuickNoteManager(context) }
             val isAsset = fileInfo.isAsset || fileInfo.path.startsWith("asset://")
             val assetPath = if (isAsset) fileInfo.path.removePrefix("asset://") else fileInfo.path
             val markdownContent = remember(fileInfo.path) {
@@ -121,6 +127,7 @@ fun InternalFileViewer(
 
             // State für Expand/Collapse All
             var expandAllSections by remember { mutableStateOf(prefsManager.areMarkdownSectionsExpandedByDefault()) }
+            var showQuickAccess by remember { mutableStateOf(false) }
 
             Scaffold(
                 topBar = {
@@ -155,11 +162,26 @@ fun InternalFileViewer(
                     )
                 },
                 floatingActionButton = {
-                    FloatingActionButton(
-                        onClick = onShowFileList,
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        horizontalAlignment = Alignment.End
                     ) {
-                        Icon(Icons.Default.Menu, contentDescription = LocalContext.current.getString(R.string.file_list))
+                        // Quick Access FAB - immer sichtbar an fester Position
+                        FloatingActionButton(
+                            onClick = { showQuickAccess = true },
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ) {
+                            Icon(Icons.Default.NoteAdd, contentDescription = "Schnellzugriff")
+                        }
+
+                        // Menu FAB - immer an fester Position
+                        FloatingActionButton(
+                            onClick = onShowFileList,
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Icon(Icons.Default.Menu, contentDescription = LocalContext.current.getString(R.string.file_list))
+                        }
                     }
                 }
             ) { padding ->
@@ -170,6 +192,16 @@ fun InternalFileViewer(
                     modifier = Modifier.padding(padding),
                     isInternalFile = !isAsset,
                     prefsManager = prefsManager
+                )
+            }
+
+            // Quick Access Bottom Sheet
+            if (showQuickAccess) {
+                QuickAccessSheet(
+                    onDismiss = { showQuickAccess = false },
+                    currentDocumentPath = fileInfo.path,
+                    currentDocumentName = fileInfo.displayName,
+                    onOpenDocument = onOpenLinkedDocument
                 )
             }
         }

@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.NoteAdd
 import androidx.compose.runtime.*
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -79,9 +80,12 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material.icons.filled.CenterFocusWeak
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Link
 import android.content.ClipboardManager
 import android.content.ClipData
 import android.content.Context
+import com.example.checklist_interactive.ui.quickaccess.QuickAccessSheet
+import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
 
 /**
  * Eigener PDF-Viewer ohne externe Abhängigkeiten.
@@ -100,7 +104,8 @@ fun PdfViewer(
     isDarkTheme: Boolean = false,
     onToggleTheme: (() -> Unit)? = null,
     initialPage: Int = 0,
-    onPageChange: ((Int) -> Unit)? = null
+    onPageChange: ((Int) -> Unit)? = null,
+    onOpenLinkedDocument: ((filePath: String, pageNumber: Int?) -> Unit)? = null
 ) {
     val context = LocalContext.current
 
@@ -108,6 +113,7 @@ fun PdfViewer(
     val shortcutManager = remember { ShortcutManager(context) }
     val highlightManager = remember { PageHighlightManager(context) }
     val lastPageManager = remember { LastPageManager(context) }
+    val quickNoteManager = remember { QuickNoteManager(context) }
 
     // Lade zuletzt geöffnete Seite, falls initialPage nicht explizit gesetzt wurde
     val effectiveInitialPage = remember(pdfPath) {
@@ -142,6 +148,7 @@ fun PdfViewer(
     var invertColors by remember { mutableStateOf(false) }
     var showTocDialog by remember { mutableStateOf(false) }
     var chapters by remember { mutableStateOf<List<Pair<String, Int>>>(emptyList()) }
+    var showQuickAccess by remember { mutableStateOf(false) }
 
     // Text-Extraktion
     val textExtractor = remember { PdfTextExtractor(context) }
@@ -468,7 +475,7 @@ fun PdfViewer(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 horizontalAlignment = Alignment.End
             ) {
-                // Zoom Reset FAB - nur anzeigen wenn gezoomt
+                // Zoom Reset FAB - nur anzeigen wenn gezoomt (oben, damit es die Position der anderen nicht verschiebt)
                 val currentScale = pageScales[currentPage] ?: 1f
                 if (currentScale != 1f) {
                     FloatingActionButton(
@@ -483,7 +490,16 @@ fun PdfViewer(
                     }
                 }
 
-                // Menu FAB - nur anzeigen wenn onShowFileList gesetzt ist
+                // Quick Access FAB - immer sichtbar an fester Position
+                FloatingActionButton(
+                    onClick = { showQuickAccess = true },
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                ) {
+                    Icon(Icons.Default.NoteAdd, contentDescription = "Schnellzugriff")
+                }
+
+                // Menu FAB - immer an fester Position (nur anzeigen wenn onShowFileList gesetzt ist)
                 if (onShowFileList != null) {
                     FloatingActionButton(
                         onClick = onShowFileList,
@@ -596,6 +612,25 @@ fun PdfViewer(
                                 Icon(
                                     Icons.Default.BookmarkAdd,
                                     contentDescription = "Shortcut",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            // Link zu Schnellnotiz
+                            HintIconButton(
+                                onClick = {
+                                    quickNoteManager.addLinkedDocument(
+                                        filePath = pdfPath,
+                                        fileName = title,
+                                        pageNumber = currentPage
+                                    )
+                                },
+                                hint = "Zu Schnellnotiz verlinken",
+                                onHintChange = { hoveredHint = it },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Link,
+                                    contentDescription = "Link",
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -1183,6 +1218,17 @@ fun PdfViewer(
                 }
             )
         }
+    }
+
+    // Quick Access Bottom Sheet
+    if (showQuickAccess) {
+        QuickAccessSheet(
+            onDismiss = { showQuickAccess = false },
+            currentDocumentPath = pdfPath,
+            currentDocumentName = title,
+            currentPageNumber = currentPage,
+            onOpenDocument = onOpenLinkedDocument
+        )
     }
 }
 
