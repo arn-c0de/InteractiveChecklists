@@ -1365,8 +1365,6 @@ private fun PdfPageWithAnnotations(
                 )
             ) else null
         }
-
-        fun invertColor(c: Color) = Color(1f - c.red, 1f - c.green, 1f - c.blue, c.alpha)
         // PDF-Seite als Bitmap
         Image(
             bitmap = remember(bitmap) { bitmap.asImageBitmap() },
@@ -1385,9 +1383,9 @@ private fun PdfPageWithAnnotations(
             colorFilter = colorFilter
         )
 
-        // Seiten-Highlight (wenn aktiviert)
+        // Seiten-Highlight (wenn aktiviert) - immer die Originalfarbe verwenden
         if (isPageHighlighted) {
-            val highlightCol = if (invertColors) invertColor(Color.Yellow).copy(alpha = 0.2f) else Color.Yellow.copy(alpha = 0.2f)
+            val highlightCol = Color.Yellow.copy(alpha = 0.2f)
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1591,10 +1589,10 @@ private fun PdfPageWithAnnotations(
                     maxOf(1f, stroke.strokeWidth * scale)
                 }
                 val strokeBaseColor = Color(stroke.color.toULong())
-                val strokeDrawColor = if (invertColors) invertColor(strokeBaseColor) else strokeBaseColor
+                // Annotations/Highlights/Drawing should NOT be affected by page color inversion
                 drawPath(
                     path = path,
-                    color = strokeDrawColor,
+                    color = strokeBaseColor,
                     style = Stroke(width = widthPx),
                     alpha = if (stroke.isHighlight) 0.4f else 1f
                 )
@@ -1617,10 +1615,10 @@ private fun PdfPageWithAnnotations(
                         maxOf(1f, stroke.strokeWidth * scale)
                     }
                     val strokeBaseColor = Color(stroke.color.toULong())
-                    val strokeDrawColor = if (invertColors) invertColor(strokeBaseColor) else strokeBaseColor
+                    // Live stroke uses the original color as well
                     drawPath(
                         path = path,
-                        color = strokeDrawColor,
+                        color = strokeBaseColor,
                         style = Stroke(width = widthPx),
                         alpha = if (stroke.isHighlight) 0.4f else 1f
                     )
@@ -1629,8 +1627,9 @@ private fun PdfPageWithAnnotations(
 
             // Zeichne den Radierer-Cursor wenn Radierer-Modus aktiv ist
             if (eraseMode && eraserPosition != null && isCurrentPage) {
-                val eraserOuter = if (invertColors) invertColor(Color.Red.copy(alpha = 0.3f)) else Color.Red.copy(alpha = 0.3f)
-                val eraserInner = if (invertColors) invertColor(Color.Red.copy(alpha = 0.1f)) else Color.Red.copy(alpha = 0.1f)
+                // Eraser cursor should keep its original color regardless of inversion
+                val eraserOuter = Color.Red.copy(alpha = 0.3f)
+                val eraserInner = Color.Red.copy(alpha = 0.1f)
                 drawCircle(
                     color = eraserOuter,
                     radius = eraseRadius,
@@ -1654,9 +1653,9 @@ private fun PdfPageWithAnnotations(
                     maxOf(2f, strokeWidth * scale / 2f)
                 }
 
-                // Äußerer Ring in der ausgewählten Farbe
-                val selOuter = if (invertColors) invertColor(selectedColor.copy(alpha = 0.5f)) else selectedColor.copy(alpha = 0.5f)
-                val selInner = if (invertColors) invertColor(selectedColor.copy(alpha = if (highlightMode) 0.3f else 0.2f)) else selectedColor.copy(alpha = if (highlightMode) 0.3f else 0.2f)
+                // Äußerer Ring in der ausgewählten Farbe (Original-Farbe, nicht invertiert)
+                val selOuter = selectedColor.copy(alpha = 0.5f)
+                val selInner = selectedColor.copy(alpha = if (highlightMode) 0.3f else 0.2f)
                 drawCircle(
                     color = selOuter,
                     radius = brushRadius,
