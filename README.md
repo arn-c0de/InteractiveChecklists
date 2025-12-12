@@ -7,15 +7,15 @@
 	<img src="https://img.shields.io/badge/license-CC--BY--NC--SA%204.0-lightgrey.svg" alt="License: CC BY-NC-SA 4.0" />
 </p>
 
-
-# Checklist Interactive
-
 <div align="center">
 	<a href="CHANGELOG.md">Changelog</a> |
 	<a href="docs/docnavigation.md">Documentation</a> |
 	<a href="SECURITY.md">Security Policy</a> |
 	<a href="LICENSE">License</a>
 </div>
+
+# Checklist Interactive
+
 
 Checklist Interactive is an Android application designed for viewing and interacting with markdown and PDF checklists. It's built with Jetpack Compose and follows an MVVM architecture.
 
