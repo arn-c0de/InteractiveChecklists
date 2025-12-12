@@ -39,6 +39,9 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.NoteAdd
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 import com.example.checklist_interactive.R
 import androidx.compose.ui.graphics.Color
@@ -111,9 +114,9 @@ fun InternalFilesScreen(
     val assetAircraftsLower = remember(assetAircrafts, assetTopLevelFolders, fileManager) { 
         (assetTopLevelFolders + assetAircrafts + fileManager.getCategories()).map { it.lowercase() }.toSet() 
     }
-    var groupedFiles by remember { mutableStateOf(fileManager.getAllFilesGrouped()) }
-    var folderTree by remember { mutableStateOf(fileManager.getFolderTree()) }
-    var shortcuts by remember { mutableStateOf(shortcutManager.loadShortcuts()) }
+    var groupedFiles by remember { mutableStateOf<Map<String, List<FileInfo>>>(emptyMap()) }
+    var folderTree by remember { mutableStateOf<List<InternalFileManager.FolderNode>>(emptyList()) }
+    var shortcuts by remember { mutableStateOf<List<PageShortcut>>(emptyList()) }
     var showImportDialog by remember { mutableStateOf(false) }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
     var fileToDelete by remember { mutableStateOf<FileInfo?>(null) }
@@ -129,50 +132,99 @@ fun InternalFilesScreen(
     var showTagFilter by remember { mutableStateOf(false) }
     var selectedTagFilters by remember { mutableStateOf(prefsManager.getActiveTagFilters()) }
     var tagFilterMode by remember { mutableStateOf(prefsManager.getTagFilterMode()) }
-    val allUsedTags = remember(refreshTrigger) { tagManager.getAllUsedTags() }
+    var allUsedTags by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var isLoadingTags by remember { mutableStateOf(false) }
+    var isLoadingFiles by remember { mutableStateOf(true) }
+    
+    val coroutineScope = rememberCoroutineScope()
 
     // Quick Access state
     var showQuickAccess by remember { mutableStateOf(false) }
-    
-    // Function to refresh and enrich files with tags
-    fun refreshFilesWithTags() {
-        val rawGroupedFiles = fileManager.getAllFilesGrouped()
-        groupedFiles = rawGroupedFiles.mapValues { (_, files) ->
-            val enrichedFiles = fileManager.enrichWithTags(files)
-            if (selectedTagFilters.isEmpty()) {
-                enrichedFiles
-            } else if (tagFilterMode == "all") {
-                enrichedFiles.filter { file -> selectedTagFilters.all { tag -> file.tags.contains(tag) } }
-            } else {
-                enrichedFiles.filter { file -> file.tags.any { tag -> selectedTagFilters.contains(tag) } }
-            }
-        }.filterValues { it.isNotEmpty() }
-        
-        val rawTree = fileManager.getFolderTree().map { node ->
-            filterAircraftChildren(node, assetAircraftsLower, prefsManager)
+
+    // Suspended function to refresh and enrich files with tags (IO-heavy - keep suspended)
+    suspend fun refreshFilesWithTags() {
+        val rawGroupedFiles = withContext(Dispatchers.IO) {
+            fileManager.getAllFilesGrouped()
         }
-        folderTree = rawTree.map { node -> enrichNodeWithTags(node, fileManager, selectedTagFilters, tagFilterMode) }
+        val newGrouped = withContext(Dispatchers.IO) {
+            rawGroupedFiles.mapValues { (_, files) ->
+                val enrichedFiles = fileManager.enrichWithTags(files)
+                if (selectedTagFilters.isEmpty()) {
+                    enrichedFiles
+                } else if (tagFilterMode == "all") {
+                    enrichedFiles.filter { file -> selectedTagFilters.all { tag -> file.tags.contains(tag) } }
+                } else {
+                    enrichedFiles.filter { file -> file.tags.any { tag -> selectedTagFilters.contains(tag) } }
+                }
+            }.filterValues { it.isNotEmpty() }
+        }
+        if (newGrouped != groupedFiles) groupedFiles = newGrouped
+        
+        val rawTree = withContext(Dispatchers.IO) {
+            fileManager.getFolderTree().map { node ->
+                filterAircraftChildren(node, assetAircraftsLower, prefsManager)
+            }
+        }
+        val newTree = withContext(Dispatchers.IO) {
+            rawTree.map { node -> enrichNodeWithTags(node, fileManager, selectedTagFilters, tagFilterMode) }
+        }
+        if (newTree != folderTree) folderTree = newTree
+    }
+
+    
+    
+    // Load tags asynchronously on background thread
+    LaunchedEffect(refreshTrigger) {
+        isLoadingTags = true
+        allUsedTags = withContext(Dispatchers.IO) {
+            tagManager.getAllUsedTags()
+        }
+        isLoadingTags = false
     }
     
+    // Initial load of files (async)
+    LaunchedEffect(Unit) {
+        isLoadingFiles = true
+        // Ensure tag manager is initialized on IO thread first
+        withContext(Dispatchers.IO) {
+            try {
+                tagManager.initializeIfNeeded()
+            } catch (_: Exception) { }
+        }
+        // Refresh files (suspending, performs IO internally)
+        refreshFilesWithTags()
+        // Load shortcuts after files are loaded
+        shortcuts = withContext(Dispatchers.IO) { shortcutManager.loadShortcuts() }
+        isLoadingFiles = false
+    }
+    
+
     // Expanded state für jede Kategorie + Shortcuts
-    val expandedCategories = remember {
-        mutableStateMapOf<String, Boolean>().apply {
-            groupedFiles.keys.forEach { category ->
-                put(category, prefsManager.isCategoryExpanded(category) ?: false)
+    val expandedCategories = remember { mutableStateMapOf<String, Boolean>() }
+
+    // Seed expandedCategories from groupedFiles and folderTree when they become available
+    LaunchedEffect(groupedFiles, folderTree) {
+        groupedFiles.keys.forEach { category ->
+            if (!expandedCategories.containsKey(category)) {
+                expandedCategories[category] = prefsManager.isCategoryExpanded(category) ?: false
             }
-            // Also seed expanded state from folderTree nodes
-            folderTree.forEach { node ->
-                put(node.relativePath, prefsManager.isCategoryExpanded(node.relativePath) ?: false)
-                // include nested children
-                fun seedChildren(n: InternalFileManager.FolderNode) {
-                    n.children.forEach {
-                        put(it.relativePath, prefsManager.isCategoryExpanded(it.relativePath) ?: false)
-                        seedChildren(it)
+        }
+        folderTree.forEach { node ->
+            if (!expandedCategories.containsKey(node.relativePath)) {
+                expandedCategories[node.relativePath] = prefsManager.isCategoryExpanded(node.relativePath) ?: false
+            }
+            fun seedChildren(n: InternalFileManager.FolderNode) {
+                n.children.forEach {
+                    if (!expandedCategories.containsKey(it.relativePath)) {
+                        expandedCategories[it.relativePath] = prefsManager.isCategoryExpanded(it.relativePath) ?: false
                     }
+                    seedChildren(it)
                 }
-                seedChildren(node)
             }
-            put("shortcuts", prefsManager.isCategoryExpanded("shortcuts") ?: false)
+            seedChildren(node)
+        }
+        if (!expandedCategories.containsKey("shortcuts")) {
+            expandedCategories["shortcuts"] = prefsManager.isCategoryExpanded("shortcuts") ?: false
         }
     }
 
@@ -185,8 +237,12 @@ fun InternalFilesScreen(
                 val result = fileManager.importFile(selectedUri, category)
                 result.onSuccess {
                     // Refresh file list und filter folderTree nach Sichtbarkeit
-                    refreshFilesWithTags()
-                    onRefresh()
+                    coroutineScope.launch {
+                        isLoadingFiles = true
+                        refreshFilesWithTags()
+                        onRefresh()
+                        isLoadingFiles = false
+                    }
                 }.onFailure { error ->
                     // TODO: Show error to user
                 }
@@ -216,8 +272,12 @@ fun InternalFilesScreen(
                         Icon(Icons.Default.Add, contentDescription = context.getString(R.string.import_file))
                     }
                     IconButton(onClick = {
-                        refreshFilesWithTags()
-                        onRefresh()
+                        coroutineScope.launch {
+                            isLoadingFiles = true
+                            refreshFilesWithTags()
+                            onRefresh()
+                            isLoadingFiles = false
+                        }
                     }) {
                         Icon(Icons.Default.Refresh, contentDescription = context.getString(R.string.refresh))
                     }
@@ -260,7 +320,16 @@ fun InternalFilesScreen(
             }
         }
     ) { padding ->
-        if (folderTree.isEmpty() && shortcuts.isEmpty()) {
+        if (isLoadingFiles) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        } else if (folderTree.isEmpty() && shortcuts.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -313,7 +382,48 @@ fun InternalFilesScreen(
                                         selectedTagFilters + tag
                                     }
                                     prefsManager.setActiveTagFilters(selectedTagFilters)
+                                    // Refresh and compute folder expansions off the UI thread
+                                    coroutineScope.launch {
                                         refreshFilesWithTags()
+                                        val nodesToExpand = withContext(Dispatchers.IO) {
+                                            // Compute which folder nodes contain matching files
+                                            fun nodeHasMatchingFiles(node: InternalFileManager.FolderNode): Boolean {
+                                                val enriched = fileManager.enrichWithTags(node.files)
+                                                val fileMatches = enriched.any { file ->
+                                                    if (selectedTagFilters.isEmpty()) return@any false
+                                                    if (tagFilterMode == "all") {
+                                                        selectedTagFilters.all { tag -> file.tags.contains(tag) }
+                                                    } else {
+                                                        file.tags.any { t -> selectedTagFilters.contains(t) }
+                                                    }
+                                                }
+                                                if (fileMatches) return true
+                                                return node.children.any { child -> nodeHasMatchingFiles(child) }
+                                            }
+                                            val matching = mutableListOf<String>()
+                                            folderTree.forEach { rootNode ->
+                                                if (rootNode.name.equals("Checklists", ignoreCase = true)) {
+                                                    rootNode.children.forEach { aircraftNode ->
+                                                        if (!prefsManager.isAircraftVisible(aircraftNode.name)) return@forEach
+                                                        if (nodeHasMatchingFiles(aircraftNode)) matching.add(aircraftNode.relativePath)
+                                                    }
+                                                } else {
+                                                    if (nodeHasMatchingFiles(rootNode)) matching.add(rootNode.relativePath)
+                                                }
+                                            }
+                                            matching
+                                        }
+                                        // Apply expansion on UI thread
+                                        withContext(Dispatchers.Main) {
+                                            nodesToExpand.forEach { expandPath ->
+                                                var p = expandPath
+                                                while (p.isNotBlank()) {
+                                                    expandedCategories[p] = true
+                                                    p = p.substringBeforeLast('/', "")
+                                                }
+                                            }
+                                        }
+                                    }
 
                                     // Expand folders that contain files matching the selected tags,
                                     // but do not expand aircraft folders that are deselected in settings.
@@ -363,12 +473,12 @@ fun InternalFilesScreen(
                                 onClearAll = {
                                     selectedTagFilters = emptySet()
                                     prefsManager.clearTagFilters()
-                                    refreshFilesWithTags()
+                                    coroutineScope.launch { refreshFilesWithTags() }
                                 },
                                 onFilterModeChange = { mode ->
                                     tagFilterMode = mode
                                     prefsManager.setTagFilterMode(mode)
-                                    refreshFilesWithTags()
+                                    coroutineScope.launch { refreshFilesWithTags() }
                                 },
                                 modifier = Modifier.padding(16.dp)
                             )
@@ -467,8 +577,12 @@ fun InternalFilesScreen(
                             // Convert to relative path for tag removal
                             val relativePath = fileManager.getRelativePath(file.path)
                             tagManager.removeFileFromTags(relativePath)
-                            refreshFilesWithTags()
-                            onRefresh()
+                            coroutineScope.launch {
+                                isLoadingFiles = true
+                                refreshFilesWithTags()
+                                onRefresh()
+                                isLoadingFiles = false
+                            }
                         }
                         showDeleteConfirm = false
                         fileToDelete = null
@@ -543,10 +657,14 @@ fun InternalFilesScreen(
             },
             onSave = { newTags ->
                 fileToEditTags?.let { file ->
-                    // Convert absolute path to relative path
-                    val relativePath = fileManager.getRelativePath(file.path)
-                    tagManager.setTagsForFile(relativePath, newTags)
-                    refreshFilesWithTags()
+                    coroutineScope.launch {
+                        withContext(Dispatchers.IO) {
+                            // Convert absolute path to relative path
+                            val relativePath = fileManager.getRelativePath(file.path)
+                            tagManager.setTagsForFile(relativePath, newTags)
+                        }
+                        refreshFilesWithTags()
+                    }
                 }
                 showTagEditor = false
                 fileToEditTags = null
@@ -572,8 +690,10 @@ fun InternalFilesScreen(
     // Listen for preference changes and update filtering when visible aircrafts change
     DisposableEffect(prefsManager) {
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
-            refreshFilesWithTags()
-            shortcuts = shortcutManager.loadShortcuts()
+            coroutineScope.launch {
+                refreshFilesWithTags()
+                shortcuts = shortcutManager.loadShortcuts()
+            }
         }
         prefsManager.registerOnChangeListener(listener)
         onDispose { prefsManager.unregisterOnChangeListener(listener) }

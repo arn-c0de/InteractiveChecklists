@@ -76,18 +76,11 @@ fun SettingsScreen(
     
     var showSourcesJsonDialog by remember { mutableStateOf(false) }
     var sourcesJsonContent by remember { mutableStateOf("") }
-    var sourcesReloadKey by remember { mutableStateOf(0) }
-    var showAddSourceDialog by remember { mutableStateOf(false) }
-    var editingSourceIndex by remember { mutableStateOf<Int?>(null) }
-    var showDeleteSourceConfirm by remember { mutableStateOf<Pair<Boolean, Int?>>(false to null) }
     val sources = remember { androidx.compose.runtime.mutableStateListOf<SourceEntry>().apply { addAll(prefsManager.getDocumentSources()) } }
 
     // Contributors
     var showContributorsJsonDialog by remember { mutableStateOf(false) }
     var contributorsJsonContent by remember { mutableStateOf("") }
-    var showAddContributorDialog by remember { mutableStateOf(false) }
-    var editingContributorIndex by remember { mutableStateOf<Int?>(null) }
-    var showDeleteContributorConfirm by remember { mutableStateOf<Pair<Boolean, Int?>>(false to null) }
     val contributors = remember { androidx.compose.runtime.mutableStateListOf<ContributorEntry>().apply { addAll(prefsManager.getContributors()) } }
 
     // Collapsible section states
@@ -210,18 +203,6 @@ fun SettingsScreen(
                             }) {
                                 Text("View contributors JSON")
                             }
-                            Button(onClick = { showAddContributorDialog = true }) {
-                                Text("Add contributor")
-                            }
-                            OutlinedButton(onClick = {
-                                // reset contributors to defaults (empty)
-                                prefsManager.resetContributorsToDefaults()
-                                contributors.clear()
-                                contributors.addAll(prefsManager.getContributors())
-                                Toast.makeText(context, "Contributors reset to defaults", Toast.LENGTH_SHORT).show()
-                            }) {
-                                Text("Reset to defaults")
-                            }
                         }
                         Spacer(modifier = Modifier.height(12.dp))
                         Column {
@@ -229,44 +210,28 @@ fun SettingsScreen(
                                 Column(modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 8.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(entry.name, fontWeight = FontWeight.Bold)
-                                            if (!entry.website.isNullOrBlank()) {
-                                                Text(
-                                                    text = entry.website,
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.clickable {
-                                                        try {
-                                                            val intent = Intent(Intent.ACTION_VIEW)
-                                                            intent.data = android.net.Uri.parse(entry.website)
-                                                            context.startActivity(intent)
-                                                        } catch (_: Exception) { }
-                                                    }
-                                                )
-                                            }
-                                            if (!entry.role.isNullOrBlank()) {
-                                                Text(
-                                                    text = "Rolle: ${entry.role}",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        Text(entry.name, fontWeight = FontWeight.Bold)
+                                        if (!entry.website.isNullOrBlank()) {
+                                            Text(
+                                                text = entry.website,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.clickable {
+                                                    try {
+                                                        val intent = Intent(Intent.ACTION_VIEW)
+                                                        intent.data = android.net.Uri.parse(entry.website)
+                                                        context.startActivity(intent)
+                                                    } catch (_: Exception) { }
+                                                }
+                                            )
                                         }
-                                        Row {
-                                            IconButton(onClick = {
-                                                editingContributorIndex = idx
-                                                showAddContributorDialog = true
-                                            }) {
-                                                Icon(Icons.Default.Edit, contentDescription = "Edit")
-                                            }
-                                            IconButton(onClick = { showDeleteContributorConfirm = true to idx }) {
-                                                Icon(Icons.Default.Delete, contentDescription = "Delete")
-                                            }
+                                        if (!entry.role.isNullOrBlank()) {
+                                            Text(
+                                                text = "Rolle: ${entry.role}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
                                         }
                                     }
                                 }
@@ -338,19 +303,6 @@ fun SettingsScreen(
                                     }) {
                                         Text("View sources JSON")
                                     }
-                                    Button(onClick = { showAddSourceDialog = true }) {
-                                        Text("Add source")
-                                    }
-                                    OutlinedButton(onClick = {
-                                        // reset to defaults
-                                        prefsManager.resetDocumentSourcesToDefaults()
-                                        sources.clear()
-                                        sources.addAll(prefsManager.getDocumentSources())
-                                        sourcesReloadKey++
-                                        Toast.makeText(context, "Sources reset to defaults", Toast.LENGTH_SHORT).show()
-                                    }) {
-                                        Text("Reset to defaults")
-                                    }
                                 }
                                 Spacer(modifier = Modifier.height(12.dp))
                                 Column {
@@ -358,44 +310,28 @@ fun SettingsScreen(
                                         Column(modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(vertical = 8.dp)) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Column(modifier = Modifier.weight(1f)) {
-                                                    Text(entry.name, fontWeight = FontWeight.Bold)
-                                                    if (!entry.website.isNullOrBlank()) {
-                                                        Text(
-                                                            text = entry.website,
-                                                            style = MaterialTheme.typography.bodySmall,
-                                                            color = MaterialTheme.colorScheme.primary,
-                                                            modifier = Modifier.clickable {
-                                                                try {
-                                                                    val intent = Intent(Intent.ACTION_VIEW)
-                                                                    intent.data = android.net.Uri.parse(entry.website)
-                                                                    context.startActivity(intent)
-                                                                } catch (_: Exception) { }
-                                                            }
-                                                        )
-                                                    }
-                                                    if (!entry.license.isNullOrBlank()) {
-                                                        Text(
-                                                            text = "Lizenz: ${entry.license}",
-                                                            style = MaterialTheme.typography.bodySmall,
-                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                        )
-                                                    }
+                                            Column(modifier = Modifier.fillMaxWidth()) {
+                                                Text(entry.name, fontWeight = FontWeight.Bold)
+                                                if (!entry.website.isNullOrBlank()) {
+                                                    Text(
+                                                        text = entry.website,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.clickable {
+                                                            try {
+                                                                val intent = Intent(Intent.ACTION_VIEW)
+                                                                intent.data = android.net.Uri.parse(entry.website)
+                                                                context.startActivity(intent)
+                                                            } catch (_: Exception) { }
+                                                        }
+                                                    )
                                                 }
-                                                Row {
-                                                    IconButton(onClick = {
-                                                        editingSourceIndex = idx
-                                                        showAddSourceDialog = true
-                                                    }) {
-                                                        Icon(Icons.Default.Edit, contentDescription = "Edit")
-                                                    }
-                                                    IconButton(onClick = { showDeleteSourceConfirm = true to idx }) {
-                                                        Icon(Icons.Default.Delete, contentDescription = "Delete")
-                                                    }
+                                                if (!entry.license.isNullOrBlank()) {
+                                                    Text(
+                                                        text = "Lizenz: ${entry.license}",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
                                                 }
                                             }
                                         }
@@ -805,146 +741,6 @@ fun SettingsScreen(
                         Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
                     } catch (_: Exception) { }
                 }) { Text("Copy") }
-            }
-        )
-    }
-
-    if (showAddSourceDialog) {
-        // Prefill if we have an editing index
-        val editIdx = editingSourceIndex
-        var nameField by remember { mutableStateOf(editIdx?.let { sources.getOrNull(it)?.name } ?: "") }
-        var websiteField by remember { mutableStateOf(editIdx?.let { sources.getOrNull(it)?.website } ?: "") }
-        var licenseField by remember { mutableStateOf(editIdx?.let { sources.getOrNull(it)?.license } ?: "") }
-
-        AlertDialog(
-            onDismissRequest = {
-                showAddSourceDialog = false
-                editingSourceIndex = null
-            },
-            title = { Text(if (editIdx != null) "Edit source" else "Add source") },
-            text = {
-                Column {
-                    OutlinedTextField(value = nameField, onValueChange = { nameField = it }, label = { Text("Name") })
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(value = websiteField, onValueChange = { websiteField = it }, label = { Text("Website (optional)") })
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(value = licenseField, onValueChange = { licenseField = it }, label = { Text("License (optional)") })
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (nameField.isNotBlank()) {
-                        val newEntry = SourceEntry(nameField.trim(), websiteField.trim().ifBlank { null }, licenseField.trim().ifBlank { null })
-                        if (editIdx != null) {
-                            sources[editIdx] = newEntry
-                        } else {
-                            sources.add(newEntry)
-                        }
-                        prefsManager.setDocumentSources(sources.toList())
-                        sourcesReloadKey++
-                        showAddSourceDialog = false
-                        editingSourceIndex = null
-                    } else {
-                        Toast.makeText(context, "Please enter a name", Toast.LENGTH_SHORT).show()
-                    }
-                }) { Text("Save") }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    showAddSourceDialog = false
-                    editingSourceIndex = null
-                }) { Text("Cancel") }
-            }
-        )
-    }
-
-    if (showAddContributorDialog) {
-        val editIdx = editingContributorIndex
-        var nameField by remember { mutableStateOf(editIdx?.let { contributors.getOrNull(it)?.name } ?: "") }
-        var websiteField by remember { mutableStateOf(editIdx?.let { contributors.getOrNull(it)?.website } ?: "") }
-        var roleField by remember { mutableStateOf(editIdx?.let { contributors.getOrNull(it)?.role } ?: "") }
-
-        AlertDialog(
-            onDismissRequest = {
-                showAddContributorDialog = false
-                editingContributorIndex = null
-            },
-            title = { Text(if (editIdx != null) "Edit contributor" else "Add contributor") },
-            text = {
-                Column {
-                    OutlinedTextField(value = nameField, onValueChange = { nameField = it }, label = { Text("Name") })
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(value = websiteField, onValueChange = { websiteField = it }, label = { Text("Website (optional)") })
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(value = roleField, onValueChange = { roleField = it }, label = { Text("Role (optional)") })
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (nameField.isNotBlank()) {
-                        val newEntry = ContributorEntry(nameField.trim(), websiteField.trim().ifBlank { null }, roleField.trim().ifBlank { null })
-                        if (editIdx != null) {
-                            contributors[editIdx] = newEntry
-                        } else {
-                            contributors.add(newEntry)
-                        }
-                        prefsManager.setContributors(contributors.toList())
-                        showAddContributorDialog = false
-                        editingContributorIndex = null
-                    } else {
-                        Toast.makeText(context, "Please enter a name", Toast.LENGTH_SHORT).show()
-                    }
-                }) { Text("Save") }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    showAddContributorDialog = false
-                    editingContributorIndex = null
-                }) { Text("Cancel") }
-            }
-        )
-    }
-
-    if (showDeleteSourceConfirm.first && showDeleteSourceConfirm.second != null) {
-        val idx = showDeleteSourceConfirm.second!!
-        AlertDialog(
-            onDismissRequest = { showDeleteSourceConfirm = false to null },
-            title = { Text("Delete source") },
-            text = { Text("Remove this source from the list?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (idx in sources.indices) {
-                        sources.removeAt(idx)
-                        prefsManager.setDocumentSources(sources.toList())
-                        Toast.makeText(context, "Source deleted", Toast.LENGTH_SHORT).show()
-                    }
-                    showDeleteSourceConfirm = false to null
-                }) { Text("Delete") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteSourceConfirm = false to null }) { Text("Cancel") }
-            }
-        )
-    }
-
-    if (showDeleteContributorConfirm.first && showDeleteContributorConfirm.second != null) {
-        val idx = showDeleteContributorConfirm.second!!
-        AlertDialog(
-            onDismissRequest = { showDeleteContributorConfirm = false to null },
-            title = { Text("Delete contributor") },
-            text = { Text("Remove this contributor from the list?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (idx in contributors.indices) {
-                        contributors.removeAt(idx)
-                        prefsManager.setContributors(contributors.toList())
-                        Toast.makeText(context, "Contributor deleted", Toast.LENGTH_SHORT).show()
-                    }
-                    showDeleteContributorConfirm = false to null
-                }) { Text("Delete") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteContributorConfirm = false to null }) { Text("Cancel") }
             }
         )
     }
