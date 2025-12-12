@@ -38,12 +38,14 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.NoteAdd
 
 import com.example.checklist_interactive.R
 import androidx.compose.ui.graphics.Color
 import com.example.checklist_interactive.ui.tags.FileTagEditorDialog
 import com.example.checklist_interactive.ui.tags.TagFilterBar
 import com.example.checklist_interactive.ui.tags.TagChips
+import com.example.checklist_interactive.ui.quickaccess.QuickAccessSheet
 
 /**
  * Hauptscreen für interne Dateiverwaltung
@@ -59,7 +61,8 @@ fun InternalFilesScreen(
     refreshTrigger: Int,
     isDarkTheme: Boolean,
     onToggleTheme: () -> Unit,
-    onShowSettings: () -> Unit = {}
+    onShowSettings: () -> Unit = {},
+    onOpenLinkedDocument: ((filePath: String, pageNumber: Int?) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val prefsManager = remember { PreferencesManager(context) }
@@ -127,6 +130,9 @@ fun InternalFilesScreen(
     var selectedTagFilters by remember { mutableStateOf(prefsManager.getActiveTagFilters()) }
     var tagFilterMode by remember { mutableStateOf(prefsManager.getTagFilterMode()) }
     val allUsedTags = remember(refreshTrigger) { tagManager.getAllUsedTags() }
+
+    // Quick Access state
+    var showQuickAccess by remember { mutableStateOf(false) }
     
     // Function to refresh and enrich files with tags
     fun refreshFilesWithTags() {
@@ -200,9 +206,9 @@ fun InternalFilesScreen(
                         Icon(
                             imageVector = Icons.Default.FilterList,
                             contentDescription = "Filter by tags",
-                            tint = if (selectedTagFilters.isNotEmpty()) 
-                                MaterialTheme.colorScheme.primary 
-                            else 
+                            tint = if (selectedTagFilters.isNotEmpty())
+                                MaterialTheme.colorScheme.primary
+                            else
                                 LocalContentColor.current
                         )
                     }
@@ -226,6 +232,32 @@ fun InternalFilesScreen(
                     }
                 }
             )
+        },
+        floatingActionButton = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalAlignment = Alignment.End
+            ) {
+                // Quick Access FAB - immer sichtbar an fester Position
+                FloatingActionButton(
+                    onClick = { showQuickAccess = true },
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                ) {
+                    Icon(
+                        Icons.Default.NoteAdd,
+                        contentDescription = "Schnellzugriff"
+                    )
+                }
+
+                // Import FAB - immer an fester Position
+                FloatingActionButton(
+                    onClick = { showImportDialog = true },
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = context.getString(R.string.import_file))
+                }
+            }
         }
     ) { padding ->
         if (folderTree.isEmpty() && shortcuts.isEmpty()) {
@@ -519,6 +551,15 @@ fun InternalFilesScreen(
                 showTagEditor = false
                 fileToEditTags = null
             }
+        )
+    }
+
+    // Quick Access Bottom Sheet - zentrale Notizen ohne Dokument-Kontext
+    if (showQuickAccess) {
+        QuickAccessSheet(
+            onDismiss = { showQuickAccess = false },
+            onOpenDocument = onOpenLinkedDocument
+            // Keine currentDocument-Parameter = zentrale Notizen ohne Pin-Funktion
         )
     }
 

@@ -8,9 +8,11 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material.icons.filled.UnfoldLess
+import androidx.compose.material.icons.filled.NoteAdd
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.example.checklist_interactive.data.checklist.Checklist
 import com.example.checklist_interactive.data.checklist.ChecklistRepository
 import com.example.checklist_interactive.data.checklist.MarkdownChecklistParser
@@ -22,6 +24,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.example.checklist_interactive.data.prefs.PreferencesManager
 import androidx.compose.ui.platform.LocalContext
+import com.example.checklist_interactive.ui.quickaccess.QuickAccessSheet
+import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
+import androidx.compose.material.icons.filled.Link
 
 /**
  * MarkdownViewerScreen - Screen-Komponente für die Markdown-Anzeige
@@ -52,6 +57,7 @@ fun MarkdownViewerScreen(
     val context = LocalContext.current
     val prefsManager = remember { PreferencesManager(context) }
     val checklistRepository = remember { ChecklistRepository(context) }
+    val quickNoteManager = remember { QuickNoteManager(context) }
     val markdownContent = remember(assetPath) {
         try {
             context.assets.open(assetPath).bufferedReader().use { it.readText() }
@@ -69,6 +75,7 @@ fun MarkdownViewerScreen(
 
     // State für Expand/Collapse All
     var expandAllSections by remember { mutableStateOf(prefsManager.areMarkdownSectionsExpandedByDefault()) }
+    var showQuickAccess by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -87,6 +94,20 @@ fun MarkdownViewerScreen(
                         IconButton(onClick = { viewModel.resetChecklist() }) {
                             Icon(Icons.Default.Refresh, contentDescription = "Reset Checklist")
                         }
+                    }
+                    // Link zu Schnellnotiz
+                    IconButton(onClick = {
+                        quickNoteManager.addLinkedDocument(
+                            filePath = assetPath,
+                            fileName = fileName,
+                            pageNumber = null
+                        )
+                    }) {
+                        Icon(Icons.Default.Link, contentDescription = "Zu Schnellnotiz verlinken")
+                    }
+                    // Quick Access shortcut (visible in top bar)
+                    IconButton(onClick = { showQuickAccess = true }) {
+                        Icon(Icons.Default.NoteAdd, contentDescription = "Schnellzugriff")
                     }
                     // Expand/Collapse All Button
                     IconButton(onClick = {
@@ -110,12 +131,27 @@ fun MarkdownViewerScreen(
             )
         },
         floatingActionButton = {
-            if (onShowFileList != null) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalAlignment = androidx.compose.ui.Alignment.End
+            ) {
+                // Quick Access FAB - immer sichtbar
                 FloatingActionButton(
-                    onClick = onShowFileList,
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                    onClick = { showQuickAccess = true },
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ) {
-                    Icon(Icons.Default.Menu, contentDescription = "Dateiliste")
+                    Icon(Icons.Default.NoteAdd, contentDescription = "Schnellzugriff")
+                }
+
+                // Menu FAB - nur wenn onShowFileList gesetzt ist
+                if (onShowFileList != null) {
+                    FloatingActionButton(
+                        onClick = onShowFileList,
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Icon(Icons.Default.Menu, contentDescription = "Dateiliste")
+                    }
                 }
             }
         }
@@ -130,6 +166,15 @@ fun MarkdownViewerScreen(
             onCheckboxChange = handler,
             modifier = Modifier.padding(paddingValues),
             prefsManager = prefsManager
+        )
+    }
+
+    // Quick Access Bottom Sheet
+    if (showQuickAccess) {
+        QuickAccessSheet(
+            onDismiss = { showQuickAccess = false },
+            currentDocumentPath = assetPath,
+            currentDocumentName = fileName
         )
     }
 }

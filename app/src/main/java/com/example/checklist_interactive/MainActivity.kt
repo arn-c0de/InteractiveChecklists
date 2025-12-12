@@ -297,7 +297,27 @@ class MainActivity : ComponentActivity() {
                                 }
                                 ,
                                 isDarkTheme = isDarkTheme,
-                                onToggleTheme = toggleTheme
+                                onToggleTheme = toggleTheme,
+                                onOpenLinkedDocument = { filePath, pageNumber ->
+                                    // Finde die Datei im File Manager
+                                    // Unterstütze verschiedene Pfadformate: absolute Pfade, relative Pfade, asset:// Pfade
+                                    val allFiles = fileManager.getAllFilesGrouped().values.flatten()
+                                    val targetFile = allFiles.find { file ->
+                                        file.path == filePath ||
+                                        file.path.endsWith(filePath) ||
+                                        filePath.endsWith(file.path) ||
+                                        file.path.replace("asset://", "") == filePath ||
+                                        filePath.replace("asset://", "") == file.path.replace("asset://", "")
+                                    }
+                                    if (targetFile != null) {
+                                        openFile = targetFile
+                                        openPage = pageNumber ?: 0
+                                        showFileList = false
+                                        scope.launch {
+                                            repository.saveLastOpenedFile(targetFile.path)
+                                        }
+                                    }
+                                }
                             )
                         }
                         else -> {
@@ -334,7 +354,20 @@ class MainActivity : ComponentActivity() {
                                 refreshTrigger = refreshTrigger,
                                 isDarkTheme = isDarkTheme,
                                 onToggleTheme = toggleTheme,
-                                onShowSettings = { showSettings = true }
+                                onShowSettings = { showSettings = true },
+                                onOpenLinkedDocument = { filePath, pageNumber ->
+                                    // Find the file in the file manager and open it
+                                    val allFiles = fileManager.getAllFilesGrouped().values.flatten()
+                                    val targetFile = allFiles.find { it.path == filePath || it.path.endsWith(filePath) }
+                                    if (targetFile != null) {
+                                        openFile = targetFile
+                                        openPage = pageNumber ?: 0
+                                        showFileList = false
+                                        scope.launch {
+                                            repository.saveLastOpenedFile(targetFile.path)
+                                        }
+                                    }
+                                }
                             )
                         }
                     }
