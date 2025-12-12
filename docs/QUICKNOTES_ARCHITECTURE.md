@@ -1,6 +1,6 @@
 # QuickNotes Architecture - Developer Guide
 
-1.0.3
+Updated-VERSION=1.0.3
 
 ## Table of Contents
 1. [Overview](#overview)
