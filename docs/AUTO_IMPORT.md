@@ -1,3 +1,5 @@
+[Home](../README.md) | [Documentation Navigation](docnavigation.md)
+
 # Auto-Import von Dateien aus Imports-Ordner
 
 Die App lädt automatisch beim Start alle PDF- und Markdown-Dateien aus dem `Imports/` Ordner.
