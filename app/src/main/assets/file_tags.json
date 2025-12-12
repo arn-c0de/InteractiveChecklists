@@ -1,146 +1,180 @@
-[
-  {
-    "filePath": "asset://Checklists/A-10_Warthog/A-10_Warthog-startup.md",
-    "tags": ["startup", "preflight"]
-  },
-  {
-    "filePath": "asset://Checklists/A-10_Warthog/A-10_Warthog-landing.md",
-    "tags": ["landing"]
-  },
-  {
-    "filePath": "asset://Checklists/A-10_Warthog/A-10_Warthog-takeoff.md",
-    "tags": ["takeoff"]
-  },
-  {
-    "filePath": "asset://Checklists/A-10_Warthog/A-10_Warthog-taxi.md",
-    "tags": ["taxi"]
-  },
-  {
-    "filePath": "asset://Checklists/A-10_Warthog/A-10_Warthog-shutdown.md",
-    "tags": ["postflight"]
-  },
-  {
-    "filePath": "asset://Checklists/F-15_Eagle/F-15_Eagle-startup.md",
-    "tags": ["startup", "preflight"]
-  },
-  {
-    "filePath": "asset://Checklists/F-16_Viper/F-16_Viper-startup.md",
-    "tags": ["startup", "preflight"]
-  },
-  {
-    "filePath": "asset://Checklists/F-16_Viper/F-16_Viper-takeoff.md",
-    "tags": ["takeoff"]
-  },
-  {
-    "filePath": "asset://Checklists/F-16_Viper/F-16_Viper-landing.md",
-    "tags": ["landing"]
-  },
-  {
-    "filePath": "asset://Checklists/F-16_Viper/F-16_Viper-shutdown.md",
-    "tags": ["postflight"]
-  },
-  {
-    "filePath": "asset://Checklists/F-16_Viper/F-16_Viper-taxi.md",
-    "tags": ["taxi"]
-  },
-  {
-    "filePath": "asset://Checklists/F-16_Viper/F-16_Viper-air_to_air_combat.md",
-    "tags": ["combat", "weapons"]
-  },
-  {
-    "filePath": "asset://Checklists/F-16_Viper/F-16_Viper-air_to_ground_attack.md",
-    "tags": ["combat", "weapons"]
-  },
-  {
-    "filePath": "asset://Checklists/FA-18_Hornet/FA18C-startup.md",
-    "tags": ["startup", "preflight"]
-  },
-  {
-    "filePath": "asset://Checklists/FA-18_Hornet/FA-18C-landing.md",
-    "tags": ["landing"]
-  },
-  {
-    "filePath": "asset://Checklists/FA-18_Hornet/FA-18C-carrier_landing.md",
-    "tags": ["landing", "carrier"]
-  },
-  {
-    "filePath": "asset://Checklists/FA-18_Hornet/FA-18C-carrier_takeoff.md",
-    "tags": ["takeoff", "carrier"]
-  },
-  {
-    "filePath": "asset://Checklists/FA-18_Hornet/FA-18C-airport_landing.md",
-    "tags": ["landing"]
-  },
-  {
-    "filePath": "asset://Checklists/FA-18_Hornet/FA-18C-air_to_air_combat.md",
-    "tags": ["combat", "weapons"]
-  },
-  {
-    "filePath": "asset://Checklists/FA-18_Hornet/FA-18C-aerial_refuelling.md",
-    "tags": ["fuel", "operations"]
-  },
-  {
-    "filePath": "asset://Checklists/MIG-21BIS/MIG-21BIS-startup.md",
-    "tags": ["startup", "preflight"]
-  },
-  {
-    "filePath": "asset://Checklists/MIG-21BIS/MIG-21BIS-takeoff.md",
-    "tags": ["takeoff"]
-  },
-  {
-    "filePath": "asset://Checklists/MIG-21BIS/MIG-21BIS-landing.md",
-    "tags": ["landing"]
-  },
-  {
-    "filePath": "asset://Checklists/MIG-21BIS/MIG-21BIS-taxi.md",
-    "tags": ["taxi"]
-  },
-  {
-    "filePath": "asset://Checklists/P-51_Mustang/startup.md",
-    "tags": ["startup"]
-  },
-  {
-    "filePath": "asset://Checklists/P-51_Mustang/takeoff.md",
-    "tags": ["takeoff"]
-  },
-  {
-    "filePath": "asset://Checklists/P-51_Mustang/landing.md",
-    "tags": ["landing"]
-  },
-  {
-    "filePath": "asset://Checklists/P-51_Mustang/taxi.md",
-    "tags": ["taxi"]
-  },
-  {
-    "filePath": "asset://radiocommunication/ICAO-Doc-9432-Manual-of-Radiotelephony-4th-ed.-2007.pdf",
-    "tags": ["communications", "reference", "icao"]
-  },
-  {
-    "filePath": "asset://radiocommunication/Ivana-Francetic-Radiotelephoy-Communications-Handbook.pdf",
-    "tags": ["communications", "reference", "handbook"]
-  },
-  {
-    "filePath": "asset://radiocommunication/cap-413-radiotelephony.pdf",
-    "tags": ["communications", "reference", "cap-413"]
-  },
-  {
-    "filePath": "asset://Checklists/AH-64D/AH-64D Quick Checklist.pdf",
-    "tags": ["checklist", "quick", "ah-64d"]
-  },
-  {
-    "filePath": "asset://Checklists/AH-64D/AH-64D Quick Checklist-Night Ops.pdf",
-    "tags": ["checklist", "night", "ah-64d"]
-  },
-  {
-    "filePath": "asset://Checklists/FA-18_Hornet/FA18C-Checklist-v2-OFS.pdf",
-    "tags": ["checklist", "operations", "fa-18c"]
-  },
-  {
-    "filePath": "asset://Charts/GND_and_VAD_Charts_v405.pdf",
-    "tags": ["charts", "ground"]
-  },
-  {
-    "filePath": "asset://Charts/Caucasus - Aerodrome Chart - DAY.pdf",
-    "tags": ["charts", "aerodrome", "caucasus"]
-  }
-]
+[{
+  "filePath": "asset://Checklists/A-10_Warthog/A-10_Warthog-startup.md",
+  "tags": ["startup"]
+},
+{
+  "filePath": "asset://Checklists/A-10_Warthog/A-10_Warthog-landing.md",
+  "tags": ["landing"]
+},
+{
+  "filePath": "asset://Checklists/A-10_Warthog/A-10_Warthog-takeoff.md",
+  "tags": ["takeoff"]
+},
+{
+  "filePath": "asset://Checklists/A-10_Warthog/A-10_Warthog-taxi.md",
+  "tags": ["taxi"]
+},
+{
+  "filePath": "asset://Checklists/A-10_Warthog/A-10_Warthog-shutdown.md",
+  "tags": ["shutdown"]
+},
+{
+  "filePath": "asset://Checklists/F-15_Eagle/F-15_Eagle-startup.md",
+  "tags": ["startup"]
+},
+{
+  "filePath": "asset://Checklists/F-16_Viper/F-16_Viper-startup.md",
+  "tags": ["startup"]
+},
+{
+  "filePath": "asset://Checklists/F-16_Viper/F-16_Viper-takeoff.md",
+  "tags": ["takeoff"]
+},
+{
+  "filePath": "asset://Checklists/F-16_Viper/F-16_Viper-landing.md",
+  "tags": ["landing"]
+},
+{
+  "filePath": "asset://Checklists/F-16_Viper/F-16_Viper-shutdown.md",
+  "tags": ["shutdown"]
+},
+{
+  "filePath": "asset://Checklists/F-16_Viper/F-16_Viper-taxi.md",
+  "tags": ["taxi"]
+},
+{
+  "filePath": "asset://Checklists/F-16_Viper/F-16_Viper-air_to_air_combat.md",
+  "tags": ["combat"]
+},
+{
+  "filePath": "asset://Checklists/F-16_Viper/F-16_Viper-air_to_ground_attack.md",
+  "tags": ["combat"]
+},
+{
+  "filePath": "asset://Checklists/FA-18_Hornet/FA18C-startup.md",
+  "tags": ["startup"]
+},
+{
+  "filePath": "asset://Checklists/FA-18_Hornet/FA-18C-landing.md",
+  "tags": ["landing"]
+},
+{
+  "filePath": "asset://Checklists/FA-18_Hornet/FA-18C-carrier_landing.md",
+  "tags": ["landing"]
+},
+{
+  "filePath": "asset://Checklists/FA-18_Hornet/FA-18C-carrier_takeoff.md",
+  "tags": ["takeoff"]
+},
+{
+  "filePath": "asset://Checklists/FA-18_Hornet/FA-18C-airport_landing.md",
+  "tags": ["landing"]
+},
+{
+  "filePath": "asset://Checklists/FA-18_Hornet/FA-18C-air_to_air_combat.md",
+  "tags": ["combat"]
+},
+{
+  "filePath": "asset://Checklists/FA-18_Hornet/FA-18C-aerial_refuelling.md",
+  "tags": ["refuel"]
+},
+{
+  "filePath": "asset://Checklists/MIG-21BIS/MIG-21BIS-startup.md",
+  "tags": ["startup"]
+},
+{
+  "filePath": "asset://Checklists/MIG-21BIS/MIG-21BIS-takeoff.md",
+  "tags": ["takeoff"]
+},
+{
+  "filePath": "asset://Checklists/MIG-21BIS/MIG-21BIS-landing.md",
+  "tags": ["landing"]
+},
+{
+  "filePath": "asset://Checklists/MIG-21BIS/MIG-21BIS-taxi.md",
+  "tags": ["taxi"]
+},
+{
+  "filePath": "asset://Checklists/P-51_Mustang/startup.md",
+  "tags": ["startup"]
+},
+{
+  "filePath": "asset://Checklists/P-51_Mustang/takeoff.md",
+  "tags": ["takeoff"]
+},
+{
+  "filePath": "asset://Checklists/P-51_Mustang/landing.md",
+  "tags": ["landing"]
+},
+{
+  "filePath": "asset://Checklists/P-51_Mustang/taxi.md",
+  "tags": ["taxi"]
+},
+{
+  "filePath": "asset://radiocommunication/ICAO-Doc-9432-Manual-of-Radiotelephony-4th-ed.-2007.pdf",
+  "tags": ["communications", "reference"]
+},
+{
+  "filePath": "asset://radiocommunication/Ivana-Francetic-Radiotelephoy-Communications-Handbook.pdf",
+  "tags": ["communications", "reference"]
+},
+{
+  "filePath": "asset://radiocommunication/cap-413-radiotelephony.pdf",
+  "tags": ["communications", "reference"]
+},
+{
+  "filePath": "asset://Checklists/AH-64D/AH-64D Quick Checklist.pdf",
+  "tags": ["checklist"]
+},
+{
+  "filePath": "asset://Checklists/AH-64D/AH-64D Quick Checklist-Night Ops.pdf",
+  "tags": ["checklist"]
+},
+{
+  "filePath": "asset://Checklists/FA-18_Hornet/FA18C-Checklist-v2-OFS.pdf",
+  "tags": ["checklist"]
+},
+{
+  "filePath": "asset://Charts/GND_and_VAD_Charts_v405.pdf",
+  "tags": ["chart"]
+},
+{
+  "filePath": "asset://Charts/Caucasus - Aerodrome Chart - DAY.pdf",
+  "tags": ["chart"]
+},
+{
+  "filePath": "asset://Charts/CW-Germany-Charts.pdf",
+  "tags": ["chart"]
+},
+{
+  "filePath": "asset://Checklists/Mi-24P_Hind/Mi-24P_manual.pdf",
+  "tags": ["reference"]
+},
+{
+  "filePath": "asset://Checklists/Mi-24P_Hind/Checklists Mi-24P Hind.pdf",
+  "tags": ["checklist"]
+},
+{
+  "filePath": "asset://Handbooks/fm3_04x240_Instrument_Flight_for_Army_Aviators.pdf",
+  "tags": ["reference"]
+},
+{
+  "filePath": "asset://Handbooks/fm3_04x203_Fundamentals of Flight.pdf",
+  "tags": ["reference"]
+},
+{
+  "filePath": "asset://Handbooks/AR_95-2_Air Traffic_Airspace.pdf",
+  "tags": ["reference"]
+},
+{
+  "filePath": "asset://Handbooks/AR_95-1_Flight_Regulations.pdf",
+  "tags": ["reference"]
+},
+{
+  "filePath": "asset://Handbooks/Aerodynamics_for_Naval_Aviators_00-80T-80_1-Jan-1965.pdf",
+  "tags": ["reference"]
+},
+{
+  "filePath": "asset://Checklists/CH-47F_Chinook/DCS CH-47F Early Access Guide EN.pdf",
+  "tags": ["checklist"]
+}]
