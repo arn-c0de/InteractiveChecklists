@@ -90,6 +90,11 @@ fun SettingsScreen(
     var showDeleteContributorConfirm by remember { mutableStateOf<Pair<Boolean, Int?>>(false to null) }
     val contributors = remember { androidx.compose.runtime.mutableStateListOf<ContributorEntry>().apply { addAll(prefsManager.getContributors()) } }
 
+    // Collapsible section states
+    var tagsExpanded by remember { mutableStateOf(false) }
+    var markdownExpanded by remember { mutableStateOf(false) }
+    var sourcesExpanded by remember { mutableStateOf(false) }
+
     // Launcher for folder picker (SAF)
     val folderPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
@@ -199,7 +204,7 @@ fun SettingsScreen(
                                     )
                                     contributorsJsonContent = json
                                 } catch (e: Exception) {
-                                    contributorsJsonContent = "Error encoding contributors: ${'$'}{e.message}"
+                                    contributorsJsonContent = "Error encoding contributors: ${e.message}"
                                 }
                                 showContributorsJsonDialog = true
                             }) {
@@ -246,7 +251,7 @@ fun SettingsScreen(
                                             }
                                             if (!entry.role.isNullOrBlank()) {
                                                 Text(
-                                                    text = "Rolle: ${'$'}{entry.role}",
+                                                    text = "Rolle: ${entry.role}",
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
@@ -265,7 +270,7 @@ fun SettingsScreen(
                                         }
                                     }
                                 }
-                                Divider()
+                                HorizontalDivider()
                             }
                         }
                     }
@@ -284,97 +289,119 @@ fun SettingsScreen(
             }
 
             item {
+                val sourcesRotation by animateFloatAsState(targetValue = if (sourcesExpanded) 180f else 0f)
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "Dokumentquellen",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Quellen für Dokumente (z. B. Open Flight School). Jede Quelle kann Webseite und Lizenz haben.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Button(onClick = {
-                                try {
-                                    val json = Json { prettyPrint = true }.encodeToString(
-                                        kotlinx.serialization.builtins.ListSerializer(SourceEntry.serializer()),
-                                        sources
-                                    )
-                                    sourcesJsonContent = json
-                                } catch (e: Exception) {
-                                    sourcesJsonContent = "Error encoding sources: ${'$'}{e.message}"
-                                }
-                                showSourcesJsonDialog = true
-                            }) {
-                                Text("View sources JSON")
-                            }
-                            Button(onClick = { showAddSourceDialog = true }) {
-                                Text("Add source")
-                            }
-                            OutlinedButton(onClick = {
-                                // reset to defaults
-                                prefsManager.resetDocumentSourcesToDefaults()
-                                sources.clear()
-                                sources.addAll(prefsManager.getDocumentSources())
-                                sourcesReloadKey++
-                                Toast.makeText(context, "Sources reset to defaults", Toast.LENGTH_SHORT).show()
-                            }) {
-                                Text("Reset to defaults")
-                            }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { sourcesExpanded = !sourcesExpanded },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Dokumentquellen",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = if (sourcesExpanded) "Collapse" else "Expand",
+                                modifier = Modifier.rotate(sourcesRotation)
+                            )
                         }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Column {
-                            sources.forEachIndexed { idx, entry ->
-                                Column(modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 8.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(entry.name, fontWeight = FontWeight.Bold)
-                                            if (!entry.website.isNullOrBlank()) {
-                                                Text(
-                                                    text = entry.website,
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.clickable {
-                                                        try {
-                                                            val intent = Intent(Intent.ACTION_VIEW)
-                                                            intent.data = android.net.Uri.parse(entry.website)
-                                                            context.startActivity(intent)
-                                                        } catch (_: Exception) { }
-                                                    }
-                                                )
-                                            }
-                                            if (!entry.license.isNullOrBlank()) {
-                                                Text(
-                                                    text = "Lizenz: ${'$'}{entry.license}",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
+                        AnimatedVisibility(
+                            visible = sourcesExpanded,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            Column {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Quellen für Dokumente (z. B. Open Flight School). Jede Quelle kann Webseite und Lizenz haben.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Button(onClick = {
+                                        try {
+                                            val json = Json { prettyPrint = true }.encodeToString(
+                                                kotlinx.serialization.builtins.ListSerializer(SourceEntry.serializer()),
+                                                sources
+                                            )
+                                            sourcesJsonContent = json
+                                        } catch (e: Exception) {
+                                            sourcesJsonContent = "Error encoding sources: ${'$'}{e.message}"
                                         }
-                                        Row {
-                                            IconButton(onClick = {
-                                                editingSourceIndex = idx
-                                                showAddSourceDialog = true
-                                            }) {
-                                                Icon(Icons.Default.Edit, contentDescription = "Edit")
-                                            }
-                                            IconButton(onClick = { showDeleteSourceConfirm = true to idx }) {
-                                                Icon(Icons.Default.Delete, contentDescription = "Delete")
-                                            }
-                                        }
+                                        showSourcesJsonDialog = true
+                                    }) {
+                                        Text("View sources JSON")
+                                    }
+                                    Button(onClick = { showAddSourceDialog = true }) {
+                                        Text("Add source")
+                                    }
+                                    OutlinedButton(onClick = {
+                                        // reset to defaults
+                                        prefsManager.resetDocumentSourcesToDefaults()
+                                        sources.clear()
+                                        sources.addAll(prefsManager.getDocumentSources())
+                                        sourcesReloadKey++
+                                        Toast.makeText(context, "Sources reset to defaults", Toast.LENGTH_SHORT).show()
+                                    }) {
+                                        Text("Reset to defaults")
                                     }
                                 }
-                                Divider()
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Column {
+                                    sources.forEachIndexed { idx, entry ->
+                                        Column(modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 8.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(entry.name, fontWeight = FontWeight.Bold)
+                                                    if (!entry.website.isNullOrBlank()) {
+                                                        Text(
+                                                            text = entry.website,
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.clickable {
+                                                                try {
+                                                                    val intent = Intent(Intent.ACTION_VIEW)
+                                                                    intent.data = android.net.Uri.parse(entry.website)
+                                                                    context.startActivity(intent)
+                                                                } catch (_: Exception) { }
+                                                            }
+                                                        )
+                                                    }
+                                                    if (!entry.license.isNullOrBlank()) {
+                                                        Text(
+                                                            text = "Lizenz: ${entry.license}",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                }
+                                                Row {
+                                                    IconButton(onClick = {
+                                                        editingSourceIndex = idx
+                                                        showAddSourceDialog = true
+                                                    }) {
+                                                        Icon(Icons.Default.Edit, contentDescription = "Edit")
+                                                    }
+                                                    IconButton(onClick = { showDeleteSourceConfirm = true to idx }) {
+                                                        Icon(Icons.Default.Delete, contentDescription = "Delete")
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        HorizontalDivider()
+                                    }
+                                }
                             }
                         }
                     }
@@ -431,87 +458,109 @@ fun SettingsScreen(
             }
 
             item {
+                val tagsRotation by animateFloatAsState(targetValue = if (tagsExpanded) 180f else 0f)
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "Internal tags JSON",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "View or copy the internal tag JSON currently stored by the app.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Button(onClick = {
-                                // Load tags and display JSON
-                                try {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { tagsExpanded = !tagsExpanded },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Internal tags JSON",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = if (tagsExpanded) "Collapse" else "Expand",
+                                modifier = Modifier.rotate(tagsRotation)
+                            )
+                        }
+                        AnimatedVisibility(
+                            visible = tagsExpanded,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            Column {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "View or copy the internal tag JSON currently stored by the app.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Button(onClick = {
+                                        // Load tags and display JSON
+                                        try {
+                                            val tags = fileManager.tagManager.loadFileTags()
+                                            val jsonStr = Json { prettyPrint = true }.encodeToString(
+                                                kotlinx.serialization.builtins.ListSerializer(FileTag.serializer()),
+                                                tags
+                                            )
+                                            tagJsonContent = jsonStr
+                                        } catch (e: Exception) {
+                                            tagJsonContent = "Error loading tags: ${e.message}"
+                                        }
+                                        showTagJsonDialog = true
+                                    }) {
+                                        Text("View internal tag JSON")
+                                    }
+                                    OutlinedButton(onClick = {
+                                        // Show asset default file as JSON if present
+                                        try {
+                                            val stream = context.assets.open("file_tags.json")
+                                            val content = stream.bufferedReader().use { it.readText() }
+                                            tagJsonContent = content
+                                        } catch (e: Exception) {
+                                            tagJsonContent = "No default tags asset found."
+                                        }
+                                        showTagJsonDialog = true
+                                    }) {
+                                        Text("View default asset JSON")
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Button(onClick = {
+                                    // Import and reload tags from asset file_tags.json
+                                    try {
+                                        // Overwrite internal file_tags.json with asset version
+                                        context.assets.open("file_tags.json").use { input ->
+                                            val outFile = java.io.File(context.filesDir, "file_tags.json")
+                                            outFile.outputStream().use { output -> input.copyTo(output) }
+                                        }
+                                        tagReloadKey++
+                                        onFilesRefreshed()
+                                        Toast.makeText(context, "Tags imported and reloaded!", Toast.LENGTH_SHORT).show()
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Import failed: ${e.message}", Toast.LENGTH_LONG).show()
+                                    }
+                                }, modifier = Modifier.fillMaxWidth()) {
+                                    Icon(Icons.Default.Refresh, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Tags importieren & neu laden")
+                                }
+                                Spacer(modifier = Modifier.height(16.dp))
+                                // Tag statistics
+                                val tagStats = remember(tagReloadKey) {
                                     val tags = fileManager.tagManager.loadFileTags()
-                                    val jsonStr = Json { prettyPrint = true }.encodeToString(
-                                        kotlinx.serialization.builtins.ListSerializer(FileTag.serializer()),
-                                        tags
-                                    )
-                                    tagJsonContent = jsonStr
-                                } catch (e: Exception) {
-                                    tagJsonContent = "Error loading tags: ${e.message}"
+                                    val uniqueTags = tags.flatMap { it.tags }.toSet()
+                                    val filesWithTags = tags.count { it.tags.isNotEmpty() }
+                                    Pair(uniqueTags.size, filesWithTags)
                                 }
-                                showTagJsonDialog = true
-                            }) {
-                                Text("View internal tag JSON")
-                            }
-                            OutlinedButton(onClick = {
-                                // Show asset default file as JSON if present
-                                try {
-                                    val stream = context.assets.open("file_tags.json")
-                                    val content = stream.bufferedReader().use { it.readText() }
-                                    tagJsonContent = content
-                                } catch (e: Exception) {
-                                    tagJsonContent = "No default tags asset found."
-                                }
-                                showTagJsonDialog = true
-                            }) {
-                                Text("View default asset JSON")
+                                Text(
+                                    text = "Gesamtzahl unterschiedlicher Tags: ${tagStats.first}",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    text = "Dateien mit mindestens einem Tag: ${tagStats.second}",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
                             }
                         }
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = {
-                            // Import and reload tags from asset file_tags.json
-                            try {
-                                // Overwrite internal file_tags.json with asset version
-                                context.assets.open("file_tags.json").use { input ->
-                                    val outFile = java.io.File(context.filesDir, "file_tags.json")
-                                    outFile.outputStream().use { output -> input.copyTo(output) }
-                                }
-                                tagReloadKey++
-                                onFilesRefreshed()
-                                Toast.makeText(context, "Tags imported and reloaded!", Toast.LENGTH_SHORT).show()
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "Import failed: ${e.message}", Toast.LENGTH_LONG).show()
-                            }
-                        }, modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Default.Refresh, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Tags importieren & neu laden")
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
-                        // Tag statistics
-                        val tagStats = remember(tagReloadKey) {
-                            val tags = fileManager.tagManager.loadFileTags()
-                            val uniqueTags = tags.flatMap { it.tags }.toSet()
-                            val filesWithTags = tags.count { it.tags.isNotEmpty() }
-                            Pair(uniqueTags.size, filesWithTags)
-                        }
-                        Text(
-                            text = "Gesamtzahl unterschiedlicher Tags: ${tagStats.first}",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Text(
-                            text = "Dateien mit mindestens einem Tag: ${tagStats.second}",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
                     }
                 }
             }
@@ -528,39 +577,61 @@ fun SettingsScreen(
             }
 
             item {
+                val markdownRotation by animateFloatAsState(targetValue = if (markdownExpanded) 180f else 0f)
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "Markdown font size",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { markdownExpanded = !markdownExpanded },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Markdown font size",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = if (markdownExpanded) "Collapse" else "Expand",
+                                modifier = Modifier.rotate(markdownRotation)
+                            )
+                        }
+                        AnimatedVisibility(
+                            visible = markdownExpanded,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            Column {
+                                Spacer(modifier = Modifier.height(8.dp))
 
-                        var currentFontSize by remember { mutableStateOf(prefsManager.getMarkdownFontSize()) }
-                        val sizes = listOf(14, 16, 18, 20, 22)
+                                var currentFontSize by remember { mutableStateOf(prefsManager.getMarkdownFontSize()) }
+                                val sizes = listOf(14, 16, 18, 20, 22)
 
-                        Column {
-                            sizes.forEach { size ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            prefsManager.setMarkdownFontSize(size)
-                                            currentFontSize = size
+                                Column {
+                                    sizes.forEach { size ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    prefsManager.setMarkdownFontSize(size)
+                                                    currentFontSize = size
+                                                }
+                                                .padding(vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            RadioButton(
+                                                selected = size == currentFontSize,
+                                                onClick = {
+                                                    prefsManager.setMarkdownFontSize(size)
+                                                    currentFontSize = size
+                                                }
+                                            )
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Text("$size sp")
                                         }
-                                        .padding(vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    RadioButton(
-                                        selected = size == currentFontSize,
-                                        onClick = {
-                                            prefsManager.setMarkdownFontSize(size)
-                                            currentFontSize = size
-                                        }
-                                    )
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text("$size sp")
+                                    }
                                 }
                             }
                         }
