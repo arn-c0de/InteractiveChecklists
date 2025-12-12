@@ -411,7 +411,8 @@ fun PdfViewer(
     // Scrolle zur Seite wenn initialPage sich ändert (z.B. durch Link-Klick)
     LaunchedEffect(initialPage) {
         if (initialPage >= 0 && initialPage != currentPage && pageCount > 0) {
-            listState.scrollToItem(initialPage)
+            val target = initialPage.coerceIn(0, pageCount - 1)
+            listState.scrollToItem(target)
         }
     }
 

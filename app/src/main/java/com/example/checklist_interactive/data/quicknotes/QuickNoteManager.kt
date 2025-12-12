@@ -1,15 +1,34 @@
 package com.example.checklist_interactive.data.quicknotes
 
 import android.content.Context
+import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Represents a linked document in quick notes
+ * Represents a single quick note
  */
+data class QuickNote(
+    val id: String,
+    val title: String = "",
+    val content: String = "",
+    val linkedDocuments: List<LinkedDocument> = emptyList(), // Kept for backward compatibility during migration
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+/**
+ * Represents a linked document (deprecated - replaced by markdown links in content)
+ * Kept only for backward compatibility during migration
+ */
+@Deprecated("Use markdown links in note content instead")
 data class LinkedDocument(
     val id: String,
     val filePath: String,
@@ -19,23 +38,18 @@ data class LinkedDocument(
 )
 
 /**
- * Represents a single quick note tab
- */
-data class QuickNote(
-    val id: String,
-    val title: String = "",
-    val content: String = "",
-    val linkedDocuments: List<LinkedDocument> = emptyList(),
-    val timestamp: Long = System.currentTimeMillis()
-)
-
-/**
  * Manager for quick notes that can be accessed from anywhere in the app
+ * Uses Room database with Repository pattern for efficient data management
  */
 class QuickNoteManager(private val context: Context) {
     private val prefs = context.getSharedPreferences("quick_notes", Context.MODE_PRIVATE)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    // MutableStateFlows initialized empty/default, then loaded in init
+    // Initialize database and repository
+    private val database = QuickNoteDatabase.getDatabase(context)
+    private val repository = QuickNoteRepository(database.quickNoteDao())
+
+    // StateFlows for reactive UI updates
     private val _notes = MutableStateFlow<List<QuickNote>>(emptyList())
     val notes: StateFlow<List<QuickNote>> = _notes.asStateFlow()
 
@@ -45,209 +59,86 @@ class QuickNoteManager(private val context: Context) {
     private val _noteContent = MutableStateFlow("")
     val noteContent: StateFlow<String> = _noteContent.asStateFlow()
 
-    private val _linkedDocuments = MutableStateFlow<List<LinkedDocument>>(emptyList())
-    val linkedDocuments: StateFlow<List<LinkedDocument>> = _linkedDocuments.asStateFlow()
-
     init {
-        // Load notes and handle migration if needed
-        val loadedNotes = loadNotesInternal()
-
-        // Wenn keine Notizen existieren, erstelle eine Default-Notiz
-        val notesToUse = if (loadedNotes.isEmpty()) {
-            val defaultNote = QuickNote(
-                id = "note_${System.currentTimeMillis()}",
-                title = "Meine Notizen",
-                content = ""
-            )
-            listOf(defaultNote)
-        } else {
-            loadedNotes
-        }
-
-        _notes.value = notesToUse
-        val loadedActiveId = loadActiveNoteId() ?: notesToUse.firstOrNull()?.id
-        _activeNoteId.value = loadedActiveId
-        _noteContent.value = notesToUse.firstOrNull { it.id == loadedActiveId }?.content ?: ""
-        _linkedDocuments.value = notesToUse.firstOrNull { it.id == loadedActiveId }?.linkedDocuments ?: emptyList()
-
-        // Speichere Notizen wenn sie neu erstellt wurden oder migriert wurden
-        if (prefs.getString(NOTES_KEY, null) == null) {
-            saveNotes(notesToUse)
-            loadedActiveId?.let { prefs.edit().putString(ACTIVE_NOTE_KEY, it).apply() }
-        }
-    }
-
-    // Loads the active note id from shared preferences
-    private fun loadActiveNoteId(): String? {
-        return prefs.getString(ACTIVE_NOTE_KEY, null)
-    }
-
-    private fun loadActiveNoteContent(): String {
-        // if no notes exist, ensure we have at least one
-        val notes = _notes.value
-        val activeId = loadActiveNoteId()
-        val note = if (notes.isNotEmpty()) notes.firstOrNull { it.id == activeId } ?: notes.first() else null
-        return note?.content ?: ""
-    }
-
-    private fun loadActiveNoteLinkedDocuments(): List<LinkedDocument> {
-        val activeId = loadActiveNoteId()
-        val activeNote: JSONObject? = activeId?.let { id ->
+        // Start coroutine to initialize data
+        scope.launch {
             try {
-                val json = prefs.getString(NOTES_KEY, "[]") ?: "[]"
-                val array = JSONArray(json)
-                (0 until array.length())
-                    .map { i: Int -> array.getJSONObject(i) }
-                    .firstOrNull { obj -> obj.optString("id") == id }
-            } catch (e: Exception) {
-                null
-            }
-        }
-        // If active note JSON found, parse its linkedDocuments; otherwise fallback to migration path
-        return if (activeNote != null && activeNote.has("linkedDocuments")) {
-            try {
-                val list = mutableListOf<LinkedDocument>()
-                val larr = activeNote.getJSONArray("linkedDocuments")
-                for (i in 0 until larr.length()) {
-                    val obj = larr.getJSONObject(i)
-                    list.add(LinkedDocument(
-                        id = obj.getString("id"),
-                        filePath = obj.getString("filePath"),
-                        fileName = obj.getString("fileName"),
-                        pageNumber = if (obj.has("pageNumber")) obj.getInt("pageNumber") else null,
-                        timestamp = obj.optLong("timestamp", System.currentTimeMillis())
-                    ))
+                // Check if migration is needed
+                val notesCount = repository.getNotesCount()
+                if (notesCount == 0) {
+                    // No notes in database, try to migrate from SharedPreferences
+                    migrateFromSharedPreferences()
                 }
-                list
-            } catch (e: Exception) {
-                emptyList()
-            }
-        } else {
-            // Last resort, try parse old style linked docs
-            val json = prefs.getString(LINKED_DOCS_KEY, "[]") ?: "[]"
-            try {
-                val array = JSONArray(json)
-                (0 until array.length()).map { i ->
-                    val obj = array.getJSONObject(i)
-                    LinkedDocument(
-                        id = obj.getString("id"),
-                        filePath = obj.getString("filePath"),
-                        fileName = obj.getString("fileName"),
-                        pageNumber = if (obj.has("pageNumber")) obj.getInt("pageNumber") else null,
-                        timestamp = obj.optLong("timestamp", System.currentTimeMillis())
-                    )
-                }
-            } catch (e: Exception) {
-                emptyList()
-            }
-        }
-    }
 
-    fun saveNoteContent(noteId: String? = null, content: String) {
-        val id = noteId ?: _activeNoteId.value
-        val current = _notes.value.toMutableList()
-        val idx = current.indexOfFirst { note: QuickNote -> note.id == id }
-        if (idx >= 0) {
-            val note = current[idx]
-            current[idx] = note.copy(content = content)
-            saveNotes(current)
-            if (_activeNoteId.value == id) _noteContent.value = content
-        }
-    }
+                // Observe notes from database
+                repository.getAllNotes().collect { notesList ->
+                    _notes.value = notesList
 
-    // Backwards-compatible wrapper for existing callers
-    fun saveNote(content: String) {
-        saveNoteContent(null, content)
-    }
-
-    fun clearActiveNote() {
-        val id = _activeNoteId.value
-        if (id != null) saveNoteContent(id, "")
-    }
-
-    // Backwards-compatible wrapper
-    fun clearNote() { clearActiveNote() }
-
-    fun addLinkedDocument(filePath: String, fileName: String, pageNumber: Int? = null, noteId: String? = null) {
-        val id = "${filePath}_${pageNumber ?: 0}_${System.currentTimeMillis()}"
-        val targetId = noteId ?: _activeNoteId.value
-        if (targetId == null) return
-
-        val current = _notes.value.toMutableList()
-        val idx = current.indexOfFirst { note: QuickNote -> note.id == targetId }
-        if (idx < 0) return
-
-        val note = current[idx]
-        val docs = note.linkedDocuments.toMutableList()
-        docs.removeAll { it.filePath == filePath && it.pageNumber == pageNumber }
-        docs.add(0, LinkedDocument(id = id, filePath = filePath, fileName = fileName, pageNumber = pageNumber))
-        current[idx] = note.copy(linkedDocuments = docs)
-        saveNotes(current)
-        if (_activeNoteId.value == targetId) _linkedDocuments.value = docs
-    }
-
-    fun removeLinkedDocument(id: String, noteId: String? = null) {
-        val targetId = noteId ?: _activeNoteId.value
-        if (targetId == null) return
-
-        val current = _notes.value.toMutableList()
-        val idx = current.indexOfFirst { note: QuickNote -> note.id == targetId }
-        if (idx < 0) return
-
-        val note = current[idx]
-        val docs = note.linkedDocuments.toMutableList()
-        docs.removeAll { it.id == id }
-        current[idx] = note.copy(linkedDocuments = docs)
-        saveNotes(current)
-        if (_activeNoteId.value == targetId) _linkedDocuments.value = docs
-    }
-
-    // Backwards-compatible overload
-    fun removeLinkedDocument(id: String) { removeLinkedDocument(id, null) }
-
-    fun clearActiveNoteLinkedDocuments() {
-        val id = _activeNoteId.value ?: return
-        val current = _notes.value.toMutableList()
-        val idx = current.indexOfFirst { note: QuickNote -> note.id == id }
-        if (idx < 0) return
-        val note = current[idx]
-        current[idx] = note.copy(linkedDocuments = emptyList())
-        saveNotes(current)
-        _linkedDocuments.value = emptyList()
-    }
-
-    // Backwards-compatible wrapper
-    fun clearLinkedDocuments() { clearActiveNoteLinkedDocuments() }
-
-    private fun saveNotes(notes: List<QuickNote>) {
-        val array = JSONArray()
-        notes.forEach { note ->
-            val obj = JSONObject().apply {
-                put("id", note.id)
-                put("title", note.title)
-                put("content", note.content)
-                put("timestamp", note.timestamp)
-                val lad = JSONArray()
-                note.linkedDocuments.forEach { doc ->
-                    val dobj = JSONObject().apply {
-                        put("id", doc.id)
-                        put("filePath", doc.filePath)
-                        put("fileName", doc.fileName)
-                        doc.pageNumber?.let { put("pageNumber", it) }
-                        put("timestamp", doc.timestamp)
+                    // If no active note is set, set the first one
+                    if (_activeNoteId.value == null && notesList.isNotEmpty()) {
+                        setActiveNote(notesList.first().id)
                     }
-                    lad.put(dobj)
+
+                    // Update active note content if it changed
+                    val activeId = _activeNoteId.value
+                    if (activeId != null) {
+                        val activeNote = notesList.find { it.id == activeId }
+                        if (activeNote != null) {
+                            _noteContent.value = activeNote.content
+                        }
+                    }
                 }
-                put("linkedDocuments", lad)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error initializing QuickNoteManager", e)
             }
-            array.put(obj)
         }
-        prefs.edit().putString(NOTES_KEY, array.toString()).apply()
-        _notes.value = notes
+
+        // Load active note ID from preferences
+        scope.launch {
+            val activeId = loadActiveNoteId()
+            if (activeId != null) {
+                _activeNoteId.value = activeId
+            }
+        }
     }
 
-    // Internal loader for notes, does not call saveNotes to avoid NPE during construction
-    private fun loadNotesInternal(): List<QuickNote> {
+    /**
+     * Migrate data from SharedPreferences to Room database
+     */
+    private suspend fun migrateFromSharedPreferences() {
+        try {
+            val migratedNotes = loadNotesFromSharedPreferences()
+
+            if (migratedNotes.isNotEmpty()) {
+                Log.d(TAG, "Migrating ${migratedNotes.size} notes from SharedPreferences to Room")
+                repository.insertNotes(migratedNotes)
+
+                // Clear old SharedPreferences data after successful migration
+                prefs.edit().apply {
+                    remove(NOTE_KEY)
+                    remove(LINKED_DOCS_KEY)
+                    remove(NOTES_KEY)
+                }.apply()
+
+                Log.d(TAG, "Migration completed successfully")
+            } else {
+                // No old data, create a default note
+                val defaultNote = QuickNote(
+                    id = "note_${System.currentTimeMillis()}",
+                    title = "Meine Notizen",
+                    content = ""
+                )
+                repository.insertNote(defaultNote)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during migration", e)
+        }
+    }
+
+    /**
+     * Load notes from SharedPreferences (for migration)
+     */
+    private fun loadNotesFromSharedPreferences(): List<QuickNote> {
         // Try load new format
         val json = prefs.getString(NOTES_KEY, null)
         if (json != null) {
@@ -255,110 +146,227 @@ class QuickNoteManager(private val context: Context) {
                 val array = JSONArray(json)
                 (0 until array.length()).map { i ->
                     val obj = array.getJSONObject(i)
-                    val linkedDocs = mutableListOf<LinkedDocument>()
-                    if (obj.has("linkedDocuments")) {
-                        val la = obj.getJSONArray("linkedDocuments")
-                        (0 until la.length()).forEach { j ->
-                            val d = la.getJSONObject(j)
-                            linkedDocs.add(LinkedDocument(
-                                id = d.getString("id"),
-                                filePath = d.getString("filePath"),
-                                fileName = d.getString("fileName"),
-                                pageNumber = if (d.has("pageNumber")) d.getInt("pageNumber") else null,
-                                timestamp = d.optLong("timestamp", System.currentTimeMillis())
-                            ))
-                        }
-                    }
                     QuickNote(
                         id = obj.getString("id"),
                         title = obj.optString("title", ""),
                         content = obj.optString("content", ""),
-                        linkedDocuments = linkedDocs,
+                        linkedDocuments = emptyList(), // Clear legacy linked documents
                         timestamp = obj.optLong("timestamp", System.currentTimeMillis())
                     )
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "Error loading notes from SharedPreferences", e)
                 emptyList()
             }
         }
 
-        // Backwards-compatibility: if old single-note keys exist, migrate (but don't save yet)
+        // Try old single-note format
         val oldContent = prefs.getString(NOTE_KEY, null)
-        val oldLinked = prefs.getString(LINKED_DOCS_KEY, null)
-        if (oldContent != null || oldLinked != null) {
-            val linked = try {
-                val arr = JSONArray(oldLinked ?: "[]")
-                (0 until arr.length()).map { i ->
-                    val obj = arr.getJSONObject(i)
-                    LinkedDocument(
-                        id = obj.getString("id"),
-                        filePath = obj.getString("filePath"),
-                        fileName = obj.getString("fileName"),
-                        pageNumber = if (obj.has("pageNumber")) obj.getInt("pageNumber") else null,
-                        timestamp = obj.optLong("timestamp", System.currentTimeMillis())
-                    )
-                }
-            } catch (e: Exception) { emptyList() }
-
-            val note = QuickNote(id = "note_${System.currentTimeMillis()}", title = "Notes", content = oldContent ?: "", linkedDocuments = linked)
+        if (oldContent != null) {
+            val note = QuickNote(
+                id = "note_${System.currentTimeMillis()}",
+                title = "Notizen",
+                content = oldContent,
+                linkedDocuments = emptyList()
+            )
             return listOf(note)
         }
 
-        // No notes at all: return empty
         return emptyList()
     }
 
+    private fun loadActiveNoteId(): String? {
+        return prefs.getString(ACTIVE_NOTE_KEY, null)
+    }
+
+    /**
+     * Save note content
+     */
+    fun saveNoteContent(noteId: String? = null, content: String) {
+        scope.launch {
+            try {
+                val id = noteId ?: _activeNoteId.value
+                if (id != null) {
+                    repository.updateNoteContent(id, content)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error saving note content", e)
+            }
+        }
+    }
+
+    /**
+     * Backwards-compatible wrapper for existing callers
+     */
+    fun saveNote(content: String) {
+        saveNoteContent(null, content)
+    }
+
+    /**
+     * Clear active note content
+     */
+    fun clearActiveNote() {
+        val id = _activeNoteId.value
+        if (id != null) saveNoteContent(id, "")
+    }
+
+    /**
+     * Backwards-compatible wrapper
+     */
+    fun clearNote() {
+        clearActiveNote()
+    }
+
+    /**
+     * Add a linked document to the active note (deprecated - now adds markdown link to content)
+     * Kept for backward compatibility with existing UI code
+     */
+    @Deprecated("Use markdown links directly in note content", ReplaceWith("addMarkdownLink(filePath, fileName, pageNumber)"))
+    fun addLinkedDocument(
+        filePath: String,
+        fileName: String,
+        pageNumber: Int? = null,
+        noteId: String? = null
+    ) {
+        scope.launch {
+            try {
+                val targetId = noteId ?: _activeNoteId.value
+                if (targetId != null) {
+                    val note = repository.getNoteByIdOnce(targetId)
+                    if (note != null) {
+                        // Create markdown link instead of using LinkedDocuments
+                        val encodedPath = java.net.URLEncoder.encode(filePath, "UTF-8")
+                        val pageParam = if (pageNumber != null) "&page=${pageNumber + 1}" else ""
+                        val label = if (pageNumber != null) "$fileName (S. ${pageNumber + 1})" else fileName
+                        val markdownLink = "\n📎 [$label](internal://open?file=$encodedPath$pageParam)\n"
+
+                        val newContent = note.content + markdownLink
+                        repository.updateNoteContent(targetId, newContent)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error adding linked document", e)
+            }
+        }
+    }
+
+    /**
+     * Add a new note
+     */
     fun addNote(title: String = "New Note", content: String = "", setActive: Boolean = true): String {
         val id = "note_${System.currentTimeMillis()}"
-        val current = _notes.value.toMutableList()
-        current.add(0, QuickNote(id = id, title = title, content = content))
-        saveNotes(current)
-        if (setActive) setActiveNote(id)
+        scope.launch {
+            try {
+                val note = QuickNote(id = id, title = title, content = content)
+                repository.insertNote(note)
+                if (setActive) {
+                    setActiveNote(id)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error adding note", e)
+            }
+        }
         return id
     }
 
+    /**
+     * Remove a note
+     */
     fun removeNote(id: String) {
-        val current = _notes.value.toMutableList()
-        current.removeAll { it.id == id }
-        saveNotes(current)
-        if (_activeNoteId.value == id) _activeNoteId.value = _notes.value.firstOrNull()?.id
+        scope.launch {
+            try {
+                repository.deleteNoteById(id)
+                if (_activeNoteId.value == id) {
+                    val notes = repository.getAllNotes().first()
+                    _activeNoteId.value = notes.firstOrNull()?.id
+                    saveActiveNoteId(_activeNoteId.value)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error removing note", e)
+            }
+        }
     }
 
+    /**
+     * Rename a note
+     */
     fun renameNote(id: String, newTitle: String) {
-        val current = _notes.value.toMutableList()
-        val idx = current.indexOfFirst { it.id == id }
-        if (idx >= 0) {
-            val note = current[idx]
-            current[idx] = note.copy(title = newTitle)
-            saveNotes(current)
+        scope.launch {
+            try {
+                repository.updateNoteTitle(id, newTitle)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error renaming note", e)
+            }
         }
     }
 
+    /**
+     * Set active note
+     */
     fun setActiveNote(id: String?) {
-        if (id == null) {
-            _activeNoteId.value = _notes.value.firstOrNull()?.id
-            _noteContent.value = loadActiveNoteContent()
-            _linkedDocuments.value = loadActiveNoteLinkedDocuments()
-            prefs.edit().remove(ACTIVE_NOTE_KEY).apply()
-            return
+        scope.launch {
+            try {
+                if (id == null) {
+                    val notes = repository.getAllNotes().first()
+                    _activeNoteId.value = notes.firstOrNull()?.id
+                } else {
+                    val note = repository.getNoteByIdOnce(id)
+                    if (note != null) {
+                        _activeNoteId.value = id
+                        _noteContent.value = note.content
+                    }
+                }
+                saveActiveNoteId(_activeNoteId.value)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error setting active note", e)
+            }
         }
-        val exists = _notes.value.any { it.id == id }
-        if (!exists) return
-        _activeNoteId.value = id
-        prefs.edit().putString(ACTIVE_NOTE_KEY, id).apply()
-        _noteContent.value = loadActiveNoteContent()
-        _linkedDocuments.value = loadActiveNoteLinkedDocuments()
     }
 
-    fun clearAllNotes() {
-        saveNotes(emptyList())
-        prefs.edit().remove(ACTIVE_NOTE_KEY).apply()
-        _activeNoteId.value = null
-        _noteContent.value = ""
-        _linkedDocuments.value = emptyList()
+    private fun saveActiveNoteId(id: String?) {
+        if (id == null) {
+            prefs.edit().remove(ACTIVE_NOTE_KEY).apply()
+        } else {
+            prefs.edit().putString(ACTIVE_NOTE_KEY, id).apply()
+        }
     }
+
+    /**
+     * Clear all notes
+     */
+    fun clearAllNotes() {
+        scope.launch {
+            try {
+                repository.deleteAllNotes()
+                _activeNoteId.value = null
+                _noteContent.value = ""
+                prefs.edit().remove(ACTIVE_NOTE_KEY).apply()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error clearing all notes", e)
+            }
+        }
+    }
+
+    /**
+     * Search notes by query
+     */
+    fun searchNotes(query: String) {
+        scope.launch {
+            try {
+                repository.searchNotes(query).collect { /* Results observed via notes StateFlow */ }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error searching notes", e)
+            }
+        }
+    }
+
+    /**
+     * Get search results as a Flow
+     */
+    fun getSearchResults(query: String) = repository.searchNotes(query)
 
     companion object {
+        private const val TAG = "QuickNoteManager"
         private const val NOTE_KEY = "quick_note_content"
         private const val LINKED_DOCS_KEY = "linked_documents"
         private const val NOTES_KEY = "quick_notes_list"
