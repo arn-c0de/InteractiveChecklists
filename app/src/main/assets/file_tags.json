@@ -1,130 +1,114 @@
 [
   {
-    "filePath": "Checklists/A-10_Warthog/startup.md",
-    "tags": ["startup", "preflight", "systems", "electrical", "normal"]
+    "filePath": "asset://Checklists/A-10_Warthog/A-10_Warthog-startup.md",
+    "tags": ["startup", "preflight"]
   },
   {
-    "filePath": "Checklists/A-10_Warthog/taxi.md",
-    "tags": ["taxi", "normal", "preflight"]
+    "filePath": "asset://Checklists/A-10_Warthog/A-10_Warthog-landing.md",
+    "tags": ["landing"]
   },
   {
-    "filePath": "Checklists/A-10_Warthog/takeoff.md",
-    "tags": ["takeoff", "normal", "departure"]
+    "filePath": "asset://Checklists/A-10_Warthog/A-10_Warthog-takeoff.md",
+    "tags": ["takeoff"]
   },
   {
-    "filePath": "Checklists/A-10_Warthog/landing.md",
-    "tags": ["landing", "approach", "normal"]
+    "filePath": "asset://Checklists/A-10_Warthog/A-10_Warthog-taxi.md",
+    "tags": ["taxi"]
   },
   {
-    "filePath": "Checklists/A-10_Warthog/shutdown.md",
-    "tags": ["shutdown", "postflight", "normal"]
+    "filePath": "asset://Checklists/A-10_Warthog/A-10_Warthog-shutdown.md",
+    "tags": ["postflight"]
   },
   {
-    "filePath": "Checklists/F-15_Eagle/startup.md",
-    "tags": ["startup", "preflight", "systems", "electrical", "normal"]
+    "filePath": "asset://Checklists/F-15_Eagle/F-15_Eagle-startup.md",
+    "tags": ["startup", "preflight"]
   },
   {
-    "filePath": "Checklists/F-16_Viper/startup.md",
-    "tags": ["startup", "preflight", "systems", "electrical", "normal"]
+    "filePath": "asset://Checklists/F-16_Viper/F-16_Viper-startup.md",
+    "tags": ["startup", "preflight"]
   },
   {
-    "filePath": "Checklists/F-16_Viper/taxi.md",
-    "tags": ["taxi", "normal", "preflight"]
+    "filePath": "asset://Checklists/F-16_Viper/F-16_Viper-takeoff.md",
+    "tags": ["takeoff"]
   },
   {
-    "filePath": "Checklists/F-16_Viper/takeoff.md",
-    "tags": ["takeoff", "normal", "departure"]
+    "filePath": "asset://Checklists/F-16_Viper/F-16_Viper-landing.md",
+    "tags": ["landing"]
   },
   {
-    "filePath": "Checklists/F-16_Viper/landing.md",
-    "tags": ["landing", "approach", "normal"]
+    "filePath": "asset://Checklists/F-16_Viper/F-16_Viper-shutdown.md",
+    "tags": ["postflight"]
   },
   {
-    "filePath": "Checklists/F-16_Viper/shutdown.md",
-    "tags": ["shutdown", "postflight", "normal"]
+    "filePath": "asset://Checklists/F-16_Viper/F-16_Viper-taxi.md",
+    "tags": ["taxi"]
   },
   {
-    "filePath": "Checklists/F-16_Viper/air_to_air_combat.md",
-    "tags": ["combat", "weapons", "systems", "important"]
+    "filePath": "asset://Checklists/F-16_Viper/F-16_Viper-air_to_air_combat.md",
+    "tags": ["combat", "weapons"]
   },
   {
-    "filePath": "Checklists/F-16_Viper/air_to_ground_attack.md",
-    "tags": ["combat", "weapons", "systems", "important"]
+    "filePath": "asset://Checklists/F-16_Viper/F-16_Viper-air_to_ground_attack.md",
+    "tags": ["combat", "weapons"]
   },
   {
-    "filePath": "Checklists/FA-18_Hornet/startup.md",
-    "tags": ["startup", "preflight", "systems", "electrical", "normal"]
+    "filePath": "asset://Checklists/FA-18_Hornet/FA18C-startup.md",
+    "tags": ["startup", "preflight"]
   },
   {
-    "filePath": "Checklists/FA-18_Hornet/landing.md",
-    "tags": ["landing", "approach", "normal"]
+    "filePath": "asset://Checklists/FA-18_Hornet/FA-18C-landing.md",
+    "tags": ["landing"]
   },
   {
-    "filePath": "Checklists/FA-18_Hornet/carrier_landing.md",
-    "tags": ["landing", "approach", "carrier", "important"]
+    "filePath": "asset://Checklists/FA-18_Hornet/FA-18C-carrier_landing.md",
+    "tags": ["landing", "carrier"]
   },
   {
-    "filePath": "Checklists/FA-18_Hornet/carrier_takeoff.md",
-    "tags": ["takeoff", "carrier", "departure", "important"]
+    "filePath": "asset://Checklists/FA-18_Hornet/FA-18C-carrier_takeoff.md",
+    "tags": ["takeoff", "carrier"]
   },
   {
-    "filePath": "Checklists/FA-18_Hornet/airport_landing.md",
-    "tags": ["landing", "approach", "normal"]
+    "filePath": "asset://Checklists/FA-18_Hornet/FA-18C-airport_landing.md",
+    "tags": ["landing"]
   },
   {
-    "filePath": "Checklists/FA-18_Hornet/aerial_refuelling.md",
-    "tags": ["fuel", "systems", "important", "inflight"]
+    "filePath": "asset://Checklists/FA-18_Hornet/FA-18C-air_to_air_combat.md",
+    "tags": ["combat", "weapons"]
   },
   {
-    "filePath": "Checklists/FA-18_Hornet/air_to_air_combat.md",
-    "tags": ["combat", "weapons", "systems", "important"]
+    "filePath": "asset://Checklists/FA-18_Hornet/FA-18C-aerial_refuelling.md",
+    "tags": ["fuel", "operations"]
   },
   {
-    "filePath": "Checklists/MIG-21BIS/startup.md",
-    "tags": ["startup", "preflight", "systems", "electrical", "normal"]
+    "filePath": "asset://Checklists/MIG-21BIS/MIG-21BIS-startup.md",
+    "tags": ["startup", "preflight"]
   },
   {
-    "filePath": "Checklists/MIG-21BIS/taxi.md",
-    "tags": ["taxi", "normal", "preflight"]
+    "filePath": "asset://Checklists/MIG-21BIS/MIG-21BIS-takeoff.md",
+    "tags": ["takeoff"]
   },
   {
-    "filePath": "Checklists/MIG-21BIS/takeoff.md",
-    "tags": ["takeoff", "normal", "departure"]
+    "filePath": "asset://Checklists/MIG-21BIS/MIG-21BIS-landing.md",
+    "tags": ["landing"]
   },
   {
-    "filePath": "Checklists/MIG-21BIS/landing.md",
-    "tags": ["landing", "approach", "normal"]
+    "filePath": "asset://Checklists/MIG-21BIS/MIG-21BIS-taxi.md",
+    "tags": ["taxi"]
   },
   {
-    "filePath": "Checklists/P-51_Mustang/startup.md",
-    "tags": ["startup", "preflight", "systems", "normal"]
+    "filePath": "asset://Checklists/P-51_Mustang/startup.md",
+    "tags": ["startup"]
   },
   {
-    "filePath": "Checklists/P-51_Mustang/taxi.md",
-    "tags": ["taxi", "normal", "preflight"]
+    "filePath": "asset://Checklists/P-51_Mustang/takeoff.md",
+    "tags": ["takeoff"]
   },
   {
-    "filePath": "Checklists/P-51_Mustang/takeoff.md",
-    "tags": ["takeoff", "normal", "departure"]
+    "filePath": "asset://Checklists/P-51_Mustang/landing.md",
+    "tags": ["landing"]
   },
   {
-    "filePath": "Checklists/P-51_Mustang/landing.md",
-    "tags": ["landing", "approach", "normal"]
-  },
-  {
-    "filePath": "radiocommunication/cap-413-radiotelephony.pdf",
-    "tags": ["communications", "reference", "training", "important"]
-  },
-  {
-    "filePath": "radiocommunication/ICAO-Doc-9432-Manual-of-Radiotelephony-4th-ed.-2007.pdf",
-    "tags": ["communications", "reference", "training", "important"]
-  },
-  {
-    "filePath": "radiocommunication/Ivana-Francetic-Radiotelephoy-Communications-Handbook.pdf",
-    "tags": ["communications", "reference", "training"]
-  },
-  {
-    "filePath": "Charts/Caucasus - Aerodrome Chart - DAY.pdf",
-    "tags": ["charts", "navigation", "reference", "caucasus"]
+    "filePath": "asset://Checklists/P-51_Mustang/taxi.md",
+    "tags": ["taxi"]
   }
 ]

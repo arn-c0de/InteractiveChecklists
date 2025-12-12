@@ -44,7 +44,7 @@ import com.example.checklist_interactive.R
 @Composable
 fun InternalFileViewer(
     fileInfo: FileInfo,
-    initialPage: Int = 0,
+    initialPage: Int = -1,
     onBack: () -> Unit,
     onShowFileList: () -> Unit,
     isDarkTheme: Boolean,
@@ -57,7 +57,15 @@ fun InternalFileViewer(
         "pdf" -> {
             val prefsManager = remember { PreferencesManager(context) }
             val lastPage = remember(fileInfo.path) { prefsManager.getInt("pdf_last_page_${fileInfo.path}", 0) }
-            var currentPage by remember { mutableStateOf(lastPage) }
+            var currentPage by remember(fileInfo.path) { mutableStateOf(lastPage) }
+
+            // Aktualisiere currentPage wenn initialPage sich ändert (z.B. durch Link-Klick)
+            // initialPage = -1 bedeutet "nicht gesetzt, verwende lastPage"
+            androidx.compose.runtime.LaunchedEffect(initialPage) {
+                if (initialPage >= 0) {
+                    currentPage = initialPage
+                }
+            }
 
             val isAsset = fileInfo.isAsset || fileInfo.path.startsWith("asset://")
             val pdfPath = if (isAsset) {

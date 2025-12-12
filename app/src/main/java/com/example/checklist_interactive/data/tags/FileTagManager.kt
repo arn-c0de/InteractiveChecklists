@@ -37,6 +37,11 @@ class FileTagManager(private val context: Context) {
                     tagsFile.outputStream().use { output -> input.copyTo(output) }
                 }
             }
+            // Always try to merge/latest asset-provided tags into internal tags on startup.
+            // This ensures bundled tag entries are present and user tags are preserved (we union sets).
+            try {
+                syncAssetTagsAndHeuristics()
+            } catch (_: Exception) { /* ignore sync errors */ }
         } catch (e: Exception) {
             // If there is no asset or another error occurs, ensure the file exists with an empty array
             try {
@@ -45,6 +50,87 @@ class FileTagManager(private val context: Context) {
                 }
             } catch (_: Exception) { }
         }
+    }
+
+    // Synchronize asset-provided tags and add heuristic tags for asset files missing explicit tags
+    private fun syncAssetTagsAndHeuristics() {
+        // 1) Read asset file_tags.json if present
+        val assetTags = try {
+            context.assets.open("file_tags.json").use { input ->
+                val s = input.readBytes().toString(Charsets.UTF_8)
+                if (s.isBlank()) emptyList<FileTag>() else json.decodeFromString<List<FileTag>>(s)
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+
+        // Load current internal tags into a mutable map for quick updates
+        val internal = loadFileTags().associateBy { normalizePath(it.filePath) }.toMutableMap()
+
+        // Merge asset tags: union of tag sets, do not remove user tags
+        for (a in assetTags) {
+            val key = normalizePath(a.filePath)
+            val existing = internal[key]
+            if (existing != null) {
+                val union = (existing.tags + a.tags).toSet()
+                if (union != existing.tags) {
+                    // Preserve the stored filePath string (absolute/internal path), keep unioned tags
+                    internal[key] = FileTag(existing.filePath, union)
+                }
+            } else {
+                internal[key] = FileTag(a.filePath, a.tags)
+            }
+        }
+
+        // 2) Walk assets and add heuristic tags for files not covered by assetTags
+        fun walker(path: String) {
+            val list = try { context.assets.list(path) ?: emptyArray() } catch (e: Exception) { emptyArray() }
+            if (list.isEmpty()) return
+            for (child in list) {
+                val childPath = if (path.isEmpty()) child else "$path/$child"
+                val sub = try { context.assets.list(childPath) ?: emptyArray() } catch (e: Exception) { emptyArray() }
+                if (sub.isNotEmpty()) {
+                    walker(childPath)
+                } else {
+                    val lower = child.lowercase()
+                    if (lower.endsWith(".pdf") || lower.endsWith(".md") || lower.endsWith(".markdown")) {
+                        val assetPath = "asset://$childPath"
+                        val key = normalizePath(assetPath)
+                        if (internal.containsKey(key)) continue // already present
+                        // derive heuristic tags from filename
+                        val heurTags = heuristicTagsFromName(child)
+                        if (heurTags.isNotEmpty()) {
+                            internal[key] = FileTag(assetPath, heurTags)
+                        } else {
+                            // Ensure asset is present in tags file even if no tags assigned yet
+                            internal[key] = FileTag(assetPath, emptySet())
+                        }
+                    }
+                }
+            }
+        }
+
+        walker("")
+
+        // 3) Persist merged map back to internal tags file (replace fully)
+        saveFileTags(internal.values.toList())
+    }
+
+    // Simple heuristics to derive tags from filename
+    private fun heuristicTagsFromName(fileName: String): Set<String> {
+        val name = fileName.lowercase()
+        val tags = mutableSetOf<String>()
+        if (name.contains("start") || name.contains("startup")) tags.add("startup")
+        if (name.contains("takeoff")) tags.add("takeoff")
+        if (name.contains("landing")) tags.add("landing")
+        if (name.contains("taxi")) tags.add("taxi")
+        if (name.contains("shutdown")) tags.add("postflight")
+        if (name.contains("combat") || name.contains("air_to_air") || name.contains("air_to_ground") || name.contains("air-to-air") || name.contains("air-to-ground")) tags.add("combat")
+        if (name.contains("carrier")) tags.add("carrier")
+        if (name.contains("refu" ) || name.contains("refuelling")) tags.add("fuel")
+        if (name.contains("nav") || name.contains("navigation")) tags.add("navigation")
+        if (name.contains("comm" ) || name.contains("radio")) tags.add("communications")
+        return tags
     }
     
     /**
@@ -220,6 +306,7 @@ class FileTagManager(private val context: Context) {
             "taxi",
             "preflight",
             "postflight",
+            "carrier",
             "systems",
             "weapons",
             "navigation",

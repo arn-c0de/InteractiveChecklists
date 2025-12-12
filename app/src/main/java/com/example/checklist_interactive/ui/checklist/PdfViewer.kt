@@ -8,7 +8,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.lazy.LazyColumn
@@ -103,7 +105,7 @@ fun PdfViewer(
     isInternalFile: Boolean = false,
     isDarkTheme: Boolean = false,
     onToggleTheme: (() -> Unit)? = null,
-    initialPage: Int = 0,
+    initialPage: Int = -1,
     onPageChange: ((Int) -> Unit)? = null,
     onOpenLinkedDocument: ((filePath: String, pageNumber: Int?) -> Unit)? = null
 ) {
@@ -115,9 +117,9 @@ fun PdfViewer(
     val lastPageManager = remember { LastPageManager(context) }
     val quickNoteManager = remember { QuickNoteManager(context) }
 
-    // Lade zuletzt geöffnete Seite, falls initialPage nicht explizit gesetzt wurde
+    // Lade zuletzt geöffnete Seite, falls initialPage nicht explizit gesetzt wurde (< 0 = nicht gesetzt)
     val effectiveInitialPage = remember(pdfPath) {
-        if (initialPage == 0) {
+        if (initialPage < 0) {
             lastPageManager.getLastPage(pdfPath).coerceAtLeast(0)
         } else {
             initialPage
@@ -406,6 +408,13 @@ fun PdfViewer(
         }
     }
 
+    // Scrolle zur Seite wenn initialPage sich ändert (z.B. durch Link-Klick)
+    LaunchedEffect(initialPage) {
+        if (initialPage >= 0 && initialPage != currentPage && pageCount > 0) {
+            listState.scrollToItem(initialPage)
+        }
+    }
+
     // Speichere die aktuelle Seite bei jedem Seitenwechsel
     LaunchedEffect(currentPage) {
         if (pageCount > 0) {
@@ -546,16 +555,16 @@ fun PdfViewer(
                             .padding(vertical = 4.dp, horizontal = 8.dp)
                     ) {
                         // Erste Reihe: Zeichnen & Annotationen
+                        var showDeleteAllDialog by remember { mutableStateOf(false) }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             HintIconButton(
                                 onClick = {
                                     annotateMode = !annotateMode
-                                    if (annotateMode) {
-                                        eraseMode = false
-                                    }
+                                    if (annotateMode) eraseMode = false
                                 },
                                 hint = "Zeichnen",
                                 onHintChange = { hoveredHint = it },
@@ -689,9 +698,7 @@ fun PdfViewer(
                                 )
                             }
                             HintIconButton(
-                                onClick = {
-                                    strokes.removeAll { it.page == currentPage }
-                                },
+                                onClick = { showDeleteAllDialog = true },
                                 hint = "Alle Anmerkungen löschen",
                                 onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
@@ -716,6 +723,28 @@ fun PdfViewer(
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
+                        }
+
+                        // Delete All Dialog
+                        if (showDeleteAllDialog) {
+                            AlertDialog(
+                                onDismissRequest = { showDeleteAllDialog = false },
+                                title = { Text("Alle Zeichnungen löschen?") },
+                                text = { Text("Möchten Sie wirklich alle Zeichnungen/Annotationen auf dieser Seite unwiderruflich löschen?") },
+                                confirmButton = {
+                                    TextButton(onClick = {
+                                        strokes.removeAll { it.page == currentPage }
+                                        showDeleteAllDialog = false
+                                    }) {
+                                        Text("Löschen")
+                                    }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { showDeleteAllDialog = false }) {
+                                        Text("Abbrechen")
+                                    }
+                                }
+                            )
                         }
 
                         // Zweite Reihe: Zoom & Radierer
@@ -1347,6 +1376,23 @@ private fun PdfPageWithAnnotations(
     var brushPosition by remember(pageIndex) { mutableStateOf<Offset?>(null) }
     val isCurrentPage = pageIndex == currentPage
 
+    // Transient zoom state for smooth visual feedback without recomposition
+    var transientScale by remember { mutableStateOf(1f) }
+    var transientOffsetX by remember { mutableStateOf(0f) }
+    var transientOffsetY by remember { mutableStateOf(0f) }
+
+    // Sync transient state with persistent state when not gesturing
+    LaunchedEffect(scale, offsetX, offsetY) {
+        transientScale = scale
+        transientOffsetX = offsetX
+        transientOffsetY = offsetY
+    }
+
+    // Use transient state for rendering to avoid recomposition lag
+    val renderScale = transientScale
+    val renderOffsetX = transientOffsetX
+    val renderOffsetY = transientOffsetY
+
     Box(
         modifier = modifier
             .padding(8.dp)
@@ -1372,10 +1418,10 @@ private fun PdfPageWithAnnotations(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer(
-                    scaleX = scale,
-                    scaleY = scale,
-                    translationX = offsetX,
-                    translationY = offsetY,
+                    scaleX = renderScale,
+                    scaleY = renderScale,
+                    translationX = renderOffsetX,
+                    translationY = renderOffsetY,
                     transformOrigin = TransformOrigin(0f, 0f)
                 ),
             contentScale = ContentScale.Fit,
@@ -1394,94 +1440,139 @@ private fun PdfPageWithAnnotations(
         }
 
         // Annotations Canvas Overlay
+        val touchSlop = with(LocalDensity.current) { 8.dp.toPx() }
+
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
                 .onSizeChanged { overlaySize = it }
-                // Custom pointer handling: Pan/Zoom. Active for multi-touch, or single-touch when zoomed (but not in drawing mode).
-                .pointerInput(pageIndex, isCurrentPage, scale, annotateMode, eraseMode) {
+                // Zoom/Pan handling - detects multi-touch or panning when zoomed
+                .pointerInput(pageIndex, isCurrentPage, annotateMode, eraseMode) {
                     if (!isCurrentPage) return@pointerInput
+                    // Don't handle zoom/pan in drawing/erase mode
+                    if (annotateMode || eraseMode) return@pointerInput
 
                     awaitPointerEventScope {
                         while (true) {
                             val event = awaitPointerEvent()
-                            val pressedPointers = event.changes.filter { it.pressed }
+                            val pointers = event.changes.filter { it.pressed }
 
-                            // Multi-touch (>= 2 pointers): implement pinch zoom + pan
-                            if (pressedPointers.size >= 2) {
-                                // Initialize previous positions and capture initial state
-                                val initialPos1 = pressedPointers[0].position
-                                val initialPos2 = pressedPointers[1].position
-                                val initialDist = hypot((initialPos1.x - initialPos2.x).toDouble(), (initialPos1.y - initialPos2.y).toDouble()).toFloat()
-                                val initialCentroid = (initialPos1 + initialPos2) / 2f
-                                val initialScale = scale
-                                val initialOffsetX = offsetX
-                                val initialOffsetY = offsetY
+                            // Multi-touch: always handle zoom + pan (even from scale 1f)
+                            if (pointers.size >= 2) {
+                                // Early exit if overlay not initialized
+                                if (overlaySize.width == 0 || overlaySize.height == 0) continue
 
-                                // Loop until one of the pointers released
+                                val pos1 = pointers[0].position
+                                val pos2 = pointers[1].position
+                                val centroid = (pos1 + pos2) / 2f
+
+                                var prevDist = hypot((pos1.x - pos2.x).toDouble(), (pos1.y - pos2.y).toDouble()).toFloat()
+                                var prevCentroid = centroid
+
+                                // Track the gesture
                                 while (true) {
                                     val nextEvent = awaitPointerEvent()
                                     val changes = nextEvent.changes
-                                    // Consume pointer changes so parent LazyColumn doesn't pick them up
                                     changes.forEach { it.consume() }
                                     val active = changes.filter { it.pressed }
                                     if (active.size < 2) break
 
-                                    val currentPos1 = active[0].position
-                                    val currentPos2 = if (active.size >= 2) active[1].position else active[0].position
-                                    val currentDist = hypot((currentPos1.x - currentPos2.x).toDouble(), (currentPos1.y - currentPos2.y).toDouble()).toFloat()
-                                    val currentCentroid = (currentPos1 + currentPos2) / 2f
+                                    val newPos1 = active[0].position
+                                    val newPos2 = if (active.size >= 2) active[1].position else newPos1
+                                    val newDist = hypot((newPos1.x - newPos2.x).toDouble(), (newPos1.y - newPos2.y).toDouble()).toFloat()
+                                    val newCentroid = (newPos1 + newPos2) / 2f
 
-                                    // Calculate zoom factor relative to initial state
-                                    val zoomFactor = if (initialDist != 0f) currentDist / initialDist else 1f
-                                    val newScale = (initialScale * zoomFactor).coerceIn(0.5f, 3f)
+                                    val zoom = if (prevDist > 0f) newDist / prevDist else 1f
+                                    val pan = newCentroid - prevCentroid
 
-                                    // Calculate the content point under the initial centroid
-                                    val contentX = (initialCentroid.x - initialOffsetX) / initialScale
-                                    val contentY = (initialCentroid.y - initialOffsetY) / initialScale
+                                    // Calculate new scale
+                                    val currentScale = transientScale
+                                    val currentOffsetX = transientOffsetX
+                                    val currentOffsetY = transientOffsetY
+                                    val newScale = (currentScale * zoom).coerceIn(0.5f, 3f)
 
-                                    // Calculate new offsets to keep that content point under the current centroid
-                                    val newOffsetX = currentCentroid.x - contentX * newScale
-                                    val newOffsetY = currentCentroid.y - contentY * newScale
+                                    // Calculate content point under centroid
+                                    val contentX = (prevCentroid.x - currentOffsetX) / currentScale
+                                    val contentY = (prevCentroid.y - currentOffsetY) / currentScale
+
+                                    // Calculate new offsets
+                                    var newOffsetX = newCentroid.x - contentX * newScale
+                                    var newOffsetY = newCentroid.y - contentY * newScale
+
+                                    // Apply pan
+                                    newOffsetX += pan.x * 0.5f // Dampen pan during zoom
+                                    newOffsetY += pan.y * 0.5f
 
                                     // Apply bounds
                                     val maxOffsetX = 0f
                                     val minOffsetX = overlaySize.width * (1f - newScale)
                                     val maxOffsetY = 0f
                                     val minOffsetY = overlaySize.height * (1f - newScale)
-                                    val boundedOffsetX = newOffsetX.coerceIn(minOffsetX, maxOffsetX)
-                                    val boundedOffsetY = newOffsetY.coerceIn(minOffsetY, maxOffsetY)
 
-                                    // Update scale and offsets in one go
-                                    onScaleAndOffsetChange(newScale, boundedOffsetX, boundedOffsetY)
+                                    newOffsetX = if (minOffsetX <= maxOffsetX) {
+                                        newOffsetX.coerceIn(minOffsetX, maxOffsetX)
+                                    } else {
+                                        newOffsetX.coerceAtMost(maxOffsetX).coerceAtLeast(minOffsetX)
+                                    }
+                                    newOffsetY = if (minOffsetY <= maxOffsetY) {
+                                        newOffsetY.coerceIn(minOffsetY, maxOffsetY)
+                                    } else {
+                                        newOffsetY.coerceAtMost(maxOffsetY).coerceAtLeast(minOffsetY)
+                                    }
+
+                                    // Update transient state
+                                    transientScale = newScale
+                                    transientOffsetX = newOffsetX
+                                    transientOffsetY = newOffsetY
+                                    onScaleAndOffsetChange(newScale, newOffsetX, newOffsetY)
+
+                                    prevDist = newDist
+                                    prevCentroid = newCentroid
                                 }
-                                continue
-                            }
+                            } else if (pointers.size == 1 && transientScale != 1f) {
+                                // Single-finger pan when zoomed
+                                val pointerId = pointers[0].id
+                                var prevPos = pointers[0].position
 
-                                // Single-finger drag: only handle panning if zoomed AND not in drawing/erase mode, otherwise let parent handle scroll or let drawing handle it
-                            if (pressedPointers.size == 1 && scale != 1f && !annotateMode && !eraseMode) {
-                                val pointerId = pressedPointers[0].id
-                                var prevPos = pressedPointers[0].position
-                                var active = true
-                                while (active) {
+                                while (true) {
                                     val nextEvent = awaitPointerEvent()
                                     val change = nextEvent.changes.firstOrNull { it.id == pointerId }
-                                    if (change == null || !change.pressed) {
-                                        active = false
-                                        break
-                                    }
+                                    if (change == null || !change.pressed) break
+
                                     val newPos = change.position
                                     val drag = newPos - prevPos
+
                                     if (drag.x != 0f || drag.y != 0f) {
                                         change.consume()
-                                        onOffsetChange(drag.x, drag.y, overlaySize)
+
+                                        val currentScale = transientScale
+                                        var newOffsetX = transientOffsetX + drag.x
+                                        var newOffsetY = transientOffsetY + drag.y
+
+                                        // Apply bounds
+                                        val maxOffsetX = 0f
+                                        val minOffsetX = overlaySize.width * (1f - currentScale)
+                                        val maxOffsetY = 0f
+                                        val minOffsetY = overlaySize.height * (1f - currentScale)
+
+                                        newOffsetX = if (minOffsetX <= maxOffsetX) {
+                                            newOffsetX.coerceIn(minOffsetX, maxOffsetX)
+                                        } else {
+                                            newOffsetX.coerceAtMost(maxOffsetX).coerceAtLeast(minOffsetX)
+                                        }
+                                        newOffsetY = if (minOffsetY <= maxOffsetY) {
+                                            newOffsetY.coerceIn(minOffsetY, maxOffsetY)
+                                        } else {
+                                            newOffsetY.coerceAtMost(maxOffsetY).coerceAtLeast(minOffsetY)
+                                        }
+
+                                        transientOffsetX = newOffsetX
+                                        transientOffsetY = newOffsetY
+                                        onScaleAndOffsetChange(currentScale, newOffsetX, newOffsetY)
                                     }
                                     prevPos = newPos
                                 }
-                                continue
                             }
-
-                            // No multi-touch and either scale == 1f or no pointers pressed or in drawing mode: do nothing to allow LazyColumn to handle scrolls or drawing to handle it.
                         }
                     }
                 }
@@ -1497,8 +1588,8 @@ private fun PdfPageWithAnnotations(
                                 eraserPosition = offset
                                 val toErase = strokes.filter { stroke ->
                                     stroke.points.any { p ->
-                                        val px = p.first * scale + offsetX
-                                        val py = p.second * scale + offsetY
+                                        val px = p.first * renderScale + renderOffsetX
+                                        val py = p.second * renderScale + renderOffsetY
                                         hypot(
                                             (px - offset.x).toDouble(),
                                             (py - offset.y).toDouble()
@@ -1511,8 +1602,8 @@ private fun PdfPageWithAnnotations(
 
                             if (annotateMode) {
                                 brushPosition = offset
-                                val docX = (offset.x - offsetX) / scale
-                                val docY = (offset.y - offsetY) / scale
+                                val docX = (offset.x - renderOffsetX) / renderScale
+                                val docY = (offset.y - renderOffsetY) / renderScale
                                 val newStroke = AnnotationStroke(
                                     page = pageIndex,
                                     color = selectedColor.value.toLong(),
@@ -1530,8 +1621,8 @@ private fun PdfPageWithAnnotations(
                                 eraserPosition = offset
                                 val toErase = strokes.filter { stroke ->
                                     stroke.points.any { p ->
-                                        val px = p.first * scale + offsetX
-                                        val py = p.second * scale + offsetY
+                                        val px = p.first * renderScale + renderOffsetX
+                                        val py = p.second * renderScale + renderOffsetY
                                         hypot(
                                             (px - offset.x).toDouble(),
                                             (py - offset.y).toDouble()
@@ -1547,8 +1638,8 @@ private fun PdfPageWithAnnotations(
                                 val offset = change.position
                                 brushPosition = offset
                                 currentStroke?.let { stroke ->
-                                    val docX = (offset.x - offsetX) / scale
-                                    val docY = (offset.y - offsetY) / scale
+                                    val docX = (offset.x - renderOffsetX) / renderScale
+                                    val docY = (offset.y - renderOffsetY) / renderScale
                                     val newPoints = stroke.points.toMutableList().apply {
                                         add(Pair(docX, docY))
                                     }
@@ -1577,16 +1668,16 @@ private fun PdfPageWithAnnotations(
             for (stroke in strokes) {
                 val path = Path().apply {
                     stroke.points.forEachIndexed { i, p ->
-                        val x = p.first * scale + offsetX
-                        val y = p.second * scale + offsetY
+                        val x = p.first * renderScale + renderOffsetX
+                        val y = p.second * renderScale + renderOffsetY
                         if (i == 0) moveTo(x, y) else lineTo(x, y)
                     }
                 }
                 // Highlight-Modus: dicker Pinsel (5x breiter), halbtransparent
                 val widthPx = if (stroke.isHighlight) {
-                    maxOf(15f, stroke.strokeWidth * scale * 5f)
+                    maxOf(15f, stroke.strokeWidth * renderScale * 5f)
                 } else {
-                    maxOf(1f, stroke.strokeWidth * scale)
+                    maxOf(1f, stroke.strokeWidth * renderScale)
                 }
                 val strokeBaseColor = Color(stroke.color.toULong())
                 // Annotations/Highlights/Drawing should NOT be affected by page color inversion
@@ -1603,16 +1694,16 @@ private fun PdfPageWithAnnotations(
                 if (stroke.points.isNotEmpty()) {
                     val path = Path().apply {
                         stroke.points.forEachIndexed { i, p ->
-                            val x = p.first * scale + offsetX
-                            val y = p.second * scale + offsetY
+                            val x = p.first * renderScale + renderOffsetX
+                            val y = p.second * renderScale + renderOffsetY
                             if (i == 0) moveTo(x, y) else lineTo(x, y)
                         }
                     }
                     // Highlight-Modus: dicker Pinsel (5x breiter), halbtransparent
                     val widthPx = if (stroke.isHighlight) {
-                        maxOf(15f, stroke.strokeWidth * scale * 5f)
+                        maxOf(15f, stroke.strokeWidth * renderScale * 5f)
                     } else {
-                        maxOf(1f, stroke.strokeWidth * scale)
+                        maxOf(1f, stroke.strokeWidth * renderScale)
                     }
                     val strokeBaseColor = Color(stroke.color.toULong())
                     // Live stroke uses the original color as well
@@ -1647,10 +1738,10 @@ private fun PdfPageWithAnnotations(
             if (annotateMode && !eraseMode && brushPosition != null && isCurrentPage) {
                 val brushRadius = if (highlightMode) {
                     // Highlight: dicker Pinsel
-                    maxOf(7.5f, strokeWidth * scale * 2.5f)
+                    maxOf(7.5f, strokeWidth * renderScale * 2.5f)
                 } else {
                     // Normal: normaler Pinsel
-                    maxOf(2f, strokeWidth * scale / 2f)
+                    maxOf(2f, strokeWidth * renderScale / 2f)
                 }
 
                 // Äußerer Ring in der ausgewählten Farbe (Original-Farbe, nicht invertiert)
