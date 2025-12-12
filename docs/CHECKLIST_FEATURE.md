@@ -1,3 +1,5 @@
+[Home](../README.md) | [Documentation Navigation](docnavigation.md)
+
 # PDF Checklist Feature
 
 This document explains the concept and implementation for interactive checklists based on Markdown files in the ChecklistInteractive app.

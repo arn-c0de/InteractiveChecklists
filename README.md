@@ -27,3 +27,10 @@ The app is a single-activity application, with `MainActivity.kt` serving as the 
 ## How to build
 
 This is a standard Android project. You can build it using Android Studio or by running `./gradlew assembleDebug` from the command line.
+
+## Important Links
+
+* [Documentation Navigation](docs/docnavigation.md)
+* [Security Policy](SECURITY.md)
+* [License](LICENSE)
+
