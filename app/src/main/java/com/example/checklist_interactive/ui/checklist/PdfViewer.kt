@@ -374,11 +374,17 @@ fun PdfViewer(
         }
     }
 
-    // Annotationen laden
+    // Annotationen laden (async auf Background-Thread)
     LaunchedEffect(pdfPath) {
-        strokes.clear()
-        strokes.addAll(AnnotationsRepository.load(context, pdfPath))
-        pageHighlights = highlightManager.getHighlightsForFile(pdfPath).map { it.pageNumber }
+        withContext(Dispatchers.IO) {
+            val loadedStrokes = AnnotationsRepository.load(context, pdfPath)
+            val loadedHighlights = highlightManager.getHighlightsForFile(pdfPath).map { it.pageNumber }
+            withContext(Dispatchers.Main) {
+                strokes.clear()
+                strokes.addAll(loadedStrokes)
+                pageHighlights = loadedHighlights
+            }
+        }
 
         // Note: The main PDF loading coroutine populates `chapters` after pages are loaded.
     }

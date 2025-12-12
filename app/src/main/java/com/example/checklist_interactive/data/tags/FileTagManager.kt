@@ -28,22 +28,29 @@ class FileTagManager(private val context: Context) {
     
     private val tagsFile: File
         get() = File(context.filesDir, "file_tags.json")
+    
+    // Cache für geladene Tags - wird bei App-Session beibehalten
+    @Volatile
+    private var tagsCache: List<FileTag>? = null
+    // Map caches for fast lookups (normalized path -> tags) and name -> tags
+    @Volatile
+    private var tagsCacheMap: Map<String, Set<String>>? = null
+    @Volatile
+    private var tagsByNameMap: Map<String, Set<String>>? = null
+    private val cacheLock = Any()
+
+    @Volatile
+    private var initialized = false
 
     init {
-        // On first run, if the internal tags file does not exist, try to copy a default one from assets.
+        // Ensure tags file exists; but avoid expensive sync on the UI thread.
         try {
             if (!tagsFile.exists()) {
                 context.assets.open("file_tags.json").use { input ->
                     tagsFile.outputStream().use { output -> input.copyTo(output) }
                 }
             }
-            // Always try to merge/latest asset-provided tags into internal tags on startup.
-            // This ensures bundled tag entries are present and user tags are preserved (we union sets).
-            try {
-                syncAssetTagsAndHeuristics()
-            } catch (_: Exception) { /* ignore sync errors */ }
         } catch (e: Exception) {
-            // If there is no asset or another error occurs, ensure the file exists with an empty array
             try {
                 if (!tagsFile.exists()) {
                     tagsFile.writeText("[]")
@@ -116,6 +123,26 @@ class FileTagManager(private val context: Context) {
         saveFileTags(internal.values.toList())
     }
 
+    /**
+     * Initialize the manager asynchronously if not already done.
+     * This will perform the asset merge and build caches on IO thread.
+     */
+    suspend fun initializeIfNeeded() {
+        if (initialized) return
+        synchronized(this) {
+            if (initialized) return
+            // perform initialization work on caller thread (expected to be IO dispatcher)
+            try {
+                syncAssetTagsAndHeuristics()
+            } catch (_: Exception) {
+                // ignore
+            }
+            // pre-load tags into memory
+            loadFileTags()
+            initialized = true
+        }
+    }
+
     // Simple heuristics to derive tags from filename
     private fun heuristicTagsFromName(fileName: String): Set<String> {
         val name = fileName.lowercase()
@@ -135,20 +162,50 @@ class FileTagManager(private val context: Context) {
     
     /**
      * Loads all file tags from storage
+     * Uses in-memory cache for session - only loads from disk once
      */
     fun loadFileTags(): List<FileTag> {
-        return try {
-            if (!tagsFile.exists()) {
-                return emptyList()
+        // Fast path: return cached data if available
+        tagsCache?.let { return it }
+        
+        // Slow path: load from disk and cache
+        synchronized(cacheLock) {
+            // Double-check after acquiring lock
+            tagsCache?.let { return it }
+            
+            val loaded = try {
+                if (!tagsFile.exists()) {
+                    emptyList()
+                } else {
+                    val jsonString = tagsFile.readText()
+                    if (jsonString.isBlank()) {
+                        emptyList()
+                    } else {
+                        json.decodeFromString<List<FileTag>>(jsonString)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                emptyList()
             }
-            val jsonString = tagsFile.readText()
-            if (jsonString.isBlank()) {
-                return emptyList()
-            }
-            json.decodeFromString<List<FileTag>>(jsonString)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            emptyList()
+            
+            tagsCache = loaded
+            // Also build fast lookup maps
+            tagsCacheMap = loaded.associate { normalizePath(it.filePath) to it.tags }
+            tagsByNameMap = loaded.groupBy { normalizePath(it.filePath).substringAfterLast('/') }
+                .mapValues { it.value.flatMap { ft -> ft.tags }.toSet() }
+            return loaded
+        }
+    }
+    
+    /**
+     * Invalidates the cache - call this after modifying tags
+     */
+    private fun invalidateCache() {
+        synchronized(cacheLock) {
+            tagsCache = null
+            tagsCacheMap = null
+            tagsByNameMap = null
         }
     }
     
@@ -159,6 +216,13 @@ class FileTagManager(private val context: Context) {
         try {
             val jsonString = json.encodeToString(tags)
             tagsFile.writeText(jsonString)
+            // Update cache with new data
+            synchronized(cacheLock) {
+                tagsCache = tags
+                tagsCacheMap = tags.associate { normalizePath(it.filePath) to it.tags }
+                tagsByNameMap = tags.groupBy { normalizePath(it.filePath).substringAfterLast('/') }
+                    .mapValues { it.value.flatMap { ft -> ft.tags }.toSet() }
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -169,20 +233,20 @@ class FileTagManager(private val context: Context) {
      */
     fun getTagsForFile(filePath: String): Set<String> {
         val normalized = normalizePath(filePath)
-        val all = loadFileTags()
-        // Exact match first
-        val exact = all.find { normalizePath(it.filePath) == normalized }
-        if (exact != null) return exact.tags
-
-        // Fallback: match by filename or suffix (case-insensitive)
+        // Fast path: try the maps
+        loadFileTags() // ensure maps are loaded
+        tagsCacheMap?.get(normalized)?.let { return it }
         val fileName = normalized.substringAfterLast('/')
-        val matches = all.filter { stored ->
-            val s = normalizePath(stored.filePath).lowercase()
-            s.endsWith("/${normalized}".lowercase()) || s.endsWith(fileName.lowercase()) || s == normalized.lowercase() || s == fileName.lowercase()
-        }
-        if (matches.isEmpty()) return emptySet()
-        // Return union of tags from all matches as fallback
-        return matches.flatMap { it.tags }.toSet()
+        val byName = tagsByNameMap?.get(fileName)
+        if (!byName.isNullOrEmpty()) return byName
+
+        // Fallback: try suffix match but using cached map keys for faster scan
+        val lowerNormalized = normalized.lowercase()
+        val suffixMatches = tagsCacheMap?.entries?.asSequence()
+            ?.filter { (k, _) -> k.lowercase().endsWith("/${lowerNormalized}") || k.lowercase().endsWith(lowerNormalized) }
+            ?.flatMap { it.value.asSequence() }
+            ?.toSet() ?: emptySet()
+        return suffixMatches
     }
     
     /**
@@ -233,16 +297,16 @@ class FileTagManager(private val context: Context) {
      * Gets all unique tags used across all files
      */
     fun getAllUsedTags(): Set<String> {
-        return loadFileTags().flatMap { it.tags }.toSet()
+        loadFileTags()
+        return tagsCacheMap?.values?.flatMap { it.asSequence() }?.toSet() ?: emptySet()
     }
     
     /**
      * Gets all files that have a specific tag
      */
     fun getFilesWithTag(tag: String): List<String> {
-        return loadFileTags()
-            .filter { it.tags.contains(tag) }
-            .map { normalizePath(it.filePath) }
+        loadFileTags()
+        return tagsCacheMap?.entries?.filter { it.value.contains(tag) }?.map { it.key } ?: emptyList()
     }
     
     /**
@@ -250,9 +314,8 @@ class FileTagManager(private val context: Context) {
      */
     fun getFilesWithAnyTag(tags: Set<String>): List<String> {
         if (tags.isEmpty()) return emptyList()
-        return loadFileTags()
-            .filter { fileTag -> fileTag.tags.any { it in tags } }
-            .map { normalizePath(it.filePath) }
+        loadFileTags()
+        return tagsCacheMap?.entries?.filter { entry -> entry.value.any { it in tags } }?.map { it.key } ?: emptyList()
     }
     
     /**
@@ -260,9 +323,8 @@ class FileTagManager(private val context: Context) {
      */
     fun getFilesWithAllTags(tags: Set<String>): List<String> {
         if (tags.isEmpty()) return emptyList()
-        return loadFileTags()
-            .filter { fileTag -> tags.all { it in fileTag.tags } }
-            .map { normalizePath(it.filePath) }
+        loadFileTags()
+        return tagsCacheMap?.entries?.filter { entry -> tags.all { it in entry.value } }?.map { it.key } ?: emptyList()
     }
     
     /**
