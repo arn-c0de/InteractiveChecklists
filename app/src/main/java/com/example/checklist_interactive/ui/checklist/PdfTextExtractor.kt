@@ -8,6 +8,8 @@ import com.tom_roush.pdfbox.text.PDFTextStripper
 import com.tom_roush.pdfbox.text.TextPosition
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.io.Writer
 
@@ -28,9 +30,52 @@ data class PdfTextBlock(
  */
 class PdfTextExtractor(private val context: Context) {
 
+    private var cachedDocument: PDDocument? = null
+    private var cachedFilePath: String? = null
+    private val documentMutex = Mutex()
+
     init {
         // PDFBox für Android initialisieren
         PDFBoxResourceLoader.init(context)
+    }
+
+    /**
+     * Lädt das PDF-Dokument, verwendet Cache wenn möglich
+     */
+    private suspend fun getDocument(pdfFile: File): PDDocument = documentMutex.withLock {
+        val currentPath = pdfFile.absolutePath
+
+        // Wenn ein anderes Dokument gecacht ist, schließe es zuerst
+        if (cachedFilePath != currentPath && cachedDocument != null) {
+            try {
+                cachedDocument?.close()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            cachedDocument = null
+            cachedFilePath = null
+        }
+
+        // Lade neues Dokument wenn nötig
+        if (cachedDocument == null) {
+            cachedDocument = PDDocument.load(pdfFile)
+            cachedFilePath = currentPath
+        }
+
+        cachedDocument!!
+    }
+
+    /**
+     * Gibt das gecachte Dokument frei
+     */
+    fun cleanup() {
+        try {
+            cachedDocument?.close()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        cachedDocument = null
+        cachedFilePath = null
     }
 
     /**
@@ -40,55 +85,60 @@ class PdfTextExtractor(private val context: Context) {
         val textBlocks = mutableListOf<PdfTextBlock>()
 
         try {
-            PDDocument.load(pdfFile).use { document ->
-                val stripper = object : PDFTextStripper() {
-                    init {
-                        startPage = pageIndex + 1
-                        endPage = pageIndex + 1
-                    }
+            val document = getDocument(pdfFile)
 
-                    override fun writeString(text: String, textPositions: MutableList<TextPosition>) {
-                        if (text.trim().isEmpty()) return
-
-                        // Gruppiere zusammenhängende Textpositionen
-                        var currentText = ""
-                        var minX = Float.MAX_VALUE
-                        var minY = Float.MAX_VALUE
-                        var maxX = Float.MIN_VALUE
-                        var maxY = Float.MIN_VALUE
-                        var fontSize = 0f
-
-                        for (position in textPositions) {
-                            currentText += position.unicode
-                            val x = position.x
-                            val y = position.y
-                            val width = position.width
-                            val height = position.height
-
-                            minX = minOf(minX, x)
-                            minY = minOf(minY, y)
-                            maxX = maxOf(maxX, x + width)
-                            maxY = maxOf(maxY, y + height)
-                            fontSize = maxOf(fontSize, position.fontSize)
-                        }
-
-                        if (currentText.isNotBlank()) {
-                            textBlocks.add(
-                                PdfTextBlock(
-                                    text = currentText,
-                                    x = minX,
-                                    y = minY,
-                                    width = maxX - minX,
-                                    height = maxY - minY,
-                                    fontSize = fontSize
-                                )
-                            )
-                        }
-                    }
+            val stripper = object : PDFTextStripper() {
+                init {
+                    startPage = pageIndex + 1
+                    endPage = pageIndex + 1
                 }
 
-                stripper.getText(document)
+                override fun writeString(text: String, textPositions: MutableList<TextPosition>) {
+                    if (text.trim().isEmpty()) return
+
+                    // Gruppiere zusammenhängende Textpositionen
+                    var currentText = ""
+                    var minX = Float.MAX_VALUE
+                    var minY = Float.MAX_VALUE
+                    var maxX = Float.MIN_VALUE
+                    var maxY = Float.MIN_VALUE
+                    var fontSize = 0f
+
+                    for (position in textPositions) {
+                        currentText += position.unicode
+                        val x = position.x
+                        val y = position.y
+                        val width = position.width
+                        val height = position.height
+
+                        minX = minOf(minX, x)
+                        minY = minOf(minY, y)
+                        maxX = maxOf(maxX, x + width)
+                        maxY = maxOf(maxY, y + height)
+                        fontSize = maxOf(fontSize, position.fontSize)
+                    }
+
+                    if (currentText.isNotBlank()) {
+                        textBlocks.add(
+                            PdfTextBlock(
+                                text = currentText,
+                                x = minX,
+                                y = minY,
+                                width = maxX - minX,
+                                height = maxY - minY,
+                                fontSize = fontSize
+                            )
+                        )
+                    }
+                }
             }
+
+            stripper.getText(document)
+        } catch (e: OutOfMemoryError) {
+            e.printStackTrace()
+            // Bei OOM-Fehler, versuche Cache zu leeren
+            cleanup()
+            System.gc()
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -101,13 +151,18 @@ class PdfTextExtractor(private val context: Context) {
      */
     suspend fun extractPageText(pdfFile: File, pageIndex: Int): String = withContext(Dispatchers.IO) {
         try {
-            PDDocument.load(pdfFile).use { document ->
-                val stripper = PDFTextStripper().apply {
-                    startPage = pageIndex + 1
-                    endPage = pageIndex + 1
-                }
-                stripper.getText(document)
+            val document = getDocument(pdfFile)
+            val stripper = PDFTextStripper().apply {
+                startPage = pageIndex + 1
+                endPage = pageIndex + 1
             }
+            stripper.getText(document)
+        } catch (e: OutOfMemoryError) {
+            e.printStackTrace()
+            // Bei OOM-Fehler, versuche Cache zu leeren
+            cleanup()
+            System.gc()
+            ""
         } catch (e: Exception) {
             e.printStackTrace()
             ""
