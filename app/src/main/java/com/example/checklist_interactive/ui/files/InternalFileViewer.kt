@@ -68,27 +68,41 @@ fun InternalFileViewer(
             }
 
             val isAsset = fileInfo.isAsset || fileInfo.path.startsWith("asset://")
-            val pdfPath = if (isAsset) {
-                val assetPath = fileInfo.path.removePrefix("asset://")
-                // Copy asset to cache once
-                val safeName = assetPath.replace('/', '_')
-                val tmp = File(context.cacheDir, "asset_$safeName")
-                if (!tmp.exists()) {
-                    try {
-                        context.assets.open(assetPath).use { input ->
-                            tmp.outputStream().use { output -> input.copyTo(output) }
+            val assetPath = if (isAsset) fileInfo.path.removePrefix("asset://") else fileInfo.path
+
+            val pdfPath by androidx.compose.runtime.produceState<String?>(initialValue = null, key1 = fileInfo.path) {
+                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    val start = System.currentTimeMillis()
+                    val result = if (isAsset) {
+                        val safeName = assetPath.replace('/', '_')
+                        val tmp = File(context.cacheDir, "asset_$safeName")
+                        try {
+                            if (!tmp.exists()) {
+                                context.assets.open(assetPath).use { input ->
+                                    tmp.outputStream().use { output -> input.copyTo(output) }
+                                }
+                            }
+                            tmp.absolutePath
+                        } catch (e: Exception) {
+                            // fallback to path (might fail)
+                            null
                         }
-                    } catch (e: Exception) {
-                        // fallback: try without copying (will fail later)
+                    } else {
+                        fileInfo.path
                     }
+                    val elapsed = System.currentTimeMillis() - start
+                    android.util.Log.i("InternalFileViewer", "pdf asset load for ${fileInfo.path} took ${elapsed}ms")
+                    result
                 }
-                tmp.absolutePath
-            } else {
-                fileInfo.path
             }
 
+            val currentPdfPath = pdfPath
+            if (currentPdfPath == null) {
+                // Loading indicator while asset copy happens
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            } else {
             PdfViewer(
-                pdfPath = pdfPath,
+                pdfPath = currentPdfPath,
                 title = fileInfo.displayName,
                 onBack = {
                     prefsManager.setInt("pdf_last_page_${fileInfo.path}", currentPage)
@@ -102,6 +116,7 @@ fun InternalFileViewer(
                 onPageChange = { page -> currentPage = page },
                 onOpenLinkedDocument = onOpenLinkedDocument
             )
+            }
         }
             "md", "markdown" -> {
             val prefsManager = remember { PreferencesManager(context) }
@@ -109,15 +124,18 @@ fun InternalFileViewer(
             val quickNoteManager = remember { QuickNoteManager(context) }
             val isAsset = fileInfo.isAsset || fileInfo.path.startsWith("asset://")
             val assetPath = if (isAsset) fileInfo.path.removePrefix("asset://") else fileInfo.path
-            val markdownContent = remember(fileInfo.path) {
-                try {
-                    if (isAsset) {
-                        context.assets.open(assetPath).bufferedReader().use { it.readText() }
-                    } else {
-                        File(fileInfo.path).readText()
+            val markdownContent by androidx.compose.runtime.produceState(initialValue = "", key1 = fileInfo.path) {
+                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    val start = System.currentTimeMillis()
+                    try {
+                        if (isAsset) context.assets.open(assetPath).bufferedReader().use { it.readText() }
+                        else java.io.File(fileInfo.path).readText()
+                    } catch (e: Exception) {
+                        ""
+                    } finally {
+                        val elapsed = System.currentTimeMillis() - start
+                        android.util.Log.i("InternalFileViewer", "markdown load for ${fileInfo.path} took ${elapsed}ms")
                     }
-                } catch (e: Exception) {
-                    "" // Return empty on error
                 }
             }
             val parsedChecklist = remember(markdownContent) {
