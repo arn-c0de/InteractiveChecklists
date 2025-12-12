@@ -1,5 +1,7 @@
 [Home](../README.md) | [Documentation Navigation](docnavigation.md)
 
+Updated-VERSION=1.0.3
+
 # File Tagging System - Implementation Summary
 
 ## Overview

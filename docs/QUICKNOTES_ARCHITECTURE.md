@@ -1,5 +1,7 @@
 # QuickNotes Architecture - Developer Guide
 
+1.0.3
+
 ## Table of Contents
 1. [Overview](#overview)
 2. [Architecture](#architecture)
