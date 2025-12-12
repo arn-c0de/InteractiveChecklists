@@ -16,6 +16,11 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
@@ -83,6 +88,8 @@ import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material.icons.filled.CenterFocusWeak
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import android.content.ClipboardManager
 import android.content.ClipData
 import android.content.Context
@@ -151,6 +158,7 @@ fun PdfViewer(
     var showTocDialog by remember { mutableStateOf(false) }
     var chapters by remember { mutableStateOf<List<Pair<String, Int>>>(emptyList()) }
     var showQuickAccess by remember { mutableStateOf(false) }
+    var showToolbar by remember { mutableStateOf(true) }
 
     // Text-Extraktion
     val textExtractor = remember { PdfTextExtractor(context) }
@@ -548,8 +556,13 @@ fun PdfViewer(
                 )
             } else {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    // Kompakte Toolbar mit Scroll
-                    Column(
+                    // Kompakte Toolbar mit Scroll - ein-/ausklappbar
+                    AnimatedVisibility(
+                        visible = showToolbar,
+                        enter = expandVertically() + slideInVertically(),
+                        exit = shrinkVertically() + slideOutVertically()
+                    ) {
+                        Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f))
@@ -824,6 +837,31 @@ fun PdfViewer(
                                        else "Ansicht",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    }
+
+                    // Toolbar Toggle Button - schwebt über dem Inhalt
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(24.dp)
+                    ) {
+                        IconButton(
+                            onClick = { showToolbar = !showToolbar },
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .size(32.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                                    shape = CircleShape
+                                )
+                        ) {
+                            Icon(
+                                imageVector = if (showToolbar) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                contentDescription = if (showToolbar) "Werkzeugleiste ausblenden" else "Werkzeugleiste einblenden",
+                                tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
