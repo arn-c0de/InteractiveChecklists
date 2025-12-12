@@ -367,6 +367,7 @@ fun QuickAccessSheet(
                                         val parts = value.split("|")
                                         val file = URLDecoder.decode(parts.getOrNull(0) ?: "", "UTF-8")
                                         val page = parts.getOrNull(1)?.toIntOrNull()
+                                        android.util.Log.d("QuickAccessSheet", "Opening linked document: file=$file, page=$page, value=$value")
                                         if (onOpenDocument != null) {
                                             onOpenDocument.invoke(file, page)
                                             onDismiss()

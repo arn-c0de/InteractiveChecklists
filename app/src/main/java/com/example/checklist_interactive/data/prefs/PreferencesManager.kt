@@ -2,6 +2,10 @@ package com.example.checklist_interactive.data.prefs
 
 import android.content.Context
 import android.content.SharedPreferences
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
+import com.example.checklist_interactive.data.prefs.SourceEntry
+import com.example.checklist_interactive.data.prefs.ContributorEntry
 
 /**
  * Manager für App-Einstellungen und Präferenzen
@@ -22,6 +26,8 @@ class PreferencesManager(context: Context) {
         private const val KEY_ACTIVE_TAG_FILTERS = "active_tag_filters"
         private const val KEY_TAG_FILTER_MODE = "tag_filter_mode" // "any" or "all"
         private const val KEY_LAST_IMPORTED_VERSION = "last_imported_version"
+        private const val KEY_DOCUMENT_SOURCES_JSON = "document_sources_json"
+        private const val KEY_CONTRIBUTORS_JSON = "contributors_json"
     }
     
     /**
@@ -231,5 +237,57 @@ class PreferencesManager(context: Context) {
      */
     fun setLastImportedVersion(version: String) {
         prefs.edit().putString(KEY_LAST_IMPORTED_VERSION, version).apply()
+    }
+
+    /**
+     * Document sources persistence: JSON list of SourceEntry
+     */
+    fun setDocumentSources(sources: List<SourceEntry>) {
+        val json = Json { prettyPrint = true }.encodeToString(ListSerializer(SourceEntry.serializer()), sources)
+        prefs.edit().putString(KEY_DOCUMENT_SOURCES_JSON, json).apply()
+    }
+
+    fun getDocumentSources(): List<SourceEntry> {
+        val raw = prefs.getString(KEY_DOCUMENT_SOURCES_JSON, null)
+        return if (raw.isNullOrBlank()) {
+            // Default source list: Open Flight School
+            listOf(SourceEntry("Open Flight School (OFS)", "https://www.openflightschool.de", "CC BY-NC-SA 3.0 DE"))
+        } else {
+            try {
+                Json.decodeFromString(ListSerializer(SourceEntry.serializer()), raw)
+            } catch (e: Exception) {
+                // If parsing fails, reset to defaults
+                listOf(SourceEntry("Open Flight School (OFS)", "https://www.openflightschool.de", "CC BY-NC-SA 3.0 DE"))
+            }
+        }
+    }
+
+    fun resetDocumentSourcesToDefaults() {
+        setDocumentSources(listOf(SourceEntry("Open Flight School (OFS)", "https://www.openflightschool.de", "CC BY-NC-SA 3.0 DE")))
+    }
+
+    /**
+     * Contributor persistence: JSON list of ContributorEntry
+     */
+    fun setContributors(contributors: List<ContributorEntry>) {
+        val json = Json { prettyPrint = true }.encodeToString(ListSerializer(ContributorEntry.serializer()), contributors)
+        prefs.edit().putString(KEY_CONTRIBUTORS_JSON, json).apply()
+    }
+
+    fun getContributors(): List<ContributorEntry> {
+        val raw = prefs.getString(KEY_CONTRIBUTORS_JSON, null)
+        return if (raw.isNullOrBlank()) {
+            emptyList()
+        } else {
+            try {
+                Json.decodeFromString(ListSerializer(ContributorEntry.serializer()), raw)
+            } catch (e: Exception) {
+                emptyList()
+            }
+        }
+    }
+
+    fun resetContributorsToDefaults() {
+        setContributors(emptyList())
     }
 }

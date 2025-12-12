@@ -8,6 +8,21 @@ import java.io.FileOutputStream
 import java.io.InputStream
 
 /**
+ * Datei-Informationen
+ */
+data class FileInfo(
+    val name: String,
+    val displayName: String,
+    val path: String,
+    val category: String,
+    val size: Long,
+    val lastModified: Long,
+    val extension: String,
+    val isAsset: Boolean = false,
+    val tags: Set<String> = emptySet()
+)
+
+/**
  * Verwaltet das interne Dateisystem der App.
  * Erstellt Ordnerstruktur und importiert externe Dateien.
  */
@@ -629,6 +644,19 @@ class InternalFileManager(private val context: Context) {
      */
     fun importAllBundledAssets(rootAssetPath: String = ""): Int {
         var imported = 0
+
+        // Cleanup potential stale/duplicated internal files that may have been restored
+        // by OS backup or left from previous imports. We remove internal files whose
+        // base names conflict with bundled asset names to avoid duplicates after rename.
+        try {
+            val assetNames = collectAllAssetBaseNames(rootAssetPath)
+            val removed = cleanupConflictingInternalFiles(assetNames)
+            if (removed > 0) {
+                // proceed silently; UI refresh will show updated list
+            }
+        } catch (e: Exception) {
+            // ignore cleanup errors
+        }
         
         // Define allowed top-level asset folders to import
         val allowedAssetFolders = setOf("checklists", "handbooks", "radiocommunication", "charts")
@@ -686,6 +714,59 @@ class InternalFileManager(private val context: Context) {
             // ignore, return count
         }
         return imported
+    }
+
+    // Collect base filenames (without extension) of all supported asset files under rootAssetPath
+    private fun collectAllAssetBaseNames(rootAssetPath: String = ""): List<String> {
+        val names = mutableListOf<String>()
+        try {
+            fun walker(path: String) {
+                val list = try { context.assets.list(path) ?: emptyArray() } catch (e: Exception) { emptyArray() }
+                if (list.isEmpty()) return
+                for (child in list) {
+                    val childPath = if (path.isEmpty()) child else "$path/$child"
+                    val sub = try { context.assets.list(childPath) ?: emptyArray() } catch (e: Exception) { emptyArray() }
+                    if (sub.isNotEmpty()) {
+                        walker(childPath)
+                    } else {
+                        val lower = child.lowercase()
+                        if (lower.endsWith(".pdf") || lower.endsWith(".md") || lower.endsWith(".markdown")) {
+                            names.add(child.substringBeforeLast('.'))
+                        }
+                    }
+                }
+            }
+            walker(rootAssetPath)
+        } catch (e: Exception) {
+            // ignore
+        }
+        return names
+    }
+
+    // Remove internal files whose base name conflicts with any asset base name.
+    // Heuristic: consider a conflict when either name contains the other (case-insensitive).
+    private fun cleanupConflictingInternalFiles(assetBaseNames: List<String>): Int {
+        if (assetBaseNames.isEmpty()) return 0
+        var removed = 0
+        rootDir.walkTopDown().forEach { file ->
+            try {
+                if (!file.isFile) return@forEach
+                val ext = file.extension.lowercase()
+                if (ext != "pdf" && ext != "md" && ext != "markdown") return@forEach
+                val internalBase = file.nameWithoutExtension
+                val conflict = assetBaseNames.any { assetBase ->
+                    assetBase.equals(internalBase, ignoreCase = true) ||
+                    assetBase.contains(internalBase, ignoreCase = true) ||
+                    internalBase.contains(assetBase, ignoreCase = true)
+                }
+                if (conflict) {
+                    if (file.delete()) removed++
+                }
+            } catch (e: Exception) {
+                // ignore per-file errors
+            }
+        }
+        return removed
     }
 
     /**
@@ -782,18 +863,3 @@ class InternalFileManager(private val context: Context) {
         return imported
     }
 }
-
-/**
- * Datei-Informationen
- */
-data class FileInfo(
-    val name: String,
-    val displayName: String,
-    val path: String,
-    val category: String,
-    val size: Long,
-    val lastModified: Long,
-    val extension: String,
-    val isAsset: Boolean = false,
-    val tags: Set<String> = emptySet()
-)

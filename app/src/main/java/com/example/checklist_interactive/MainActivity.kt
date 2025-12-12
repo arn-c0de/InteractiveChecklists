@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity() {
             }
             // State hoisted for back button handling
             var openFile by remember { mutableStateOf<FileInfo?>(null) }
-            var openPage by remember { mutableStateOf(0) }
+            var openPage by remember { mutableStateOf(-1) }
             var showFileList by remember { mutableStateOf(false) }
             var showSettings by remember { mutableStateOf(false) }
             val backHandlerEnabled = openFile != null || showSettings
@@ -287,7 +287,7 @@ class MainActivity : ComponentActivity() {
                                 initialPage = openPage,
                                 onBack = {
                                     openFile = null
-                                    openPage = 0
+                                    openPage = -1
                                     scope.launch {
                                         repository.saveLastOpenedFile("")
                                     }
@@ -311,10 +311,16 @@ class MainActivity : ComponentActivity() {
                                     }
                                     if (targetFile != null) {
                                         openFile = targetFile
-                                        openPage = pageNumber ?: 0
+                                        openPage = pageNumber ?: -1
                                         showFileList = false
                                         scope.launch {
                                             repository.saveLastOpenedFile(targetFile.path)
+                                        }
+                                    } else {
+                                        // Debug: Datei nicht gefunden
+                                        android.util.Log.e("MainActivity", "Linked document not found: $filePath")
+                                        allFiles.forEach { file ->
+                                            android.util.Log.d("MainActivity", "Available file: ${file.path}")
                                         }
                                     }
                                 }
