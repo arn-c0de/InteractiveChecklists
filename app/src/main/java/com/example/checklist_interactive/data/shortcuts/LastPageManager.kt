@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.net.URLDecoder
 
 /**
  * Repräsentiert die zuletzt geöffnete Seite einer Datei
@@ -63,11 +64,12 @@ class LastPageManager(private val context: Context) {
     fun saveLastPage(filePath: String, pageNumber: Int) {
         val lastPages = loadLastPages().toMutableList()
 
+        val norm = normalizePath(filePath)
         // Entferne vorhandenen Eintrag für diese Datei
-        lastPages.removeAll { it.filePath == filePath }
+        lastPages.removeAll { it.filePath == norm }
 
         // Füge neuen Eintrag hinzu
-        lastPages.add(LastPageRecord(filePath, pageNumber))
+        lastPages.add(LastPageRecord(norm, pageNumber))
 
         saveLastPages(lastPages)
     }
@@ -77,8 +79,9 @@ class LastPageManager(private val context: Context) {
      * Gibt 0 zurück, wenn keine Seite gespeichert ist
      */
     fun getLastPage(filePath: String): Int {
+        val norm = normalizePath(filePath)
         return loadLastPages()
-            .find { it.filePath == filePath }
+            .find { it.filePath == norm }
             ?.pageNumber ?: 0
     }
 
@@ -87,8 +90,18 @@ class LastPageManager(private val context: Context) {
      */
     fun clearLastPage(filePath: String) {
         val lastPages = loadLastPages().toMutableList()
-        lastPages.removeAll { it.filePath == filePath }
+        val norm = normalizePath(filePath)
+        lastPages.removeAll { it.filePath == norm }
         saveLastPages(lastPages)
+    }
+
+    private fun normalizePath(path: String): String {
+        var p = path
+        try {
+            p = URLDecoder.decode(p, "UTF-8")
+        } catch (_: Exception) {}
+        if (p.startsWith("asset://")) p = p.removePrefix("asset://")
+        return p.trim()
     }
 
     /**

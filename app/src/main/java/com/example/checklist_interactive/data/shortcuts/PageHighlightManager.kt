@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.net.URLDecoder
 
 /**
  * Repräsentiert ein Seiten-Highlight (gesamte Seite ist markiert)
@@ -63,8 +64,9 @@ class PageHighlightManager(private val context: Context) {
      */
     fun togglePageHighlight(filePath: String, pageNumber: Int, color: Long = 0xFFFFFF00): Boolean {
         val highlights = loadHighlights().toMutableList()
-        val existing = highlights.find { 
-            it.filePath == filePath && it.pageNumber == pageNumber 
+        val norm = normalizePath(filePath)
+        val existing = highlights.find {
+            it.filePath == norm && it.pageNumber == pageNumber
         }
         
         return if (existing != null) {
@@ -74,7 +76,7 @@ class PageHighlightManager(private val context: Context) {
             false
         } else {
             // Hinzufügen
-            highlights.add(PageHighlight(filePath, pageNumber, color))
+            highlights.add(PageHighlight(norm, pageNumber, color))
             saveHighlights(highlights)
             true
         }
@@ -84,8 +86,9 @@ class PageHighlightManager(private val context: Context) {
      * Prüft ob eine Seite highlighted ist
      */
     fun isPageHighlighted(filePath: String, pageNumber: Int): Boolean {
-        return loadHighlights().any { 
-            it.filePath == filePath && it.pageNumber == pageNumber 
+        val norm = normalizePath(filePath)
+        return loadHighlights().any {
+            it.filePath == norm && it.pageNumber == pageNumber
         }
     }
     
@@ -93,7 +96,8 @@ class PageHighlightManager(private val context: Context) {
      * Gibt alle Highlights für eine Datei zurück
      */
     fun getHighlightsForFile(filePath: String): List<PageHighlight> {
-        return loadHighlights().filter { it.filePath == filePath }
+        val norm = normalizePath(filePath)
+        return loadHighlights().filter { it.filePath == norm }
     }
     
     /**
@@ -101,7 +105,17 @@ class PageHighlightManager(private val context: Context) {
      */
     fun clearHighlightsForFile(filePath: String) {
         val highlights = loadHighlights().toMutableList()
-        highlights.removeAll { it.filePath == filePath }
+        val norm = normalizePath(filePath)
+        highlights.removeAll { it.filePath == norm }
         saveHighlights(highlights)
+    }
+
+    private fun normalizePath(path: String): String {
+        var p = path
+        try {
+            p = URLDecoder.decode(p, "UTF-8")
+        } catch (_: Exception) {}
+        if (p.startsWith("asset://")) p = p.removePrefix("asset://")
+        return p.trim()
     }
 }
