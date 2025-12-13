@@ -2,7 +2,7 @@
 
 All relevant changes are summarized here by version.
 
-## [1.1.0] - 2025-12-13
+## [1.0.6] - 2025-12-13
 ### Added
 - **Multi-Tab System**: Open multiple MD/PDF files simultaneously
 - **Tab Bar**: Scrollable tab bar with file icons, close buttons, and active tab highlighting
@@ -26,7 +26,7 @@ All relevant changes are summarized here by version.
 
 ## [1.0.5] - 2025-12-13
 - **PDF Outline Extractor | searching function**
-
+**Commit:** `c0459fd` — 2025-12-13 — arn-c0de — checklists pdf updates
 
 ## [1.0.4] - 2025-12-12
 ### Added
@@ -83,6 +83,7 @@ All relevant changes are summarized here by version.
 - Implemented conditional UI rendering based on note count
 - Cleaned up imports and removed deprecated code paths
 - Added proper spacing and alignment using Material Design guidelines
+**Commit:** `093206d` — 2025-12-12 — arn-c0de — paint pdf fix
 
 ## [1.0.3] - 2025-12-12
 ### Added
@@ -94,6 +95,7 @@ All relevant changes are summarized here by version.
 
 ### Changed
 - Various improvements and bugfixes
+**Commit:** `e84f9cb` — 2025-12-12 — arn-c0de — docs changelog
 
 ## [1.0.2] - 2025-12-11
 ### Added
@@ -111,6 +113,7 @@ All relevant changes are summarized here by version.
 - PDF view fixes
 - Multi MD persistence fix
 - MD checkbox fix
+**Commit:** `e1a8eae` — 2025-12-11 — arn-c0de — color inverse pdf function filter
 
 ## [1.0.1] - 2025-12-11
 ### Added
@@ -124,6 +127,7 @@ All relevant changes are summarized here by version.
 - PDF flickering fixes
 - PDF chapter
 - MD fixes
+**Commit:** `939b262` — 2025-12-11 — arn-c0de — softwareversion visibility
 
 ## [1.0.0] - 2025-12-11
 ### Initial version
