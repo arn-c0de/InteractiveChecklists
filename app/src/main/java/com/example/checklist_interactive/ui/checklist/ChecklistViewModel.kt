@@ -39,20 +39,24 @@ class ChecklistViewModel(
     }
 
     fun onCheckboxChange(itemId: String, isChecked: Boolean) {
+        android.util.Log.d("ChecklistViewModel", "onCheckboxChange called: itemId=$itemId, isChecked=$isChecked")
         viewModelScope.launch {
             // Update local state immediately for UI responsiveness
-            val updatedSections = _checklistState.value.sections.map { section ->
-                val updatedItems = section.items.map { item ->
-                    if (item.id == itemId) {
-                        item.copy(isChecked = isChecked)
-                    } else {
-                        item
+            _checklistState.update { currentState ->
+                val updatedSections = currentState.sections.map { section ->
+                    val updatedItems = section.items.map { item ->
+                        if (item.id == itemId) {
+                            item.copy(isChecked = isChecked)
+                        } else {
+                            item
+                        }
                     }
+                    section.copy(items = updatedItems)
                 }
-                section.copy(items = updatedItems)
+                currentState.copy(sections = updatedSections)
             }
-            _checklistState.value = _checklistState.value.copy(sections = updatedSections)
-            
+            android.util.Log.d("ChecklistViewModel", "State updated, new value: ${_checklistState.value}")
+
             // Save the state to the repository
             repository.saveChecklistItemState(initialChecklist.id, itemId, isChecked)
         }
@@ -81,9 +85,13 @@ class ChecklistViewModel(
         checklist.sections.forEach { section ->
             sb.append("## ").append(section.title).append("\n\n")
             section.items.forEach { item ->
-                val checkbox = if (item.isChecked) "[x]" else "[ ]"
                 val indent = "    ".repeat(item.indent)
-                sb.append(indent).append("- ").append(checkbox).append(" ").append(item.text).append("\n")
+                if (item.isTask) {
+                    val checkbox = if (item.isChecked) "[x]" else "[ ]"
+                    sb.append(indent).append("- ").append(checkbox).append(" ").append(item.text).append("\n")
+                } else {
+                    sb.append(indent).append("- ").append(item.text).append("\n")
+                }
             }
             sb.append("\n")
         }

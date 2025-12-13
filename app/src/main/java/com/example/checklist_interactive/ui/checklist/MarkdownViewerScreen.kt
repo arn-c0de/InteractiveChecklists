@@ -65,12 +65,27 @@ fun MarkdownViewerScreen(
             "" // Return empty on error
         }
     }
-    val parsedChecklist = remember(markdownContent) { MarkdownChecklistParser().parse(assetPath, markdownContent) }
-    val viewModel: ChecklistViewModel? = if (checklist != null) {
+    val parsedChecklist = remember(markdownContent) {
+        val parsed = MarkdownChecklistParser().parse(assetPath, markdownContent)
+        android.util.Log.d("MarkdownViewerScreen", "Parsed checklist: sections=${parsed.sections.size}, items=${parsed.sections.sumOf { it.items.size }}")
+        parsed
+    }
+    val hasCheckboxes = remember(parsedChecklist) {
+        val result = parsedChecklist.sections.any { it.items.isNotEmpty() }
+        android.util.Log.d("MarkdownViewerScreen", "hasCheckboxes=$result")
+        result
+    }
+    val viewModel: ChecklistViewModel? = if (hasCheckboxes) {
+        android.util.Log.d("MarkdownViewerScreen", "Creating ViewModel for $assetPath")
         viewModel(key = assetPath, factory = ChecklistViewModelFactory(checklistRepository, parsedChecklist))
-    } else null
+    } else {
+        android.util.Log.d("MarkdownViewerScreen", "No ViewModel created (no checkboxes)")
+        null
+    }
     val checklistState: Checklist? = viewModel?.let { vm ->
-        vm.checklistState.collectAsState().value
+        val state = vm.checklistState.collectAsState().value
+        android.util.Log.d("MarkdownViewerScreen", "checklistState from ViewModel: ${state.sections.size} sections")
+        state
     } ?: checklist
 
     // State für Expand/Collapse All
@@ -158,14 +173,18 @@ fun MarkdownViewerScreen(
     ) { paddingValues ->
         // Use previously prepared context/prefs/viewmodel
         val checkedStateForViewer = checklistState
-        val handler: ((itemId: String, checked: Boolean) -> Unit)? = viewModel?.let { it::onCheckboxChange } ?: onCheckboxChange
+        val handler: ((itemId: String, checked: Boolean) -> Unit)? = viewModel?.let { vm ->
+            { itemId: String, checked: Boolean -> vm.onCheckboxChange(itemId, checked) }
+        } ?: onCheckboxChange
 
         MarkdownViewer(
             assetPath = assetPath,
             checklist = checkedStateForViewer,
             onCheckboxChange = handler,
             modifier = Modifier.padding(paddingValues),
-            prefsManager = prefsManager
+            prefsManager = prefsManager,
+            forceExpandAll = expandAllSections,
+            markdownContentOverride = markdownContent
         )
     }
 

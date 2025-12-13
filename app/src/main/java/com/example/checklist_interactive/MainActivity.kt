@@ -44,7 +44,7 @@ import androidx.activity.compose.BackHandler
 
 class MainActivity : ComponentActivity() {
         companion object {
-            const val SOFTWARE_VERSION = "1.0.4"
+            const val SOFTWARE_VERSION = "1.0.5"
         }
 
         val softwareVersion = SOFTWARE_VERSION
