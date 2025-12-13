@@ -59,7 +59,7 @@ fun TabBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            // Scrollable tabs
+            // Scrollable tabs (include New Tab button inside so it sits beside last tab)
             Row(
                 modifier = Modifier
                     .weight(1f)
@@ -84,19 +84,19 @@ fun TabBar(
                         )
                     }
                 }
-            }
-            
-            // New Tab button
-            IconButton(
-                onClick = onNewTab,
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Neuer Tab",
-                    modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
+
+                // New Tab button inside scrollable row so it appears right after the last tab
+                IconButton(
+                    onClick = onNewTab,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Neuer Tab",
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
         }
     }

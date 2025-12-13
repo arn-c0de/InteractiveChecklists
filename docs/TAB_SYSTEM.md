@@ -1,56 +1,56 @@
 [Home](../README.md) | [Documentation Navigation](docnavigation.md)
 
-# Tab-System für Multi-Document Navigation
+# Tab System for Multi-Document Navigation
 
-## Überblick
+## Overview
 
-Das Tab-System ermöglicht das gleichzeitige Öffnen mehrerer Markdown- und PDF-Dateien mit komfortabler Navigation zwischen ihnen. Die Implementierung folgt modernen Android-Best-Practices mit Clean Architecture.
+The tab system enables opening multiple Markdown and PDF documents simultaneously with efficient navigation between them. The implementation follows modern Android best practices and a Clean Architecture approach.
 
 ## Features
 
-### ✅ Implementierte Features
+### ✅ Implemented Features
 
-1. **Multi-Tab-Unterstützung**
-   - Bis zu 10 gleichzeitig geöffnete Dokumente
-   - Automatische Verwaltung bei Tab-Limit (älteste Tabs werden geschlossen)
-   - Persistierung über App-Neustarts
+1. **Multi-tab Support**
+   - Up to 10 concurrently open documents
+   - Automatic management when the tab limit is reached (oldest tabs are closed)
+   - Persistence across app restarts
 
-2. **Horizontale Wisch-Gesten**
-   - Links/rechts wischen zum Wechseln zwischen Tabs
-   - Flüssige Animationen mit `HorizontalPager`
-   - Visuelle Rückmeldung während des Wischens
+2. **Horizontal Swipe Gestures**
+   - Swipe left/right to switch between tabs
+   - Smooth animations using `HorizontalPager`
+   - Visual feedback during swipe
 
-3. **Tab-Bar UI**
-   - Scrollbare Tab-Leiste am oberen Bildschirmrand
-   - Datei-Icons (PDF/MD) zur schnellen Erkennung
-   - Schließen-Button auf jedem Tab
-   - Long-Press zum Schließen
-   - Aktiver Tab hervorgehoben
+3. **Tab Bar UI**
+   - Scrollable tab bar at the top of the screen
+   - File icons (PDF/MD) for quick recognition
+   - Close button on each tab
+   - Long-press to close
+   - Active tab is highlighted
 
-4. **Navigationshistorie**
-   - Bis zu 20 zuletzt besuchte Dokumente
-   - Schnellzugriff über QuickTabSwitcher
-   - "Zuletzt verwendet"-Sektion
+4. **Navigation History**
+   - Up to 20 recently viewed documents
+   - Quick access via QuickTabSwitcher
+   - "Recently used" section
 
-5. **Persistierung**
-   - Automatisches Speichern geöffneter Tabs
-   - Wiederherstellung nach App-Neustart
-   - Speicherung der Seitenpositionen pro Tab
+5. **Persistence**
+   - Automatically save open tabs
+   - Restore tabs after app restart
+   - Save per-tab page positions
 
-## Architektur
+## Architecture
 
 ### Komponenten
 
 #### 1. TabManager (Data Layer)
-**Pfad:** `app/src/main/java/com/example/checklist_interactive/data/tabs/TabManager.kt`
+**Path:** `app/src/main/java/com/example/checklist_interactive/data/tabs/TabManager.kt`
 
-**Verantwortlichkeiten:**
+**Responsibilities:**
 - State-Management für Tabs (StateFlow)
-- Persistierung via SharedPreferences
+- Persistence via SharedPreferences
 - Navigation-History-Verwaltung
 - Tab-Lifecycle (open, close, switch)
 
-**Wichtige Methoden:**
+**Important Methods:**
 ```kotlin
 fun openTab(fileInfo: FileInfo, pageNumber: Int = -1)
 fun closeTab(index: Int)
@@ -68,13 +68,13 @@ val navigationHistory: StateFlow<List<String>>
 ```
 
 #### 2. TabBar (UI Layer)
-**Pfad:** `app/src/main/java/com/example/checklist_interactive/ui/tabs/TabBar.kt`
+**Path:** `app/src/main/java/com/example/checklist_interactive/ui/tabs/TabBar.kt`
 
-**Komponenten:**
-- `TabBar` - Horizontale Tab-Leiste
-- `TabItem` - Einzelner Tab
-- `TabbedDocumentViewer` - Kombination aus TabBar + HorizontalPager
-- `CompactTabIndicator` - Kompakte Tab-Anzeige
+**Components:**
+- `TabBar` - Horizontal tab bar
+- `TabItem` - Single tab
+- `TabbedDocumentViewer` - Combination of TabBar + HorizontalPager
+- `CompactTabIndicator` - Compact tab indicator
 
 **Features:**
 - Material Design 3 Styling
@@ -83,16 +83,16 @@ val navigationHistory: StateFlow<List<String>>
 - Accessibility-Support
 
 #### 3. QuickTabSwitcher (UI Layer)
-**Pfad:** `app/src/main/java/com/example/checklist_interactive/ui/tabs/QuickTabSwitcher.kt`
+**Path:** `app/src/main/java/com/example/checklist_interactive/ui/tabs/QuickTabSwitcher.kt`
 
-**Komponenten:**
-- `QuickTabSwitcherSheet` - Bottom Sheet für Tab-Übersicht
-- `QuickTabSwitchFAB` - FAB zum Öffnen des Switchers
+**Components:**
+- `QuickTabSwitcherSheet` - Bottom Sheet for the tab overview
+- `QuickTabSwitchFAB` - FAB to open the switcher
 
 **Features:**
-- "Zuletzt verwendet"-Sektion
+- "Recently used" section
 - Liste aller offenen Tabs
-- Aktiver Tab hervorgehoben
+- Active tab highlighted
 
 ## Integration in MainActivity
 
@@ -105,11 +105,11 @@ val openTabs by tabManager.openTabs.collectAsState()
 val activeTabIndex by tabManager.activeTabIndex.collectAsState()
 ```
 
-### Tab-Wiederherstellung
+### Tab restoration
 
 ```kotlin
 LaunchedEffect(Unit) {
-    // Nach Datei-Import: Tabs wiederherstellen
+    // After file import: restore tabs
     val allFiles = fileManager.getAllFilesGrouped().values.flatten()
     tabManager.restoreTabsFromPaths { path ->
         allFiles.find { it.path == path }
@@ -118,10 +118,10 @@ LaunchedEffect(Unit) {
 }
 ```
 
-### Dokument öffnen
+### Opening a Document
 
 ```kotlin
-// Datei öffnen (neuer Tab oder existierenden Tab aktivieren)
+// Open a file (create new tab or activate existing tab)
 tabManager.openTab(fileInfo, pageNumber)
 showFileList = false
 ```
@@ -140,32 +140,32 @@ tabManager.closeAllTabs()
 
 ### Für Endnutzer
 
-1. **Tab öffnen:**
+1. **Open a Tab:**
    - Datei aus Liste auswählen
-   - Datei wird in neuem Tab geöffnet
+   - The file opens in a new tab
    - Existierende Tabs bleiben erhalten
 
 2. **Zwischen Tabs wechseln:**
-   - **Wischen:** Links/rechts über Dokument wischen
+   - **Swipe:** Swipe left/right across the document
    - **Tab-Bar:** Auf Tab in oberer Leiste tippen
    - **Quick Switcher:** FAB drücken → Tab auswählen
 
 3. **Tab schließen:**
    - X-Button auf Tab klicken
    - Long-Press auf Tab
-   - Zurück-Button (schließt aktiven Tab)
+   - Back button (closes the active tab)
 
 4. **Schnellwechsel:**
-   - Quick-Tab-Switcher öffnen
-   - "Zuletzt verwendet" zeigt häufig genutzte Dokumente
+   - Open Quick Tab Switcher
+   - "Recently used" shows frequently used documents
    - Ein Tap zum Wechseln
 
 ### Für Entwickler
 
-#### Neue Tab-Features hinzufügen
+#### Add New Tab Features
 
 ```kotlin
-// Beispiel: Tab-Gruppen
+// Example: tab groups
 class TabManager {
     fun createTabGroup(tabs: List<TabInfo>, name: String) {
         // Implementation
@@ -176,14 +176,14 @@ class TabManager {
 #### Custom Tab-Actions
 
 ```kotlin
-// Beispiel: Tab duplizieren
+// Example: duplicate tab
 fun duplicateTab(index: Int) {
     val tab = openTabs.value.getOrNull(index) ?: return
     openTab(tab.fileInfo, tab.pageNumber)
 }
 ```
 
-## Persistierung
+## Persistence
 
 ### SharedPreferences-Keys
 
@@ -192,7 +192,7 @@ fun duplicateTab(index: Int) {
 - `active_tab` - Index des aktiven Tabs
 - `tab_history` - Pipe-separated Navigationshistorie
 
-### Format-Beispiel
+### Format example
 
 ```
 tab_paths: "asset://checklists/A320.md|/storage/manual.pdf"
@@ -207,59 +207,59 @@ tab_history: "/storage/manual.pdf|asset://checklists/A320.md"
 
 1. **Lazy Loading:**
    - HorizontalPager rendert nur sichtbare + benachbarte Seiten
-   - Dokumente werden on-demand geladen
+   - Documents are loaded on-demand
 
 2. **State-Management:**
    - StateFlow für reaktive Updates
    - remember() für UI-State
 
 3. **Memory Management:**
-   - Tab-Limit (10) verhindert Memory-Issues
-   - Alte Tabs werden automatisch geschlossen
+   - Tab limit (10) prevents memory issues
+   - Old tabs are automatically closed
 
 ### UX
 
-1. **Konsistenz:**
-   - Material Design 3 Guidelines
-   - Einheitliche Gesten über gesamte App
+1. **Consistency:**
+   - Material Design 3 guidelines
+   - Consistent gestures across the app
 
 2. **Feedback:**
-   - Visuelle Bestätigung bei Tab-Wechsel
-   - Animationen für besseres Verständnis
+   - Visual confirmation when switching tabs
+   - Animations to improve clarity
 
 3. **Accessibility:**
-   - Content Descriptions für Icons
-   - Touch-Targets mind. 48dp
+   - Content descriptions for icons
+   - Touch targets at least 48dp
 
-## Erweiterungsmöglichkeiten
+## Extensibility
 
 ### Geplante Features
 
-1. **Tab-Gruppen:**
-   - Verwandte Dokumente gruppieren
+1. **Tab groups:**
+   - Group related documents
    - Farb-Coding
 
-2. **Tab-Pinning:**
+2. **Tab pinning:**
    - Wichtige Tabs fixieren
-   - Vor automatischem Schließen schützen
+   - Prevent from being closed automatically
 
 3. **Tab-Suche:**
-   - Durchsuchen aller offenen Tabs
+   - Search across all open tabs
    - Filter nach Typ (MD/PDF)
 
 4. **Keyboard-Shortcuts:**
    - Ctrl+Tab für Tab-Wechsel
    - Ctrl+W zum Schließen
 
-### Code-Beispiele für Erweiterungen
+### Code examples for extensions
 
-#### Tab-Pinning
+#### Tab pinning
 
 ```kotlin
 data class TabInfo(
     val fileInfo: FileInfo,
     val pageNumber: Int = -1,
-    val isPinned: Boolean = false  // Neu
+    val isPinned: Boolean = false  // New
 )
 
 fun closeTab(index: Int) {
@@ -269,7 +269,7 @@ fun closeTab(index: Int) {
 }
 ```
 
-#### Tab-Gruppen
+#### Tab groups
 
 ```kotlin
 data class TabGroup(
@@ -284,23 +284,23 @@ val tabGroups: StateFlow<List<TabGroup>> = _tabGroups.asStateFlow()
 
 ## Troubleshooting
 
-### Problem: Tabs werden nicht wiederhergestellt
+### Problem: Tabs are not restored
 
-**Lösung:**
-- Prüfen ob `restoreTabsFromPaths()` nach FileManager-Initialisierung aufgerufen wird
-- Logs prüfen: `TabManager` gibt Debug-Informationen aus
+**Solution:**
+- Ensure `restoreTabsFromPaths()` is called after FileManager initialization
+- Check logs: `TabManager` emits debug information
 
-### Problem: Swipe-Gesten funktionieren nicht
+### Problem: Swipe gestures are not working
 
-**Lösung:**
-- Sicherstellen dass `TabbedDocumentViewer` verwendet wird
-- Keine konfligierenden Gesture-Detector im Content
+**Solution:**
+- Ensure `TabbedDocumentViewer` is used
+- Verify there are no conflicting gesture detectors in the content
 
-### Problem: Tab-Bar wird nicht angezeigt
+### Problem: Tab bar is not displayed
 
-**Lösung:**
-- `TabBar` in Column() mit `TabbedDocumentViewer` kombinieren
-- Prüfen ob `tabs.isEmpty()` - Bar wird nicht bei 0 Tabs angezeigt
+**Solution:**
+- Combine `TabBar` with `TabbedDocumentViewer` in a Column()
+- Check if `tabs.isEmpty()` — the bar is hidden when zero tabs
 
 ## Testing
 
@@ -335,7 +335,7 @@ fun testNavigationHistory() {
 ```kotlin
 @Test
 fun testTabSwitchBySwipe() {
-    // Öffne 2 Tabs
+    // Open 2 tabs
     onView(withId(R.id.file_list))
         .perform(click())
     
@@ -349,15 +349,15 @@ fun testTabSwitchBySwipe() {
 }
 ```
 
-## Ressourcen
+## Resources
 
-### Relevante Dateien
+### Relevant Files
 
 - `MainActivity.kt` - Integration
 - `TabManager.kt` - Datenlogik
 - `TabBar.kt` - Tab-UI
 - `QuickTabSwitcher.kt` - Quick-Access
-- `InternalFileViewer.kt` - Dokument-Viewer
+- `InternalFileViewer.kt` - Document viewer
 
 ### Dependencies
 
@@ -367,7 +367,7 @@ implementation("androidx.compose.foundation:foundation:1.5.4")
 implementation("androidx.compose.material3:material3:1.1.2")
 ```
 
-### Weitere Dokumentation
+### Additional Documentation
 
 - [CHECKLIST_FEATURE.md](CHECKLIST_FEATURE.md) - Checklist-System
 - [TAG_SYSTEM.md](TAG_SYSTEM.md) - Tag-System
@@ -376,8 +376,8 @@ implementation("androidx.compose.material3:material3:1.1.2")
 ## Changelog
 
 ### Version 1.1.0 (2025-12-13)
-- ✅ Initiale Tab-System-Implementierung
-- ✅ TabManager mit Persistierung
+- ✅ Initial tab system implementation
+- ✅ TabManager with persistence
 - ✅ TabBar UI-Komponente
 - ✅ HorizontalPager für Swipe-Gesten
 - ✅ QuickTabSwitcher für schnellen Zugriff
@@ -386,4 +386,4 @@ implementation("androidx.compose.material3:material3:1.1.2")
 
 ## Lizenz
 
-Gleiche Lizenz wie Hauptprojekt.
+Same license as the main project.
