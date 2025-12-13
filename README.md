@@ -1,4 +1,9 @@
-
+> **⚠️ EARLY DEVELOPMENT NOTICE**  
+> This project is in a **very early stage of development** and is currently **NOT ready for production use**.  
+> It is intended for **development and testing purposes only**.  
+> Features may be incomplete, unstable, or subject to significant changes.  
+> Use at your own risk.
+#  InteractiveChecklists
 <!-- Badges -->
 <p align="left">
 	<img src="https://img.shields.io/badge/version-1.0.6-blue.svg" alt="Version" />
@@ -6,13 +11,6 @@
 	<img src="https://img.shields.io/badge/built_with-Jetpack%20Compose-orange.svg" alt="Jetpack Compose" />
 	<img src="https://img.shields.io/badge/license-CC--BY--NC--SA%204.0-lightgrey.svg" alt="License: CC BY-NC-SA 4.0" />
 </p>
-
-> **⚠️ EARLY DEVELOPMENT NOTICE**  
-> This project is in a **very early stage of development** and is currently **NOT ready for production use**.  
-> It is intended for **development and testing purposes only**.  
-> Features may be incomplete, unstable, or subject to significant changes.  
-> Use at your own risk.
-#  InteractiveChecklists
 
 
 <div align="center">
