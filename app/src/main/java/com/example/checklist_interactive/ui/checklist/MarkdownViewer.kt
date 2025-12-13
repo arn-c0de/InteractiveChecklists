@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,7 +45,16 @@ fun MarkdownViewer(
     resetTrigger: Int = 0
 ) {
     val context = LocalContext.current
+    val noteManager = remember { QuickNoteManager(context) }
+    val callsign by noteManager.callsign.collectAsState()
     var markdownContent by remember { mutableStateOf(markdownContentOverride ?: "") }
+    // Derived display content with callsign substitution (do not mutate the raw markdown)
+    val displayMarkdownContent by remember(markdownContent, callsign) {
+        mutableStateOf(
+            if (callsign.isBlank()) markdownContent
+            else markdownContent.replace(Regex("\\[Callsign\\]", RegexOption.IGNORE_CASE), callsign)
+        )
+    }
     var isLoading by remember { mutableStateOf(markdownContentOverride == null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -132,7 +142,7 @@ fun MarkdownViewer(
                     // Interaktive Ansicht mit Checkboxen
                     android.util.Log.d("MarkdownViewer", "Using InteractiveMarkdownView, resetTrigger=$resetTrigger, expandAll=$expandAllState")
                     InteractiveMarkdownView(
-                        markdownContent = markdownContent,
+                        markdownContent = displayMarkdownContent,
                         checklist = checklist,
                         onCheckboxChange = onCheckboxChange,
                         bodyFontSize = fontSizeState,
@@ -143,7 +153,7 @@ fun MarkdownViewer(
                     // Einfache Markdown-Ansicht ohne Interaktion (oder keine Checkboxen gefunden)
                     android.util.Log.d("MarkdownViewer", "Using SimpleMarkdownView, resetTrigger=$resetTrigger, expandAll=$expandAllState")
                     SimpleMarkdownView(
-                        markdownContent = markdownContent,
+                        markdownContent = displayMarkdownContent,
                         bodyFontSize = fontSizeState,
                         expandAll = expandAllState,
                         onCheckboxChange = onCheckboxChange,

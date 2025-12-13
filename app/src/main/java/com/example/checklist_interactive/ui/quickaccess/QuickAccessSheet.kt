@@ -16,6 +16,9 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,10 +34,19 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.ClickableText
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.graphics.Color
 import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
 import java.net.URLDecoder
 import java.net.URLEncoder
+
+// Replace [Callsign] placeholders (case-insensitive) with provided callsign value when rendering.
+private fun expandCallsignPlaceholder(content: String, callsign: String): String {
+    if (callsign.isBlank()) return content
+    val regex = Regex("\\[Callsign\\]", RegexOption.IGNORE_CASE)
+    return content.replace(regex, callsign)
+}
 
 /**
  * Builds annotated string with clickable internal links
@@ -106,6 +118,17 @@ fun QuickAccessSheet(
 
     // Local UI state
     var currentNote by remember { mutableStateOf("") }
+    // Radio toolbar state
+    val callsignFlow by noteManager.callsign.collectAsState()
+    val com1Flow by noteManager.com1.collectAsState()
+    val com1ModeFlow by noteManager.com1Mode.collectAsState()
+    val com2Flow by noteManager.com2.collectAsState()
+    val com2ModeFlow by noteManager.com2Mode.collectAsState()
+    var callsign by remember { mutableStateOf("") }
+    var com1 by remember { mutableStateOf("") }
+    var com1Mode by remember { mutableStateOf("FM") }
+    var com2 by remember { mutableStateOf("") }
+    var com2Mode by remember { mutableStateOf("FM") }
     var hasChanges by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var renameText by remember { mutableStateOf("") }
@@ -114,6 +137,9 @@ fun QuickAccessSheet(
     var newTextInput by remember { mutableStateOf("") }
     var searchQuery by remember { mutableStateOf("") }
     var showSearchBar by remember { mutableStateOf(false) }
+    // Flight info expanded state
+    val flightExpandedFlow by noteManager.flightInfoExpanded.collectAsState()
+    var flightExpanded by remember { mutableStateOf(flightExpandedFlow) }
 
     // Sync currentNote with savedNote from manager
     LaunchedEffect(savedNote) {
@@ -121,6 +147,40 @@ fun QuickAccessSheet(
             currentNote = savedNote
         }
     }
+
+    // Initialize toolbar state from flows
+    LaunchedEffect(callsignFlow, com1Flow, com1ModeFlow, com2Flow, com2ModeFlow) {
+        callsign = callsignFlow
+        com1 = com1Flow
+        com1Mode = com1ModeFlow
+        com2 = com2Flow
+        com2Mode = com2ModeFlow
+    }
+
+    // Auto-save callsign when it changes (debounced via LaunchedEffect cancellations)
+    LaunchedEffect(callsign) {
+        if (callsign != callsignFlow) {
+            kotlinx.coroutines.delay(600L)
+            noteManager.saveCallsign(callsign)
+        }
+    }
+
+    // Auto-save COM1 and mode when either changes
+    LaunchedEffect(com1, com1Mode) {
+        if (com1 != com1Flow || com1Mode != com1ModeFlow) {
+            kotlinx.coroutines.delay(600L)
+            noteManager.saveCom1(com1, com1Mode)
+        }
+    }
+
+    // Auto-save COM2 and mode when either changes
+    LaunchedEffect(com2, com2Mode) {
+        if (com2 != com2Flow || com2Mode != com2ModeFlow) {
+            kotlinx.coroutines.delay(600L)
+            noteManager.saveCom2(com2, com2Mode)
+        }
+    }
+    LaunchedEffect(flightExpandedFlow) { flightExpanded = flightExpandedFlow }
 
     // Auto-save after 2 seconds of inactivity
     LaunchedEffect(currentNote, hasChanges) {
@@ -234,6 +294,109 @@ fun QuickAccessSheet(
                     },
                     singleLine = true
                 )
+            }
+
+            // Flight Info header + Radio / Callsign toolbar (small)
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = "Flight Info", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                IconButton(onClick = {
+                    flightExpanded = !flightExpanded
+                    noteManager.saveFlightInfoExpanded(flightExpanded)
+                }) {
+                    Icon(
+                        imageVector = if (flightExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = if (flightExpanded) "Einklappen" else "Ausklappen"
+                    )
+                }
+            }
+
+            // Compact view when collapsed
+            AnimatedVisibility(visible = !flightExpanded) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "${callsign.ifBlank { "-" }}  | COM1: ${com1.ifBlank { "-" }} ${com1Mode}  | COM2: ${com2.ifBlank { "-" }} ${com2Mode}", style = MaterialTheme.typography.bodyMedium)
+                    Row {
+                        IconButton(onClick = { flightExpanded = true; noteManager.saveFlightInfoExpanded(true) }) {
+                            Icon(Icons.Default.ExpandMore, contentDescription = "Expand")
+                        }
+                    }
+                }
+            }
+
+            AnimatedVisibility(visible = flightExpanded) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    // Top row: CALLSIGN
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = callsign,
+                            onValueChange = { callsign = it },
+                            label = { Text("CALLSIGN") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth().weight(1f)
+                        )
+                    }
+
+                    // Second row: COM1 and COM2 side-by-side with their modes and the action buttons
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // COM1 column
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            OutlinedTextField(
+                                value = com1,
+                                onValueChange = { com1 = it },
+                                label = { Text("COM1") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Decimal),
+                                modifier = Modifier.width(140.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            FilterChip(selected = com1Mode == "FM", onClick = { com1Mode = "FM" }, label = { Text("FM") })
+                            Spacer(modifier = Modifier.width(4.dp))
+                            FilterChip(selected = com1Mode == "AM", onClick = { com1Mode = "AM" }, label = { Text("AM") })
+                        }
+
+                        // COM2 column
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            OutlinedTextField(
+                                value = com2,
+                                onValueChange = { com2 = it },
+                                label = { Text("COM2") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Decimal),
+                                modifier = Modifier.width(140.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            FilterChip(selected = com2Mode == "FM", onClick = { com2Mode = "FM" }, label = { Text("FM") })
+                            Spacer(modifier = Modifier.width(4.dp))
+                            FilterChip(selected = com2Mode == "AM", onClick = { com2Mode = "AM" }, label = { Text("AM") })
+                        }
+
+                        // no manual save/load buttons (auto-save/auto-load enabled)
+                    }
+                }
             }
 
             // Note tabs (horizontal scrollable)
@@ -422,8 +585,9 @@ fun QuickAccessSheet(
                 } else {
                     // Normal mode with clickable links
                     Column(modifier = Modifier.fillMaxWidth()) {
-                        if (currentNote.isNotEmpty()) {
-                            val annotatedString = buildAnnotatedStringWithLinks(currentNote)
+                            if (currentNote.isNotEmpty()) {
+                            val displayNote = expandCallsignPlaceholder(currentNote, callsign)
+                            val annotatedString = buildAnnotatedStringWithLinks(displayNote)
                             @Suppress("DEPRECATION")
                             ClickableText(
                                 text = annotatedString,
