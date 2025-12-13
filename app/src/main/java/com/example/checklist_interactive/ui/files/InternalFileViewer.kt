@@ -154,6 +154,7 @@ fun InternalFileViewer(
             // State für Expand/Collapse All
             var expandAllSections by remember { mutableStateOf(prefsManager.areMarkdownSectionsExpandedByDefault()) }
             var showQuickAccess by remember { mutableStateOf(false) }
+            var resetTrigger by remember { mutableStateOf(0) }
 
             Scaffold(
                 topBar = {
@@ -165,7 +166,10 @@ fun InternalFileViewer(
                             }
                         },
                         actions = {
-                            IconButton(onClick = { viewModel.resetChecklist() }) {
+                            IconButton(onClick = {
+                                viewModel.resetChecklist()
+                                resetTrigger += 1
+                            }) {
                                 Icon(Icons.Default.Refresh, contentDescription = "Reset Checklist")
                             }
                             // Expand/Collapse All Button
@@ -217,7 +221,10 @@ fun InternalFileViewer(
                     onCheckboxChange = viewModel::onCheckboxChange,
                     modifier = Modifier.padding(padding),
                     isInternalFile = !isAsset,
-                    prefsManager = prefsManager
+                    prefsManager = prefsManager,
+                    forceExpandAll = expandAllSections,
+                    markdownContentOverride = markdownContent,
+                    resetTrigger = resetTrigger
                 )
             }
 
