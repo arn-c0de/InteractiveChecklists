@@ -14,10 +14,10 @@
 	<a href="LICENSE">License</a>
 </div>
 
-# Checklist Interactive
+#  InteractiveChecklists
 
 
-Checklist Interactive is an Android application designed for viewing and interacting with markdown and PDF checklists. It's built with Jetpack Compose and follows an MVVM architecture.
+InteractiveChecklists is an Android application designed for viewing and interacting with markdown and PDF checklists. It's built with Jetpack Compose and follows an MVVM architecture.
 
 ## Features
 
