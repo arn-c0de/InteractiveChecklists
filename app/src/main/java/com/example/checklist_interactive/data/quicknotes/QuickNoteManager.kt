@@ -423,11 +423,34 @@ class QuickNoteManager(private val context: Context) {
     fun removeNote(id: String) {
         scope.launch {
             try {
-                repository.deleteNoteById(id)
                 if (_activeNoteId.value == id) {
+                    // Get current notes list before deletion
                     val notes = repository.getAllNotes().first()
-                    _activeNoteId.value = notes.firstOrNull()?.id
+                    val currentIndex = notes.indexOfFirst { it.id == id }
+
+                    // Delete the note
+                    repository.deleteNoteById(id)
+
+                    // Select next note in order
+                    val updatedNotes = repository.getAllNotes().first()
+                    val nextNote = when {
+                        updatedNotes.isEmpty() -> null
+                        currentIndex < updatedNotes.size -> updatedNotes[currentIndex] // Next in line
+                        else -> updatedNotes.lastOrNull() // Was last, select previous
+                    }
+
+                    _activeNoteId.value = nextNote?.id
                     saveActiveNoteId(_activeNoteId.value)
+
+                    // Update content for new active note
+                    if (nextNote != null) {
+                        _noteContent.value = nextNote.content
+                    } else {
+                        _noteContent.value = ""
+                    }
+                } else {
+                    // Not active note, just delete
+                    repository.deleteNoteById(id)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error removing note", e)
