@@ -84,13 +84,21 @@ private fun expandCallsignPlaceholder(content: String, callsign: String): String
 
 // Format a com input as 3-digit whole + '.' + up to 3-digit fractional while typing
 private fun formatComInputToDot(input: String): String {
+    // Nur Ziffern extrahieren
     val digitsOnly = input.filter { it.isDigit() }
-    val maxDigits = 6 // 3 whole + 3 fraction
-    val trimmed = if (digitsOnly.length > maxDigits) digitsOnly.substring(0, maxDigits) else digitsOnly
+
+    // Maximal 6 Ziffern (3 Vorkommastellen + 3 Nachkommastellen)
+    val maxDigits = 6
+    val trimmed = digitsOnly.take(maxDigits)
+
     return when {
-        trimmed.length < 3 -> trimmed
-        trimmed.length == 3 -> trimmed + "."
-        else -> trimmed.substring(0, 3) + "." + trimmed.substring(3)
+        trimmed.isEmpty() -> ""
+        trimmed.length <= 3 -> trimmed
+        else -> {
+            val whole = trimmed.take(3)
+            val fraction = trimmed.drop(3).take(3)
+            "$whole.$fraction"
+        }
     }
 }
 
@@ -628,87 +636,6 @@ fun QuickAccessSheet(
                 }
             }
 
-            // Note tabs (horizontal scrollable)
-            LazyRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Filter notes based on search query
-                val filteredNotes = if (searchQuery.isBlank()) {
-                    notes
-                } else {
-                    notes.filter { note ->
-                        note.title.contains(searchQuery, ignoreCase = true) ||
-                        note.content.contains(searchQuery, ignoreCase = true)
-                    }
-                }
-
-                items(filteredNotes) { note ->
-                    FilterChip(
-                        selected = note.id == activeNoteId,
-                        onClick = { noteManager.setActiveNote(note.id) },
-                        label = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(
-                                    text = if (note.title.isNotBlank()) note.title else "Unbenannt",
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                if (note.id == activeNoteId) {
-                                    Icon(
-                                        Icons.Default.Edit,
-                                        contentDescription = null,
-                                        modifier = Modifier
-                                            .size(16.dp)
-                                            .clickable {
-                                                renameTargetId = note.id
-                                                renameText = note.title
-                                                showRenameDialog = true
-                                            }
-                                    )
-                                }
-                            }
-                        },
-                        trailingIcon = if (note.id == activeNoteId && notes.size > 1) {
-                            {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = "Löschen",
-                                    modifier = Modifier
-                                        .size(18.dp)
-                                        .clickable { noteManager.removeNote(note.id) },
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        } else null
-                    )
-                }
-
-                // Add note button
-                item {
-                    FilterChip(
-                        selected = false,
-                        onClick = {
-                            val id = noteManager.addNote(title = "Neue Notiz")
-                            noteManager.setActiveNote(id)
-                        },
-                        label = { Text("Neu") },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.Add,
-                                contentDescription = "Neue Notiz",
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    )
-                }
-            }
-
             // Rename dialog
             if (showRenameDialog) {
                 AlertDialog(
@@ -822,7 +749,8 @@ fun QuickAccessSheet(
                         ClickableText(
                             text = annotatedString,
                             style = MaterialTheme.typography.bodyMedium.copy(
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = MaterialTheme.colorScheme.onSurface,
+                                lineHeight = 20.sp
                             ),
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -882,6 +810,87 @@ fun QuickAccessSheet(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // Note tabs (horizontal scrollable)
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Filter notes based on search query
+                val filteredNotes = if (searchQuery.isBlank()) {
+                    notes
+                } else {
+                    notes.filter { note ->
+                        note.title.contains(searchQuery, ignoreCase = true) ||
+                        note.content.contains(searchQuery, ignoreCase = true)
+                    }
+                }
+
+                items(filteredNotes) { note ->
+                    FilterChip(
+                        selected = note.id == activeNoteId,
+                        onClick = { noteManager.setActiveNote(note.id) },
+                        label = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = if (note.title.isNotBlank()) note.title else "Unbenannt",
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                if (note.id == activeNoteId) {
+                                    Icon(
+                                        Icons.Default.Edit,
+                                        contentDescription = null,
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .clickable {
+                                                renameTargetId = note.id
+                                                renameText = note.title
+                                                showRenameDialog = true
+                                            }
+                                    )
+                                }
+                            }
+                        },
+                        trailingIcon = if (note.id == activeNoteId && notes.size > 1) {
+                            {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Löschen",
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .clickable { noteManager.removeNote(note.id) },
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        } else null
+                    )
+                }
+
+                // Add note button
+                item {
+                    FilterChip(
+                        selected = false,
+                        onClick = {
+                            val id = noteManager.addNote(title = "Neue Notiz")
+                            noteManager.setActiveNote(id)
+                        },
+                        label = { Text("Neu") },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = "Neue Notiz",
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    )
+                }
+            }
+
             // Quick input section (separate card, always visible)
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
@@ -904,18 +913,21 @@ fun QuickAccessSheet(
                     ) {
                         FilterChip(
                             selected = quickInputMode == "text",
-                            onClick = { quickInputMode = "text" },
+                            onClick = {
+                                if (quickInputMode != "text") {
+                                    quickInputMode = "text"
+                                    newTextInput = TextFieldValue("")
+                                }
+                            },
                             label = { Text("Text", style = MaterialTheme.typography.labelSmall) }
                         )
                         FilterChip(
                             selected = quickInputMode == "coord",
                             onClick = {
-                                quickInputMode = "coord"
-                                if (newTextInput.text.isEmpty() || !newTextInput.text.contains("N") || !newTextInput.text.contains("E")) {
-                                    val tmpl = "N 00 00 00 E 00 00 00"
+                                if (quickInputMode != "coord") {
+                                    quickInputMode = "coord"
+                                    val tmpl = "N       E      "
                                     newTextInput = TextFieldValue(tmpl, selection = TextRange(2))
-                                    focusRequester.requestFocus()
-                                } else {
                                     focusRequester.requestFocus()
                                 }
                             },
@@ -924,12 +936,10 @@ fun QuickAccessSheet(
                         FilterChip(
                             selected = quickInputMode == "freq",
                             onClick = {
-                                quickInputMode = "freq"
-                                if (newTextInput.text.isEmpty()) {
+                                if (quickInputMode != "freq") {
+                                    quickInputMode = "freq"
                                     val tmpl = "COM: "
                                     newTextInput = TextFieldValue(tmpl, selection = TextRange(tmpl.length))
-                                    focusRequester.requestFocus()
-                                } else {
                                     focusRequester.requestFocus()
                                 }
                             },
@@ -938,25 +948,35 @@ fun QuickAccessSheet(
                         FilterChip(
                             selected = quickInputMode == "time",
                             onClick = {
-                                quickInputMode = "time"
-                                val now = java.time.LocalTime.now()
-                                val tmpl = "${now.hour.toString().padStart(2, '0')}:${now.minute.toString().padStart(2, '0')} "
-                                newTextInput = TextFieldValue(tmpl, selection = TextRange(tmpl.length))
-                                focusRequester.requestFocus()
+                                if (quickInputMode != "time") {
+                                    quickInputMode = "time"
+                                    val now = java.time.LocalTime.now()
+                                    val tmpl = "${now.hour.toString().padStart(2, '0')}:${now.minute.toString().padStart(2, '0')} "
+                                    newTextInput = TextFieldValue(tmpl, selection = TextRange(tmpl.length))
+                                    focusRequester.requestFocus()
+                                }
                             },
                             label = { Text("Zeit", style = MaterialTheme.typography.labelSmall) }
                         )
                         FilterChip(
                             selected = quickInputMode == "number",
-                            onClick = { quickInputMode = "number" },
+                            onClick = {
+                                if (quickInputMode != "number") {
+                                    quickInputMode = "number"
+                                    newTextInput = TextFieldValue("")
+                                }
+                            },
                             label = { Text("Zahlen", style = MaterialTheme.typography.labelSmall) }
                         )
                         FilterChip(
-                            selected = false,
+                            selected = quickInputMode == "fluglage",
                             onClick = {
-                                val tmpl = "Höhe: FL  / Speed:  / HDG: "
-                                newTextInput = TextFieldValue(tmpl, selection = TextRange(tmpl.length))
-                                focusRequester.requestFocus()
+                                if (quickInputMode != "fluglage") {
+                                    quickInputMode = "fluglage"
+                                    val tmpl = "Höhe: FL    / Speed:     / HDG:    "
+                                    newTextInput = TextFieldValue(tmpl, selection = TextRange(9))
+                                    focusRequester.requestFocus()
+                                }
                             },
                             label = { Text("Fluglage", style = MaterialTheme.typography.labelSmall) }
                         )
@@ -969,7 +989,7 @@ fun QuickAccessSheet(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         val keyboardType = when (quickInputMode) {
-                            "coord", "freq", "number" -> KeyboardType.Decimal
+                            "coord", "freq", "number", "fluglage" -> KeyboardType.Number
                             "time" -> KeyboardType.Number
                             else -> KeyboardType.Text
                         }
@@ -978,89 +998,114 @@ fun QuickAccessSheet(
                             value = newTextInput,
                             onValueChange = { newVal ->
                                 if (quickInputMode == "coord") {
-                                    val prev = newTextInput.text.ifBlank { "N 00 00 00 E 00 00 00" }
-                                    val prevDigits = prev.filter { it.isDigit() }.padEnd(12, '0')
-                                    val northChars = prevDigits.take(6).toCharArray()
-                                    val eastChars = prevDigits.drop(6).take(6).toCharArray()
+                                    // Extrahiere alle Ziffern aus der neuen Eingabe
+                                    val allDigits = newVal.text.filter { it.isDigit() }
 
-                                    val incDigits = newVal.text.filter { it.isDigit() }
-                                    val template = "N 00 00 00 E 00 00 00"
-                                    val nStart = template.indexOf('N') + 2
-                                    val eStart = template.indexOf('E') + 2
-                                    val digitOffsets = listOf(0,1,3,4,6,7)
+                                    // Maximal 12 Ziffern (6 für N, 6 für E), Minimum 0
+                                    val digits = allDigits.take(12).ifEmpty { "" }
 
-                                    fun positions(start: Int) = digitOffsets.map { start + it }
-                                    val nPos = positions(nStart)
-                                    val ePos = positions(eStart)
-
-                                    val caret = newVal.selection.start.coerceAtLeast(0)
-                                    val editingEast = caret >= ePos.first()
-
-                                    fun slotForCaret(posList: List<Int>, caretPos: Int): Int {
-                                        for ((i, p) in posList.withIndex()) {
-                                            if (caretPos <= p + 1) return i
-                                        }
-                                        return posList.size - 1
+                                    // North: erste 6 Ziffern, mit Leerzeichen auffüllen
+                                    val northDigits = digits.take(6).padEnd(6, ' ')
+                                    // East: nächste 6 Ziffern, mit Leerzeichen auffüllen
+                                    val eastDigits = if (digits.length > 6) {
+                                        digits.drop(6).take(6).padEnd(6, ' ')
+                                    } else {
+                                        "      " // 6 Leerzeichen
                                     }
 
-                                    val slot = if (editingEast) slotForCaret(ePos, caret) else slotForCaret(nPos, caret)
-                                    val prevAll = prevDigits
-                                    val added = if (incDigits.length > prevAll.length) incDigits.drop(prevAll.length) else ""
-                                    val removed = if (incDigits.length < prevAll.length) prevAll.length - incDigits.length else 0
-
-                                    if (added.isNotEmpty()) {
-                                        var idx = 0
-                                        if (editingEast) {
-                                            for (ch in added) {
-                                                val pos = (slot + idx).coerceIn(0,5)
-                                                eastChars[pos] = ch
-                                                idx++
-                                                if (pos == 5) break
-                                            }
-                                        } else {
-                                            for (ch in added) {
-                                                val pos = (slot + idx).coerceIn(0,5)
-                                                northChars[pos] = ch
-                                                idx++
-                                                if (pos == 5) break
-                                            }
+                                    // Sichere Formatierung als "N DD DD DD E DD DD DD"
+                                    fun formatCoordPart(s: String): String {
+                                        // Sicherstellen dass String mindestens 6 Zeichen hat
+                                        val safe = s.padEnd(6, ' ')
+                                        return buildString {
+                                            append(safe.getOrNull(0) ?: ' ')
+                                            append(safe.getOrNull(1) ?: ' ')
+                                            append(' ')
+                                            append(safe.getOrNull(2) ?: ' ')
+                                            append(safe.getOrNull(3) ?: ' ')
+                                            append(' ')
+                                            append(safe.getOrNull(4) ?: ' ')
+                                            append(safe.getOrNull(5) ?: ' ')
                                         }
-                                    } else if (removed > 0) {
-                                        if (editingEast) {
-                                            val keep = eastChars.joinToString("").filter { it.isDigit() }.dropLast(removed.coerceAtMost(6))
-                                            val padded = keep.padEnd(6, '0')
-                                            for (i in padded.indices) eastChars[i] = padded[i]
-                                        } else {
-                                            val keep = northChars.joinToString("").filter { it.isDigit() }.dropLast(removed.coerceAtMost(6))
-                                            val padded = keep.padEnd(6, '0')
-                                            for (i in padded.indices) northChars[i] = padded[i]
-                                        }
-                                    } else if (added.isEmpty() && removed == 0 && incDigits.isNotEmpty()) {
-                                        val pd = incDigits.padEnd(12, '0')
-                                        for (i in 0 until 6) northChars[i] = pd[i]
-                                        for (i in 0 until 6) eastChars[i] = pd[i+6]
                                     }
 
-                                    fun fmt(chars: CharArray): String {
-                                        val s = String(chars)
-                                        return "${s.substring(0,2)} ${s.substring(2,4)} ${s.substring(4,6)}"
-                                    }
-
-                                    val northFmt = fmt(northChars)
-                                    val eastFmt = fmt(eastChars)
+                                    val northFmt = formatCoordPart(northDigits)
+                                    val eastFmt = formatCoordPart(eastDigits)
                                     val formatted = "N $northFmt E $eastFmt"
 
-                                    val base = if (editingEast) formatted.indexOf('E') + 2 else formatted.indexOf('N') + 2
-                                    val caretSlot = (slot + (if (added.isNotEmpty()) added.length else 0)).coerceIn(0,6)
-                                    val sel = base + caretSlot
+                                    // Cursor-Position basierend auf Anzahl der eingegebenen Ziffern
+                                    val numDigits = digits.length
+                                    val cursorPos = when (numDigits) {
+                                        0 -> 2  // Nach "N "
+                                        1 -> 3  // N X|
+                                        2 -> 4  // N XX|
+                                        3 -> 6  // N XX X|X (nach Leerzeichen)
+                                        4 -> 7  // N XX XX|
+                                        5 -> 9  // N XX XX X|X (nach Leerzeichen)
+                                        6 -> 10 // N XX XX XX|
+                                        7 -> formatted.indexOf('E') + 3  // E X|
+                                        8 -> formatted.indexOf('E') + 4  // E XX|
+                                        9 -> formatted.indexOf('E') + 6  // E XX X|X
+                                        10 -> formatted.indexOf('E') + 7 // E XX XX|
+                                        11 -> formatted.indexOf('E') + 9 // E XX XX X|X
+                                        else -> formatted.indexOf('E') + 10 // E XX XX XX|
+                                    }
 
-                                    newTextInput = TextFieldValue(formatted, selection = TextRange(sel.coerceIn(0, formatted.length)))
+                                    newTextInput = TextFieldValue(
+                                        text = formatted,
+                                        selection = TextRange(cursorPos.coerceIn(0, formatted.length))
+                                    )
                                 } else if (quickInputMode == "freq") {
                                     val formatted = formatComInputToDot(newVal.text)
                                     newTextInput = TextFieldValue(formatted, selection = TextRange(formatted.length))
                                 } else if (quickInputMode == "number") {
                                     val filtered = newVal.text.filter { it.isDigit() }
                                     newTextInput = TextFieldValue(filtered, selection = TextRange(filtered.length))
+                                } else if (quickInputMode == "fluglage") {
+                                    // Extrahiere alle Ziffern
+                                    val allDigits = newVal.text.filter { it.isDigit() }
+
+                                    // Maximal 11 Ziffern (4 FL + 3 Speed + 3 HDG + 1 optionales Zeichen)
+                                    val digits = allDigits.take(10)
+
+                                    // FL: erste 4 Ziffern (z.B. 0350)
+                                    val flDigits = digits.take(4).padEnd(4, ' ')
+                                    // Speed: nächste 3 Ziffern
+                                    val speedDigits = if (digits.length > 4) {
+                                        digits.drop(4).take(3).padEnd(3, ' ')
+                                    } else {
+                                        "   "
+                                    }
+                                    // HDG: letzte 3 Ziffern
+                                    val hdgDigits = if (digits.length > 7) {
+                                        digits.drop(7).take(3).padEnd(3, ' ')
+                                    } else {
+                                        "   "
+                                    }
+
+                                    // Formatiere: "Höhe: FL DDDD / Speed: DDD / HDG: DDD"
+                                    val formatted = buildString {
+                                        append("Höhe: FL ")
+                                        append(flDigits)
+                                        append(" / Speed: ")
+                                        append(speedDigits)
+                                        append(" / HDG: ")
+                                        append(hdgDigits)
+                                    }
+
+                                    // Cursor-Position basierend auf Anzahl der Ziffern
+                                    val numDigits = digits.length
+                                    val cursorPos = when {
+                                        numDigits == 0 -> 9  // Nach "Höhe: FL "
+                                        numDigits <= 4 -> 9 + numDigits  // In FL Bereich
+                                        numDigits <= 7 -> 23 + (numDigits - 4)  // In Speed Bereich (nach " / Speed: ")
+                                        else -> 33 + (numDigits - 7)  // In HDG Bereich (nach " / HDG: ")
+                                    }
+
+                                    newTextInput = TextFieldValue(
+                                        text = formatted,
+                                        selection = TextRange(cursorPos.coerceIn(0, formatted.length))
+                                    )
                                 } else {
                                     newTextInput = newVal
                                 }
@@ -1069,26 +1114,50 @@ fun QuickAccessSheet(
                                 .weight(1f)
                                 .focusRequester(focusRequester)
                                 .onFocusChanged { state ->
-                                    if (state.isFocused && quickInputMode == "coord") {
-                                        val txt = newTextInput.text
-                                        val digits = txt.filter { it.isDigit() && it != '0' }
-                                        val pos = if (digits.isEmpty()) {
-                                            txt.indexOf('N') + 2
-                                        } else {
-                                            val allDigits = txt.filter { it.isDigit() }
-                                            val numDigits = allDigits.takeWhile { d ->
-                                                allDigits.indexOf(d) < allDigits.indexOfLast { it != '0' } + 1
-                                            }.count()
-                                            when {
-                                                numDigits <= 2 -> 2 + numDigits
-                                                numDigits <= 4 -> 2 + numDigits + 1
-                                                numDigits <= 6 -> 2 + numDigits + 2
-                                                numDigits <= 8 -> txt.indexOf('E') + 2 + (numDigits - 6)
-                                                numDigits <= 10 -> txt.indexOf('E') + 2 + (numDigits - 6) + 1
-                                                else -> txt.indexOf('E') + 2 + (numDigits - 6) + 2
+                                    if (state.isFocused) {
+                                        when (quickInputMode) {
+                                            "coord" -> {
+                                                val txt = newTextInput.text
+                                                val digits = txt.filter { it.isDigit() }
+                                                val numDigits = digits.length
+
+                                                val pos = when (numDigits) {
+                                                    0 -> 2  // Nach "N "
+                                                    1 -> 3
+                                                    2 -> 4
+                                                    3 -> 6
+                                                    4 -> 7
+                                                    5 -> 9
+                                                    6 -> 10
+                                                    7 -> txt.indexOf('E') + 3
+                                                    8 -> txt.indexOf('E') + 4
+                                                    9 -> txt.indexOf('E') + 6
+                                                    10 -> txt.indexOf('E') + 7
+                                                    11 -> txt.indexOf('E') + 9
+                                                    else -> txt.indexOf('E') + 10
+                                                }
+
+                                                newTextInput = newTextInput.copy(
+                                                    selection = TextRange(pos.coerceIn(0, txt.length))
+                                                )
+                                            }
+                                            "fluglage" -> {
+                                                val txt = newTextInput.text
+                                                val digits = txt.filter { it.isDigit() }
+                                                val numDigits = digits.length
+
+                                                val pos = when {
+                                                    numDigits == 0 -> 9  // Nach "Höhe: FL "
+                                                    numDigits <= 4 -> 9 + numDigits
+                                                    numDigits <= 7 -> 23 + (numDigits - 4)
+                                                    else -> 33 + (numDigits - 7)
+                                                }
+
+                                                newTextInput = newTextInput.copy(
+                                                    selection = TextRange(pos.coerceIn(0, txt.length))
+                                                )
                                             }
                                         }
-                                        newTextInput = newTextInput.copy(selection = TextRange(pos.coerceIn(0, txt.length)))
                                     }
                                 },
                             placeholder = {
@@ -1097,6 +1166,7 @@ fun QuickAccessSheet(
                                     "freq" -> "z.B. 122.500"
                                     "time" -> "z.B. 14:30"
                                     "number" -> "Zahlen eingeben..."
+                                    "fluglage" -> "Zahlen eingeben (z.B. 0350250090 für FL350/250kt/HDG090)"
                                     else -> "Text hinzufügen..."
                                 })
                             },
@@ -1112,7 +1182,7 @@ fun QuickAccessSheet(
                                         currentNote = if (currentNote.isEmpty()) {
                                             newTextInput.text
                                         } else {
-                                            "$currentNote\n\n${newTextInput.text}"
+                                            "$currentNote\n${newTextInput.text}"
                                         }
                                         newTextInput = TextFieldValue("")
                                         hasChanges = true
@@ -1128,7 +1198,7 @@ fun QuickAccessSheet(
                                     currentNote = if (currentNote.isEmpty()) {
                                         newTextInput.text
                                     } else {
-                                        "$currentNote\n\n${newTextInput.text}"
+                                        "$currentNote\n${newTextInput.text}"
                                     }
                                     newTextInput = TextFieldValue("")
                                     hasChanges = true
