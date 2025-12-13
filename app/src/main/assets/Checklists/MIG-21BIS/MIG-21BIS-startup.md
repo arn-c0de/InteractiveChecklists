@@ -4,7 +4,7 @@
 
 - [ ] **Canopy:** Close and seal the canopy.
   - *Note:* The canopy seal warning light above the seal lever should extinguish.
-- [ ] **Battery:** Turn ON the main battery switch and the battery heat switch.
+- [ ] **BAT switch (BAT):** Turn ON the main BAT switch and the BAT HEAT switch.
 - [ ] **Inverters:** Turn ON the inverters.
 - [ ] **Generators:** Turn ON the AC and DC generators.
 - [ ] **Fuel Pumps:** Activate all three fuel pumps.
