@@ -65,7 +65,8 @@ fun UnifiedViewer(
                     checklist = checklistState,
                     onCheckboxChange = viewModel::onCheckboxChange,
                     modifier = modifier,
-                    prefsManager = prefsManager
+                    prefsManager = prefsManager,
+
                 )
             } else {
                 MarkdownViewer(
@@ -73,7 +74,8 @@ fun UnifiedViewer(
                     checklist = checklist,
                     onCheckboxChange = onCheckboxChange,
                     modifier = modifier,
-                    prefsManager = prefsManager
+                    prefsManager = prefsManager,
+
                 )
             }
         }
