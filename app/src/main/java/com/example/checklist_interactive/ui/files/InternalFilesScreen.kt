@@ -39,6 +39,8 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.NoteAdd
+import androidx.compose.material.icons.filled.ViewModule
+import androidx.compose.material.icons.filled.ViewList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -142,6 +144,8 @@ fun InternalFilesScreen(
 
     // Quick Access state
     var showQuickAccess by remember { mutableStateOf(false) }
+    // Display mode: list or grid for files (persisted)
+    var isGridView by remember { mutableStateOf(prefsManager.isGridViewEnabled()) }
 
     // Suspended function to refresh and enrich files with tags (IO-heavy - keep suspended)
     suspend fun refreshFilesWithTags() {
@@ -292,6 +296,16 @@ fun InternalFilesScreen(
                     }
                     IconButton(onClick = onShowSettings) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    }
+                    // Toggle between list and grid view for files
+                    IconButton(onClick = {
+                        isGridView = !isGridView
+                        prefsManager.setGridViewEnabled(isGridView)
+                    }) {
+                        Icon(
+                            imageVector = if (isGridView) Icons.Default.ViewList else Icons.Default.ViewModule,
+                            contentDescription = if (isGridView) "List view" else "Grid view"
+                        )
                     }
                 }
             )
@@ -540,6 +554,7 @@ fun InternalFilesScreen(
                                 fileToEditTags = file
                                 showTagEditor = true
                             },                            level = 0
+                            , isGridView = isGridView
                         )
                     }
                 }
@@ -693,6 +708,8 @@ fun InternalFilesScreen(
     // Listen for preference changes and update filtering when visible aircrafts change
     DisposableEffect(prefsManager) {
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+            // Update persisted UI preferences when they change elsewhere
+            isGridView = prefsManager.isGridViewEnabled()
             coroutineScope.launch {
                 refreshFilesWithTags()
                 shortcuts = shortcutManager.loadShortcuts()
@@ -767,7 +784,8 @@ private fun FolderTree(
     onFileOpen: (FileInfo) -> Unit,
     onDelete: (FileInfo) -> Unit,
     onEditTags: (FileInfo) -> Unit,
-    level: Int
+    level: Int,
+    isGridView: Boolean
 ) {
     nodes.forEach { node ->
         FolderNodeItem(
@@ -778,6 +796,8 @@ private fun FolderTree(
             onDelete = onDelete,
             onEditTags = onEditTags,
             level = level
+            ,
+            isGridView = isGridView
         )
     }
 }
@@ -799,6 +819,8 @@ private fun FolderNodeItem(
     onDelete: (FileInfo) -> Unit,
     onEditTags: (FileInfo) -> Unit,
     level: Int
+    ,
+    isGridView: Boolean
 ) {
     val key = node.relativePath
     val isExpanded = expanded[key] ?: true
@@ -847,13 +869,39 @@ private fun FolderNodeItem(
 
     if (isExpanded) {
         // Show files for this node
-        node.files.forEach { file ->
-            FileListItem(
-                file = file, 
-                onClick = { onFileOpen(file) }, 
-                onDelete = { onDelete(file) },
-                onEditTags = { onEditTags(file) }
-            )
+        if (isGridView) {
+            val columns = 3
+            val rows = node.files.chunked(columns)
+            rows.forEach { rowFiles ->
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    rowFiles.forEach { file ->
+                        Box(modifier = Modifier
+                            .weight(1f)
+                            .padding(8.dp)) {
+                            FileGridItem(
+                                file = file,
+                                onClick = { onFileOpen(file) },
+                                onDelete = { onDelete(file) },
+                                onEditTags = { onEditTags(file) }
+                            )
+                        }
+                    }
+                    if (rowFiles.size < columns) {
+                        repeat(columns - rowFiles.size) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        } else {
+            node.files.forEach { file ->
+                FileListItem(
+                    file = file,
+                    onClick = { onFileOpen(file) },
+                    onDelete = { onDelete(file) },
+                    onEditTags = { onEditTags(file) }
+                )
+            }
         }
 
         // Recurse into children nodes
@@ -865,7 +913,8 @@ private fun FolderNodeItem(
                 onFileOpen = onFileOpen,
                 onDelete = onDelete,
                 onEditTags = onEditTags,
-                level = level + 1
+                level = level + 1,
+                isGridView = isGridView
             )
         }
     }
@@ -1089,6 +1138,62 @@ private fun FileListItem(
             }
         )
         HorizontalDivider()
+    }
+}
+
+@Composable
+private fun FileGridItem(
+    file: FileInfo,
+    onClick: () -> Unit,
+    onDelete: () -> Unit,
+    onEditTags: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val fileIcon = when (file.extension.lowercase()) {
+        "pdf" -> Icons.Default.PictureAsPdf
+        "md", "markdown" -> Icons.Default.Description
+        else -> Icons.Default.InsertDriveFile
+    }
+    val fileColor = when (file.extension.lowercase()) {
+        "pdf" -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.primary
+    }
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(8.dp)
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(fileIcon, contentDescription = null, tint = fileColor, modifier = Modifier.size(36.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                file.displayName,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+            if (file.tags.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                TagChips(tags = file.tags, maxVisible = 2)
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Row {
+                IconButton(onClick = onEditTags) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit tags", tint = MaterialTheme.colorScheme.primary)
+                }
+                if (!file.isAsset) {
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Default.Delete, contentDescription = LocalContext.current.getString(R.string.delete), tint = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+        }
     }
 }
 
