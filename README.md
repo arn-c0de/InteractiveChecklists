@@ -7,19 +7,20 @@
 	<img src="https://img.shields.io/badge/license-CC--BY--NC--SA%204.0-lightgrey.svg" alt="License: CC BY-NC-SA 4.0" />
 </p>
 
-<div align="center">
-	<a href="CHANGELOG.md">Changelog</a> |
-	<a href="docs/docnavigation.md">Documentation</a> |
-	<a href="SECURITY.md">Security Policy</a> |
-	<a href="LICENSE">License</a>
-</div>
-
 > **⚠️ EARLY DEVELOPMENT NOTICE**  
 > This project is in a **very early stage of development** and is currently **NOT ready for production use**.  
 > It is intended for **development and testing purposes only**.  
 > Features may be incomplete, unstable, or subject to significant changes.  
 > Use at your own risk.
 #  InteractiveChecklists
+
+
+<div align="center">
+	<a href="CHANGELOG.md">Changelog</a> |
+	<a href="docs/docnavigation.md">Documentation</a> |
+	<a href="SECURITY.md">Security Policy</a> |
+	<a href="LICENSE">License</a>
+</div>
 
 
 InteractiveChecklists is an Android application designed for viewing and interacting with markdown and PDF checklists. It's built with Jetpack Compose and follows an MVVM architecture.
