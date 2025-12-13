@@ -352,7 +352,10 @@ private fun SimpleMarkdownView(
                                                     Spacer(modifier = Modifier.width(8.dp))
                                                     Text(
                                                         text = parseInlineMarkdown(line.trim().substring(5).trim(), bodyFontSize),
-                                                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
+                                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                                            fontSize = bodyFontSize.sp,
+                                                            textDecoration = if (checked) TextDecoration.LineThrough else TextDecoration.None
+                                                        ),
                                                         modifier = Modifier
                                                             .align(androidx.compose.ui.Alignment.CenterVertically)
                                                             .clickable(role = Role.Checkbox) {
@@ -430,7 +433,10 @@ private fun SimpleMarkdownView(
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
                                             text = parseInlineMarkdown(line.trim().substring(5).trim(), bodyFontSize),
-                                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                fontSize = bodyFontSize.sp,
+                                                textDecoration = if (checked) TextDecoration.LineThrough else TextDecoration.None
+                                            ),
                                             modifier = Modifier
                                                 .align(androidx.compose.ui.Alignment.CenterVertically)
                                                 .clickable(role = Role.Checkbox) {
@@ -537,7 +543,10 @@ private fun SimpleMarkdownView(
                                                 Spacer(modifier = Modifier.width(8.dp))
                                                 Text(
                                                     text = parseInlineMarkdown(line.trim().substring(5).trim(), bodyFontSize),
-                                                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
+                                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                                        fontSize = bodyFontSize.sp,
+                                                        textDecoration = if (checked) TextDecoration.LineThrough else TextDecoration.None
+                                                    ),
                                                     modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
                                                 )
                                             }
@@ -668,7 +677,10 @@ private fun RenderMarkdownLine(line: String, bodyFontSize: Int) {
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = parseInlineMarkdown(text, bodyFontSize),
-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontSize = bodyFontSize.sp,
+                            textDecoration = if (isChecked) TextDecoration.LineThrough else TextDecoration.None
+                        ),
                         modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
                     )
                 }
@@ -929,7 +941,10 @@ private fun ChecklistItemRow(
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = parseInlineMarkdown(item.text, bodyFontSize),
-                style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontSize = bodyFontSize.sp,
+                    textDecoration = if (item.isChecked) TextDecoration.LineThrough else TextDecoration.None
+                ),
                 modifier = Modifier
                     .align(androidx.compose.ui.Alignment.CenterVertically)
                     .clickable(role = Role.Checkbox) { onCheckboxChange(item.id, !item.isChecked) }
