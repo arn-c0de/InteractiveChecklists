@@ -39,3 +39,8 @@ app/src/main/assets/Charts/Caucasus - Aerodrome Chart - DAY.pdf
 app/src/main/assets/Charts/Caucasus-GND_and_VAD_Charts_v405.pdf
 app/src/main/assets/Charts/CW-Germany-Charts-2.pdf
 app/src/main/assets/Charts/Syria-Charts-XXL.pdf
+
+# Ignore PDF files only inside the Checklists asset folder
+# This ignores only .pdf files located under app/src/main/assets/Checklists/**
+/app/src/main/assets/Checklists/**/*.pdf
+/app/src/main/assets/Checklists/*.pdf
