@@ -76,6 +76,7 @@ import com.example.checklist_interactive.data.prefs.InvertColorPrefManager
 import java.io.File
 import kotlin.math.hypot
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -196,6 +197,9 @@ fun PdfViewer(
 
     val renderingPages = remember { mutableStateSetOf<Int>() }
     val coroutineScope = rememberCoroutineScope()
+    // Dedicated background scope for long-running operations (indexing, batch renders)
+    val backgroundJob: Job = remember { Job() }
+    val backgroundScope: CoroutineScope = remember { CoroutineScope(Dispatchers.Default + backgroundJob) }
     // LruCache for rendered bitmaps (in KB) - no automatic removal, just caching
     val maxMemoryKb = (Runtime.getRuntime().maxMemory() / 1024).toInt()
     val cacheSizeKb = maxMemoryKb / 8
@@ -232,6 +236,7 @@ fun PdfViewer(
     suspend fun renderPageToCache(pageIndex: Int, targetWidthPx: Int, renderedScale: Float = 1f) {
         // Prevent multiple concurrent renders of same page
         if (renderingPages.contains(pageIndex)) return
+        if (!backgroundJob.isActive) return
         renderingPages.add(pageIndex)
         try {
             withContext(Dispatchers.IO) {
@@ -315,8 +320,8 @@ fun PdfViewer(
                     } catch (_: Exception) {}
                 }
 
-                // Extract PDF outline (bookmarks) asynchronously to avoid blocking
-                coroutineScope.launch(Dispatchers.IO) {
+                    // Extract PDF outline (bookmarks) asynchronously to avoid blocking
+                    backgroundScope.launch(Dispatchers.IO) {
                     try {
                         val extracted = outlineExtractor.extractOutline(loadedPdfFile)
                         withContext(Dispatchers.Main) {
@@ -349,7 +354,7 @@ fun PdfViewer(
                 }
                 for (pageIndex in initialIndices) {
                     // render initial pages via the centralized helper (it serializes PdfRenderer access)
-                    coroutineScope.launch {
+                    backgroundScope.launch {
                         try {
                             renderPageToCache(pageIndex, screenWidthPx, renderedScale = 1f)
                         } catch (_: Exception) {}
@@ -359,15 +364,18 @@ fun PdfViewer(
                 // Start async computation of remaining page aspect ratios in the background
                 // to avoid long UI-blocking loads on large documents. Do this after initial
                 // rendering is kicked off so the user sees content quickly.
-                coroutineScope.launch(Dispatchers.Default) {
+                backgroundScope.launch(Dispatchers.Default) {
                     val batchSize = 32
                     var start = 0
                     while (start < pageCount) {
+                        if (!backgroundJob.isActive) break
                         val end = (start + batchSize).coerceAtMost(pageCount)
                         for (i in start until end) {
                             if (!pageAspectRatios.containsKey(i)) {
                                 try {
-                                    val p = pdfRenderer!!.openPage(i)
+                                    val curPdf = pdfRenderer ?: continue
+                                    if (!backgroundJob.isActive) break
+                                    val p = curPdf.openPage(i)
                                     val ar = p.width.toFloat() / p.height.toFloat()
                                     p.close()
                                     withContext(Dispatchers.Main) {
@@ -400,6 +408,8 @@ fun PdfViewer(
     // Close PDF renderer and file descriptor when composable leaves scope
     DisposableEffect(pdfPath) {
         onDispose {
+            // Cancel background tasks before closing renderer or deleting files
+            try { backgroundJob.cancel() } catch (_: Exception) {}
             try {
                 pdfRenderer?.close()
             } catch (_: Exception) {}
@@ -427,7 +437,7 @@ fun PdfViewer(
         if (getPageBitmapState(pageIndex).value != null) return
         if (bitmapCache.get(pageIndex) != null) return
         if (renderingPages.contains(pageIndex)) return
-        coroutineScope.launch {
+        backgroundScope.launch {
             try {
                 renderPageToCache(pageIndex, widthPx)
             } catch (_: Exception) {}
@@ -464,7 +474,7 @@ fun PdfViewer(
                     // Abbrechen eines laufenden Jobs für diese Seite
                     textExtractionJobs[idx]?.cancel()
 
-                    val job = coroutineScope.launch(Dispatchers.IO) {
+                    val job = backgroundScope.launch(Dispatchers.IO) {
                         try {
                             val textBlocks = textExtractor.extractTextBlocks(file, idx)
                             withContext(Dispatchers.Main) {
@@ -513,7 +523,7 @@ fun PdfViewer(
         if (renderedScale > 0f && currentScale <= renderedScale * 1.15f) return@LaunchedEffect
         if (pdfRenderer == null) return@LaunchedEffect
         // Wait a bit to avoid over-rendering while the user is still pinching
-        zoomRenderJob = coroutineScope.launch {
+        zoomRenderJob = backgroundScope.launch {
             kotlinx.coroutines.delay(350L)
             // Determine desired pixel width to render for the current scale
             val currentScale = pageScales[currentPage] ?: 1f
@@ -761,7 +771,7 @@ fun PdfViewer(
                             HintIconButton(
                                 onClick = {
                                     pdfFile?.let { file ->
-                                        coroutineScope.launch(Dispatchers.IO) {
+                                        backgroundScope.launch(Dispatchers.IO) {
                                             val pageText = textExtractor.extractPageText(file, currentPage)
                                             withContext(Dispatchers.Main) {
                                                 dialogPageText = pageText
@@ -1240,7 +1250,7 @@ fun PdfViewer(
                                         }
                                         LaunchedEffect(Unit) {
                                             if (pdfRenderer != null && !isRendering && pageBitmap == null) {
-                                                coroutineScope.launch {
+                                                backgroundScope.launch {
                                                     try {
                                                         renderPageToCache(pageIndex, screenWidthPx)
                                                     } catch (_: Exception) {}
@@ -1329,7 +1339,7 @@ fun PdfViewer(
                                             .fillMaxWidth()
                                             .clickable {
                                                 showTocDialog = false
-                                                coroutineScope.launch {
+                                                backgroundScope.launch(Dispatchers.Main) {
                                                     listState.scrollToItem(item.pageNumber)
                                                 }
                                             }
@@ -1372,7 +1382,7 @@ fun PdfViewer(
                                         modifier = Modifier
                                             .clickable {
                                                 showTocDialog = false
-                                                coroutineScope.launch {
+                                                backgroundScope.launch(Dispatchers.Main) {
                                                     listState.scrollToItem(pageIndex)
                                                 }
                                             }
@@ -1476,7 +1486,7 @@ private fun HintIconButton(
                         // Show bubble tooltip locally
                         showLocalTooltip = true
                         onLongClick?.invoke()
-                        coroutineScope.launch {
+                        coroutineScope.launch(Dispatchers.Main) {
                             delay(1500L)
                             onHintChange(null)
                             showLocalTooltip = false
