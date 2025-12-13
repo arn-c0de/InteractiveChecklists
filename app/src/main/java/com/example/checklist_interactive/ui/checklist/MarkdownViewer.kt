@@ -329,6 +329,18 @@ private fun SimpleMarkdownView(
                                                                     repository.saveChecklistItemState(assetId, syntheticId, newChecked)
                                                                 }
                                                             }
+
+                                                            // If all checkboxes in this section are now checked, collapse the container
+                                                            val totalCheckboxesInSection = section.content.count { it.trim().startsWith("- [") }
+                                                            if (totalCheckboxesInSection > 0) {
+                                                                val checkedCount = section.content.mapIndexed { lidx, line ->
+                                                                    if (line.trim().startsWith("- [")) checkboxStates[Pair(index, lidx)] ?: (line.trim().startsWith("- [x]") || line.trim().startsWith("- [X]")) else false
+                                                                }.count { it }
+                                                                if (checkedCount == totalCheckboxesInSection) {
+                                                                    android.util.Log.d("MarkdownViewer", "Auto-closing simple section index=$index for $assetId (all checked)")
+                                                                    expandedSections[index] = false
+                                                                }
+                                                            }
                                                         }
                                                     )
                                                     Spacer(modifier = Modifier.width(8.dp))
@@ -361,19 +373,31 @@ private fun SimpleMarkdownView(
                                 val checked = checkboxStates[key] ?: false
                                 Column(modifier = Modifier.fillMaxWidth()) {
                                     Row(modifier = Modifier.padding(vertical = 2.dp), horizontalArrangement = Arrangement.Start) {
-                                        Checkbox(
-                                            checked = checked,
-                                            onCheckedChange = { newChecked ->
-                                                checkboxStates[key] = newChecked
-                                                val syntheticId = "$assetId-simple-$index-$lineIndex"
-                                                onCheckboxChange?.invoke(syntheticId, newChecked)
-                                                if (onCheckboxChange == null) {
-                                                    coroutineScope.launch {
-                                                        repository.saveChecklistItemState(assetId, syntheticId, newChecked)
+                                            Checkbox(
+                                                checked = checked,
+                                                onCheckedChange = { newChecked ->
+                                                    checkboxStates[key] = newChecked
+                                                    val syntheticId = "$assetId-simple-$index-$lineIndex"
+                                                    onCheckboxChange?.invoke(syntheticId, newChecked)
+                                                    if (onCheckboxChange == null) {
+                                                        coroutineScope.launch {
+                                                            repository.saveChecklistItemState(assetId, syntheticId, newChecked)
+                                                        }
+                                                    }
+
+                                                    // If all checkboxes in this subsection are now checked, collapse the subsection container
+                                                    val totalCheckboxesInSection = section.content.count { it.trim().startsWith("- [") }
+                                                    if (totalCheckboxesInSection > 0) {
+                                                        val checkedCount = section.content.mapIndexed { lidx, line ->
+                                                            if (line.trim().startsWith("- [")) checkboxStates[Pair(index, lidx)] ?: (line.trim().startsWith("- [x]") || line.trim().startsWith("- [X]")) else false
+                                                        }.count { it }
+                                                        if (checkedCount == totalCheckboxesInSection) {
+                                                            android.util.Log.d("MarkdownViewer", "Auto-closing simple subsection index=$index for $assetId (all checked)")
+                                                            expandedSections[index] = false
+                                                        }
                                                     }
                                                 }
-                                            }
-                                        )
+                                            )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
                                             text = parseInlineMarkdown(line.trim().substring(5).trim(), bodyFontSize),
@@ -676,6 +700,20 @@ private fun InteractiveMarkdownView(
         checklist.sections.forEach { section ->
             if (section.title.isNotEmpty() && section.items.isNotEmpty()) {
                 expandedSections[section.title] = expandAll
+            }
+        }
+    }
+
+    // Auto-collapse: Wenn alle Items einer Sektion abgehakt sind, klappe die Sektion automatisch zu
+    LaunchedEffect(checklist) {
+        checklist.sections.forEach { section ->
+            val isExpanded = expandedSections[section.title] ?: false
+            if (isExpanded && section.items.isNotEmpty()) {
+                val allChecked = section.items.all { it.isChecked }
+                if (allChecked) {
+                    android.util.Log.d("MarkdownViewer", "Auto-closing section ${section.title} because all items are checked")
+                    expandedSections[section.title] = false
+                }
             }
         }
     }
