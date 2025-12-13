@@ -40,9 +40,6 @@ Checklist Interactive is an Android application designed for viewing and interac
 	<img src="images/1.0.6_Notes.png" alt="QuickNotes bottom sheet and editor" width="360" />
 </p>
 
-Screenshots are included in the `images/` folder. If you prefer different filenames/path, update the references here. For high resolution previews, include images with about 1200px width and link to them directly for full-size views.
-
-
 The app is a single-activity application, with `MainActivity.kt` serving as the entry point. It uses a state-driven `when` block to switch between composable screens. The architecture is a variant of MVVM, with several manager classes handling business logic.
 
 ### Key Components
