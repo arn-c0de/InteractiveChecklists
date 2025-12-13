@@ -250,20 +250,20 @@ class PreferencesManager(context: Context) {
     fun getDocumentSources(): List<SourceEntry> {
         val raw = prefs.getString(KEY_DOCUMENT_SOURCES_JSON, null)
         return if (raw.isNullOrBlank()) {
-            // Default source list: Open Flight School
-            listOf(SourceEntry("Open Flight School (OFS)", "https://www.openflightschool.de", "CC BY-NC-SA 3.0 DE"))
+            // Default source list: PLATZHALTER
+            listOf(SourceEntry("PLATZHALTER)", "PLATZHALTER", "CC BY-NC-SA 3.0 DE"))
         } else {
             try {
                 Json.decodeFromString(ListSerializer(SourceEntry.serializer()), raw)
             } catch (e: Exception) {
                 // If parsing fails, reset to defaults
-                listOf(SourceEntry("Open Flight School (OFS)", "https://www.openflightschool.de", "CC BY-NC-SA 3.0 DE"))
+                listOf(SourceEntry("PLATZHALTER", "PLATZHALTER", "CC BY-NC-SA 3.0 DE"))
             }
         }
     }
 
     fun resetDocumentSourcesToDefaults() {
-        setDocumentSources(listOf(SourceEntry("Open Flight School (OFS)", "https://www.openflightschool.de", "CC BY-NC-SA 3.0 DE")))
+        setDocumentSources(listOf(SourceEntry("PLATZHALTER)", "PLATZHALTER", "CC BY-NC-SA 3.0 DE")))
     }
 
     /**
