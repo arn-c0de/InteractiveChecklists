@@ -21,12 +21,14 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.NoteAdd
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -42,8 +44,26 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.core.view.WindowCompat
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.background
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -51,6 +71,7 @@ import android.view.View
 import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.map
 import java.net.URLDecoder
 import java.net.URLEncoder
 
@@ -185,6 +206,8 @@ fun QuickAccessSheet(
     // State flows
     val notes by noteManager.notesSummary.collectAsState()
     val activeNoteId by noteManager.activeNoteId.collectAsState()
+
+    // Get content for active note (reactive to activeNoteId changes)
     val savedNote by noteManager.noteContent.collectAsState()
 
     // Local UI state
@@ -207,18 +230,32 @@ fun QuickAccessSheet(
     var renameText by remember { mutableStateOf("") }
     var renameTargetId by remember { mutableStateOf<String?>(null) }
     var showAdvancedEditor by remember { mutableStateOf(false) }
-    var newTextInput by remember { mutableStateOf("") }
+    var newTextInput by remember { mutableStateOf(TextFieldValue("")) }
+    var quickInputMode by remember { mutableStateOf("text") }
+    val focusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    val configuration = LocalConfiguration.current
+    val isLargeScreen = configuration.screenWidthDp >= 600 || configuration.screenHeightDp >= 800
+
+    // Sheet height control (persisted)
+    val prefs = context.getSharedPreferences("quick_notes", android.content.Context.MODE_PRIVATE)
+    val KEY_SHEET_FRACTION = "quick_access_sheet_fraction"
+    val savedFraction = prefs.getFloat(KEY_SHEET_FRACTION, 0.7f)
+    var sheetFraction by rememberSaveable { mutableStateOf(savedFraction.coerceIn(0.2f, 0.95f)) }
+    val sheetMin = 0.2f
+    val sheetMax = 0.95f
+
     var searchQuery by remember { mutableStateOf("") }
     var showSearchBar by remember { mutableStateOf(false) }
     // Flight info expanded state
     val flightExpandedFlow by noteManager.flightInfoExpanded.collectAsState()
     var flightExpanded by remember { mutableStateOf(flightExpandedFlow) }
 
-    // Sync currentNote with savedNote from manager
-    LaunchedEffect(savedNote) {
-        if (!hasChanges) {
-            currentNote = savedNote
-        }
+
+    // Sync currentNote with savedNote and activeNoteId (Tab-Wechsel)
+    LaunchedEffect(savedNote, activeNoteId) {
+        currentNote = savedNote
+        hasChanges = false
     }
 
     // Initialize toolbar state from flows
@@ -356,17 +393,52 @@ fun QuickAccessSheet(
                 }
             }
         }
-        Column(
+        // Restrict sheet height to a fraction of screen height and allow dragging the handle to resize
+        val density = LocalDensity.current
+        val sheetHeightDp = (configuration.screenHeightDp.toFloat() * sheetFraction).dp
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .height(sheetHeightDp)
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 32.dp)
         ) {
+            // Drag handle at top
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(28.dp)
+                    .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDrag = { change, dragAmount ->
+                                // dragAmount.y > 0 means dragging down -> reduce sheet fraction
+                                val screenPx = with(density) { configuration.screenHeightDp.dp.toPx() }
+                                val fracDelta = dragAmount.y / screenPx
+                                sheetFraction = (sheetFraction - fracDelta).coerceIn(sheetMin, sheetMax)
+                            },
+                            onDragEnd = {
+                                prefs.edit().putFloat(KEY_SHEET_FRACTION, sheetFraction).apply()
+                            }
+                        )
+                    },
+                contentAlignment = Alignment.TopCenter
+            ) {
+                // visual handle
+                Box(
+                    modifier = Modifier
+                        .padding(top = 6.dp)
+                        .size(width = 64.dp, height = 6.dp)
+                        .background(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f), shape = MaterialTheme.shapes.small)
+                )
+            }
+
+            Column(modifier = Modifier.fillMaxSize()) {
             // Header with title and actions
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 16.dp),
+                    .padding(bottom = 16.dp)
+                    .padding(top = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -702,17 +774,19 @@ fun QuickAccessSheet(
                 }
             }
 
-            // Note editor card
+            // Note editor card (only the text display/editor)
             OutlinedCard(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f, fill = false),
+                    .defaultMinSize(minHeight = 200.dp)
+                    .weight(1f, fill = isLargeScreen),
                 colors = CardDefaults.outlinedCardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
                 )
             ) {
                 if (showAdvancedEditor) {
                     // Advanced markdown editor
+                    val editorMax = if (isLargeScreen) 900.dp else 500.dp
                     OutlinedTextField(
                         value = currentNote,
                         onValueChange = {
@@ -721,7 +795,7 @@ fun QuickAccessSheet(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 300.dp, max = 500.dp),
+                            .heightIn(min = 300.dp, max = editorMax),
                         placeholder = {
                             Text(
                                 "Markdown Editor\n\n" +
@@ -741,75 +815,328 @@ fun QuickAccessSheet(
                     )
                 } else {
                     // Normal mode with clickable links
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                            if (currentNote.isNotEmpty()) {
-                            val displayNote = expandCallsignPlaceholder(currentNote, callsign)
-                            val annotatedString = buildAnnotatedStringWithLinks(displayNote)
-                            @Suppress("DEPRECATION")
-                            ClickableText(
-                                text = annotatedString,
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    color = MaterialTheme.colorScheme.onSurface
-                                ),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(min = 200.dp, max = 400.dp)
-                                    .padding(16.dp)
-                                    .verticalScroll(rememberScrollState()),
-                                onClick = { offset ->
-                                    annotatedString.getStringAnnotations("OPEN_LINK", offset, offset)
-                                        .firstOrNull()?.let { annotation ->
-                                            val parts = annotation.item.split("|")
-                                            val filePath = URLDecoder.decode(
-                                                parts.getOrNull(0) ?: "",
-                                                "UTF-8"
-                                            )
-                                            // Normalize clicked page number to 0-based index (allow stored links to be 1-based)
-                                            val rawPage = parts.getOrNull(1)?.toIntOrNull()
-                                            val pageNumber = rawPage?.let { if (it > 0) it - 1 else it }
-
-                                            onOpenDocument?.invoke(filePath, pageNumber)
-                                            onDismiss()
-                                        }
-                                }
-                            )
-
-                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                        }
-
-                        // Quick add text field
-                        Row(
+                    if (currentNote.isNotEmpty()) {
+                        val displayNote = expandCallsignPlaceholder(currentNote, callsign)
+                        val annotatedString = buildAnnotatedStringWithLinks(displayNote)
+                        @Suppress("DEPRECATION")
+                        ClickableText(
+                            text = annotatedString,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.Top,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = newTextInput,
-                                onValueChange = { newTextInput = it },
-                                modifier = Modifier.weight(1f),
-                                placeholder = { Text("Text hinzufügen...") },
-                                maxLines = 4,
-                                textStyle = MaterialTheme.typography.bodyMedium
-                            )
+                                .padding(16.dp)
+                                .verticalScroll(rememberScrollState()),
+                            onClick = { offset ->
+                                annotatedString.getStringAnnotations("OPEN_LINK", offset, offset)
+                                    .firstOrNull()?.let { annotation ->
+                                        val parts = annotation.item.split("|")
+                                        val filePath = URLDecoder.decode(
+                                            parts.getOrNull(0) ?: "",
+                                            "UTF-8"
+                                        )
+                                        // Normalize clicked page number to 0-based index (allow stored links to be 1-based)
+                                        val rawPage = parts.getOrNull(1)?.toIntOrNull()
+                                        val pageNumber = rawPage?.let { if (it > 0) it - 1 else it }
 
-                            FilledTonalIconButton(
-                                onClick = {
-                                    if (newTextInput.isNotEmpty()) {
-                                        currentNote = if (currentNote.isEmpty()) {
-                                            newTextInput
-                                        } else {
-                                            "$currentNote\n\n$newTextInput"
+                                        onOpenDocument?.invoke(filePath, pageNumber)
+                                        onDismiss()
+                                    }
+                            }
+                        )
+                    } else {
+                        // Empty state
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 200.dp)
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.NoteAdd,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(48.dp),
+                                    tint = MaterialTheme.colorScheme.outline
+                                )
+                                Text(
+                                    text = "Notiz ist leer",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "Verwende die Schnelleingabe unten",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Quick input section (separate card, always visible)
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp)
+                ) {
+                    // Template chips row
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(bottom = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        FilterChip(
+                            selected = quickInputMode == "text",
+                            onClick = { quickInputMode = "text" },
+                            label = { Text("Text", style = MaterialTheme.typography.labelSmall) }
+                        )
+                        FilterChip(
+                            selected = quickInputMode == "coord",
+                            onClick = {
+                                quickInputMode = "coord"
+                                if (newTextInput.text.isEmpty() || !newTextInput.text.contains("N") || !newTextInput.text.contains("E")) {
+                                    val tmpl = "N 00 00 00 E 00 00 00"
+                                    newTextInput = TextFieldValue(tmpl, selection = TextRange(2))
+                                    focusRequester.requestFocus()
+                                } else {
+                                    focusRequester.requestFocus()
+                                }
+                            },
+                            label = { Text("Koordinaten", style = MaterialTheme.typography.labelSmall) }
+                        )
+                        FilterChip(
+                            selected = quickInputMode == "freq",
+                            onClick = {
+                                quickInputMode = "freq"
+                                if (newTextInput.text.isEmpty()) {
+                                    val tmpl = "COM: "
+                                    newTextInput = TextFieldValue(tmpl, selection = TextRange(tmpl.length))
+                                    focusRequester.requestFocus()
+                                } else {
+                                    focusRequester.requestFocus()
+                                }
+                            },
+                            label = { Text("Frequenz", style = MaterialTheme.typography.labelSmall) }
+                        )
+                        FilterChip(
+                            selected = quickInputMode == "time",
+                            onClick = {
+                                quickInputMode = "time"
+                                val now = java.time.LocalTime.now()
+                                val tmpl = "${now.hour.toString().padStart(2, '0')}:${now.minute.toString().padStart(2, '0')} "
+                                newTextInput = TextFieldValue(tmpl, selection = TextRange(tmpl.length))
+                                focusRequester.requestFocus()
+                            },
+                            label = { Text("Zeit", style = MaterialTheme.typography.labelSmall) }
+                        )
+                        FilterChip(
+                            selected = quickInputMode == "number",
+                            onClick = { quickInputMode = "number" },
+                            label = { Text("Zahlen", style = MaterialTheme.typography.labelSmall) }
+                        )
+                        FilterChip(
+                            selected = false,
+                            onClick = {
+                                val tmpl = "Höhe: FL  / Speed:  / HDG: "
+                                newTextInput = TextFieldValue(tmpl, selection = TextRange(tmpl.length))
+                                focusRequester.requestFocus()
+                            },
+                            label = { Text("Fluglage", style = MaterialTheme.typography.labelSmall) }
+                        )
+                    }
+
+                    // Quick input field with smart keyboard
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val keyboardType = when (quickInputMode) {
+                            "coord", "freq", "number" -> KeyboardType.Decimal
+                            "time" -> KeyboardType.Number
+                            else -> KeyboardType.Text
+                        }
+
+                        OutlinedTextField(
+                            value = newTextInput,
+                            onValueChange = { newVal ->
+                                if (quickInputMode == "coord") {
+                                    val prev = newTextInput.text.ifBlank { "N 00 00 00 E 00 00 00" }
+                                    val prevDigits = prev.filter { it.isDigit() }.padEnd(12, '0')
+                                    val northChars = prevDigits.take(6).toCharArray()
+                                    val eastChars = prevDigits.drop(6).take(6).toCharArray()
+
+                                    val incDigits = newVal.text.filter { it.isDigit() }
+                                    val template = "N 00 00 00 E 00 00 00"
+                                    val nStart = template.indexOf('N') + 2
+                                    val eStart = template.indexOf('E') + 2
+                                    val digitOffsets = listOf(0,1,3,4,6,7)
+
+                                    fun positions(start: Int) = digitOffsets.map { start + it }
+                                    val nPos = positions(nStart)
+                                    val ePos = positions(eStart)
+
+                                    val caret = newVal.selection.start.coerceAtLeast(0)
+                                    val editingEast = caret >= ePos.first()
+
+                                    fun slotForCaret(posList: List<Int>, caretPos: Int): Int {
+                                        for ((i, p) in posList.withIndex()) {
+                                            if (caretPos <= p + 1) return i
                                         }
-                                        newTextInput = ""
-                                        hasChanges = true
+                                        return posList.size - 1
+                                    }
+
+                                    val slot = if (editingEast) slotForCaret(ePos, caret) else slotForCaret(nPos, caret)
+                                    val prevAll = prevDigits
+                                    val added = if (incDigits.length > prevAll.length) incDigits.drop(prevAll.length) else ""
+                                    val removed = if (incDigits.length < prevAll.length) prevAll.length - incDigits.length else 0
+
+                                    if (added.isNotEmpty()) {
+                                        var idx = 0
+                                        if (editingEast) {
+                                            for (ch in added) {
+                                                val pos = (slot + idx).coerceIn(0,5)
+                                                eastChars[pos] = ch
+                                                idx++
+                                                if (pos == 5) break
+                                            }
+                                        } else {
+                                            for (ch in added) {
+                                                val pos = (slot + idx).coerceIn(0,5)
+                                                northChars[pos] = ch
+                                                idx++
+                                                if (pos == 5) break
+                                            }
+                                        }
+                                    } else if (removed > 0) {
+                                        if (editingEast) {
+                                            val keep = eastChars.joinToString("").filter { it.isDigit() }.dropLast(removed.coerceAtMost(6))
+                                            val padded = keep.padEnd(6, '0')
+                                            for (i in padded.indices) eastChars[i] = padded[i]
+                                        } else {
+                                            val keep = northChars.joinToString("").filter { it.isDigit() }.dropLast(removed.coerceAtMost(6))
+                                            val padded = keep.padEnd(6, '0')
+                                            for (i in padded.indices) northChars[i] = padded[i]
+                                        }
+                                    } else if (added.isEmpty() && removed == 0 && incDigits.isNotEmpty()) {
+                                        val pd = incDigits.padEnd(12, '0')
+                                        for (i in 0 until 6) northChars[i] = pd[i]
+                                        for (i in 0 until 6) eastChars[i] = pd[i+6]
+                                    }
+
+                                    fun fmt(chars: CharArray): String {
+                                        val s = String(chars)
+                                        return "${s.substring(0,2)} ${s.substring(2,4)} ${s.substring(4,6)}"
+                                    }
+
+                                    val northFmt = fmt(northChars)
+                                    val eastFmt = fmt(eastChars)
+                                    val formatted = "N $northFmt E $eastFmt"
+
+                                    val base = if (editingEast) formatted.indexOf('E') + 2 else formatted.indexOf('N') + 2
+                                    val caretSlot = (slot + (if (added.isNotEmpty()) added.length else 0)).coerceIn(0,6)
+                                    val sel = base + caretSlot
+
+                                    newTextInput = TextFieldValue(formatted, selection = TextRange(sel.coerceIn(0, formatted.length)))
+                                } else if (quickInputMode == "freq") {
+                                    val formatted = formatComInputToDot(newVal.text)
+                                    newTextInput = TextFieldValue(formatted, selection = TextRange(formatted.length))
+                                } else if (quickInputMode == "number") {
+                                    val filtered = newVal.text.filter { it.isDigit() }
+                                    newTextInput = TextFieldValue(filtered, selection = TextRange(filtered.length))
+                                } else {
+                                    newTextInput = newVal
+                                }
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .focusRequester(focusRequester)
+                                .onFocusChanged { state ->
+                                    if (state.isFocused && quickInputMode == "coord") {
+                                        val txt = newTextInput.text
+                                        val digits = txt.filter { it.isDigit() && it != '0' }
+                                        val pos = if (digits.isEmpty()) {
+                                            txt.indexOf('N') + 2
+                                        } else {
+                                            val allDigits = txt.filter { it.isDigit() }
+                                            val numDigits = allDigits.takeWhile { d ->
+                                                allDigits.indexOf(d) < allDigits.indexOfLast { it != '0' } + 1
+                                            }.count()
+                                            when {
+                                                numDigits <= 2 -> 2 + numDigits
+                                                numDigits <= 4 -> 2 + numDigits + 1
+                                                numDigits <= 6 -> 2 + numDigits + 2
+                                                numDigits <= 8 -> txt.indexOf('E') + 2 + (numDigits - 6)
+                                                numDigits <= 10 -> txt.indexOf('E') + 2 + (numDigits - 6) + 1
+                                                else -> txt.indexOf('E') + 2 + (numDigits - 6) + 2
+                                            }
+                                        }
+                                        newTextInput = newTextInput.copy(selection = TextRange(pos.coerceIn(0, txt.length)))
                                     }
                                 },
-                                enabled = newTextInput.isNotEmpty()
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = "Hinzufügen")
-                            }
+                            placeholder = {
+                                Text(when (quickInputMode) {
+                                    "coord" -> "Zahlen eingeben (z.B. 481234 für N48°12'34\")"
+                                    "freq" -> "z.B. 122.500"
+                                    "time" -> "z.B. 14:30"
+                                    "number" -> "Zahlen eingeben..."
+                                    else -> "Text hinzufügen..."
+                                })
+                            },
+                            maxLines = 2,
+                            textStyle = MaterialTheme.typography.bodyMedium,
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = keyboardType,
+                                imeAction = ImeAction.Done
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onDone = {
+                                    if (newTextInput.text.isNotEmpty()) {
+                                        currentNote = if (currentNote.isEmpty()) {
+                                            newTextInput.text
+                                        } else {
+                                            "$currentNote\n\n${newTextInput.text}"
+                                        }
+                                        newTextInput = TextFieldValue("")
+                                        hasChanges = true
+                                        focusManager.clearFocus()
+                                    }
+                                }
+                            )
+                        )
+
+                        FilledTonalIconButton(
+                            onClick = {
+                                if (newTextInput.text.isNotEmpty()) {
+                                    currentNote = if (currentNote.isEmpty()) {
+                                        newTextInput.text
+                                    } else {
+                                        "$currentNote\n\n${newTextInput.text}"
+                                    }
+                                    newTextInput = TextFieldValue("")
+                                    hasChanges = true
+                                }
+                            },
+                            enabled = newTextInput.text.isNotEmpty()
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Hinzufügen")
                         }
                     }
                 }
@@ -912,4 +1239,5 @@ fun QuickAccessSheet(
             }
         }
     }
+}
 }
