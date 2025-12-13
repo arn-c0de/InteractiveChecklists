@@ -46,7 +46,14 @@ fun FlightMiniStatusBar(noteManager: QuickNoteManager, onClick: (() -> Unit)? = 
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(text = (callsign.ifBlank { "-" }), style = MaterialTheme.typography.labelSmall)
-        Text(text = "Status: ${status.ifBlank { "Idle" }}", style = MaterialTheme.typography.labelSmall)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(text = "Status:", style = MaterialTheme.typography.labelSmall)
+            FlightStatusDropdown(
+                currentStatus = status,
+                onStatusChange = { noteManager.saveFlightStatus(it) },
+                compact = true
+            )
+        }
         Text(text = "COM1: ${com1.ifBlank { "-" }} ${com1Mode}", style = MaterialTheme.typography.labelSmall)
         Text(text = "COM2: ${com2.ifBlank { "-" }} ${com2Mode}", style = MaterialTheme.typography.labelSmall)
         Spacer(modifier = Modifier.weight(1f))
