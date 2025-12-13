@@ -59,6 +59,25 @@ class QuickNoteManager(private val context: Context) {
     private val _noteContent = MutableStateFlow("")
     val noteContent: StateFlow<String> = _noteContent.asStateFlow()
 
+    // Radio/CALLSIGN state flows
+    private val _callsign = MutableStateFlow("")
+    val callsign: StateFlow<String> = _callsign.asStateFlow()
+
+    private val _com1 = MutableStateFlow("")
+    val com1: StateFlow<String> = _com1.asStateFlow()
+
+    private val _com1Mode = MutableStateFlow("FM") // or "AM"
+    val com1Mode: StateFlow<String> = _com1Mode.asStateFlow()
+
+    private val _com2 = MutableStateFlow("")
+    val com2: StateFlow<String> = _com2.asStateFlow()
+
+    private val _com2Mode = MutableStateFlow("FM")
+    val com2Mode: StateFlow<String> = _com2Mode.asStateFlow()
+
+    private val _flightInfoExpanded = MutableStateFlow(false)
+    val flightInfoExpanded: StateFlow<Boolean> = _flightInfoExpanded.asStateFlow()
+
     init {
         // Start coroutine to initialize data
         scope.launch {
@@ -99,7 +118,19 @@ class QuickNoteManager(private val context: Context) {
             if (activeId != null) {
                 _activeNoteId.value = activeId
             }
+            // load callsign/coms
+            _callsign.value = prefs.getString(CALLSIGN_KEY, "") ?: ""
+            _com1.value = prefs.getString(COM1_KEY, "") ?: ""
+            _com1Mode.value = prefs.getString(COM1_MODE_KEY, "FM") ?: "FM"
+            _com2.value = prefs.getString(COM2_KEY, "") ?: ""
+            _com2Mode.value = prefs.getString(COM2_MODE_KEY, "FM") ?: "FM"
+            _flightInfoExpanded.value = prefs.getBoolean(FLIGHT_INFO_EXPANDED_KEY, false)
         }
+    }
+
+    fun saveFlightInfoExpanded(expanded: Boolean) {
+        prefs.edit().putBoolean(FLIGHT_INFO_EXPANDED_KEY, expanded).apply()
+        _flightInfoExpanded.value = expanded
     }
 
     /**
@@ -193,6 +224,72 @@ class QuickNoteManager(private val context: Context) {
                 Log.e(TAG, "Error saving note content", e)
             }
         }
+    }
+
+    // -------- CALLSIGN and COM persistence --------
+    fun saveCallsign(value: String) {
+        prefs.edit().putString(CALLSIGN_KEY, value).apply()
+        _callsign.value = value
+    }
+
+    fun saveCom1(freq: String, mode: String = "FM") {
+        val formatted = formatComFreq(freq)
+        prefs.edit().putString(COM1_KEY, formatted).putString(COM1_MODE_KEY, mode).apply()
+        _com1.value = formatted
+        _com1Mode.value = mode
+    }
+
+    fun saveCom2(freq: String, mode: String = "FM") {
+        val formatted = formatComFreq(freq)
+        prefs.edit().putString(COM2_KEY, formatted).putString(COM2_MODE_KEY, mode).apply()
+        _com2.value = formatted
+        _com2Mode.value = mode
+    }
+
+    /**
+     * Load the saved radio settings and return them in a map
+     */
+    fun loadRadioSettings(): Map<String, String> {
+        val map = mutableMapOf<String, String>()
+        map[CALLSIGN_KEY] = prefs.getString(CALLSIGN_KEY, "") ?: ""
+        map[COM1_KEY] = prefs.getString(COM1_KEY, "") ?: ""
+        map[COM1_MODE_KEY] = prefs.getString(COM1_MODE_KEY, "FM") ?: "FM"
+        map[COM2_KEY] = prefs.getString(COM2_KEY, "") ?: ""
+        map[COM2_MODE_KEY] = prefs.getString(COM2_MODE_KEY, "FM") ?: "FM"
+        return map
+    }
+
+    data class RadioSettings(
+        val callsign: String,
+        val com1: String,
+        val com1Mode: String,
+        val com2: String,
+        val com2Mode: String
+    )
+
+    fun getRadioSettings(): RadioSettings {
+        return RadioSettings(
+            callsign = prefs.getString(CALLSIGN_KEY, "") ?: "",
+            com1 = prefs.getString(COM1_KEY, "") ?: "",
+            com1Mode = prefs.getString(COM1_MODE_KEY, "FM") ?: "FM",
+            com2 = prefs.getString(COM2_KEY, "") ?: "",
+            com2Mode = prefs.getString(COM2_MODE_KEY, "FM") ?: "FM"
+        )
+    }
+
+    private fun formatComFreq(freq: String): String {
+        // Accept both comma and dot, format as 000,000 with 3 digits fractional
+        val normalized = freq.replace('.', ',')
+        // allow only digits and comma
+        val filtered = normalized.filter { it.isDigit() || it == ',' }
+        val parts = filtered.split(',')
+        val whole = parts.getOrNull(0)?.padStart(3, '0') ?: "000"
+        val fracRaw = parts.getOrNull(1) ?: "000"
+        val frac = when {
+            fracRaw.length >= 3 -> fracRaw.substring(0, 3)
+            else -> fracRaw.padEnd(3, '0')
+        }
+        return "$whole,$frac"
     }
 
     /**
@@ -371,5 +468,11 @@ class QuickNoteManager(private val context: Context) {
         private const val LINKED_DOCS_KEY = "linked_documents"
         private const val NOTES_KEY = "quick_notes_list"
         private const val ACTIVE_NOTE_KEY = "active_quick_note_id"
+        private const val CALLSIGN_KEY = "callsign"
+        private const val COM1_KEY = "com1"
+        private const val COM1_MODE_KEY = "com1_mode"
+        private const val COM2_KEY = "com2"
+        private const val COM2_MODE_KEY = "com2_mode"
+        private const val FLIGHT_INFO_EXPANDED_KEY = "flight_info_expanded"
     }
 }
