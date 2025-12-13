@@ -371,40 +371,12 @@ fun QuickAccessSheet(
 
                                 Spacer(modifier = Modifier.width(8.dp))
 
-                                // Flight status dropdown (small width)
-                                val statusOptions = listOf("Idle", "Startup", "Taxi", "Holding", "Start Navigation", "Navigation", "Landing", "Shutdown")
-                                var statusExpanded by remember { mutableStateOf(false) }
-                                Box(modifier = Modifier.wrapContentSize()) {
-                                    OutlinedTextField(
-                                        value = flightStatus.ifBlank { "Idle" },
-                                        onValueChange = {},
-                                        label = { Text("Status") },
-                                        readOnly = true,
-                                        trailingIcon = {
-                                            IconButton(onClick = { statusExpanded = !statusExpanded }) {
-                                                Icon(
-                                                    imageVector = if (statusExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                                    contentDescription = if (statusExpanded) "Collapse" else "Expand"
-                                                )
-                                            }
-                                        },
-                                        modifier = Modifier.width(170.dp).clickable { statusExpanded = true }
-                                    )
-                                    DropdownMenu(
-                                        expanded = statusExpanded,
-                                        onDismissRequest = { statusExpanded = false }
-                                    ) {
-                                        statusOptions.forEach { selection ->
-                                            DropdownMenuItem(
-                                                text = { Text(selection) },
-                                                onClick = {
-                                                    flightStatus = selection
-                                                    statusExpanded = false
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
+                                // Flight status dropdown using shared component
+                                FlightStatusDropdown(
+                                    currentStatus = flightStatus,
+                                    onStatusChange = { flightStatus = it },
+                                    compact = false
+                                )
                             }
                     }
 
