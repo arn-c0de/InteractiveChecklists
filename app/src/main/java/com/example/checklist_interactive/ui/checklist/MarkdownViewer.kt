@@ -465,7 +465,7 @@ private fun RenderMarkdownLine(line: String, bodyFontSize: Int) {
     when {
         line.startsWith("# ") -> {
             Text(
-                text = line.substring(2),
+                text = parseInlineMarkdown(line.substring(2), bodyFontSize),
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(vertical = 8.dp)
@@ -473,7 +473,7 @@ private fun RenderMarkdownLine(line: String, bodyFontSize: Int) {
         }
         line.startsWith("## ") -> {
             Text(
-                text = line.substring(3),
+                text = parseInlineMarkdown(line.substring(3), bodyFontSize),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(vertical = 6.dp)
@@ -481,7 +481,7 @@ private fun RenderMarkdownLine(line: String, bodyFontSize: Int) {
         }
         line.startsWith("### ") -> {
             Text(
-                text = line.substring(4),
+                text = parseInlineMarkdown(line.substring(4), bodyFontSize),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(vertical = 4.dp)
@@ -503,7 +503,7 @@ private fun RenderMarkdownLine(line: String, bodyFontSize: Int) {
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = text,
+                        text = parseInlineMarkdown(text, bodyFontSize),
                         style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
                         modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
                     )
@@ -519,14 +519,28 @@ private fun RenderMarkdownLine(line: String, bodyFontSize: Int) {
             Row(modifier = Modifier.padding(vertical = 2.dp)) {
                 Text("• ", style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp))
                 Text(
-                    text = line.trim().substring(2),
+                    text = parseInlineMarkdown(line.trim().substring(2), bodyFontSize),
                     style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp)
+                )
+            }
+        }
+        line.trim().startsWith("> ") -> {
+            // Blockquote
+            val quoted = line.trim().substring(2)
+            Card(
+                modifier = Modifier.padding(vertical = 2.dp).fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.05f))
+            ) {
+                Text(
+                    text = parseInlineMarkdown(quoted, bodyFontSize),
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = (bodyFontSize - 1).sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
+                    modifier = Modifier.padding(8.dp)
                 )
             }
         }
         line.isNotBlank() -> {
             Text(
-                text = line,
+                text = parseInlineMarkdown(line, bodyFontSize),
                 style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
                 modifier = Modifier.padding(vertical = 2.dp)
             )
@@ -592,14 +606,11 @@ private fun InteractiveMarkdownView(
     // State für expandierte Sektionen - Key ist der Section-Title
     val expandedSections = remember { mutableStateMapOf<String, Boolean>() }
 
-    // Wenn expandAll sich ändert, aktualisiere alle Sektionen
+    // Wenn expandAll sich ändert, aktualisiere alle Sektionen mit Items
     LaunchedEffect(expandAll) {
         checklist.sections.forEach { section ->
-            if (section.title.isNotEmpty()) {
-                val isSubSection = section.title.length > 3 && !section.title.contains("Case") && !section.title.contains("Recovery")
-                if (isSubSection) {
-                    expandedSections[section.title] = expandAll
-                }
+            if (section.title.isNotEmpty() && section.items.isNotEmpty()) {
+                expandedSections[section.title] = expandAll
             }
         }
     }
@@ -638,10 +649,10 @@ private fun InteractiveMarkdownView(
                 // Prüfe ob es eine ### Überschrift ist (Sub-Section)
                 val isSubSection = section.title.length > 3 && !section.title.contains("Case") && !section.title.contains("Recovery")
 
-                if (isSubSection) {
+                if (section.items.isNotEmpty()) {
                     val isExpanded = expandedSections[section.title] ?: false // Default: collapsed
 
-                    // ### Überschrift - in Card gruppieren mit Collapsible-Funktion
+                    // Section with items - show as collapsible Card
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -746,7 +757,7 @@ private fun ChecklistItemRow(
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = item.text,
+                text = parseInlineMarkdown(item.text, bodyFontSize),
                 style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
                 modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
             )
