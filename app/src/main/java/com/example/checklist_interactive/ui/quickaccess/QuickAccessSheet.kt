@@ -553,11 +553,6 @@ fun QuickAccessSheet(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(text = "${callsign.ifBlank { "-" }}  | Status: ${flightStatus.ifBlank { "Idle" }}  | COM1: ${com1.ifBlank { "-" }} ${com1Mode}  | COM2: ${com2.ifBlank { "-" }} ${com2Mode}", style = MaterialTheme.typography.bodyMedium)
-                    Row {
-                        IconButton(onClick = { flightExpanded = true; noteManager.saveFlightInfoExpanded(true) }) {
-                            Icon(Icons.Default.ExpandMore, contentDescription = "Expand")
-                        }
-                    }
                 }
             }
 
@@ -808,45 +803,65 @@ fun QuickAccessSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Note tabs (horizontal scrollable)
-            LazyRow(
+            // Note tabs (horizontal scrollable) - styled as sticky note tabs
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(horizontal = 0.dp)
+                    .offset(y = (-1).dp),
+                horizontalArrangement = Arrangement.Start
             ) {
-                // Filter notes based on search query
-                val filteredNotes = if (searchQuery.isBlank()) {
-                    notes
-                } else {
-                    notes.filter { note ->
-                        note.title.contains(searchQuery, ignoreCase = true) ||
-                        note.content.contains(searchQuery, ignoreCase = true)
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    contentPadding = PaddingValues(horizontal = 0.dp)
+                ) {
+                    // Filter notes based on search query
+                    val filteredNotes = if (searchQuery.isBlank()) {
+                        notes
+                    } else {
+                        notes.filter { note ->
+                            note.title.contains(searchQuery, ignoreCase = true) ||
+                            note.content.contains(searchQuery, ignoreCase = true)
+                        }
                     }
-                }
 
-                items(filteredNotes) { note ->
-                    FilterChip(
-                        selected = note.id == activeNoteId,
-                        onClick = { noteManager.setActiveNote(note.id) },
-                        label = {
+                    items(filteredNotes) { note ->
+                        Surface(
+                            onClick = { noteManager.setActiveNote(note.id) },
+                            modifier = Modifier
+                                .height(32.dp),
+                            shape = MaterialTheme.shapes.small.copy(
+                                topStart = androidx.compose.foundation.shape.CornerSize(0.dp),
+                                topEnd = androidx.compose.foundation.shape.CornerSize(0.dp)
+                            ),
+                            color = if (note.id == activeNoteId) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant
+                            },
+                            tonalElevation = if (note.id == activeNoteId) 3.dp else 1.dp,
+                            shadowElevation = if (note.id == activeNoteId) 2.dp else 0.dp
+                        ) {
                             Row(
+                                modifier = Modifier
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 Text(
                                     text = if (note.title.isNotBlank()) note.title else "Unbenannt",
                                     maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (note.id == activeNoteId) FontWeight.Bold else FontWeight.Normal
                                 )
                                 if (note.id == activeNoteId) {
                                     Icon(
                                         Icons.Default.Edit,
                                         contentDescription = null,
                                         modifier = Modifier
-                                            .size(16.dp)
+                                            .size(14.dp)
                                             .clickable {
                                                 renameTargetId = note.id
                                                 renameText = note.title
@@ -854,44 +869,60 @@ fun QuickAccessSheet(
                                             }
                                     )
                                 }
+                                if (note.id == activeNoteId && notes.size > 1) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = "Löschen",
+                                        modifier = Modifier
+                                            .size(14.dp)
+                                            .clickable { noteManager.removeNote(note.id) },
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
                             }
-                        },
-                        trailingIcon = if (note.id == activeNoteId && notes.size > 1) {
-                            {
+                        }
+                    }
+
+                    // Add note button
+                    item {
+                        Surface(
+                            onClick = {
+                                val id = noteManager.addNote(title = "Neue Notiz")
+                                noteManager.setActiveNote(id)
+                            },
+                            modifier = Modifier
+                                .height(32.dp),
+                            shape = MaterialTheme.shapes.small.copy(
+                                topStart = androidx.compose.foundation.shape.CornerSize(0.dp),
+                                topEnd = androidx.compose.foundation.shape.CornerSize(0.dp)
+                            ),
+                            color = MaterialTheme.colorScheme.tertiaryContainer,
+                            tonalElevation = 2.dp
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
                                 Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = "Löschen",
-                                    modifier = Modifier
-                                        .size(18.dp)
-                                        .clickable { noteManager.removeNote(note.id) },
-                                    tint = MaterialTheme.colorScheme.error
+                                    Icons.Default.Add,
+                                    contentDescription = "Neue Notiz",
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    "Neu",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             }
-                        } else null
-                    )
-                }
-
-                // Add note button
-                item {
-                    FilterChip(
-                        selected = false,
-                        onClick = {
-                            val id = noteManager.addNote(title = "Neue Notiz")
-                            noteManager.setActiveNote(id)
-                        },
-                        label = { Text("Neu") },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.Add,
-                                contentDescription = "Neue Notiz",
-                                modifier = Modifier.size(18.dp)
-                            )
                         }
-                    )
+                    }
                 }
             }
 
             // Quick input section (separate card, always visible)
+            Spacer(modifier = Modifier.height(12.dp))
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.elevatedCardColors(
@@ -922,16 +953,14 @@ fun QuickAccessSheet(
                             label = { Text("Text", style = MaterialTheme.typography.labelSmall) }
                         )
                         FilterChip(
-                            selected = quickInputMode == "coord",
+                            selected = quickInputMode == "number",
                             onClick = {
-                                if (quickInputMode != "coord") {
-                                    quickInputMode = "coord"
-                                    val tmpl = "N       E      "
-                                    newTextInput = TextFieldValue(tmpl, selection = TextRange(2))
-                                    focusRequester.requestFocus()
+                                if (quickInputMode != "number") {
+                                    quickInputMode = "number"
+                                    newTextInput = TextFieldValue("")
                                 }
                             },
-                            label = { Text("Koordinaten", style = MaterialTheme.typography.labelSmall) }
+                            label = { Text("Zahlen", style = MaterialTheme.typography.labelSmall) }
                         )
                         FilterChip(
                             selected = quickInputMode == "freq",
@@ -946,27 +975,16 @@ fun QuickAccessSheet(
                             label = { Text("Frequenz", style = MaterialTheme.typography.labelSmall) }
                         )
                         FilterChip(
-                            selected = quickInputMode == "time",
+                            selected = quickInputMode == "coord",
                             onClick = {
-                                if (quickInputMode != "time") {
-                                    quickInputMode = "time"
-                                    val now = java.time.LocalTime.now()
-                                    val tmpl = "${now.hour.toString().padStart(2, '0')}:${now.minute.toString().padStart(2, '0')} "
-                                    newTextInput = TextFieldValue(tmpl, selection = TextRange(tmpl.length))
+                                if (quickInputMode != "coord") {
+                                    quickInputMode = "coord"
+                                    val tmpl = "N       E      "
+                                    newTextInput = TextFieldValue(tmpl, selection = TextRange(2))
                                     focusRequester.requestFocus()
                                 }
                             },
-                            label = { Text("Zeit", style = MaterialTheme.typography.labelSmall) }
-                        )
-                        FilterChip(
-                            selected = quickInputMode == "number",
-                            onClick = {
-                                if (quickInputMode != "number") {
-                                    quickInputMode = "number"
-                                    newTextInput = TextFieldValue("")
-                                }
-                            },
-                            label = { Text("Zahlen", style = MaterialTheme.typography.labelSmall) }
+                            label = { Text("Koordinaten", style = MaterialTheme.typography.labelSmall) }
                         )
                         FilterChip(
                             selected = quickInputMode == "fluglage",
@@ -979,6 +997,19 @@ fun QuickAccessSheet(
                                 }
                             },
                             label = { Text("Fluglage", style = MaterialTheme.typography.labelSmall) }
+                        )
+                        FilterChip(
+                            selected = quickInputMode == "time",
+                            onClick = {
+                                if (quickInputMode != "time") {
+                                    quickInputMode = "time"
+                                    val now = java.time.LocalTime.now()
+                                    val tmpl = "${now.hour.toString().padStart(2, '0')}:${now.minute.toString().padStart(2, '0')} "
+                                    newTextInput = TextFieldValue(tmpl, selection = TextRange(tmpl.length))
+                                    focusRequester.requestFocus()
+                                }
+                            },
+                            label = { Text("Zeit", style = MaterialTheme.typography.labelSmall) }
                         )
                     }
 
@@ -1099,7 +1130,7 @@ fun QuickAccessSheet(
                                         numDigits == 0 -> 9  // Nach "Höhe: FL "
                                         numDigits <= 4 -> 9 + numDigits  // In FL Bereich
                                         numDigits <= 7 -> 23 + (numDigits - 4)  // In Speed Bereich (nach " / Speed: ")
-                                        else -> 33 + (numDigits - 7)  // In HDG Bereich (nach " / HDG: ")
+                                        else -> 34 + (numDigits - 7)  // In HDG Bereich (nach " / HDG: ")
                                     }
 
                                     newTextInput = TextFieldValue(
@@ -1150,7 +1181,7 @@ fun QuickAccessSheet(
                                                     numDigits == 0 -> 9  // Nach "Höhe: FL "
                                                     numDigits <= 4 -> 9 + numDigits
                                                     numDigits <= 7 -> 23 + (numDigits - 4)
-                                                    else -> 33 + (numDigits - 7)
+                                                    else -> 34 + (numDigits - 7)
                                                 }
 
                                                 newTextInput = newTextInput.copy(
