@@ -56,7 +56,7 @@ fun InternalFileViewer(
     when (fileInfo.extension.lowercase()) {
         "pdf" -> {
             val prefsManager = remember { PreferencesManager(context) }
-            val lastPage = remember(fileInfo.path) { prefsManager.getInt("pdf_last_page_${fileInfo.path}", 0) }
+            val lastPage = remember(fileInfo.path) { prefsManager.getInt("pdf_last_page_${fileInfo.path}", com.example.checklist_interactive.data.shortcuts.LastPageManager(context).getLastPage(fileInfo.path)) }
             var currentPage by remember(fileInfo.path) { mutableStateOf(lastPage) }
 
             // Aktualisiere currentPage wenn initialPage sich ändert (z.B. durch Link-Klick)
@@ -106,6 +106,8 @@ fun InternalFileViewer(
                 title = fileInfo.displayName,
                 onBack = {
                     prefsManager.setInt("pdf_last_page_${fileInfo.path}", currentPage)
+                    // Also save into LastPageManager so other viewers using that storage see the same last page
+                    com.example.checklist_interactive.data.shortcuts.LastPageManager(context).saveLastPage(fileInfo.path, currentPage)
                     onBack()
                 },
                 onShowFileList = onShowFileList,
@@ -114,7 +116,8 @@ fun InternalFileViewer(
                 isInternalFile = true,
                 initialPage = currentPage,
                 onPageChange = { page -> currentPage = page },
-                onOpenLinkedDocument = onOpenLinkedDocument
+                onOpenLinkedDocument = onOpenLinkedDocument,
+                documentId = fileInfo.path
             )
             }
         }
