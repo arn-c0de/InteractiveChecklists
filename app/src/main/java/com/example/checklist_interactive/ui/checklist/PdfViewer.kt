@@ -165,6 +165,8 @@ fun PdfViewer(
     var invertColors by remember { mutableStateOf(false) }
     var showTocDialog by remember { mutableStateOf(false) }
     var chapters by remember { mutableStateOf<List<Pair<String, Int>>>(emptyList()) }
+    var outlineItems by remember { mutableStateOf<List<PdfOutlineItem>>(emptyList()) }
+    val outlineExtractor = remember { PdfOutlineExtractor(context) }
     var showQuickAccess by remember { mutableStateOf(false) }
     var showToolbar by remember { mutableStateOf(true) }
 
@@ -258,6 +260,15 @@ fun PdfViewer(
                     page.close()
                 }
 
+                // Extract PDF outline (bookmarks/chapters)
+                try {
+                    outlineItems = outlineExtractor.extractOutline(loadedPdfFile)
+                    android.util.Log.d("PdfViewer", "Extracted outline items: ${outlineItems.size} -> ${outlineItems.joinToString(", ") { it.title + ":" + it.pageNumber }}")
+                } catch (e: Exception) {
+                    // If outline extraction fails, continue without it
+                    android.util.Log.d("PdfViewer", "Outline extraction failed: ${e.message}")
+                }
+
                 // Render only an initial subset of pages (effectiveInitialPage and nearby), rest are loaded on demand.
                 val initialIndices = listOf(effectiveInitialPage - 1, effectiveInitialPage, effectiveInitialPage + 1).distinct().filter { it in 0 until pageCount }
                 for (pageIndex in initialIndices) {
@@ -297,8 +308,12 @@ fun PdfViewer(
                 }
             }
             isLoading = false
-            // Populate fallback chapters (page list) after pages are loaded
-            chapters = (0 until pageCount).map { idx -> "Seite ${idx + 1}" to idx }
+            // Populate chapters: use outline if available, otherwise fallback to page list
+            chapters = if (outlineItems.isNotEmpty()) {
+                outlineItems.map { it.title to it.pageNumber }
+            } else {
+                (0 until pageCount).map { idx -> "Seite ${idx + 1}" to idx }
+            }
         } catch (e: Exception) {
             errorMessage = context.getString(R.string.error_loading_pdf, e.message ?: "")
             isLoading = false
@@ -500,6 +515,19 @@ fun PdfViewer(
                     }
                 },
                 actions = {
+                    // Outline Button neben Seitenzahl
+                    HintIconButton(
+                        onClick = { showTocDialog = true },
+                        hint = if (outlineItems.isNotEmpty()) "Outline anzeigen" else "Seitenliste anzeigen",
+                        onHintChange = { hoveredHint = it },
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.ViewList,
+                            contentDescription = "Outline",
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                     if (onToggleTheme != null) {
                         HintIconButton(onClick = onToggleTheme, hint = context.getString(R.string.toggle_dark_mode), onHintChange = { hoveredHint = it }) {
                             Icon(
@@ -1230,7 +1258,7 @@ fun PdfViewer(
                 }
             )
         }
-        // Inhaltsverzeichnis / Kapitel-Dialog
+        // Inhaltsverzeichnis / Kapitel-Dialog mit hierarchischer Outline-Anzeige
         if (showTocDialog) {
             // LazyListState für TOC, startet bei aktueller Seite
             val tocListState = rememberLazyListState()
@@ -1245,7 +1273,7 @@ fun PdfViewer(
 
             AlertDialog(
                 onDismissRequest = { showTocDialog = false },
-                title = { Text("Inhaltsverzeichnis") },
+                title = { Text(if (outlineItems.isNotEmpty()) "Outline" else "Inhaltsverzeichnis") },
                 text = {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         if (chapters.isEmpty()) {
@@ -1255,29 +1283,70 @@ fun PdfViewer(
                             modifier = Modifier.heightIn(max = 400.dp),
                             state = tocListState
                         ) {
-                            items(chapters) { (titleText, pageIndex) ->
-                                val isCurrentPage = pageIndex == currentPage
-                                ListItem(
-                                    headlineContent = {
-                                        Text(
-                                            text = titleText,
-                                            fontWeight = if (isCurrentPage) FontWeight.Bold else FontWeight.Normal
-                                        )
-                                    },
-                                    modifier = Modifier
-                                        .clickable {
-                                            showTocDialog = false
-                                            coroutineScope.launch {
-                                                listState.scrollToItem(pageIndex)
+                            if (outlineItems.isNotEmpty()) {
+                                // Hierarchische Outline-Anzeige mit Einrückung
+                                items(outlineItems) { item ->
+                                    val isCurrentPage = item.pageNumber == currentPage
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                showTocDialog = false
+                                                coroutineScope.launch {
+                                                    listState.scrollToItem(item.pageNumber)
+                                                }
                                             }
+                                            .background(
+                                                if (isCurrentPage)
+                                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                                else
+                                                    Color.Transparent
+                                            )
+                                            .padding(vertical = 8.dp)
+                                    ) {
+                                        // Einrückung basierend auf Level
+                                        Spacer(modifier = Modifier.width((item.level * 16).dp + 16.dp))
+                                        Column {
+                                            Text(
+                                                text = item.title,
+                                                style = MaterialTheme.typography.bodyMedium.copy(
+                                                    fontWeight = if (item.level == 0) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            )
+                                            Text(
+                                                text = "Seite ${item.pageNumber + 1}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
                                         }
-                                        .background(
-                                            if (isCurrentPage)
-                                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                                            else
-                                                Color.Transparent
-                                        )
-                                )
+                                    }
+                                }
+                            } else {
+                                // Fallback: Einfache Seitenliste
+                                items(chapters) { (titleText, pageIndex) ->
+                                    val isCurrentPage = pageIndex == currentPage
+                                    ListItem(
+                                        headlineContent = {
+                                            Text(
+                                                text = titleText,
+                                                fontWeight = if (isCurrentPage) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        },
+                                        modifier = Modifier
+                                            .clickable {
+                                                showTocDialog = false
+                                                coroutineScope.launch {
+                                                    listState.scrollToItem(pageIndex)
+                                                }
+                                            }
+                                            .background(
+                                                if (isCurrentPage)
+                                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                                else
+                                                    Color.Transparent
+                                            )
+                                    )
+                                }
                             }
                         }
                     }

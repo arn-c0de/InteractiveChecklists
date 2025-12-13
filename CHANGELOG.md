@@ -2,6 +2,10 @@
 
 All relevant changes are summarized here by version.
 
+## [1.0.5] - 2025-12-13
+- **PDF Outline Extractor | searching function**
+
+
 ## [1.0.4] - 2025-12-12
 ### Added
 - **Room Database integration** for QuickNotes with proper data persistence
