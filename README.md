@@ -18,7 +18,8 @@
 	<a href="docs/docnavigation.md">Documentation</a> |
 	<a href="docs/FUTURE_PLANS.md">Future Plans</a> |
 	<a href="SECURITY.md">Security Policy</a> |
-	<a href="LICENSE">License</a>
+	<a href="LICENSE">License</a> |
+	<a href="COLLABORATORS.md">Collaborators</a>
 </div>
 
 
@@ -28,7 +29,13 @@ InteractiveChecklists is an Android application designed for viewing and interac
 
 > **Development status:** This repository is a development snapshot and not an official release. The app is functional and usable but still under active development and may contain experimental features, breaking changes, or instabilities.
 
-> **Entwicklungsstatus:** Dieses Repository ist eine Entwicklungsversion und keine offizielle Release-Version. Die App ist funktionsfähig und benutzbar, befindet sich jedoch noch in aktiver Weiterentwicklung und kann experimentelle Funktionen oder Instabilitäten enthalten.
+> **Development status:** This repository is a development version and not an official release. The app is functional and usable, but is still under active development and may contain experimental features or instabilities.
+
+## Collaborations
+
+- We welcome contributions and collaborators. See the [Collaborators](COLLABORATORS.md) document for detailed guidelines on filing issues, submitting pull requests, code style, and communication.
+- Quick ways to contribute: improve documentation, add tests, fix small bugs, or suggest UI/UX improvements through issues or PRs.
+- For larger or breaking changes, please open an issue first to discuss design and scope before starting work.
 
 ## Features
 
@@ -67,6 +74,7 @@ The app is a single-activity application, with `MainActivity.kt` serving as the 
  -   **`data/quicknotes/QuickNoteManager.kt`** and **`ui/quickaccess/QuickAccessSheet.kt`**: The QuickNotes manager and UI.
 
 ## How to build
+
 
 This is a standard Android project. You can build it using Android Studio or by running `./gradlew assembleDebug` from the command line.
 
