@@ -3,7 +3,7 @@
 > It is intended for **development and testing purposes only**.  
 > Features may be incomplete, unstable, or subject to significant changes.  
 > Use at your own risk.
-#  InteractiveChecklists
+
 <!-- Badges -->
 <p align="left">
 	<img src="https://img.shields.io/badge/version-1.0.6-blue.svg" alt="Version" />
@@ -20,6 +20,8 @@
 	<a href="LICENSE">License</a>
 </div>
 
+
+#  InteractiveChecklists
 
 InteractiveChecklists is an Android application designed for viewing and interacting with markdown and PDF checklists. It's built with Jetpack Compose and follows an MVVM architecture.
 
