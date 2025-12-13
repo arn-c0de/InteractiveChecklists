@@ -52,6 +52,18 @@ private fun expandCallsignPlaceholder(content: String, callsign: String): String
     return content.replace(regex, callsign)
 }
 
+// Format a com input as 3-digit whole + '.' + up to 3-digit fractional while typing
+private fun formatComInputToDot(input: String): String {
+    val digitsOnly = input.filter { it.isDigit() }
+    val maxDigits = 6 // 3 whole + 3 fraction
+    val trimmed = if (digitsOnly.length > maxDigits) digitsOnly.substring(0, maxDigits) else digitsOnly
+    return when {
+        trimmed.length < 3 -> trimmed
+        trimmed.length == 3 -> trimmed + "."
+        else -> trimmed.substring(0, 3) + "." + trimmed.substring(3)
+    }
+}
+
 /**
  * Builds annotated string with clickable internal links
  */
@@ -113,7 +125,8 @@ fun QuickAccessSheet(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val noteManager = remember { QuickNoteManager(context) }
+    val providedNoteManager = com.example.checklist_interactive.ui.quickaccess.LocalQuickNoteManager.current
+    val noteManager = providedNoteManager ?: remember { QuickNoteManager(context) }
 
     // State flows
     val notes by noteManager.notes.collectAsState()
@@ -157,9 +170,9 @@ fun QuickAccessSheet(
     // Initialize toolbar state from flows
     LaunchedEffect(callsignFlow, com1Flow, com1ModeFlow, com2Flow, com2ModeFlow, flightStatusFlow) {
         callsign = callsignFlow
-        com1 = com1Flow
+        com1 = com1Flow.replace(',', '.')
         com1Mode = com1ModeFlow
-        com2 = com2Flow
+        com2 = com2Flow.replace(',', '.')
         com2Mode = com2ModeFlow
         flightStatus = flightStatusFlow
     }
@@ -175,7 +188,7 @@ fun QuickAccessSheet(
     // Auto-save COM1 and mode when either changes
     LaunchedEffect(com1, com1Mode) {
         if (com1 != com1Flow || com1Mode != com1ModeFlow) {
-            kotlinx.coroutines.delay(600L)
+            kotlinx.coroutines.delay(300L)
             noteManager.saveCom1(com1, com1Mode)
         }
     }
@@ -183,7 +196,7 @@ fun QuickAccessSheet(
     // Auto-save COM2 and mode when either changes
     LaunchedEffect(com2, com2Mode) {
         if (com2 != com2Flow || com2Mode != com2ModeFlow) {
-            kotlinx.coroutines.delay(600L)
+            kotlinx.coroutines.delay(300L)
             noteManager.saveCom2(com2, com2Mode)
         }
     }
@@ -392,7 +405,7 @@ fun QuickAccessSheet(
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                             OutlinedTextField(
                                 value = com1,
-                                onValueChange = { com1 = it },
+                                onValueChange = { com1 = formatComInputToDot(it) },
                                 label = { Text("COM1") },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Decimal),
@@ -408,7 +421,7 @@ fun QuickAccessSheet(
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                             OutlinedTextField(
                                 value = com2,
-                                onValueChange = { com2 = it },
+                                onValueChange = { com2 = formatComInputToDot(it) },
                                 label = { Text("COM2") },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Decimal),

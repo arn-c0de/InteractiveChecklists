@@ -46,7 +46,8 @@ fun MarkdownViewer(
     resetTrigger: Int = 0
 ) {
     val context = LocalContext.current
-    val noteManager = remember { QuickNoteManager(context) }
+    val providedNoteManager = com.example.checklist_interactive.ui.quickaccess.LocalQuickNoteManager.current
+    val noteManager = providedNoteManager ?: remember { QuickNoteManager(context) }
     val callsign by noteManager.callsign.collectAsState()
     var markdownContent by remember { mutableStateOf(markdownContentOverride ?: "") }
     // Derived display content with callsign substitution (do not mutate the raw markdown)
