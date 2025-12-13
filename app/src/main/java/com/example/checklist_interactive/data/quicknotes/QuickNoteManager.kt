@@ -5,6 +5,7 @@ import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,19 +46,33 @@ class QuickNoteManager(private val context: Context) {
     private val prefs = context.getSharedPreferences("quick_notes", Context.MODE_PRIVATE)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    // Initialize database and repository
-    private val database = QuickNoteDatabase.getDatabase(context)
-    private val repository = QuickNoteRepository(database.quickNoteDao())
+    // Initialize database and repository lazily on IO to avoid blocking main thread
+    private lateinit var database: QuickNoteDatabase
+    private lateinit var repository: QuickNoteRepository
 
     // StateFlows for reactive UI updates
     private val _notes = MutableStateFlow<List<QuickNote>>(emptyList())
     val notes: StateFlow<List<QuickNote>> = _notes.asStateFlow()
+
+    private val _notesSummary = MutableStateFlow<List<QuickNote>>(emptyList())
+    val notesSummary: StateFlow<List<QuickNote>> = _notesSummary.asStateFlow()
 
     private val _activeNoteId = MutableStateFlow<String?>(null)
     val activeNoteId: StateFlow<String?> = _activeNoteId.asStateFlow()
 
     private val _noteContent = MutableStateFlow("")
     val noteContent: StateFlow<String> = _noteContent.asStateFlow()
+
+    /**
+     * Get note content as Flow for specific note ID
+     */
+    fun getNoteContentFlow(noteId: String): Flow<String?> {
+        return if (::repository.isInitialized) {
+            repository.getNoteContentFlow(noteId)
+        } else {
+            kotlinx.coroutines.flow.flowOf(null)
+        }
+    }
 
     // Radio/CALLSIGN state flows
     private val _callsign = MutableStateFlow("")
@@ -83,6 +98,9 @@ class QuickNoteManager(private val context: Context) {
     init {
         // Start coroutine to initialize data
         scope.launch {
+            // Initialize Room database and repository on IO
+            database = QuickNoteDatabase.getDatabase(context)
+            repository = QuickNoteRepository(database.quickNoteDao())
             try {
                 // Check if migration is needed
                 val notesCount = repository.getNotesCount()
@@ -91,8 +109,9 @@ class QuickNoteManager(private val context: Context) {
                     migrateFromSharedPreferences()
                 }
 
-                // Observe notes from database
-                repository.getAllNotes().collect { notesList ->
+                // Observe note summaries from database for fast list display
+                repository.getAllNoteSummaries().collect { notesList ->
+                    _notesSummary.value = notesList
                     _notes.value = notesList
 
                     // If no active note is set, set the first one
@@ -139,6 +158,26 @@ class QuickNoteManager(private val context: Context) {
     fun saveFlightStatus(status: String) {
         prefs.edit().putString(FLIGHT_STATUS_KEY, status).apply()
         _flightStatus.value = status
+    }
+
+    /**
+     * Warm up the database connection and load initial data
+     * Call this early (e.g., from MainActivity) to reduce perceived latency
+     */
+    fun warmUp() {
+        scope.launch {
+            try {
+                // Trigger database initialization if not already done
+                if (!::database.isInitialized) {
+                    database = QuickNoteDatabase.getDatabase(context)
+                    repository = QuickNoteRepository(database.quickNoteDao())
+                }
+                // Preload summaries to warm up cache
+                repository.getNotesCount()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error during warmup", e)
+            }
+        }
     }
 
     /**

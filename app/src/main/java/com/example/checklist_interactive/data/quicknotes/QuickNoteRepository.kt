@@ -25,6 +25,22 @@ class QuickNoteRepository(private val quickNoteDao: QuickNoteDao) {
     }
 
     /**
+     * Get note summaries (without content) for fast list display
+     */
+    fun getAllNoteSummaries(): Flow<List<QuickNote>> {
+        return quickNoteDao.getAllNoteSummaries().map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
+    /**
+     * Get note content only by ID as Flow
+     */
+    fun getNoteContentFlow(noteId: String): Flow<String?> {
+        return quickNoteDao.getNoteContent(noteId)
+    }
+
+    /**
      * Get a specific note by ID
      */
     fun getNoteById(noteId: String): Flow<QuickNote?> {

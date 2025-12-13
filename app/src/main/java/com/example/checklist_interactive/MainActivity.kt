@@ -7,6 +7,8 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.core.view.WindowCompat
+import android.view.View
+import android.view.WindowManager
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.activity.compose.setContent
@@ -61,11 +63,21 @@ class MainActivity : ComponentActivity() {
         // rememberLauncherForActivityResult and the in-composition logic.
         enableEdgeToEdge()
 
-        // Enable immersive full-screen: hide Android status/navigation bars and allow transient reveal by swipe
+        // Enable immersive full-screen for the activity: hide Android status/navigation bars and allow transient reveal by swipe
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val controller = WindowInsetsControllerCompat(window, window.decorView)
         controller.hide(WindowInsetsCompat.Type.systemBars())
         controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        // Also set compatibility flags for older APIs and ensure the window stays fullscreen
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility = (
+            View.SYSTEM_UI_FLAG_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+        )
+        window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
         setContent {
             val prefsManager = remember { PreferencesManager(this@MainActivity) }
             var isDarkTheme by remember { mutableStateOf(prefsManager.isDarkModeEnabled()) }
@@ -90,7 +102,11 @@ class MainActivity : ComponentActivity() {
                     showFileList = true
                 }
             }
-            val quickNoteManager = remember { com.example.checklist_interactive.data.quicknotes.QuickNoteManager(this@MainActivity) }
+            val quickNoteManager = remember { 
+                com.example.checklist_interactive.data.quicknotes.QuickNoteManager(this@MainActivity).also {
+                    it.warmUp()
+                }
+            }
             androidx.compose.runtime.CompositionLocalProvider(
                 com.example.checklist_interactive.ui.quickaccess.LocalQuickNoteManager provides quickNoteManager
             ) {
@@ -399,6 +415,27 @@ class MainActivity : ComponentActivity() {
                 }
                 }
             }
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            val controller = WindowInsetsControllerCompat(window, window.decorView)
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            try {
+                controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            } catch (_: Throwable) {
+            }
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_FULLSCREEN
+                    or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                    or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+            )
         }
     }
 }
