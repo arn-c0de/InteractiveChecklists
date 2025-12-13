@@ -2,6 +2,28 @@
 
 All relevant changes are summarized here by version.
 
+## [1.1.0] - 2025-12-13
+### Added
+- **Multi-Tab System**: Open multiple MD/PDF files simultaneously
+- **Tab Bar**: Scrollable tab bar with file icons, close buttons, and active tab highlighting
+- **Swipe Navigation**: Horizontal swipe gestures to navigate between tabs
+- **Quick Tab Switcher**: Bottom sheet showing recently used and all open tabs
+- **Navigation History**: Track up to 20 recently viewed documents
+- **Tab Persistence**: Restore open tabs and page positions after app restart
+- **TabManager**: Clean architecture data layer with SharedPreferences persistence
+- **Modular Tab Components**: Reusable TabBar, TabbedDocumentViewer, and QuickTabSwitcher composables
+
+### Changed
+- MainActivity now uses TabManager for multi-document support
+- File opening creates/switches to tabs instead of replacing view
+- Back button behavior updated to close individual tabs
+- InternalFileViewer integrated with tab system
+
+### Documentation
+- Added comprehensive TAB_SYSTEM.md documentation
+- Updated README.md with tab features
+- Updated docnavigation.md with tab system reference
+
 ## [1.0.5] - 2025-12-13
 - **PDF Outline Extractor | searching function**
 

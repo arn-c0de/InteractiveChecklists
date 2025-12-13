@@ -163,36 +163,49 @@ fun InternalFileViewer(
             Scaffold(
                 topBar = {
                     TopAppBar(
-                        title = { Text(fileInfo.displayName) },
+                        title = { 
+                            Text(
+                                fileInfo.displayName,
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            ) 
+                        },
                         navigationIcon = {
-                            IconButton(onClick = onBack) {
-                                Icon(Icons.Default.ArrowBack, contentDescription = LocalContext.current.getString(R.string.back))
+                            IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
+                                Icon(
+                                    Icons.Default.ArrowBack, 
+                                    contentDescription = LocalContext.current.getString(R.string.back),
+                                    modifier = Modifier.size(20.dp)
+                                )
                             }
                         },
                         actions = {
                             IconButton(onClick = {
                                 viewModel.resetChecklist()
                                 resetTrigger += 1
-                            }) {
-                                Icon(Icons.Default.Refresh, contentDescription = "Reset Checklist")
+                            }, modifier = Modifier.size(40.dp)) {
+                                Icon(Icons.Default.Refresh, contentDescription = "Reset Checklist", modifier = Modifier.size(20.dp))
                             }
-                            // Expand/Collapse All Button
                             IconButton(onClick = {
                                 expandAllSections = !expandAllSections
                                 prefsManager.setMarkdownSectionsExpandedByDefault(expandAllSections)
-                            }) {
+                            }, modifier = Modifier.size(40.dp)) {
                                 Icon(
                                     imageVector = if (expandAllSections) Icons.Default.UnfoldLess else Icons.Default.UnfoldMore,
-                                    contentDescription = if (expandAllSections) "Alle einklappen" else "Alle ausklappen"
+                                    contentDescription = if (expandAllSections) "Alle einklappen" else "Alle ausklappen",
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
-                            IconButton(onClick = onToggleTheme) {
+                            IconButton(onClick = onToggleTheme, modifier = Modifier.size(40.dp)) {
                                 Icon(
                                     imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                                    contentDescription = LocalContext.current.getString(R.string.toggle_dark_mode)
+                                    contentDescription = LocalContext.current.getString(R.string.toggle_dark_mode),
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
-                        }
+                        },
+                        modifier = Modifier.height(48.dp)
                     )
                 },
                 floatingActionButton = {

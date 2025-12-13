@@ -48,6 +48,8 @@ import com.example.checklist_interactive.ui.settings.SettingsScreen
 import com.example.checklist_interactive.ui.quickaccess.FlightMiniStatusBar
 import kotlinx.coroutines.launch
 import androidx.activity.compose.BackHandler
+import com.example.checklist_interactive.data.tabs.TabManager
+import com.example.checklist_interactive.ui.tabs.TabbedDocumentViewer
 
 class MainActivity : ComponentActivity() {
         companion object {
@@ -85,21 +87,26 @@ class MainActivity : ComponentActivity() {
                 isDarkTheme = !isDarkTheme
                 prefsManager.setDarkModeEnabled(isDarkTheme)
             }
-            // State hoisted for back button handling
-            var openFile by remember { mutableStateOf<FileInfo?>(null) }
-            var openPage by remember { mutableStateOf(-1) }
-            var showFileList by remember { mutableStateOf(false) }
+            // State hoisted for back button handling and tab management
+            val tabManager = remember { TabManager(this@MainActivity) }
+            val openTabs by tabManager.openTabs.collectAsState()
+            val activeTabIndex by tabManager.activeTabIndex.collectAsState()
+            var showFileList by remember { mutableStateOf(openTabs.isEmpty()) }
             var showSettings by remember { mutableStateOf(false) }
-            val backHandlerEnabled = openFile != null || showSettings
+            val backHandlerEnabled = openTabs.isNotEmpty() || showSettings
 
             // Handle Android back button: return to file list instead of closing app
             BackHandler(enabled = backHandlerEnabled) {
                 if (showSettings) {
                     showSettings = false
-                } else if (openFile != null) {
-                    openFile = null
-                    openPage = 0
-                    showFileList = true
+                } else if (openTabs.isNotEmpty()) {
+                    // Close current tab or go to file list if last tab
+                    if (openTabs.size == 1) {
+                        tabManager.closeAllTabs()
+                        showFileList = true
+                    } else {
+                        tabManager.closeTab(activeTabIndex)
+                    }
                 }
             }
             val quickNoteManager = remember { 
@@ -185,7 +192,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    // Auto-open last file on startup
+                    // Auto-open last file on startup and restore tabs
                     LaunchedEffect(Unit) {
                         // 1. Importiere Dateien aus externem Imports/ Ordner
                         // Check permissions and request if needed
@@ -220,19 +227,29 @@ class MainActivity : ComponentActivity() {
                             prefsManager.setLastImportedVersion(currentVersion)
                         }
                         
-                        // 3. Versuche letzte geöffnete Datei zu laden
-                        val lastFilePath = repository.getLastOpenedFile()
-                        if (!lastFilePath.isNullOrEmpty()) {
-                            // Try to find file in internal storage
-                            val allFiles = fileManager.getAllFilesGrouped().values.flatten()
-                            val lastFile = allFiles.find { it.path == lastFilePath }
-                            if (lastFile != null) {
-                                openFile = lastFile
-                            }
-                        }
-                        
                         // Always trigger refresh after startup to show latest data
                         refreshTrigger++
+                        
+                        // 3. Restore tabs from previous session
+                        val allFiles = fileManager.getAllFilesGrouped().values.flatten()
+                        tabManager.restoreTabsFromPaths { path ->
+                            allFiles.find { it.path == path }
+                        }
+                        tabManager.loadHistoryFromPreferences()
+                        
+                        // If no tabs restored, try to open last file
+                        if (openTabs.isEmpty()) {
+                            val lastFilePath = repository.getLastOpenedFile()
+                            if (!lastFilePath.isNullOrEmpty()) {
+                                val lastFile = allFiles.find { it.path == lastFilePath }
+                                if (lastFile != null) {
+                                    tabManager.openTab(lastFile)
+                                    showFileList = false
+                                }
+                            }
+                        } else {
+                            showFileList = false
+                        }
                         
                         // Show import dialog only on first launch if no files
                         if (!prefsManager.hasShownImportDialog() && prefsManager.isFirstLaunch() && importedFromExternal == 0 && fileManager.getAllFilesGrouped().values.flatten().isEmpty()) {
@@ -314,71 +331,85 @@ class MainActivity : ComponentActivity() {
                                 onFilesRefreshed = { refreshTrigger++ }
                             )
                         }
-                        openFile != null && !showFileList -> {
-                            // File viewer
-                            InternalFileViewer(
-                                fileInfo = openFile!!,
-                                initialPage = openPage,
-                                onBack = {
-                                    openFile = null
-                                    openPage = -1
-                                    scope.launch {
-                                        repository.saveLastOpenedFile("")
+                        !showFileList -> {
+                            // Tabbed document viewer with swipe support (always shown, even with 0 tabs)
+                            TabbedDocumentViewer(
+                                tabs = openTabs,
+                                activeTabIndex = activeTabIndex,
+                                onTabChanged = { index ->
+                                    tabManager.switchToTab(index)
+                                    val tab = openTabs.getOrNull(index)
+                                    if (tab != null) {
+                                        scope.launch {
+                                            repository.saveLastOpenedFile(tab.fileInfo.path)
+                                        }
                                     }
                                 },
-                                onShowFileList = {
+                                onTabClosed = { index ->
+                                    tabManager.closeTab(index)
+                                },
+                                onNewTab = {
+                                    // Show file list to select new file
                                     showFileList = true
                                 }
-                                ,
-                                isDarkTheme = isDarkTheme,
-                                onToggleTheme = toggleTheme,
-                                onOpenLinkedDocument = { filePath, pageNumber ->
-                                    // Finde die Datei im File Manager
-                                    // Unterstütze verschiedene Pfadformate: absolute Pfade, relative Pfade, asset:// Pfade
-                                    val allFiles = fileManager.getAllFilesGrouped().values.flatten()
-                                    val targetFile = allFiles.find { file ->
-                                        file.path == filePath ||
-                                        file.path.endsWith(filePath) ||
-                                        filePath.endsWith(file.path) ||
-                                        file.path.replace("asset://", "") == filePath ||
-                                        filePath.replace("asset://", "") == file.path.replace("asset://", "")
-                                    }
-                                    if (targetFile != null) {
-                                        openFile = targetFile
-                                        openPage = pageNumber ?: -1
-                                        showFileList = false
-                                        scope.launch {
-                                            repository.saveLastOpenedFile(targetFile.path)
+                            ) { tabInfo ->
+                                // Render the document viewer for each tab
+                                InternalFileViewer(
+                                    fileInfo = tabInfo.fileInfo,
+                                    initialPage = tabInfo.pageNumber,
+                                    onBack = {
+                                        // Close current tab or show file list if last tab
+                                        if (openTabs.size == 1) {
+                                            tabManager.closeAllTabs()
+                                            showFileList = true
+                                        } else {
+                                            tabManager.closeTab(activeTabIndex)
                                         }
-                                    } else {
-                                        // Debug: Datei nicht gefunden
-                                        android.util.Log.e("MainActivity", "Linked document not found: $filePath")
-                                        allFiles.forEach { file ->
-                                            android.util.Log.d("MainActivity", "Available file: ${file.path}")
+                                    },
+                                    onShowFileList = {
+                                        showFileList = true
+                                    },
+                                    isDarkTheme = isDarkTheme,
+                                    onToggleTheme = toggleTheme,
+                                    onOpenLinkedDocument = { filePath, pageNumber ->
+                                        // Open linked document in new tab
+                                        val allFiles = fileManager.getAllFilesGrouped().values.flatten()
+                                        val targetFile = allFiles.find { file ->
+                                            file.path == filePath ||
+                                            file.path.endsWith(filePath) ||
+                                            filePath.endsWith(file.path) ||
+                                            file.path.replace("asset://", "") == filePath ||
+                                            filePath.replace("asset://", "") == file.path.replace("asset://", "")
+                                        }
+                                        if (targetFile != null) {
+                                            tabManager.openTab(targetFile, pageNumber ?: -1)
+                                            showFileList = false
+                                            scope.launch {
+                                                repository.saveLastOpenedFile(targetFile.path)
+                                            }
+                                        } else {
+                                            android.util.Log.e("MainActivity", "Linked document not found: $filePath")
                                         }
                                     }
-                                }
-                            )
+                                )
+                            }
                         }
                         else -> {
-                            // File list (home screen or overlay)
+                            // File list (home screen)
                             InternalFilesScreen(
                                 fileManager = fileManager,
                                 onFileOpen = { fileInfo ->
-                                    openFile = fileInfo
-                                    openPage = -1  // -1 = use last saved page
+                                    tabManager.openTab(fileInfo)
                                     showFileList = false
                                     scope.launch {
                                         repository.saveLastOpenedFile(fileInfo.path)
                                     }
                                 },
                                 onShortcutOpen = { shortcut: PageShortcut ->
-                                    // Finde die Datei im File Manager
                                     val allFiles = fileManager.getAllFilesGrouped().values.flatten()
                                     val targetFile = allFiles.find { it.path == shortcut.filePath }
                                     if (targetFile != null) {
-                                        openFile = targetFile
-                                        openPage = shortcut.pageNumber
+                                        tabManager.openTab(targetFile, shortcut.pageNumber)
                                         showFileList = false
                                         scope.launch {
                                             repository.saveLastOpenedFile(targetFile.path)
@@ -386,22 +417,18 @@ class MainActivity : ComponentActivity() {
                                     }
                                 },
                                 onRefresh = {
-                                    // Re-import bundled assets (copy new/changed files) and refresh view
                                     fileManager.importAllBundledAssets("")
                                     refreshTrigger++
-                                }
-                                ,
+                                },
                                 refreshTrigger = refreshTrigger,
                                 isDarkTheme = isDarkTheme,
                                 onToggleTheme = toggleTheme,
                                 onShowSettings = { showSettings = true },
                                 onOpenLinkedDocument = { filePath, pageNumber ->
-                                    // Find the file in the file manager and open it
                                     val allFiles = fileManager.getAllFilesGrouped().values.flatten()
                                     val targetFile = allFiles.find { it.path == filePath || it.path.endsWith(filePath) }
                                     if (targetFile != null) {
-                                        openFile = targetFile
-                                        openPage = pageNumber ?: 0
+                                        tabManager.openTab(targetFile, pageNumber ?: 0)
                                         showFileList = false
                                         scope.launch {
                                             repository.saveLastOpenedFile(targetFile.path)
