@@ -326,14 +326,6 @@ fun InternalFilesScreen(
                         contentDescription = "Schnellzugriff"
                     )
                 }
-
-                // Import FAB - immer an fester Position
-                FloatingActionButton(
-                    onClick = { showImportDialog = true },
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = context.getString(R.string.import_file))
-                }
             }
         }
     ) { padding ->
