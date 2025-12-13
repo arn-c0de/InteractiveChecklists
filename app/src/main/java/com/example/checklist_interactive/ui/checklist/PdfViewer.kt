@@ -127,7 +127,8 @@ fun PdfViewer(
     val shortcutManager = remember { ShortcutManager(context) }
     val highlightManager = remember { PageHighlightManager(context) }
     val lastPageManager = remember { LastPageManager(context) }
-    val quickNoteManager = remember { QuickNoteManager(context) }
+    val providedNoteManager = com.example.checklist_interactive.ui.quickaccess.LocalQuickNoteManager.current
+    val quickNoteManager = providedNoteManager ?: remember { QuickNoteManager(context) }
 
     // Lade zuletzt geöffnete Seite, falls initialPage nicht explizit gesetzt wurde (< 0 = nicht gesetzt)
     // Use a stable ID for storing last-page info; allow callers to pass an explicit documentId

@@ -57,7 +57,8 @@ fun MarkdownViewerScreen(
     val context = LocalContext.current
     val prefsManager = remember { PreferencesManager(context) }
     val checklistRepository = remember { ChecklistRepository(context) }
-    val quickNoteManager = remember { QuickNoteManager(context) }
+    val providedNoteManager = com.example.checklist_interactive.ui.quickaccess.LocalQuickNoteManager.current
+    val quickNoteManager = providedNoteManager ?: remember { QuickNoteManager(context) }
     val markdownContent = remember(assetPath) {
         try {
             context.assets.open(assetPath).bufferedReader().use { it.readText() }

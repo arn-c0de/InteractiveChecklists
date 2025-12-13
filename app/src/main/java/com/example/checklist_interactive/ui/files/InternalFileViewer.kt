@@ -124,7 +124,8 @@ fun InternalFileViewer(
             "md", "markdown" -> {
             val prefsManager = remember { PreferencesManager(context) }
             val checklistRepository = remember { ChecklistRepository(context) }
-            val quickNoteManager = remember { QuickNoteManager(context) }
+            val providedNoteManager = com.example.checklist_interactive.ui.quickaccess.LocalQuickNoteManager.current
+            val quickNoteManager = providedNoteManager ?: remember { QuickNoteManager(context) }
             val isAsset = fileInfo.isAsset || fileInfo.path.startsWith("asset://")
             val assetPath = if (isAsset) fileInfo.path.removePrefix("asset://") else fileInfo.path
             val markdownContent by androidx.compose.runtime.produceState(initialValue = "", key1 = fileInfo.path) {
