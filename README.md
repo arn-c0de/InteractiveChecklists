@@ -10,6 +10,7 @@
 <div align="center">
 	<a href="CHANGELOG.md">Changelog</a> |
 	<a href="docs/docnavigation.md">Documentation</a> |
+	<a href="docs/FUTURE_PLANS.md">Future Plans</a> |
 	<a href="SECURITY.md">Security Policy</a> |
 	<a href="LICENSE">License</a>
 </div>
@@ -18,6 +19,10 @@
 
 
 Checklist Interactive is an Android application designed for viewing and interacting with markdown and PDF checklists. It's built with Jetpack Compose and follows an MVVM architecture.
+
+> **Development status:** This repository is a development snapshot and not an official release. The app is functional and usable but still under active development and may contain experimental features, breaking changes, or instabilities.
+
+> **Entwicklungsstatus:** Dieses Repository ist eine Entwicklungsversion und keine offizielle Release-Version. Die App ist funktionsfähig und benutzbar, befindet sich jedoch noch in aktiver Weiterentwicklung und kann experimentelle Funktionen oder Instabilitäten enthalten.
 
 ## Features
 
