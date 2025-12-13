@@ -18,10 +18,12 @@ import java.time.format.DateTimeFormatter
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.runtime.CompositionLocalProvider
 import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
 
 @Composable
-fun FlightMiniStatusBar(noteManager: QuickNoteManager, onClick: (() -> Unit)? = null) {
+fun FlightMiniStatusBar(noteManager: QuickNoteManager, onClick: (() -> Unit)? = null, useBackground: Boolean = true) {
     val callsign by noteManager.callsign.collectAsState()
     val status by noteManager.flightStatus.collectAsState()
     val com1 by noteManager.com1.collectAsState()
@@ -29,20 +31,24 @@ fun FlightMiniStatusBar(noteManager: QuickNoteManager, onClick: (() -> Unit)? = 
     val com2 by noteManager.com2.collectAsState()
     val com2Mode by noteManager.com2Mode.collectAsState()
 
+    val bgColor = if (useBackground) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.surfaceVariant
+    val contentColor = if (useBackground) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant
+
+    CompositionLocalProvider(LocalContentColor provides contentColor) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(34.dp)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .height(28.dp)
+            .background(bgColor)
             .then(if (onClick != null) Modifier.clickable { onClick.invoke() } else Modifier)
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text(text = (callsign.ifBlank { "-" }), style = MaterialTheme.typography.labelLarge)
-        Text(text = "Status: ${status.ifBlank { "Idle" }}", style = MaterialTheme.typography.labelMedium)
-        Text(text = "COM1: ${com1.ifBlank { "-" }} ${com1Mode}", style = MaterialTheme.typography.labelMedium)
-        Text(text = "COM2: ${com2.ifBlank { "-" }} ${com2Mode}", style = MaterialTheme.typography.labelMedium)
+        Text(text = (callsign.ifBlank { "-" }), style = MaterialTheme.typography.labelSmall)
+        Text(text = "Status: ${status.ifBlank { "Idle" }}", style = MaterialTheme.typography.labelSmall)
+        Text(text = "COM1: ${com1.ifBlank { "-" }} ${com1Mode}", style = MaterialTheme.typography.labelSmall)
+        Text(text = "COM2: ${com2.ifBlank { "-" }} ${com2Mode}", style = MaterialTheme.typography.labelSmall)
         Spacer(modifier = Modifier.weight(1f))
 
         // Live clock (HH:mm:ss)
@@ -55,6 +61,7 @@ fun FlightMiniStatusBar(noteManager: QuickNoteManager, onClick: (() -> Unit)? = 
             }
         }
 
-        Text(text = timeText, style = MaterialTheme.typography.labelMedium)
+        Text(text = timeText, style = MaterialTheme.typography.labelSmall)
+    }
     }
 }
