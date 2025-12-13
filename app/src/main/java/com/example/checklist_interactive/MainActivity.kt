@@ -332,7 +332,7 @@ class MainActivity : ComponentActivity() {
                                 fileManager = fileManager,
                                 onFileOpen = { fileInfo ->
                                     openFile = fileInfo
-                                    openPage = 0
+                                    openPage = -1  // -1 = use last saved page
                                     showFileList = false
                                     scope.launch {
                                         repository.saveLastOpenedFile(fileInfo.path)

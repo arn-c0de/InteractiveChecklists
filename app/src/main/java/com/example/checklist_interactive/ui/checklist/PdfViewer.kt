@@ -114,8 +114,13 @@ fun PdfViewer(
     onToggleTheme: (() -> Unit)? = null,
     initialPage: Int = -1,
     onPageChange: ((Int) -> Unit)? = null,
-    onOpenLinkedDocument: ((filePath: String, pageNumber: Int?) -> Unit)? = null
+    onOpenLinkedDocument: ((filePath: String, pageNumber: Int?) -> Unit)? = null,
+    documentId: String? = null
 ) {
+    // Optional stable document id used for saving/loading last-page info.
+    // If not provided, the actual pdfPath is used as key. Callers that pass a temp path
+    // (e.g., InternalFileViewer) can provide the original path as `documentId` so
+    // LastPageManager keeps a stable key across container lifecycles.
     val context = LocalContext.current
 
     // Manager für Shortcuts, Highlights und letzte Seite
@@ -125,9 +130,12 @@ fun PdfViewer(
     val quickNoteManager = remember { QuickNoteManager(context) }
 
     // Lade zuletzt geöffnete Seite, falls initialPage nicht explizit gesetzt wurde (< 0 = nicht gesetzt)
-    val effectiveInitialPage = remember(pdfPath) {
+    // Use a stable ID for storing last-page info; allow callers to pass an explicit documentId
+    // so that temporary / cache paths (e.g., asset temp files) map to a stable identifier.
+    val docIdForLastPage = documentId ?: pdfPath
+    val effectiveInitialPage = remember(pdfPath, initialPage) {
         if (initialPage < 0) {
-            lastPageManager.getLastPage(pdfPath).coerceAtLeast(0)
+            lastPageManager.getLastPage(docIdForLastPage).coerceAtLeast(0)
         } else {
             initialPage
         }
@@ -422,18 +430,23 @@ fun PdfViewer(
         }
     }
 
-    // Scrolle zur Seite wenn initialPage sich ändert (z.B. durch Link-Klick)
-    LaunchedEffect(initialPage) {
-        if (initialPage >= 0 && initialPage != currentPage && pageCount > 0) {
-            val target = initialPage.coerceIn(0, pageCount - 1)
-            listState.scrollToItem(target)
+    // Scrolle zur Seite wenn initialPage oder das Dokument (pdfPath/pageCount) sich ändert.
+    // Dies sorgt dafür, dass beim Re-Entrypunkt in dieselbe Datei die zuletzt geöffnete Seite geladen wird.
+    LaunchedEffect(pdfPath, pageCount, initialPage) {
+        if (pageCount > 0) {
+            val target = if (initialPage >= 0) initialPage else lastPageManager.getLastPage(docIdForLastPage)
+            val clamped = target.coerceIn(0, pageCount - 1)
+            if (clamped != currentPage) {
+                listState.scrollToItem(clamped)
+                currentPage = clamped
+            }
         }
     }
 
     // Speichere die aktuelle Seite bei jedem Seitenwechsel
     LaunchedEffect(currentPage) {
         if (pageCount > 0) {
-            lastPageManager.saveLastPage(pdfPath, currentPage)
+            lastPageManager.saveLastPage(docIdForLastPage, currentPage)
         }
     }
 
@@ -476,7 +489,7 @@ fun PdfViewer(
                     HintIconButton(
                         onClick = {
                             AnnotationsRepository.save(context, pdfPath, strokes.toList())
-                            lastPageManager.saveLastPage(pdfPath, currentPage)
+                            lastPageManager.saveLastPage(docIdForLastPage, currentPage)
                             onBack()
                         },
                         hint = context.getString(R.string.back),
