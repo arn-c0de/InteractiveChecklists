@@ -1,7 +1,7 @@
 
 <!-- Badges -->
 <p align="left">
-	<img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="Version" />
+	<img src="https://img.shields.io/badge/version-1.0.6-blue.svg" alt="Version" />
 	<img src="https://img.shields.io/badge/platform-Android-green.svg" alt="Platform" />
 	<img src="https://img.shields.io/badge/built_with-Jetpack%20Compose-orange.svg" alt="Jetpack Compose" />
 	<img src="https://img.shields.io/badge/license-CC--BY--NC--SA%204.0-lightgrey.svg" alt="License: CC BY-NC-SA 4.0" />
@@ -22,11 +22,12 @@ Checklist Interactive is an Android application designed for viewing and interac
 ## Features
 
 -   **Unified File System**: The app manages files from both bundled assets and internal storage, presenting them in a single, hierarchical view.
--   **Multi-Tab Navigation**: Open multiple documents simultaneously with swipeable tabs, quick switching between recent files, and persistent tab state across app restarts.
+-   **Multi-Tab System**: Open multiple documents (MD/PDF) simultaneously. Includes a scrollable Tab Bar with file icons, close buttons, active tab highlighting, swipe navigation, a Quick Tab Switcher bottom sheet for rapid switching, navigation history, and tab persistence across restarts.
 -   **PDF Viewer**: A custom-built PDF viewer with support for annotations (drawing, highlighting, erasing), pinch-to-zoom, page-snapping, and color inversion.
 -   **Interactive Markdown Checklists**: View and interact with markdown checklists, with support for collapsible sections and stateful checkboxes.
 -   **Tagging System**: Assign multiple tags to files for easy filtering and organization.
 -   **Data Persistence**: User preferences, annotations, shortcuts, tags, and open tabs are all saved locally.
+ -   **QuickNotes**: In-app persistent notes using Room database and repository pattern, with migration from SharedPreferences, search, autosave, markdown editor, clickable internal links, and a compact Quick Access sheet.
 
 ## Architecture
 
@@ -41,6 +42,9 @@ The app is a single-activity application, with `MainActivity.kt` serving as the 
 -   **`ui/checklist/MarkdownViewer.kt`**: A dual-mode viewer for interactive and plain markdown files.
 -   **`data/tags/FileTagManager.kt`**: Manages the file tagging system.
 -   **`data/prefs/PreferencesManager.kt`**: Handles user settings and preferences.
+ -   **`data/tabs/TabManager.kt`**: Manages open tabs, history, persistence, and exposes APIs to open/close/switch between tabs.
+ -   **`ui/tabs/TabBar.kt`** and **`ui/tabs/QuickTabSwitcher.kt`**: Composable UI for the tab bar and the quick tab switcher sheet.
+ -   **`data/quicknotes/QuickNoteManager.kt`** and **`ui/quickaccess/QuickAccessSheet.kt`**: The QuickNotes manager and UI.
 
 ## How to build
 

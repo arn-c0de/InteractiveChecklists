@@ -156,6 +156,45 @@
     - **Properties:** "notes", "activeNoteId", "noteContent", "linkedDocuments", "loadedNotes", "notesToUse", "defaultNote", "loadedActiveId", "notes", "activeId", "note", "activeId", "activeNote", "json", "array", "list", "larr", "obj", "json", "array", "obj", "id", "current", "idx", "note", "id", "id", "targetId", "current", "idx", "note", "docs", "targetId", "current", "idx", "note", "docs", "id", "current", "idx", "note", "array", "obj", "lad", "dobj", "json", "array", "obj", "linkedDocs", "la", "d", "oldContent", "oldLinked", "linked", "arr", "obj", "note", "id", "current", "current", "current", "idx", "note", "exists"
     - **Methods:** "saveNoteContent()", "saveNote()", "clearActiveNote()", "clearNote()", "addLinkedDocument()", "removeLinkedDocument()", "removeLinkedDocument()", "clearActiveNoteLinkedDocuments()", "clearLinkedDocuments()", "addNote()", "removeNote()", "renameNote()", "setActiveNote()", "clearAllNotes()"
 
+## C:\Users\arn\AndroidStudioProjects\ChecklistInteractive\app\src\main\java\com\example\checklist_interactive\data\quicknotes\QuickNoteEntity.kt
+
+**Package:** com.example.checklist_interactive.data.quicknotes
+
+### Classes
+
+- **QuickNoteEntity** (class)
+    - **Properties:** "id", "title", "content", "linkedDocuments", "timestamp", "lastModified"
+
+- **LinkedDocumentEntity** (class)
+    - **Properties:** "id", "filePath", "fileName", "pageNumber", "timestamp"
+
+## C:\Users\arn\AndroidStudioProjects\ChecklistInteractive\app\src\main\java\com\example\checklist_interactive\data\quicknotes\QuickNoteDao.kt
+
+**Package:** com.example.checklist_interactive.data.quicknotes
+
+### Interface
+
+- **QuickNoteDao** (interface)
+    - **Methods:** "getAllNotes()", "getAllNoteSummaries()", "getNoteById()", "getNoteByIdOnce()", "getNoteContent()", "searchNotes()", "insertNote()", "insertNotes()", "updateNote()", "deleteNote()", "deleteNoteById()", "deleteAllNotes()", "getNotesCount()", "updateNoteContent()", "updateNoteTitle()"
+
+## C:\Users\arn\AndroidStudioProjects\ChecklistInteractive\app\src\main\java\com\example\checklist_interactive\data\quicknotes\QuickNoteDatabase.kt
+
+**Package:** com.example.checklist_interactive.data.quicknotes
+
+### Classes
+
+- **QuickNoteDatabase** (abstract class)
+    - **Methods:** "quickNoteDao()", "getDatabase()", "destroyInstance()"
+
+## C:\Users\arn\AndroidStudioProjects\ChecklistInteractive\app\src\main\java\com\example\checklist_interactive\data\quicknotes\QuickNoteRepository.kt
+
+**Package:** com.example.checklist_interactive.data.quicknotes
+
+### Classes
+
+- **QuickNoteRepository** (class)
+    - **Methods:** "getAllNotes()", "getAllNoteSummaries()", "getNoteContentFlow()", "getNoteById()", "getNoteByIdOnce()", "searchNotes()", "insertNote()", "insertNotes()", "updateNote()", "updateNoteContent()", "updateNoteTitle()", "deleteNote()", "deleteNoteById()", "deleteAllNotes()", "getNotesCount()"
+
 
 ## C:\Users\arn\AndroidStudioProjects\ChecklistInteractive\app\src\main\java\com\example\checklist_interactive\data\shortcuts\LastPageManager.kt
 
@@ -197,6 +236,17 @@
 - **ShortcutManager** (class)
     - **Properties:** "jsonString", "jsonString", "shortcuts", "shortcut", "shortcuts", "shortcuts", "index", "shortcuts", "index"
     - **Methods:** "loadShortcuts()", "createShortcut()", "deleteShortcut()", "renameShortcut()", "updateHighlightStatus()", "getShortcutsForFile()"
+
+## C:\Users\arn\AndroidStudioProjects\ChecklistInteractive\app\src\main\java\com\example\checklist_interactive\data\tabs\TabManager.kt
+
+**Package:** com.example.checklist_interactive.data.tabs
+
+### Classes
+
+- **TabManager** (class)
+    - **Properties / Flows:** "openTabs", "activeTabIndex", "navigationHistory"
+    - **Methods:** "openTab()", "closeTab()", "switchToTab()", "getActiveTab()", "navigateToPreviousInHistory()", "updateCurrentTabPage()", "closeAllTabs()", "restoreTabsFromPaths()", "loadHistoryFromPreferences()"
+
 
 
 ## C:\Users\arn\AndroidStudioProjects\ChecklistInteractive\app\src\main\java\com\example\checklist_interactive\data\tags\FileTagManager.kt
@@ -318,6 +368,30 @@
 ## C:\Users\arn\AndroidStudioProjects\ChecklistInteractive\app\src\main\java\com\example\checklist_interactive\ui\quickaccess\QuickAccessSheet.kt
 
 **Package:** com.example.checklist_interactive.ui.quickaccess
+
+### Additional Files
+
+- **LocalQuickNoteManager.kt**
+    - **Package:** com.example.checklist_interactive.ui.quickaccess
+    - **Purpose:** Composition local for providing a `QuickNoteManager` to components
+
+## C:\Users\arn\AndroidStudioProjects\ChecklistInteractive\app\src\main\java\com\example\checklist_interactive\ui\tabs\TabBar.kt
+
+**Package:** com.example.checklist_interactive.ui.tabs
+
+### Files / Composables
+
+- **TabBar.kt**
+    - **Composables:** `TabBar()`, `TabbedDocumentViewer()` — renders horizontal tabs, close buttons, and integrates with a pager for swipe navigation
+
+## C:\Users\arn\AndroidStudioProjects\ChecklistInteractive\app\src\main\java\com\example\checklist_interactive\ui\tabs\QuickTabSwitcher.kt
+
+**Package:** com.example.checklist_interactive.ui.tabs
+
+### Files / Composables
+
+- **QuickTabSwitcher.kt**
+    - **Composables:** `QuickTabSwitcherSheet()` — bottom sheet for quickly switching between recent/open tabs
 
 
 ## C:\Users\arn\AndroidStudioProjects\ChecklistInteractive\app\src\main\java\com\example\checklist_interactive\ui\settings\SettingsScreen.kt

@@ -96,6 +96,12 @@ class QuickNoteManager(private val context: Context) {
     val flightStatus: StateFlow<String> = _flightStatus.asStateFlow()
 
     init {
+        // Load active note id from preferences first to avoid race condition
+        val initialActiveId = loadActiveNoteId()
+        if (initialActiveId != null) {
+            _activeNoteId.value = initialActiveId
+        }
+
         // Start coroutine to initialize data
         scope.launch {
             // Initialize Room database and repository on IO
@@ -119,12 +125,12 @@ class QuickNoteManager(private val context: Context) {
                         setActiveNote(notesList.first().id)
                     }
 
-                    // Update active note content if it changed
+                    // Update active note content if it changed: fetch full content
                     val activeId = _activeNoteId.value
                     if (activeId != null) {
-                        val activeNote = notesList.find { it.id == activeId }
-                        if (activeNote != null) {
-                            _noteContent.value = activeNote.content
+                        val fullNote = repository.getNoteByIdOnce(activeId)
+                        if (fullNote != null) {
+                            _noteContent.value = fullNote.content
                         }
                     }
                 }
@@ -133,12 +139,8 @@ class QuickNoteManager(private val context: Context) {
             }
         }
 
-        // Load active note ID from preferences
+        // Load callsign/com preferences and other small settings
         scope.launch {
-            val activeId = loadActiveNoteId()
-            if (activeId != null) {
-                _activeNoteId.value = activeId
-            }
             // load callsign/coms
             _callsign.value = prefs.getString(CALLSIGN_KEY, "") ?: ""
             _com1.value = prefs.getString(COM1_KEY, "") ?: ""
