@@ -228,6 +228,53 @@ fun PdfViewer(
     var pdfFile by remember { mutableStateOf<File?>(null) }
     val pdfRenderMutex = remember { Mutex() }
 
+    // Helper: render a page to bitmap cache at a target width in pixels
+    suspend fun renderPageToCache(pageIndex: Int, targetWidthPx: Int, renderedScale: Float = 1f) {
+        // Prevent multiple concurrent renders of same page
+        if (renderingPages.contains(pageIndex)) return
+        renderingPages.add(pageIndex)
+        try {
+            withContext(Dispatchers.IO) {
+                val pdf = pdfRenderer ?: return@withContext
+                // Serialize calls to PdfRenderer to avoid crashes (PdfRenderer isn't guaranteed to be thread-safe across multiple concurrent page rendering)
+                pdfRenderMutex.withLock {
+                    val page = try { pdf.openPage(pageIndex) } catch (_: Exception) { null }
+                    page?.let {
+                        val renderWidth = targetWidthPx.coerceAtLeast(1)
+                        val renderHeight = (renderWidth.toFloat() * page.height / page.width).toInt().coerceAtLeast(1)
+                        // Try RGB_565 (lower memory) first; fallback to ARGB_8888 when necessary.
+                        var bitmap: Bitmap? = null
+                        try {
+                            bitmap = Bitmap.createBitmap(renderWidth, renderHeight, Bitmap.Config.RGB_565)
+                            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                        } catch (e: Throwable) {
+                            // If rendering fails due to unsupported pixel format, try ARGB_8888
+                            bitmap?.let { if (!it.isRecycled) it.recycle() }
+                            bitmap = try { Bitmap.createBitmap(renderWidth, renderHeight, Bitmap.Config.ARGB_8888) } catch (_: Throwable) { null }
+                            bitmap?.let { page.render(it, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY) }
+                        }
+                        page.close()
+                        bitmap?.let { bmp ->
+                            bitmapCache.put(pageIndex, bmp)
+                            renderScaleMap[pageIndex] = renderedScale
+                            cacheKeys.add(pageIndex)
+                            withContext(Dispatchers.Main) {
+                                getPageBitmapState(pageIndex).value = bmp
+                            }
+                        }
+                        if (bitmap == null) {
+                            withContext(Dispatchers.Main) {
+                                errorMessage = context.getString(R.string.error_loading_pdf, "Unsupported pixel format for page ${pageIndex + 1}")
+                            }
+                        }
+                    }
+                }
+            }
+        } finally {
+            renderingPages.remove(pageIndex)
+        }
+    }
+
     LaunchedEffect(pdfPath, isInternalFile) {
         // Load invert state from prefs
         invertColors = invertColorPrefManager.isInverted(pdfPath)
@@ -254,59 +301,88 @@ fun PdfViewer(
                 pdfRenderer = PdfRenderer(fileDescriptor!!)
                 pageCount = pdfRenderer!!.pageCount
 
-                // Pre-calculate all page aspect ratios to prevent layout jumping on scroll
-                (0 until pageCount).forEach { index ->
-                    val page = pdfRenderer!!.openPage(index)
-                    pageAspectRatios[index] = page.width.toFloat() / page.height.toFloat()
-                    page.close()
+                // Pre-calculate only a small set of page aspect ratios to prevent layout jumping
+                // for the first visible pages. Compute the remaining ones asynchronously
+                // in small batches to avoid long blocking times on large PDFs.
+                if (pageCount > 0) {
+                    try {
+                        val firstPage = pdfRenderer!!.openPage(0)
+                        val ar = firstPage.width.toFloat() / firstPage.height.toFloat()
+                        firstPage.close()
+                        withContext(Dispatchers.Main) {
+                            pageAspectRatios[0] = ar
+                        }
+                    } catch (_: Exception) {}
                 }
 
-                // Extract PDF outline (bookmarks/chapters)
-                try {
-                    outlineItems = outlineExtractor.extractOutline(loadedPdfFile)
-                    android.util.Log.d("PdfViewer", "Extracted outline items: ${outlineItems.size} -> ${outlineItems.joinToString(", ") { it.title + ":" + it.pageNumber }}")
-                } catch (e: Exception) {
-                    // If outline extraction fails, continue without it
-                    android.util.Log.d("PdfViewer", "Outline extraction failed: ${e.message}")
+                // Extract PDF outline (bookmarks) asynchronously to avoid blocking
+                coroutineScope.launch(Dispatchers.IO) {
+                    try {
+                        val extracted = outlineExtractor.extractOutline(loadedPdfFile)
+                        withContext(Dispatchers.Main) {
+                            outlineItems = extracted
+                            android.util.Log.d("PdfViewer", "Extracted outline items: ${outlineItems.size} -> ${outlineItems.joinToString(", ") { it.title + ":" + it.pageNumber }}")
+                            // Recompute chapters if no outline was previously available
+                            if (outlineItems.isNotEmpty()) {
+                                chapters = outlineItems.map { it.title to it.pageNumber }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.d("PdfViewer", "Outline extraction failed: ${e.message}")
+                    }
                 }
 
                 // Render only an initial subset of pages (effectiveInitialPage and nearby), rest are loaded on demand.
                 val initialIndices = listOf(effectiveInitialPage - 1, effectiveInitialPage, effectiveInitialPage + 1).distinct().filter { it in 0 until pageCount }
+                // Also pre-calc aspect ratios for the first few pages we'll render immediately
+                initialIndices.forEach { idx ->
+                    try {
+                        if (!pageAspectRatios.containsKey(idx)) {
+                            val p = pdfRenderer!!.openPage(idx)
+                            val ar = p.width.toFloat() / p.height.toFloat()
+                            p.close()
+                            withContext(Dispatchers.Main) {
+                                pageAspectRatios[idx] = ar
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
                 for (pageIndex in initialIndices) {
-                    // Use a helper function to render pages to a cache-friendly size.
-                    val page = pdfRenderer!!.openPage(pageIndex)
-                        val renderWidth = screenWidthPx
-                        val renderHeight = (renderWidth.toFloat() * page.height / page.width).toInt()
-                        // Try RGB_565 (lower memory) first; fallback to ARGB_8888 when necessary.
-                        var bitmap: Bitmap? = null
+                    // render initial pages via the centralized helper (it serializes PdfRenderer access)
+                    coroutineScope.launch {
                         try {
-                            bitmap = Bitmap.createBitmap(renderWidth, renderHeight, Bitmap.Config.RGB_565)
-                            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                        } catch (e: Throwable) {
-                            bitmap?.let { if (!it.isRecycled) it.recycle() }
-                            bitmap = try { Bitmap.createBitmap(renderWidth, renderHeight, Bitmap.Config.ARGB_8888) } catch (_: Throwable) { null }
-                            bitmap?.let { page.render(it, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY) }
-                        }
-                        bitmap?.let { bmp ->
-                            bitmapCache.put(pageIndex, bmp)
-                            renderScaleMap[pageIndex] = 1f
-                            cacheKeys.add(pageIndex)
-                            withContext(Dispatchers.Main) {
-                                getPageBitmapState(pageIndex).value = bmp
-                            }
-                        }
-                        if (bitmap == null) {
-                            withContext(Dispatchers.Main) {
-                                errorMessage = context.getString(R.string.error_loading_pdf, "Unsupported pixel format for page ${pageIndex + 1}")
-                            }
-                        }
-                        page.close()
+                            renderPageToCache(pageIndex, screenWidthPx, renderedScale = 1f)
+                        } catch (_: Exception) {}
+                    }
                 }
 
-                // Nur temporäre Dateien löschen
-                if (!isInternalFile) {
-                    loadedPdfFile.delete()
+                // Start async computation of remaining page aspect ratios in the background
+                // to avoid long UI-blocking loads on large documents. Do this after initial
+                // rendering is kicked off so the user sees content quickly.
+                coroutineScope.launch(Dispatchers.Default) {
+                    val batchSize = 32
+                    var start = 0
+                    while (start < pageCount) {
+                        val end = (start + batchSize).coerceAtMost(pageCount)
+                        for (i in start until end) {
+                            if (!pageAspectRatios.containsKey(i)) {
+                                try {
+                                    val p = pdfRenderer!!.openPage(i)
+                                    val ar = p.width.toFloat() / p.height.toFloat()
+                                    p.close()
+                                    withContext(Dispatchers.Main) {
+                                        pageAspectRatios[i] = ar
+                                    }
+                                } catch (_: Exception) {}
+                            }
+                        }
+                        start = end
+                        kotlinx.coroutines.delay(50L)
+                    }
                 }
+
+                // Do not delete the temporary file here; delete it later on composable disposal
+                // to avoid races with background processing (outline extraction, async aspect ratio computation, etc.).
             }
             isLoading = false
             // Populate chapters: use outline if available, otherwise fallback to page list
@@ -335,55 +411,15 @@ fun PdfViewer(
             cacheKeys.clear()
             pageBitmapStates.values.forEach { it.value = null }
             pageBitmapStates.clear()
+            // Delete temporary cached file if we created one from assets
+            try {
+                if (!isInternalFile) {
+                    pdfFile?.delete()
+                }
+            } catch (_: Exception) {}
         }
     }
 
-    // Helper: render a page to bitmap cache at a target width in pixels
-    suspend fun renderPageToCache(pageIndex: Int, targetWidthPx: Int, renderedScale: Float = 1f) {
-        // Prevent multiple concurrent renders of same page
-        if (renderingPages.contains(pageIndex)) return
-        renderingPages.add(pageIndex)
-        try {
-        withContext(Dispatchers.IO) {
-            val pdf = pdfRenderer ?: return@withContext
-            // Serialize calls to PdfRenderer to avoid crashes (PdfRenderer isn't guaranteed to be thread-safe across multiple concurrent page rendering)
-            pdfRenderMutex.withLock {
-                val page = try { pdf.openPage(pageIndex) } catch (_: Exception) { null }
-                page?.let {
-                    val renderWidth = targetWidthPx.coerceAtLeast(1)
-                    val renderHeight = (renderWidth.toFloat() * page.height / page.width).toInt().coerceAtLeast(1)
-                    // Try RGB_565 (lower memory) first; fallback to ARGB_8888 when necessary.
-                    var bitmap: Bitmap? = null
-                    try {
-                        bitmap = Bitmap.createBitmap(renderWidth, renderHeight, Bitmap.Config.RGB_565)
-                        page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                    } catch (e: Throwable) {
-                        // If rendering fails due to unsupported pixel format, try ARGB_8888
-                        bitmap?.let { if (!it.isRecycled) it.recycle() }
-                        bitmap = try { Bitmap.createBitmap(renderWidth, renderHeight, Bitmap.Config.ARGB_8888) } catch (_: Throwable) { null }
-                        bitmap?.let { page.render(it, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY) }
-                    }
-                    page.close()
-                    bitmap?.let { bmp ->
-                        bitmapCache.put(pageIndex, bmp)
-                        renderScaleMap[pageIndex] = renderedScale
-                        cacheKeys.add(pageIndex)
-                        withContext(Dispatchers.Main) {
-                            getPageBitmapState(pageIndex).value = bmp
-                        }
-                    }
-                    if (bitmap == null) {
-                        withContext(Dispatchers.Main) {
-                            errorMessage = context.getString(R.string.error_loading_pdf, "Unsupported pixel format for page ${pageIndex + 1}")
-                        }
-                    }
-                }
-            }
-        }
-        } finally {
-            renderingPages.remove(pageIndex)
-        }
-    }
 
     // Only request a render if we do not already have a bitmap, and not already rendering
     fun maybeRequestRender(pageIndex: Int, widthPx: Int) {
