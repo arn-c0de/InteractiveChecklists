@@ -58,8 +58,8 @@
 
 ## Avionics Power Up
 
-- [ ] LEFT GEN switch (L GEN) - ON
 - [ ] RIGHT GEN switch (R GEN) - ON
+- [ ] LEFT GEN switch (L GEN) - ON
 - [ ] GEN (L/R) lights - Check extinguished
 - [ ] MASTER TEST button - Test caution/advisory lights
 - [ ] Caution lights - All illuminate then extinguish

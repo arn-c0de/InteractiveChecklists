@@ -21,6 +21,7 @@ import com.example.checklist_interactive.data.checklist.Checklist
 import com.example.checklist_interactive.data.prefs.PreferencesManager
 import com.example.checklist_interactive.data.checklist.ChecklistItem
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import android.content.SharedPreferences
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
@@ -154,13 +155,14 @@ fun MarkdownViewer(
                 } else {
                     // Einfache Markdown-Ansicht ohne Interaktion (oder keine Checkboxen gefunden)
                     android.util.Log.d("MarkdownViewer", "Using SimpleMarkdownView, resetTrigger=$resetTrigger, expandAll=$expandAllState")
-                    SimpleMarkdownView(
-                        markdownContent = displayMarkdownContent,
-                        bodyFontSize = fontSizeState,
-                        expandAll = expandAllState,
-                        onCheckboxChange = onCheckboxChange,
-                        resetTrigger = resetTrigger
-                    )
+                        SimpleMarkdownView(
+                            markdownContent = displayMarkdownContent,
+                            assetId = assetPath,
+                            bodyFontSize = fontSizeState,
+                            expandAll = expandAllState,
+                            onCheckboxChange = onCheckboxChange,
+                            resetTrigger = resetTrigger
+                        )
                 }
             }
         }
@@ -180,32 +182,57 @@ private data class MarkdownSection(
  * Gruppiert Inhalte zwischen ### Überschriften in Containern
  */
 @Composable
-private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int, expandAll: Boolean = false, onCheckboxChange: ((itemId: String, checked: Boolean) -> Unit)? = null, resetTrigger: Int = 0) {
+private fun SimpleMarkdownView(
+    markdownContent: String,
+    assetId: String,
+    bodyFontSize: Int,
+    expandAll: Boolean = false,
+    onCheckboxChange: ((itemId: String, checked: Boolean) -> Unit)? = null,
+    resetTrigger: Int = 0
+) {
     val scrollState = rememberScrollState()
 
     // Parse Markdown in Sektionen
     val sections = parseMarkdownSections(markdownContent)
 
     // State für expandierte Sektionen - Key ist der Index der Sektion
-    val expandedSections = remember { mutableStateMapOf<Int, Boolean>() }
+    // Remember per assetId so each file gets its own expand/collapse state
+    val expandedSections = remember(assetId) { mutableStateMapOf<Int, Boolean>() }
 
     // State for checkbox lines per section-line index (Pair<sectionIndex,lineIndex> -> checked)
-    val checkboxStates = remember { mutableStateMapOf<Pair<Int, Int>, Boolean>() }
+    // Remember per assetId so each file keeps a separate checkbox state
+    val checkboxStates = remember(assetId) { mutableStateMapOf<Pair<Int, Int>, Boolean>() }
 
     // Helper to identify a checkbox line
     val isCheckboxLine: (String) -> Boolean = { it.trim().startsWith("- [") }
 
+    // Get context and repository for loading saved states
+    val context = LocalContext.current
+    val repository = remember { com.example.checklist_interactive.data.checklist.ChecklistRepository(context) }
+    val coroutineScope = rememberCoroutineScope()
+
     // Initialize expand/checkbox states when content changes
-    LaunchedEffect(expandAll, markdownContent) {
+    LaunchedEffect(expandAll, markdownContent, assetId) {
         sections.indices.forEach { index ->
             if (sections[index].content.any { it.trim().startsWith("- [") }) {
                 expandedSections[index] = expandAll
             }
-            sections[index].content.forEachIndexed { lineIndex, line ->
+        }
+        
+        // Load saved checkbox states from repository
+        val savedStates = repository.getChecklistState(assetId)
+        android.util.Log.d("MarkdownViewer", "Loaded saved states for $assetId: ${savedStates.keys.size} entries")
+        
+        sections.forEachIndexed { index, section ->
+            section.content.forEachIndexed { lineIndex, line ->
                 if (isCheckboxLine(line)) {
                     val key = Pair(index, lineIndex)
-                    if (!checkboxStates.containsKey(key)) {
-                        checkboxStates[key] = line.trim().startsWith("- [x]") || line.trim().startsWith("- [X]")
+                    val syntheticId = "$assetId-simple-$index-$lineIndex"
+                    // Restore from saved state if available, otherwise use markdown default
+                    val defaultChecked = line.trim().startsWith("- [x]") || line.trim().startsWith("- [X]")
+                    checkboxStates[key] = savedStates[syntheticId] ?: defaultChecked
+                    if (savedStates.containsKey(syntheticId)) {
+                        android.util.Log.d("MarkdownViewer", "Restored $syntheticId = ${checkboxStates[key]}")
                     }
                 }
             }
@@ -213,7 +240,7 @@ private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int, expan
     }
 
     // Listen for reset trigger to clear local checkbox states and reinitialize them to defaults from content
-    LaunchedEffect(resetTrigger) {
+    LaunchedEffect(resetTrigger, assetId) {
         if (resetTrigger > 0) {
             checkboxStates.clear()
             sections.forEachIndexed { secIndex, sec ->
@@ -292,7 +319,16 @@ private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int, expan
                                                         checked = checked,
                                                         onCheckedChange = { newChecked ->
                                                             checkboxStates[key] = newChecked
-                                                            onCheckboxChange?.invoke("simple-$index-$lineIndex", newChecked)
+                                                            val syntheticId = "$assetId-simple-$index-$lineIndex"
+                                                            onCheckboxChange?.invoke(syntheticId, newChecked)
+                                                            // Persist directly if no external handler (e.g., no ViewModel)
+                                                            if (onCheckboxChange == null) {
+                                                                android.util.Log.d("MarkdownViewer", "Saving $syntheticId=$newChecked for $assetId (no handler)")
+                                                                // launch a coroutine to save
+                                                                coroutineScope.launch {
+                                                                    repository.saveChecklistItemState(assetId, syntheticId, newChecked)
+                                                                }
+                                                            }
                                                         }
                                                     )
                                                     Spacer(modifier = Modifier.width(8.dp))
@@ -329,7 +365,13 @@ private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int, expan
                                             checked = checked,
                                             onCheckedChange = { newChecked ->
                                                 checkboxStates[key] = newChecked
-                                                onCheckboxChange?.invoke("simple-$index-$lineIndex", newChecked)
+                                                val syntheticId = "$assetId-simple-$index-$lineIndex"
+                                                onCheckboxChange?.invoke(syntheticId, newChecked)
+                                                if (onCheckboxChange == null) {
+                                                    coroutineScope.launch {
+                                                        repository.saveChecklistItemState(assetId, syntheticId, newChecked)
+                                                    }
+                                                }
                                             }
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
@@ -405,7 +447,15 @@ private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int, expan
                                                     checked = checked,
                                                     onCheckedChange = { newChecked ->
                                                         checkboxStates[key] = newChecked
-                                                        onCheckboxChange?.invoke("simple-$index-$lineIndex", newChecked)
+                                                        val syntheticId = "$assetId-simple-$index-$lineIndex"
+                                                        onCheckboxChange?.invoke(syntheticId, newChecked)
+                                                        if (onCheckboxChange == null) {
+                                                            android.util.Log.d("MarkdownViewer", "Saving $syntheticId=$newChecked for $assetId (no handler)")
+                                                            android.util.Log.d("MarkdownViewer", "Saving $syntheticId=$newChecked for $assetId (no handler)")
+                                                            coroutineScope.launch {
+                                                                repository.saveChecklistItemState(assetId, syntheticId, newChecked)
+                                                            }
+                                                        }
                                                     }
                                                 )
                                                 Spacer(modifier = Modifier.width(8.dp))
@@ -440,7 +490,14 @@ private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int, expan
                                         checked = checked,
                                         onCheckedChange = { newChecked ->
                                             checkboxStates[key] = newChecked
-                                            onCheckboxChange?.invoke("simple-$index-$lineIndex", newChecked)
+                                            val syntheticId = "$assetId-simple-$index-$lineIndex"
+                                            onCheckboxChange?.invoke(syntheticId, newChecked)
+                                            if (onCheckboxChange == null) {
+                                                android.util.Log.d("MarkdownViewer", "Saving $syntheticId=$newChecked for $assetId (no handler)")
+                                                coroutineScope.launch {
+                                                    repository.saveChecklistItemState(assetId, syntheticId, newChecked)
+                                                }
+                                            }
                                         }
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
