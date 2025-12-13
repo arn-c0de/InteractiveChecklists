@@ -17,7 +17,7 @@
 - [ ] **Communications Equipment** - Turn off all three radios
 - [ ] **Oxygen Supply** - Move the oxygen supply lever to the "OFF" position
 - [ ] **Inverter** - OFF
-- [ ] **Battery** - OFF
+- [ ] **BAT switch (BAT)** - OFF
 
 ## Final Steps
 

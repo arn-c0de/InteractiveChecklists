@@ -319,7 +319,7 @@ fun SettingsScreen(
                             Column {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = "Quellen für Dokumente (z. B. Open Flight School). Jede Quelle kann Webseite und Lizenz haben.",
+                                    text = "Quellen für Dokumente. Jede Quelle kann Webseite und Lizenz haben.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

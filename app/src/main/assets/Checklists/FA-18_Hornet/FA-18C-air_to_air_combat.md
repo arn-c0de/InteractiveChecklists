@@ -2,7 +2,7 @@
 
 ## Pre-Combat Configuration
 
-- [ ] Master arm - ARM
+- [ ] MASTER ARM switch (MASTER ARM) - ARM
 - [ ] Radar - A/A mode selected
 - [ ] Radar elevation - Set for scan volume
 - [ ] RWR - Check operational
@@ -30,7 +30,7 @@
 ## AIM-120 AMRAAM Employment
 
 - [ ] Weapons selector - AIM-120
-- [ ] Master arm - ARM
+- [ ] MASTER ARM switch (MASTER ARM) - ARM
 - [ ] Radar mode - STT on target
 - [ ] Target data - Verify on HUD/DDI
 - [ ] Range - Check within Rmax
@@ -45,7 +45,7 @@
 ## AIM-9 Sidewinder Employment
 
 - [ ] Weapons selector - AIM-9X
-- [ ] Master arm - ARM
+- [ ] MASTER ARM switch (MASTER ARM) - ARM
 - [ ] Acquisition - HMCS or radar
 - [ ] Seeker - Uncage
 - [ ] Seeker tone - Listen for good tone
@@ -58,7 +58,7 @@
 ## Gun Employment (M61A1 20mm)
 
 - [ ] Weapons selector - GUN
-- [ ] Master arm - ARM
+- [ ] MASTER ARM switch (MASTER ARM) - ARM
 - [ ] Sight - Select A/A gun mode
 - [ ] HUD - Funnel displayed
 - [ ] Range - Optimal 1500-3000 feet

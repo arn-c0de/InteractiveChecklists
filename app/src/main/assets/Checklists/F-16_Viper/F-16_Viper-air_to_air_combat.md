@@ -2,7 +2,7 @@
 
 ## Pre-Combat Setup
 
-- [ ] Master arm - ARM
+- [ ] MASTER ARM switch (MASTER ARM) - ARM
 - [ ] Radar - A/A mode
 - [ ] RWR - Check operational
 - [ ] CMDS programs - Loaded and verified
@@ -33,7 +33,7 @@
 - [ ] Radar lock - STT on target
 - [ ] Range - Within Rmax envelope
 - [ ] DLZ display - Check shoot cues
-- [ ] Master arm - ARM
+- [ ] MASTER ARM switch (MASTER ARM) - ARM
 - [ ] Target data - Verify on HUD
 - [ ] Uncage - As required
 - [ ] Fire - Weapon release button
@@ -47,7 +47,7 @@
 ## AIM-9 Sidewinder Employment
 
 - [ ] Weapons selector - AIM-9
-- [ ] Master arm - ARM
+- [ ] MASTER ARM switch (MASTER ARM) - ARM
 - [ ] Radar - May use or visual acquisition
 - [ ] HMCS - Use for off-boresight targeting
 - [ ] Seeker tone - Listen for good tone
@@ -61,7 +61,7 @@
 ## Gun Employment (20mm M61A1)
 
 - [ ] Weapons selector - GUN
-- [ ] Master arm - ARM
+- [ ] MASTER ARM switch (MASTER ARM) - ARM
 - [ ] Radar - Acquire target (or visual)
 - [ ] HUD - Funnel or EEGS symbology
 - [ ] Range - Optimal 2000-4000 feet

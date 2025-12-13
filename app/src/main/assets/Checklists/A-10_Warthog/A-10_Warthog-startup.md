@@ -2,7 +2,7 @@
 
 ## Prior to Engine Start
 
-- [ ] **Battery switch** - PWR
+- [ ] **BAT switch (BAT)** - PWR
 - [ ] **UHF controls** – ON/Set
 - [ ] **Inverter switch** - STBY
 - [ ] **Engine instruments** - Check, ITT indicator below 150°C, OFF flag
@@ -34,7 +34,7 @@
 - [ ] **Flap lever** - Set to flap position
 - [ ] **Landing gear handle** - DOWN
 - [ ] **Landing/taxi light switch** - OFF
-- [ ] **Armament HUD control panel** - Set: MASTER armament switch - SAFE; GUN/PAC armament switch - SAFE; LASER armament switch - SAFE; TGP - OFF; ALT SCE - As desired; HUD mode switch - As desired; CICU - OFF; JTRS - OFF; IFFCC switch - OFF
+- [ ] **Armament HUD control panel** - Set: MASTER ARM switch - SAFE; GUN/PAC armament switch - SAFE; LASER armament switch - SAFE; TGP - OFF; ALT SCE - As desired; HUD mode switch - As desired; CICU - OFF; JTRS - OFF; IFFCC switch - OFF
 - [ ] **MFCD (L/R)** - OFF
 - [ ] **Standby attitude indicator** - CAGE
 - [ ] **Accelerometer** - Reset
