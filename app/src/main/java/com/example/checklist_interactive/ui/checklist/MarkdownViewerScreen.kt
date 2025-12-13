@@ -91,6 +91,7 @@ fun MarkdownViewerScreen(
     // State für Expand/Collapse All
     var expandAllSections by remember { mutableStateOf(prefsManager.areMarkdownSectionsExpandedByDefault()) }
     var showQuickAccess by remember { mutableStateOf(false) }
+    var resetTrigger by remember { mutableStateOf(0) }
 
     Scaffold(
         topBar = {
@@ -105,10 +106,11 @@ fun MarkdownViewerScreen(
                     }
                 },
                 actions = {
-                    if (viewModel != null) {
-                        IconButton(onClick = { viewModel.resetChecklist() }) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Reset Checklist")
-                        }
+                    IconButton(onClick = {
+                        viewModel?.resetChecklist()
+                        resetTrigger += 1
+                    }) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Reset Checklist")
                     }
                     // Link zu Schnellnotiz
                     IconButton(onClick = {
@@ -184,7 +186,8 @@ fun MarkdownViewerScreen(
             modifier = Modifier.padding(paddingValues),
             prefsManager = prefsManager,
             forceExpandAll = expandAllSections,
-            markdownContentOverride = markdownContent
+            markdownContentOverride = markdownContent,
+            resetTrigger = resetTrigger
         )
     }
 

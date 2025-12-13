@@ -1,1 +1,5 @@
 /build
+
+# Ignore only PDF files inside the Checklists asset folder (module local rule)
+\src/main/assets/Checklists/**/*.pdf
+\src/main/assets/Checklists/*.pdf
