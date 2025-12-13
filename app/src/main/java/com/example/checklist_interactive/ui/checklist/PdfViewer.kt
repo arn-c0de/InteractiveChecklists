@@ -1309,12 +1309,33 @@ fun PdfViewer(
         if (showTocDialog) {
             // LazyListState für TOC, startet bei aktueller Seite
             val tocListState = rememberLazyListState()
+            var tocSearchQuery by remember { mutableStateOf("") }
+            // Build a unified list of (title, page, level) for displaying in the TOC
+            val tocDisplayList = remember(outlineItems, chapters, tocSearchQuery) {
+                val raw = if (outlineItems.isNotEmpty()) {
+                    outlineItems.map { Triple(it.title, it.pageNumber, it.level) }
+                } else {
+                    chapters.map { Triple(it.first, it.second, 0) }
+                }
+                if (tocSearchQuery.isBlank()) raw
+                else raw.filter { it.first.contains(tocSearchQuery, ignoreCase = true) }
+            }
 
             // Scrolle beim Öffnen zur aktuellen Seite und zentriere sie
             LaunchedEffect(Unit) {
                 if (chapters.isNotEmpty()) {
                     val targetIndex = currentPage.coerceIn(0, chapters.size - 1)
                     tocListState.scrollToItem(targetIndex)
+                }
+            }
+            // Reset search when the dialog opens
+            LaunchedEffect(showTocDialog) {
+                if (showTocDialog) tocSearchQuery = ""
+            }
+            // Wenn der Suchbegriff sich ändert, scrolle ggf. an den Anfang der gefilterten Liste
+            LaunchedEffect(tocSearchQuery) {
+                if (tocDisplayList.isNotEmpty()) {
+                    tocListState.scrollToItem(0)
                 }
             }
 
@@ -1326,73 +1347,55 @@ fun PdfViewer(
                         if (chapters.isEmpty()) {
                             Text("Keine Kapitel gefunden. Zeige Seitenliste als Fallback.")
                         }
+                        // Suchfeld
+                        OutlinedTextField(
+                            value = tocSearchQuery,
+                            onValueChange = { tocSearchQuery = it },
+                            label = { Text("Kapitel suchen") },
+                            singleLine = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 8.dp)
+                        )
+
                         LazyColumn(
                             modifier = Modifier.heightIn(max = 400.dp),
                             state = tocListState
                         ) {
-                            if (outlineItems.isNotEmpty()) {
-                                // Hierarchische Outline-Anzeige mit Einrückung
-                                items(outlineItems) { item ->
-                                    val isCurrentPage = item.pageNumber == currentPage
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                showTocDialog = false
-                                                backgroundScope.launch(Dispatchers.Main) {
-                                                    listState.scrollToItem(item.pageNumber)
-                                                }
+                            items(tocDisplayList) { itemTriple ->
+                                val (titleText, pageIndex, level) = itemTriple
+                                val isCurrentPage = pageIndex == currentPage
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            showTocDialog = false
+                                            backgroundScope.launch(Dispatchers.Main) {
+                                                listState.scrollToItem(pageIndex)
                                             }
-                                            .background(
-                                                if (isCurrentPage)
-                                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                                                else
-                                                    Color.Transparent
-                                            )
-                                            .padding(vertical = 8.dp)
-                                    ) {
-                                        // Einrückung basierend auf Level
-                                        Spacer(modifier = Modifier.width((item.level * 16).dp + 16.dp))
-                                        Column {
-                                            Text(
-                                                text = item.title,
-                                                style = MaterialTheme.typography.bodyMedium.copy(
-                                                    fontWeight = if (item.level == 0) FontWeight.Bold else FontWeight.Normal
-                                                )
-                                            )
-                                            Text(
-                                                text = "Seite ${item.pageNumber + 1}",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
                                         }
+                                        .background(
+                                            if (isCurrentPage)
+                                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                            else
+                                                Color.Transparent
+                                        )
+                                        .padding(vertical = 8.dp)
+                                ) {
+                                    Spacer(modifier = Modifier.width((level * 16).dp + 16.dp))
+                                    Column {
+                                        Text(
+                                            text = titleText,
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                fontWeight = if (level == 0) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        )
+                                        Text(
+                                            text = "Seite ${pageIndex + 1}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
                                     }
-                                }
-                            } else {
-                                // Fallback: Einfache Seitenliste
-                                items(chapters) { (titleText, pageIndex) ->
-                                    val isCurrentPage = pageIndex == currentPage
-                                    ListItem(
-                                        headlineContent = {
-                                            Text(
-                                                text = titleText,
-                                                fontWeight = if (isCurrentPage) FontWeight.Bold else FontWeight.Normal
-                                            )
-                                        },
-                                        modifier = Modifier
-                                            .clickable {
-                                                showTocDialog = false
-                                                backgroundScope.launch(Dispatchers.Main) {
-                                                    listState.scrollToItem(pageIndex)
-                                                }
-                                            }
-                                            .background(
-                                                if (isCurrentPage)
-                                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                                                else
-                                                    Color.Transparent
-                                            )
-                                    )
                                 }
                             }
                         }
