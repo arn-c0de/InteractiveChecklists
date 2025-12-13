@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.checklist_interactive.data.checklist.Checklist
@@ -265,9 +266,10 @@ private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int, expan
                                     }.count { it }
                                     val countText = if (totalCheckboxes > 0) " | $checkedCheckboxes/$totalCheckboxes" else ""
 
+                                    val isAllChecked = totalCheckboxes > 0 && checkedCheckboxes == totalCheckboxes
                                     Text(
                                         text = section.heading.substring(3) + countText,
-                                        style = MaterialTheme.typography.headlineMedium,
+                                        style = if (isAllChecked) MaterialTheme.typography.headlineMedium.copy(textDecoration = TextDecoration.LineThrough) else MaterialTheme.typography.headlineMedium,
                                         fontWeight = FontWeight.Bold,
                                         modifier = Modifier.weight(1f)
                                     )
@@ -377,9 +379,10 @@ private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int, expan
                                 }.count { it }
                                 val countText = if (totalCheckboxes > 0) " | $checkedCheckboxes/$totalCheckboxes" else ""
 
+                                val isAllCheckedSub = totalCheckboxes > 0 && checkedCheckboxes == totalCheckboxes
                                 Text(
                                     text = section.heading.substring(4) + countText,
-                                    style = MaterialTheme.typography.headlineSmall,
+                                    style = if (isAllCheckedSub) MaterialTheme.typography.headlineSmall.copy(textDecoration = TextDecoration.LineThrough) else MaterialTheme.typography.headlineSmall,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.weight(1f)
                                 )
@@ -673,9 +676,10 @@ private fun InteractiveMarkdownView(
                                 val checkedCheckboxes = section.items.count { it.isChecked }
                                 val countText = if (totalCheckboxes > 0) " | $checkedCheckboxes/$totalCheckboxes" else ""
 
+                                val isAllCheckedInteractive = totalCheckboxes > 0 && checkedCheckboxes == totalCheckboxes
                                 Text(
                                     text = section.title + countText,
-                                    style = MaterialTheme.typography.headlineSmall,
+                                    style = if (isAllCheckedInteractive) MaterialTheme.typography.headlineSmall.copy(textDecoration = TextDecoration.LineThrough) else MaterialTheme.typography.headlineSmall,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.weight(1f)
                                 )

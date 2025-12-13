@@ -34,6 +34,10 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.ClickableText
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.graphics.Color
@@ -124,11 +128,13 @@ fun QuickAccessSheet(
     val com1ModeFlow by noteManager.com1Mode.collectAsState()
     val com2Flow by noteManager.com2.collectAsState()
     val com2ModeFlow by noteManager.com2Mode.collectAsState()
+    val flightStatusFlow by noteManager.flightStatus.collectAsState()
     var callsign by remember { mutableStateOf("") }
     var com1 by remember { mutableStateOf("") }
     var com1Mode by remember { mutableStateOf("FM") }
     var com2 by remember { mutableStateOf("") }
     var com2Mode by remember { mutableStateOf("FM") }
+    var flightStatus by remember { mutableStateOf("") }
     var hasChanges by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var renameText by remember { mutableStateOf("") }
@@ -149,12 +155,13 @@ fun QuickAccessSheet(
     }
 
     // Initialize toolbar state from flows
-    LaunchedEffect(callsignFlow, com1Flow, com1ModeFlow, com2Flow, com2ModeFlow) {
+    LaunchedEffect(callsignFlow, com1Flow, com1ModeFlow, com2Flow, com2ModeFlow, flightStatusFlow) {
         callsign = callsignFlow
         com1 = com1Flow
         com1Mode = com1ModeFlow
         com2 = com2Flow
         com2Mode = com2ModeFlow
+        flightStatus = flightStatusFlow
     }
 
     // Auto-save callsign when it changes (debounced via LaunchedEffect cancellations)
@@ -178,6 +185,14 @@ fun QuickAccessSheet(
         if (com2 != com2Flow || com2Mode != com2ModeFlow) {
             kotlinx.coroutines.delay(600L)
             noteManager.saveCom2(com2, com2Mode)
+        }
+    }
+
+    // Auto-save flight status
+    LaunchedEffect(flightStatus) {
+        if (flightStatus != flightStatusFlow) {
+            kotlinx.coroutines.delay(600L)
+            noteManager.saveFlightStatus(flightStatus)
         }
     }
     LaunchedEffect(flightExpandedFlow) { flightExpanded = flightExpandedFlow }
@@ -326,7 +341,7 @@ fun QuickAccessSheet(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = "${callsign.ifBlank { "-" }}  | COM1: ${com1.ifBlank { "-" }} ${com1Mode}  | COM2: ${com2.ifBlank { "-" }} ${com2Mode}", style = MaterialTheme.typography.bodyMedium)
+                    Text(text = "${callsign.ifBlank { "-" }}  | Status: ${flightStatus.ifBlank { "Idle" }}  | COM1: ${com1.ifBlank { "-" }} ${com1Mode}  | COM2: ${com2.ifBlank { "-" }} ${com2Mode}", style = MaterialTheme.typography.bodyMedium)
                     Row {
                         IconButton(onClick = { flightExpanded = true; noteManager.saveFlightInfoExpanded(true) }) {
                             Icon(Icons.Default.ExpandMore, contentDescription = "Expand")
@@ -345,13 +360,52 @@ fun QuickAccessSheet(
                             .padding(bottom = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        OutlinedTextField(
-                            value = callsign,
-                            onValueChange = { callsign = it },
-                            label = { Text("CALLSIGN") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth().weight(1f)
-                        )
+                            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                OutlinedTextField(
+                                    value = callsign,
+                                    onValueChange = { callsign = it },
+                                    label = { Text("CALLSIGN") },
+                                    singleLine = true,
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                // Flight status dropdown (small width)
+                                val statusOptions = listOf("Idle", "Startup", "Taxi", "Holding", "Start Navigation", "Navigation", "Landing", "Shutdown")
+                                var statusExpanded by remember { mutableStateOf(false) }
+                                Box(modifier = Modifier.wrapContentSize()) {
+                                    OutlinedTextField(
+                                        value = flightStatus.ifBlank { "Idle" },
+                                        onValueChange = {},
+                                        label = { Text("Status") },
+                                        readOnly = true,
+                                        trailingIcon = {
+                                            IconButton(onClick = { statusExpanded = !statusExpanded }) {
+                                                Icon(
+                                                    imageVector = if (statusExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                                    contentDescription = if (statusExpanded) "Collapse" else "Expand"
+                                                )
+                                            }
+                                        },
+                                        modifier = Modifier.width(170.dp).clickable { statusExpanded = true }
+                                    )
+                                    DropdownMenu(
+                                        expanded = statusExpanded,
+                                        onDismissRequest = { statusExpanded = false }
+                                    ) {
+                                        statusOptions.forEach { selection ->
+                                            DropdownMenuItem(
+                                                text = { Text(selection) },
+                                                onClick = {
+                                                    flightStatus = selection
+                                                    statusExpanded = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                     }
 
                     // Second row: COM1 and COM2 side-by-side with their modes and the action buttons
