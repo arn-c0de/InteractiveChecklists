@@ -212,12 +212,6 @@ private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int, expan
                     }
                 }
             }
-            // Reset expanded sections to the configured default
-            sections.indices.forEach { idx ->
-                if (sections[idx].content.any { it.trim().startsWith("- [") }) {
-                    expandedSections[idx] = expandAll
-                }
-            }
         }
     }
 
@@ -615,16 +609,8 @@ private fun InteractiveMarkdownView(
         }
     }
 
-    // Listen for reset trigger to reset expanded section states
-    LaunchedEffect(resetTrigger) {
-        if (resetTrigger > 0) {
-            checklist.sections.forEach { section ->
-                if (section.title.isNotEmpty() && section.items.isNotEmpty()) {
-                    expandedSections[section.title] = expandAll
-                }
-            }
-        }
-    }
+    // Note: Do not reset collapsed/expanded section states on resetTrigger
+    // Reset trigger should only reset checkbox states, not UI collapse/expand state.
 
     Column(
         modifier = Modifier
