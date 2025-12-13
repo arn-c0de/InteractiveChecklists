@@ -21,11 +21,14 @@ class ChecklistRepository(private val context: Context) {
 
     suspend fun getChecklistState(checklistId: String): Map<String, Boolean> {
         val prefs = getPreferences(checklistId)
-        return prefs.all.mapValues { it.value as? Boolean ?: false }
+        val map = prefs.all.mapValues { it.value as? Boolean ?: false }
+        android.util.Log.d("ChecklistRepository", "getChecklistState for $checklistId -> ${map.keys.size} keys")
+        return map
     }
 
     suspend fun saveChecklistItemState(checklistId: String, itemId: String, isChecked: Boolean) {
         val prefs = getPreferences(checklistId)
+        android.util.Log.d("ChecklistRepository", "saveChecklistItemState: $checklistId -> $itemId = $isChecked")
         prefs.edit().putBoolean(itemId, isChecked).apply()
     }
 
