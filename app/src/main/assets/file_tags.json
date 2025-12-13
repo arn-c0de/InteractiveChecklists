@@ -135,7 +135,7 @@
   "tags": ["checklist"]
 },
 {
-  "filePath": "asset://Charts/GND_and_VAD_Charts_v405.pdf",
+  "filePath": "asset://Charts/Caucasus-GND_and_VAD_Charts_v405.pdf",
   "tags": ["chart"]
 },
 {
@@ -177,4 +177,61 @@
 {
   "filePath": "asset://Checklists/CH-47F_Chinook/DCS CH-47F Early Access Guide EN.pdf",
   "tags": ["checklist"]
-}]
+},
+{
+  "filePath": "asset://Checklists/F-14B/F-14B-Flight_Manual.pdf",
+  "tags": ["reference"]
+},
+{
+  "filePath": "asset://Checklists/F-14B/F14B-carrier-ops.md",
+  "tags": ["carrier_ops", "checklist"]
+},
+{
+  "filePath": "asset://Checklists/F-14B/F14B-landing.md",
+  "tags": ["landing"]
+},
+{
+  "filePath": "asset://Checklists/F-14B/F14B-maneuvers.md",
+  "tags": ["maneuvers"]
+},
+{
+  "filePath": "asset://Checklists/F-14B/F14B-startup.md",
+  "tags": ["startup"]
+},
+{
+  "filePath": "asset://Checklists/FA-18_Hornet/F18-ABCD-Flight_Manual.pdf",
+  "tags": ["reference"]
+},
+{
+  "filePath": "asset://Charts/CW-Germany-Charts-2.pdf",
+  "tags": ["chart"]
+},
+{
+  "filePath": "asset://Charts/Syria-Charts-XXL.pdf",
+  "tags": ["chart"]
+},
+{
+  "filePath": "asset://Handbooks/09_ch7_Airport_Traffic_Patterns.pdf",
+  "tags": ["reference"]
+},
+{
+  "filePath": "asset://Handbooks/auo_2022_MULTI-SERVICE_TACTICS_FOR_AVIATION_URBAN_OPERATIONS.pdf",
+  "tags": ["reference"]
+},
+{
+  "filePath": "asset://Handbooks/cnaf-3710.7_NATOPS_FLIGHT_AND_OPERATING_MANUAL.pdf",
+  "tags": ["reference"]
+},
+{
+  "filePath": "asset://Handbooks/jp-3-50-21_Joint_Tactics_Procedures_for_Combat_Search_and_Rescue.pdf",
+  "tags": ["reference"]
+},
+{
+  "filePath": "asset://radiocommunication/EGAST_Radiotelephony-guide-for-VFR-pilots.pdf",
+  "tags": ["communications", "reference"]
+},
+{
+  "filePath": "asset://radiocommunication/MA-Radio-Communication-Checklist.md",
+  "tags": ["checklist", "communications"]
+}
+]
