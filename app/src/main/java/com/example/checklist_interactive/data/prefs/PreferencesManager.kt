@@ -25,6 +25,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_MARKDOWN_SECTIONS_EXPANDED = "markdown_sections_expanded"
         private const val KEY_ACTIVE_TAG_FILTERS = "active_tag_filters"
         private const val KEY_TAG_FILTER_MODE = "tag_filter_mode" // "any" or "all"
+        private const val KEY_GRID_VIEW = "grid_view_enabled"
         private const val KEY_LAST_IMPORTED_VERSION = "last_imported_version"
         private const val KEY_DOCUMENT_SOURCES_JSON = "document_sources_json"
         private const val KEY_CONTRIBUTORS_JSON = "contributors_json"
@@ -212,6 +213,17 @@ class PreferencesManager(context: Context) {
      */
     fun getTagFilterMode(): String {
         return prefs.getString(KEY_TAG_FILTER_MODE, "any") ?: "any"
+    }
+
+    /**
+     * Grid view preference: true = grid, false = list (default false)
+     */
+    fun setGridViewEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_GRID_VIEW, enabled).apply()
+    }
+
+    fun isGridViewEnabled(): Boolean {
+        return prefs.getBoolean(KEY_GRID_VIEW, false)
     }
 
     /**
