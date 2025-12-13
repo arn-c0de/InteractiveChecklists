@@ -19,9 +19,9 @@
 - [ ] **Initial Approach:** Fly at 800 ft AGL, offset to the right of the runway at approximately 350 knots (Navy-style approach).
 - [ ] **Break:** Initiate a level break (turn to downwind) with idle throttle and speed brakes out.
 - [ ] As airspeed decreases through 250 knots:
-    - [ ] **Landing Gear:** Lower landing gear.
-    - [ ] **Flaps:** Extend flaps to FULL.
-    - [ ] **Speed Brake:** Retract speed brake.
+- [ ] **Landing Gear:** Lower landing gear.
+- [ ] **Flaps:** Extend flaps to FULL.
+- [ ] **Speed Brake:** Retract speed brake.
 - [ ] **Descent to Downwind:** Descend to 600 ft AGL on the downwind leg.
 - [ ] **Trim:** Trim aircraft to achieve on-speed Angle of Attack (AOA).
 - [ ] **Landing Checklist Completion:** Complete the landing checklist once established on the downwind leg.
