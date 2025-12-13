@@ -97,12 +97,20 @@ fun MarkdownViewerScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(fileName) },
+                title = { 
+                    Text(
+                        fileName,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    ) 
+                },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Zurück"
+                            contentDescription = "Zurück",
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 },
@@ -110,42 +118,42 @@ fun MarkdownViewerScreen(
                     IconButton(onClick = {
                         viewModel?.resetChecklist()
                         resetTrigger += 1
-                    }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Reset Checklist")
+                    }, modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Reset Checklist", modifier = Modifier.size(20.dp))
                     }
-                    // Link zu Schnellnotiz
                     IconButton(onClick = {
                         quickNoteManager.addLinkedDocument(
                             filePath = assetPath,
                             fileName = fileName,
                             pageNumber = null
                         )
-                    }) {
-                        Icon(Icons.Default.Link, contentDescription = "Zu Schnellnotiz verlinken")
+                    }, modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.Default.Link, contentDescription = "Zu Schnellnotiz verlinken", modifier = Modifier.size(20.dp))
                     }
-                    // Quick Access shortcut (visible in top bar)
-                    IconButton(onClick = { showQuickAccess = true }) {
-                        Icon(Icons.Default.NoteAdd, contentDescription = "Schnellzugriff")
+                    IconButton(onClick = { showQuickAccess = true }, modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.Default.NoteAdd, contentDescription = "Schnellzugriff", modifier = Modifier.size(20.dp))
                     }
-                    // Expand/Collapse All Button
                     IconButton(onClick = {
                         expandAllSections = !expandAllSections
                         prefsManager.setMarkdownSectionsExpandedByDefault(expandAllSections)
-                    }) {
+                    }, modifier = Modifier.size(40.dp)) {
                         Icon(
                             imageVector = if (expandAllSections) Icons.Default.UnfoldLess else Icons.Default.UnfoldMore,
-                            contentDescription = if (expandAllSections) "Alle einklappen" else "Alle ausklappen"
+                            contentDescription = if (expandAllSections) "Alle einklappen" else "Alle ausklappen",
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                     if (onSettings != null) {
-                        IconButton(onClick = onSettings) {
+                        IconButton(onClick = onSettings, modifier = Modifier.size(40.dp)) {
                             Icon(
                                 imageVector = Icons.Default.Settings,
-                                contentDescription = "Einstellungen"
+                                contentDescription = "Einstellungen",
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
-                }
+                },
+                modifier = Modifier.height(48.dp)
             )
         },
         floatingActionButton = {

@@ -22,10 +22,11 @@ Checklist Interactive is an Android application designed for viewing and interac
 ## Features
 
 -   **Unified File System**: The app manages files from both bundled assets and internal storage, presenting them in a single, hierarchical view.
+-   **Multi-Tab Navigation**: Open multiple documents simultaneously with swipeable tabs, quick switching between recent files, and persistent tab state across app restarts.
 -   **PDF Viewer**: A custom-built PDF viewer with support for annotations (drawing, highlighting, erasing), pinch-to-zoom, page-snapping, and color inversion.
 -   **Interactive Markdown Checklists**: View and interact with markdown checklists, with support for collapsible sections and stateful checkboxes.
 -   **Tagging System**: Assign multiple tags to files for easy filtering and organization.
--   **Data Persistence**: User preferences, annotations, shortcuts, and tags are all saved locally.
+-   **Data Persistence**: User preferences, annotations, shortcuts, tags, and open tabs are all saved locally.
 
 ## Architecture
 
