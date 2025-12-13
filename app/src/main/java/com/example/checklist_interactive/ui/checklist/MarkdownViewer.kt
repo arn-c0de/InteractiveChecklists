@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -314,7 +315,12 @@ private fun SimpleMarkdownView(
                                             val key = Pair(index, lineIndex)
                                             val checked = checkboxStates[key] ?: false
                                             Column(modifier = Modifier.fillMaxWidth()) {
-                                                Row(modifier = Modifier.padding(vertical = 2.dp), horizontalArrangement = Arrangement.Start) {
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(vertical = 2.dp),
+                                                    horizontalArrangement = Arrangement.Start
+                                                ) {
                                                     Checkbox(
                                                         checked = checked,
                                                         onCheckedChange = { newChecked ->
@@ -347,7 +353,30 @@ private fun SimpleMarkdownView(
                                                     Text(
                                                         text = parseInlineMarkdown(line.trim().substring(5).trim(), bodyFontSize),
                                                         style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
-                                                        modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
+                                                        modifier = Modifier
+                                                            .align(androidx.compose.ui.Alignment.CenterVertically)
+                                                            .clickable(role = Role.Checkbox) {
+                                                                val newChecked = !checked
+                                                                checkboxStates[key] = newChecked
+                                                                val syntheticId = "$assetId-simple-$index-$lineIndex"
+                                                                onCheckboxChange?.invoke(syntheticId, newChecked)
+                                                                if (onCheckboxChange == null) {
+                                                                    coroutineScope.launch {
+                                                                        repository.saveChecklistItemState(assetId, syntheticId, newChecked)
+                                                                    }
+                                                                }
+
+                                                                val totalCheckboxes = section.content.count { it.trim().startsWith("- [") }
+                                                                if (totalCheckboxes > 0) {
+                                                                    val checkedCount = section.content.mapIndexed { lidx, line ->
+                                                                        if (line.trim().startsWith("- [")) checkboxStates[Pair(index, lidx)] ?: (line.trim().startsWith("- [x]") || line.trim().startsWith("- [X]")) else false
+                                                                    }.count { it }
+                                                                    if (checkedCount == totalCheckboxes) {
+                                                                        android.util.Log.d("MarkdownViewer", "Auto-closing simple section index=$index for $assetId (all checked)")
+                                                                        expandedSections[index] = false
+                                                                    }
+                                                                }
+                                                            }
                                                     )
                                                 }
                                                 HorizontalDivider(
@@ -402,7 +431,30 @@ private fun SimpleMarkdownView(
                                         Text(
                                             text = parseInlineMarkdown(line.trim().substring(5).trim(), bodyFontSize),
                                             style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
-                                            modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
+                                            modifier = Modifier
+                                                .align(androidx.compose.ui.Alignment.CenterVertically)
+                                                .clickable(role = Role.Checkbox) {
+                                                    val newChecked = !checked
+                                                    checkboxStates[key] = newChecked
+                                                    val syntheticId = "$assetId-simple-$index-$lineIndex"
+                                                    onCheckboxChange?.invoke(syntheticId, newChecked)
+                                                    if (onCheckboxChange == null) {
+                                                        coroutineScope.launch {
+                                                            repository.saveChecklistItemState(assetId, syntheticId, newChecked)
+                                                        }
+                                                    }
+
+                                                    val totalCheckboxes = section.content.count { it.trim().startsWith("- [") }
+                                                    if (totalCheckboxes > 0) {
+                                                        val checkedCount = section.content.mapIndexed { lidx, line ->
+                                                            if (line.trim().startsWith("- [")) checkboxStates[Pair(index, lidx)] ?: (line.trim().startsWith("- [x]") || line.trim().startsWith("- [X]")) else false
+                                                        }.count { it }
+                                                        if (checkedCount == totalCheckboxes) {
+                                                            android.util.Log.d("MarkdownViewer", "Auto-closing simple section index=$index for $assetId (all checked)")
+                                                            expandedSections[index] = false
+                                                        }
+                                                    }
+                                                } 
                                         )
                                     }
                                     HorizontalDivider(
@@ -528,7 +580,30 @@ private fun SimpleMarkdownView(
                                     Text(
                                         text = parseInlineMarkdown(line.trim().substring(5).trim(), bodyFontSize),
                                         style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
-                                        modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
+                                        modifier = Modifier
+                                            .align(androidx.compose.ui.Alignment.CenterVertically)
+                                            .clickable(role = Role.Checkbox) {
+                                                val newChecked = !checked
+                                                checkboxStates[key] = newChecked
+                                                val syntheticId = "$assetId-simple-$index-$lineIndex"
+                                                onCheckboxChange?.invoke(syntheticId, newChecked)
+                                                if (onCheckboxChange == null) {
+                                                    coroutineScope.launch {
+                                                        repository.saveChecklistItemState(assetId, syntheticId, newChecked)
+                                                    }
+                                                }
+
+                                                val totalCheckboxes = section.content.count { it.trim().startsWith("- [") }
+                                                if (totalCheckboxes > 0) {
+                                                    val checkedCount = section.content.mapIndexed { lidx, line ->
+                                                        if (line.trim().startsWith("- [")) checkboxStates[Pair(index, lidx)] ?: (line.trim().startsWith("- [x]") || line.trim().startsWith("- [X]")) else false
+                                                    }.count { it }
+                                                    if (checkedCount == totalCheckboxes) {
+                                                        android.util.Log.d("MarkdownViewer", "Auto-closing simple section index=$index for $assetId (all checked)")
+                                                        expandedSections[index] = false
+                                                    }
+                                                }
+                                            }
                                     )
                                 }
                                 HorizontalDivider(
@@ -855,7 +930,9 @@ private fun ChecklistItemRow(
             Text(
                 text = parseInlineMarkdown(item.text, bodyFontSize),
                 style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
-                modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
+                modifier = Modifier
+                    .align(androidx.compose.ui.Alignment.CenterVertically)
+                    .clickable(role = Role.Checkbox) { onCheckboxChange(item.id, !item.isChecked) }
             )
         }
         HorizontalDivider(
