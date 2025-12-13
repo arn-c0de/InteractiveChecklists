@@ -16,4 +16,5 @@ data class ChecklistItem(
     val text: String,
     val indent: Int = 0,
     val isChecked: Boolean = false,
+    val isTask: Boolean = true
 )
