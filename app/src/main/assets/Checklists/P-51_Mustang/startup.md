@@ -21,7 +21,7 @@
 ## Starting Procedure
 
 - [ ] **Propeller:** Have prop pulled through, with ignition switch OFF, if plane has been idle more than 2 hours
-- [ ] **Generator and battery switch:** ON, unless battery cart is being used, then battery switch OFF
+- [ ] **GEN & BAT switches:** GEN ON, BAT ON (unless battery cart is being used, then BAT OFF)
 - [ ] **Throttle:** Open 1 inch
 - [ ] **Mixture control:** IDLE CUT-OFF
 - [ ] **Propeller control:** INCREASED RPM

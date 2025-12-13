@@ -17,7 +17,7 @@
 
 ## Weapons Setup
 
-- [ ] Master arm - ARM
+- [ ] MASTER ARM switch (MASTER ARM) - ARM
 - [ ] SMS page - Display on MFD
 - [ ] Weapons selector - Select appropriate weapon
 - [ ] Release parameters - Set
@@ -28,7 +28,7 @@
 
 ## CCIP Bombing (Continuously Computed Impact Point)
 
-- [ ] Master arm - ARM
+- [ ] MASTER ARM switch (MASTER ARM) - ARM
 - [ ] Weapons - Select bombs
 - [ ] Delivery mode - CCIP
 - [ ] Target - Visually acquire
@@ -43,7 +43,7 @@
 
 ## CCRP Bombing (Continuously Computed Release Point)
 
-- [ ] Master arm - ARM
+- [ ] MASTER ARM switch (MASTER ARM) - ARM
 - [ ] Weapons - Select bombs
 - [ ] Delivery mode - CCRP
 - [ ] Target - Enter coordinates or designate
@@ -56,7 +56,7 @@
 
 ## DTOS (Dive Toss) Bombing
 
-- [ ] Master arm - ARM
+- [ ] MASTER ARM switch (MASTER ARM) - ARM
 - [ ] Weapons - Select bombs
 - [ ] Delivery mode - DTOS
 - [ ] Target - Designate
@@ -69,7 +69,7 @@
 
 ## AGM-65 Maverick Employment
 
-- [ ] Master arm - ARM
+- [ ] MASTER ARM switch (MASTER ARM) - ARM
 - [ ] Weapons selector - AGM-65
 - [ ] Targeting pod - Slew to target (or HMCS)
 - [ ] Maverick seeker - Uncage
@@ -84,7 +84,7 @@
 
 ## Laser Guided Bomb (LGB) Employment
 
-- [ ] Master arm - ARM
+- [ ] MASTER ARM switch (MASTER ARM) - ARM
 - [ ] Weapons - Select LGB
 - [ ] Targeting pod - Power on
 - [ ] Target - Acquire in targeting pod
@@ -100,7 +100,7 @@
 
 ## JDAM Employment (GPS Guided)
 
-- [ ] Master arm - ARM
+- [ ] MASTER ARM switch (MASTER ARM) - ARM
 - [ ] Weapons - Select JDAM
 - [ ] GPS - Check good signal quality
 - [ ] Target coordinates - Verify programmed
@@ -114,7 +114,7 @@
 
 ## Strafing Run (20mm Gun)
 
-- [ ] Master arm - ARM
+- [ ] MASTER ARM switch (MASTER ARM) - ARM
 - [ ] Weapons selector - GUN
 - [ ] Target - Visually acquire
 - [ ] Dive angle - 10-30° typical
@@ -129,7 +129,7 @@
 
 ## Rocket Employment (If equipped)
 
-- [ ] Master arm - ARM
+- [ ] MASTER ARM switch (MASTER ARM) - ARM
 - [ ] Weapons - Select rockets
 - [ ] Delivery - CCIP mode
 - [ ] Dive angle - 10-20° typical
@@ -166,7 +166,7 @@
 
 ## Post-Attack
 
-- [ ] Master arm - SAFE
+- [ ] MASTER ARM switch (MASTER ARM) - SAFE
 - [ ] Egress - Execute safe escape
 - [ ] Altitude - Climb if threat allows
 - [ ] Speed - Accelerate to cruise

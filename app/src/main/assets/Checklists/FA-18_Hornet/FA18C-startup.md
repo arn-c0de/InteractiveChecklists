@@ -5,7 +5,7 @@
 - [ ] Overall aircraft condition - Inspect
 - [ ] Tires and landing gear - Check condition
 - [ ] Intake FOD check - Clear
-- [ ] Exterior lights - Inspect
+- [ ] Exterior Lighting switches (NAV/TAXI/LDG/FORMATION/ANTI-COLLISION) - Inspect
 - [ ] Ram air turbine - Check stowed
 - [ ] Arresting hook - Inspect
 - [ ] Wing fold mechanism - Check locked
@@ -30,20 +30,20 @@
 ## Before Battery Power
 
 - [ ] Circuit breakers - Check in
-- [ ] Landing gear handle - DOWN
-- [ ] Hook lever - UP
-- [ ] Wing fold handle - SPREAD
-- [ ] Launch bar switch - UP
+- [ ] LANDING GEAR handle (LDG) - DOWN
+- [ ] ARRESTING HOOK lever (HOOK) - UP
+- [ ] WING FOLD handle (WING FOLD) - SPREAD
+- [ ] LAUNCH BAR switch - UP
 - [ ] Arresting hook - Check handle forward
 - [ ] Throttles - OFF
-- [ ] Speed brake switch - CENTER
-- [ ] Flap switch - AUTO
-- [ ] External lights - OFF
-- [ ] Master armament switch - SAFE
+- [ ] SPEED BRAKE switch - CENTER
+- [ ] FLAPS switch - AUTO
+- [ ] Exterior Lighting switches (NAV/TAXI/LDG/FORMATION/ANTI-COLLISION) - OFF
+- [ ] MASTER ARM switch (MASTER ARM) - SAFE
 
 ## Battery Power On
 
-- [ ] Battery switch - ON
+- [ ] BAT switch (BAT) - ON
 - [ ] Standby attitude indicator - Check erect
 - [ ] Standby compass - Check
 - [ ] Cockpit lighting - As required
@@ -51,27 +51,27 @@
 
 ## External Power / APU
 
-- [ ] External power switch - ON (if available)
-- [ ] APU control switch - ON (if required)
+- [ ] EXT PWR switch (EXT PWR) - ON (if available)
+- [ ] APU switch (APU) - ON (if required)
 - [ ] APU ready light - Check illuminated
 - [ ] External power disconnect - After APU online
 
 ## Avionics Power Up
 
-- [ ] Left generator - ON
-- [ ] Right generator - ON
-- [ ] Generator lights - Check extinguished
-- [ ] Master test switch - Test caution/advisory lights
+- [ ] LEFT GEN switch (L GEN) - ON
+- [ ] RIGHT GEN switch (R GEN) - ON
+- [ ] GEN (L/R) lights - Check extinguished
+- [ ] MASTER TEST button - Test caution/advisory lights
 - [ ] Caution lights - All illuminate then extinguish
-- [ ] UFC - Power up
-- [ ] Data transfer cartridge - Insert if required
-- [ ] INS - Select NAV mode
+- [ ] UFC (Up-Front Controller) - Power up
+- [ ] Data Transfer Cartridge (DTC) - Insert if required
+- [ ] INS Mode Selector - Select NAV mode
 - [ ] INS alignment - In progress
 - [ ] Time - Set UTC
 - [ ] Displays - Power up and check
-- [ ] HUD - Check
-- [ ] Left DDI - Check
-- [ ] Right DDI - Check
+- [ ] HUD (Heads-Up Display) - Check
+- [ ] LEFT DDI (DDI-1) - Check
+- [ ] RIGHT DDI (DDI-2) - Check
 - [ ] AMPCD - Check
 
 ## Before Engine Start
@@ -91,44 +91,44 @@
 
 ## Engine Start (Right Engine First)
 
-- [ ] Parking brake - SET
+- [ ] PARK BRAKE lever (PARK BRAKE) - SET
 - [ ] Throttles - OFF
 - [ ] Fire bottles - Check charged
-- [ ] Start switch RIGHT - Hold to START
+- [ ] RIGHT ENGINE START switch (START R) - Hold to START
 - [ ] Right engine RPM - Monitor rotation
 - [ ] Oil pressure - Check rising (at 20% RPM)
 - [ ] Right throttle - IDLE (at 20% RPM)
 - [ ] EGT - Monitor (not exceed 850°C)
 - [ ] Right engine RPM - Stabilize at 60-65%
-- [ ] Right generator - Check online
+- [ ] RIGHT GEN (R GEN) - Check online
 - [ ] Right engine instruments - Check normal
 - [ ] Hydraulic pressure - Check (2 systems)
 
 ## Engine Start (Left Engine)
 
-- [ ] Start switch LEFT - Hold to START
+- [ ] LEFT ENGINE START switch (START L) - Hold to START
 - [ ] Left engine RPM - Monitor rotation
 - [ ] Oil pressure - Check rising (at 20% RPM)
 - [ ] Left throttle - IDLE (at 20% RPM)
 - [ ] EGT - Monitor (not exceed 850°C)
 - [ ] Left engine RPM - Stabilize at 60-65%
-- [ ] Left generator - Check online
+- [ ] LEFT GEN (L GEN) - Check online
 - [ ] Left engine instruments - Check normal
 
 ## After Engine Start
 
-- [ ] APU - Switch OFF
-- [ ] Probe heat - As required
-- [ ] Anti-ice - As required
-- [ ] Environmental control - AUTO
+- [ ] APU switch (APU) - OFF
+- [ ] PROBE HEAT switch - As required
+- [ ] ENGINE ANTI-ICE switch - As required
+- [ ] ENVIRONMENTAL CONTROL (ECS) - AUTO
 - [ ] Cabin pressure - Check normal
 - [ ] INS - Continue alignment
-- [ ] FLIR - ON if required
-- [ ] Radar - ON, BIT complete
-- [ ] RWR - Check operational
-- [ ] CMDS - Check loaded and operational
+- [ ] FLIR switch (FLIR) - ON if required
+- [ ] RADAR switch - ON, BIT complete
+- [ ] RWR switch - Check operational
+- [ ] CMDS (Countermeasure Dispensing System) - Check loaded and operational
 - [ ] Stores - Check status displays
-- [ ] Master arm - Remain SAFE for taxi
+- [ ] MASTER ARM switch (MASTER ARM) - Remain SAFE for taxi
 
 ## Flight Control Check
 
@@ -138,19 +138,19 @@
 - [ ] Ailerons - Check movement
 - [ ] Stabilators - Check movement
 - [ ] Rudders - Check movement (pedal input)
-- [ ] Flaps - Check AUTO mode function
+- [ ] FLAPS - Check AUTO mode function
 - [ ] Leading edge flaps - Check movement
-- [ ] Speedbrake - Extend and retract
+- [ ] SPEED BRAKE - Extend and retract
 - [ ] Trim - Check all axes
 
 ## Before Taxi
 
-- [ ] Parking brake - RELEASE
-- [ ] Nosewheel steering - CHECK
+- [ ] PARK BRAKE lever (PARK BRAKE) - RELEASE
+- [ ] Nosewheel Steering (NWS) - CHECK
 - [ ] Brakes - Test
-- [ ] Taxi lights - ON
-- [ ] Nav lights - As required
-- [ ] Anti-collision light - ON
+- [ ] TAXI Lights - ON
+- [ ] NAV Lights - As required
+- [ ] ANTI-COLLISION light - ON
 - [ ] Canopy - Locked and check seal
 - [ ] INS - Alignment complete
 - [ ] Communication - Check in with ground
@@ -159,7 +159,7 @@
 ## Taxi
 
 - [ ] Throttles - Advance smoothly
-- [ ] Nosewheel steering - Check responsive
+- [ ] Nosewheel Steering (NWS) - Check responsive
 - [ ] Brakes - Test while taxiing
 - [ ] Engine instruments - Monitor both engines
 - [ ] Flight controls - Check freedom of movement
@@ -172,12 +172,12 @@
 - [ ] Flight controls - Full and free movement
 - [ ] Trim - Set for takeoff
 - [ ] Flaps - AUTO (1/2 flaps indicated)
-- [ ] Speedbrake - Check retracted
+- [ ] SPEED BRAKE - Check retracted
 - [ ] Fuel - Check quantity, feed balanced
 - [ ] External stores - Check configured
-- [ ] Master arm - ARM if required
+- [ ] MASTER ARM switch (MASTER ARM) - ARM if required
 - [ ] Radar altimeter - Set 250'
-- [ ] HUD - Check attitude, altitude, airspeed
+- [ ] HUD (Heads-Up Display) - Check attitude, altitude, airspeed
 - [ ] Ejection seat - ARMED
 - [ ] Canopy - Locked
 - [ ] Harness - Tight
@@ -188,7 +188,7 @@
 
 ## Lineup
 
-- [ ] Parking brake - RELEASE
+- [ ] PARK BRAKE lever (PARK BRAKE) - RELEASE
 - [ ] Throttles - Advance to position
 - [ ] Brakes - Set for runup
 - [ ] Engine instruments - Both engines normal
@@ -229,4 +229,4 @@
 - [ ] Altitude restrictions - Comply
 - [ ] Speed restrictions - Comply
 - [ ] Radar - As required for mission
-- [ ] Master arm - As required
+- [ ] MASTER ARM switch (MASTER ARM) - As required

@@ -11,7 +11,7 @@
 - [ ] **Mixture:** AUTO RICH
 - [ ] **Propeller:** Full INCREASE RPM
 - [ ] **Fuel Booster Pump:** EMERGENCY, check for 14-19 psi
-- [ ] **Generator Switch:** ON
+- [ ] **GEN switch (GEN):** ON
 - [ ] **Fuel Selector:** To fullest tank (Note: Never land with droppable wing tanks)
 - [ ] **Controls:** Unlock and check for freedom of movement
 - [ ] **Canopy:** Closed and locked (ensure no red indicators show, which would mean the emergency release is unlocked)
