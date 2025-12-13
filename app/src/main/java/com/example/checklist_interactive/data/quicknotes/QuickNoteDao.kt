@@ -21,6 +21,12 @@ interface QuickNoteDao {
     fun getAllNotes(): Flow<List<QuickNoteEntity>>
 
     /**
+     * Get note summaries (id, title, lastModified only) for fast list display
+     */
+    @Query("SELECT id, title, '' as content, '[]' as linkedDocuments, timestamp, lastModified FROM quick_notes ORDER BY lastModified DESC")
+    fun getAllNoteSummaries(): Flow<List<QuickNoteEntity>>
+
+    /**
      * Get a specific note by ID
      */
     @Query("SELECT * FROM quick_notes WHERE id = :noteId")
@@ -31,6 +37,12 @@ interface QuickNoteDao {
      */
     @Query("SELECT * FROM quick_notes WHERE id = :noteId")
     suspend fun getNoteByIdOnce(noteId: String): QuickNoteEntity?
+
+    /**
+     * Get note content only by ID as Flow
+     */
+    @Query("SELECT content FROM quick_notes WHERE id = :noteId")
+    fun getNoteContent(noteId: String): Flow<String?>
 
     /**
      * Search notes by title or content
