@@ -77,6 +77,8 @@ class QuickNoteManager(private val context: Context) {
 
     private val _flightInfoExpanded = MutableStateFlow(false)
     val flightInfoExpanded: StateFlow<Boolean> = _flightInfoExpanded.asStateFlow()
+    private val _flightStatus = MutableStateFlow("Idle")
+    val flightStatus: StateFlow<String> = _flightStatus.asStateFlow()
 
     init {
         // Start coroutine to initialize data
@@ -125,12 +127,18 @@ class QuickNoteManager(private val context: Context) {
             _com2.value = prefs.getString(COM2_KEY, "") ?: ""
             _com2Mode.value = prefs.getString(COM2_MODE_KEY, "FM") ?: "FM"
             _flightInfoExpanded.value = prefs.getBoolean(FLIGHT_INFO_EXPANDED_KEY, false)
+            _flightStatus.value = prefs.getString(FLIGHT_STATUS_KEY, "Idle") ?: "Idle"
         }
     }
 
     fun saveFlightInfoExpanded(expanded: Boolean) {
         prefs.edit().putBoolean(FLIGHT_INFO_EXPANDED_KEY, expanded).apply()
         _flightInfoExpanded.value = expanded
+    }
+
+    fun saveFlightStatus(status: String) {
+        prefs.edit().putString(FLIGHT_STATUS_KEY, status).apply()
+        _flightStatus.value = status
     }
 
     /**
@@ -264,7 +272,8 @@ class QuickNoteManager(private val context: Context) {
         val com1: String,
         val com1Mode: String,
         val com2: String,
-        val com2Mode: String
+        val com2Mode: String,
+        val flightStatus: String
     )
 
     fun getRadioSettings(): RadioSettings {
@@ -273,7 +282,8 @@ class QuickNoteManager(private val context: Context) {
             com1 = prefs.getString(COM1_KEY, "") ?: "",
             com1Mode = prefs.getString(COM1_MODE_KEY, "FM") ?: "FM",
             com2 = prefs.getString(COM2_KEY, "") ?: "",
-            com2Mode = prefs.getString(COM2_MODE_KEY, "FM") ?: "FM"
+            com2Mode = prefs.getString(COM2_MODE_KEY, "FM") ?: "FM",
+            flightStatus = prefs.getString(FLIGHT_STATUS_KEY, "Idle") ?: "Idle"
         )
     }
 
@@ -473,6 +483,7 @@ class QuickNoteManager(private val context: Context) {
         private const val COM1_MODE_KEY = "com1_mode"
         private const val COM2_KEY = "com2"
         private const val COM2_MODE_KEY = "com2_mode"
+        private const val FLIGHT_STATUS_KEY = "flight_status"
         private const val FLIGHT_INFO_EXPANDED_KEY = "flight_info_expanded"
     }
 }

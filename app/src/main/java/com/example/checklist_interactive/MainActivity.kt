@@ -6,6 +6,9 @@ import android.os.Build
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,6 +19,7 @@ import androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDoc
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.unit.dp
@@ -39,6 +43,7 @@ import com.example.checklist_interactive.ui.files.InternalFileViewer
 import com.example.checklist_interactive.data.checklist.ChecklistRepository
 import com.example.checklist_interactive.data.shortcuts.PageShortcut
 import com.example.checklist_interactive.ui.settings.SettingsScreen
+import com.example.checklist_interactive.ui.quickaccess.FlightMiniStatusBar
 import kotlinx.coroutines.launch
 import androidx.activity.compose.BackHandler
 
@@ -55,6 +60,12 @@ class MainActivity : ComponentActivity() {
         // Permission checks and SAF fallback are handled inside the Compose UI via
         // rememberLauncherForActivityResult and the in-composition logic.
         enableEdgeToEdge()
+
+        // Enable immersive full-screen: hide Android status/navigation bars and allow transient reveal by swipe
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         setContent {
             val prefsManager = remember { PreferencesManager(this@MainActivity) }
             var isDarkTheme by remember { mutableStateOf(prefsManager.isDarkModeEnabled()) }
@@ -80,7 +91,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
             ChecklistInteractiveTheme(darkTheme = isDarkTheme) {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                val quickNoteManager = remember { com.example.checklist_interactive.data.quicknotes.QuickNoteManager(this@MainActivity) }
+
+                Scaffold(modifier = Modifier.fillMaxSize(), topBar = { FlightMiniStatusBar(noteManager = quickNoteManager) }) { innerPadding ->
+                    Box(modifier = Modifier.padding(innerPadding)) {
                     var refreshTrigger by remember { mutableStateOf(0) }
                     val fileManager = remember { InternalFileManager(this@MainActivity) }
                     val repository = remember { ChecklistRepository(this@MainActivity) }
@@ -100,6 +114,7 @@ class MainActivity : ComponentActivity() {
                         // trigger refresh
                         refreshTrigger++
                     }
+                    
 
                     // Open a document tree (folder) and import all supported files
                     val pickDocumentTreeLauncher = rememberLauncherForActivityResult(
@@ -376,6 +391,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
+                    }
                     }
                 }
             }
