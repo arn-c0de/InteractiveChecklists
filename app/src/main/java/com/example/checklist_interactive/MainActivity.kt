@@ -90,8 +90,11 @@ class MainActivity : ComponentActivity() {
                     showFileList = true
                 }
             }
-            ChecklistInteractiveTheme(darkTheme = isDarkTheme) {
-                val quickNoteManager = remember { com.example.checklist_interactive.data.quicknotes.QuickNoteManager(this@MainActivity) }
+            val quickNoteManager = remember { com.example.checklist_interactive.data.quicknotes.QuickNoteManager(this@MainActivity) }
+            androidx.compose.runtime.CompositionLocalProvider(
+                com.example.checklist_interactive.ui.quickaccess.LocalQuickNoteManager provides quickNoteManager
+            ) {
+                ChecklistInteractiveTheme(darkTheme = isDarkTheme) {
 
                 Scaffold(modifier = Modifier.fillMaxSize(), topBar = { FlightMiniStatusBar(noteManager = quickNoteManager) }) { innerPadding ->
                     Box(modifier = Modifier.padding(innerPadding)) {
@@ -393,6 +396,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     }
+                }
                 }
             }
         }

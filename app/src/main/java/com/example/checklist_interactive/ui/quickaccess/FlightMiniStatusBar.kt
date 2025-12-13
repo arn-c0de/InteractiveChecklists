@@ -54,8 +54,8 @@ fun FlightMiniStatusBar(noteManager: QuickNoteManager, onClick: (() -> Unit)? = 
                 compact = true
             )
         }
-        Text(text = "COM1: ${com1.ifBlank { "-" }} ${com1Mode}", style = MaterialTheme.typography.labelSmall)
-        Text(text = "COM2: ${com2.ifBlank { "-" }} ${com2Mode}", style = MaterialTheme.typography.labelSmall)
+        Text(text = "COM1: ${com1.ifBlank { "-" }.replace(',', '.')} ${com1Mode}", style = MaterialTheme.typography.labelSmall)
+        Text(text = "COM2: ${com2.ifBlank { "-" }.replace(',', '.')} ${com2Mode}", style = MaterialTheme.typography.labelSmall)
         Spacer(modifier = Modifier.weight(1f))
 
         // Live clock (HH:mm:ss)
