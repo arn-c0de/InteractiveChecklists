@@ -37,16 +37,24 @@ fun MarkdownViewer(
     checklist: Checklist? = null,
     onCheckboxChange: ((itemId: String, checked: Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier,
-    isInternalFile: Boolean = false
-    , prefsManager: PreferencesManager? = null
+    isInternalFile: Boolean = false,
+    prefsManager: PreferencesManager? = null,
+    forceExpandAll: Boolean? = null,
+    markdownContentOverride: String? = null
 ) {
     val context = LocalContext.current
-    var markdownContent by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(true) }
+    var markdownContent by remember { mutableStateOf(markdownContentOverride ?: "") }
+    var isLoading by remember { mutableStateOf(markdownContentOverride == null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    // Markdown-Datei laden
-    LaunchedEffect(assetPath, isInternalFile) {
+    // Markdown-Datei laden nur wenn kein Override vorhanden
+    LaunchedEffect(assetPath, isInternalFile, markdownContentOverride) {
+        if (markdownContentOverride != null) {
+            markdownContent = markdownContentOverride
+            isLoading = false
+            return@LaunchedEffect
+        }
+
         isLoading = true
         errorMessage = null
         try {
@@ -68,17 +76,21 @@ fun MarkdownViewer(
     var fontSizeState by remember { mutableStateOf(initialFontSize) }
 
     // Expand/Collapse all sections state
-    val initialExpandState = effectivePrefs.areMarkdownSectionsExpandedByDefault()
-    var expandAllState by remember { mutableStateOf(initialExpandState) }
+    val initialExpandState = forceExpandAll ?: effectivePrefs.areMarkdownSectionsExpandedByDefault()
+    var expandAllState by remember(forceExpandAll) { mutableStateOf(initialExpandState) }
 
-    // Listen for preference changes and update font size and expand state in real time
+    // Update expandAllState when forceExpandAll changes
+    LaunchedEffect(forceExpandAll) {
+        if (forceExpandAll != null) {
+            expandAllState = forceExpandAll
+        }
+    }
+
+    // Listen for preference changes and update font size in real time
     DisposableEffect(effectivePrefs) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             val updatedFontSize = effectivePrefs.getMarkdownFontSize()
             if (updatedFontSize != fontSizeState) fontSizeState = updatedFontSize
-
-            val updatedExpandState = effectivePrefs.areMarkdownSectionsExpandedByDefault()
-            if (updatedExpandState != expandAllState) expandAllState = updatedExpandState
         }
         effectivePrefs.registerOnChangeListener(listener)
         onDispose {
@@ -109,25 +121,26 @@ fun MarkdownViewer(
                 }
             }
             else -> {
-                if (checklist != null && onCheckboxChange != null) {
-                    // Prüfe ob die Checklist Items hat
-                    val hasItems = checklist.sections.any { it.items.isNotEmpty() }
-                    if (hasItems) {
-                        // Interaktive Ansicht mit Checkboxen
-                        InteractiveMarkdownView(
-                            markdownContent = markdownContent,
-                            checklist = checklist,
-                            onCheckboxChange = onCheckboxChange,
-                            bodyFontSize = fontSizeState,
-                            expandAll = expandAllState
-                        )
-                    } else {
-                        // Keine Checkboxen gefunden, zeige einfache Ansicht
-                        SimpleMarkdownView(markdownContent = markdownContent, bodyFontSize = fontSizeState, expandAll = expandAllState)
-                    }
+                // Prüfe ob die Checklist Items hat
+                val hasItems = checklist?.sections?.any { it.items.isNotEmpty() } == true
+                android.util.Log.d("MarkdownViewer", "hasItems=$hasItems, checklist=${checklist != null}, onCheckboxChange=${onCheckboxChange != null}")
+                if (checklist != null) {
+                    android.util.Log.d("MarkdownViewer", "checklist sections: ${checklist.sections.size}, total items: ${checklist.sections.sumOf { it.items.size }}")
+                }
+                if (hasItems && checklist != null && onCheckboxChange != null) {
+                    // Interaktive Ansicht mit Checkboxen
+                    android.util.Log.d("MarkdownViewer", "Using InteractiveMarkdownView")
+                    InteractiveMarkdownView(
+                        markdownContent = markdownContent,
+                        checklist = checklist,
+                        onCheckboxChange = onCheckboxChange,
+                        bodyFontSize = fontSizeState,
+                        expandAll = expandAllState
+                    )
                 } else {
-                    // Einfache Markdown-Ansicht ohne Interaktion
-                    SimpleMarkdownView(markdownContent = markdownContent, bodyFontSize = fontSizeState, expandAll = expandAllState)
+                    // Einfache Markdown-Ansicht ohne Interaktion (oder keine Checkboxen gefunden)
+                    android.util.Log.d("MarkdownViewer", "Using SimpleMarkdownView")
+                    SimpleMarkdownView(markdownContent = markdownContent, bodyFontSize = fontSizeState, expandAll = expandAllState, onCheckboxChange = onCheckboxChange)
                 }
             }
         }
@@ -147,7 +160,7 @@ private data class MarkdownSection(
  * Gruppiert Inhalte zwischen ### Überschriften in Containern
  */
 @Composable
-private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int, expandAll: Boolean = false) {
+private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int, expandAll: Boolean = false, onCheckboxChange: ((itemId: String, checked: Boolean) -> Unit)? = null) {
     val scrollState = rememberScrollState()
 
     // Parse Markdown in Sektionen
@@ -156,11 +169,25 @@ private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int, expan
     // State für expandierte Sektionen - Key ist der Index der Sektion
     val expandedSections = remember { mutableStateMapOf<Int, Boolean>() }
 
-    // Wenn expandAll sich ändert, aktualisiere alle Sektionen
-    LaunchedEffect(expandAll) {
+    // State for checkbox lines per section-line index (Pair<sectionIndex,lineIndex> -> checked)
+    val checkboxStates = remember { mutableStateMapOf<Pair<Int, Int>, Boolean>() }
+
+    // Helper to identify a checkbox line
+    val isCheckboxLine: (String) -> Boolean = { it.trim().startsWith("- [") }
+
+    // Initialize expand/checkbox states when content changes
+    LaunchedEffect(expandAll, markdownContent) {
         sections.indices.forEach { index ->
-            if (sections[index].heading.startsWith("### ")) {
+            if (sections[index].content.any { it.trim().startsWith("- [") }) {
                 expandedSections[index] = expandAll
+            }
+            sections[index].content.forEachIndexed { lineIndex, line ->
+                if (isCheckboxLine(line)) {
+                    val key = Pair(index, lineIndex)
+                    if (!checkboxStates.containsKey(key)) {
+                        checkboxStates[key] = line.trim().startsWith("- [x]") || line.trim().startsWith("- [X]")
+                    }
+                }
             }
         }
     }
@@ -172,15 +199,119 @@ private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int, expan
             .padding(16.dp)
     ) {
         sections.forEachIndexed { index, section ->
+            val hasCheckboxes = section.content.any { it.trim().startsWith("- [") }
             when {
-                // Hauptüberschrift (# oder ##) - nicht in Card
+                // Hauptüberschrift (# oder ##) - wenn es Checkboxen enthält, zeige als Card
                 section.heading.startsWith("# ") || section.heading.startsWith("## ") -> {
-                    // Render Überschrift
-                    RenderMarkdownLine(section.heading, bodyFontSize)
+                    if (hasCheckboxes) {
+                        val isExpanded = expandedSections[index] ?: false // Default: collapsed
 
-                    // Render Inhalt
-                    section.content.forEach { line ->
-                        RenderMarkdownLine(line, bodyFontSize)
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp)
+                            ) {
+                                // Clickable Header mit Icon
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { expandedSections[index] = !isExpanded }
+                                        .padding(bottom = if (isExpanded) 8.dp else 0.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    // Count checked and total checkboxes in this section using the checkbox state map
+                                    val totalCheckboxes = section.content.count { line -> isCheckboxLine(line) }
+                                    val checkedCheckboxes = section.content.mapIndexed { lidx, line ->
+                                        if (isCheckboxLine(line)) checkboxStates[Pair(index, lidx)] ?: (line.trim().startsWith("- [x]") || line.trim().startsWith("- [X]")) else false
+                                    }.count { it }
+                                    val countText = if (totalCheckboxes > 0) " | $checkedCheckboxes/$totalCheckboxes" else ""
+
+                                    Text(
+                                        text = section.heading.substring(3) + countText,
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Icon(
+                                        imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                        contentDescription = if (isExpanded) "Einklappen" else "Ausklappen"
+                                    )
+                                }
+
+                                // Render Inhalt der Sektion nur wenn expanded
+                                if (isExpanded) {
+                                    section.content.forEachIndexed { lineIndex, line ->
+                                        if (isCheckboxLine(line)) {
+                                            val key = Pair(index, lineIndex)
+                                            val checked = checkboxStates[key] ?: false
+                                            Column(modifier = Modifier.fillMaxWidth()) {
+                                                Row(modifier = Modifier.padding(vertical = 2.dp), horizontalArrangement = Arrangement.Start) {
+                                                    Checkbox(
+                                                        checked = checked,
+                                                        onCheckedChange = { newChecked ->
+                                                            checkboxStates[key] = newChecked
+                                                            onCheckboxChange?.invoke("simple-$index-$lineIndex", newChecked)
+                                                        }
+                                                    )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Text(
+                                                        text = parseInlineMarkdown(line.trim().substring(5).trim(), bodyFontSize),
+                                                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
+                                                        modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
+                                                    )
+                                                }
+                                                HorizontalDivider(
+                                                    modifier = Modifier.padding(start = 8.dp, end = 8.dp),
+                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                                                )
+                                            }
+                                        } else {
+                                            RenderMarkdownLine(line, bodyFontSize)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // Render Überschrift
+                        RenderMarkdownLine(section.heading, bodyFontSize)
+
+                        // Render Inhalt
+                        section.content.forEachIndexed { lineIndex, line ->
+                            if (isCheckboxLine(line)) {
+                                val key = Pair(index, lineIndex)
+                                val checked = checkboxStates[key] ?: false
+                                Column(modifier = Modifier.fillMaxWidth()) {
+                                    Row(modifier = Modifier.padding(vertical = 2.dp), horizontalArrangement = Arrangement.Start) {
+                                        Checkbox(
+                                            checked = checked,
+                                            onCheckedChange = { newChecked ->
+                                                checkboxStates[key] = newChecked
+                                                onCheckboxChange?.invoke("simple-$index-$lineIndex", newChecked)
+                                            }
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = parseInlineMarkdown(line.trim().substring(5).trim(), bodyFontSize),
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
+                                            modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
+                                        )
+                                    }
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(start = 8.dp, end = 8.dp),
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                                    )
+                                }
+                            } else {
+                                RenderMarkdownLine(line, bodyFontSize)
+                            }
+                        }
                     }
                 }
                 // ### Überschrift - in Card gruppieren mit Collapsible-Funktion
@@ -206,13 +337,11 @@ private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int, expan
                                     .padding(bottom = if (isExpanded) 8.dp else 0.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                // Count checked and total checkboxes in this section
-                                val totalCheckboxes = section.content.count { line ->
-                                    line.trim().startsWith("- [ ]") || line.trim().startsWith("- [x]") || line.trim().startsWith("- [X]")
-                                }
-                                val checkedCheckboxes = section.content.count { line ->
-                                    line.trim().startsWith("- [x]") || line.trim().startsWith("- [X]")
-                                }
+                                // Count checked and total checkboxes in this section using the checkbox state map
+                                val totalCheckboxes = section.content.count { line -> isCheckboxLine(line) }
+                                val checkedCheckboxes = section.content.mapIndexed { lidx, line ->
+                                    if (isCheckboxLine(line)) checkboxStates[Pair(index, lidx)] ?: (line.trim().startsWith("- [x]") || line.trim().startsWith("- [X]")) else false
+                                }.count { it }
                                 val countText = if (totalCheckboxes > 0) " | $checkedCheckboxes/$totalCheckboxes" else ""
 
                                 Text(
@@ -229,8 +358,34 @@ private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int, expan
 
                             // Render Inhalt der Sektion nur wenn expanded
                             if (isExpanded) {
-                                section.content.forEach { line ->
-                                    RenderMarkdownLine(line, bodyFontSize)
+                                section.content.forEachIndexed { lineIndex, line ->
+                                    if (isCheckboxLine(line)) {
+                                        val key = Pair(index, lineIndex)
+                                        val checked = checkboxStates[key] ?: false
+                                        Column(modifier = Modifier.fillMaxWidth()) {
+                                            Row(modifier = Modifier.padding(vertical = 2.dp), horizontalArrangement = Arrangement.Start) {
+                                                Checkbox(
+                                                    checked = checked,
+                                                    onCheckedChange = { newChecked ->
+                                                        checkboxStates[key] = newChecked
+                                                        onCheckboxChange?.invoke("simple-$index-$lineIndex", newChecked)
+                                                    }
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = parseInlineMarkdown(line.trim().substring(5).trim(), bodyFontSize),
+                                                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
+                                                    modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
+                                                )
+                                            }
+                                            HorizontalDivider(
+                                                modifier = Modifier.padding(start = 8.dp, end = 8.dp),
+                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                                            )
+                                        }
+                                    } else {
+                                        RenderMarkdownLine(line, bodyFontSize)
+                                    }
                                 }
                             }
                         }
@@ -238,8 +393,34 @@ private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int, expan
                 }
                 // Inhalt ohne Überschrift
                 else -> {
-                    section.content.forEach { line ->
-                        RenderMarkdownLine(line, bodyFontSize)
+                    section.content.forEachIndexed { lineIndex, line ->
+                        if (isCheckboxLine(line)) {
+                            val key = Pair(index, lineIndex)
+                            val checked = checkboxStates[key] ?: false
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Row(modifier = Modifier.padding(vertical = 2.dp), horizontalArrangement = Arrangement.Start) {
+                                    Checkbox(
+                                        checked = checked,
+                                        onCheckedChange = { newChecked ->
+                                            checkboxStates[key] = newChecked
+                                            onCheckboxChange?.invoke("simple-$index-$lineIndex", newChecked)
+                                        }
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = parseInlineMarkdown(line.trim().substring(5).trim(), bodyFontSize),
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
+                                        modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
+                                    )
+                                }
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(start = 8.dp, end = 8.dp),
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                                )
+                            }
+                        } else {
+                            RenderMarkdownLine(line, bodyFontSize)
+                        }
                     }
                 }
             }
@@ -252,10 +433,11 @@ private fun SimpleMarkdownView(markdownContent: String, bodyFontSize: Int, expan
  */
 @Composable
 private fun RenderMarkdownLine(line: String, bodyFontSize: Int) {
+    fun inline(text: String) = parseInlineMarkdown(text, bodyFontSize)
     when {
         line.startsWith("# ") -> {
             Text(
-                text = line.substring(2),
+                text = parseInlineMarkdown(line.substring(2), bodyFontSize),
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(vertical = 8.dp)
@@ -263,7 +445,7 @@ private fun RenderMarkdownLine(line: String, bodyFontSize: Int) {
         }
         line.startsWith("## ") -> {
             Text(
-                text = line.substring(3),
+                text = parseInlineMarkdown(line.substring(3), bodyFontSize),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(vertical = 6.dp)
@@ -271,7 +453,7 @@ private fun RenderMarkdownLine(line: String, bodyFontSize: Int) {
         }
         line.startsWith("### ") -> {
             Text(
-                text = line.substring(4),
+                text = parseInlineMarkdown(line.substring(4), bodyFontSize),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(vertical = 4.dp)
@@ -293,7 +475,7 @@ private fun RenderMarkdownLine(line: String, bodyFontSize: Int) {
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = text,
+                        text = parseInlineMarkdown(text, bodyFontSize),
                         style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
                         modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
                     )
@@ -309,7 +491,7 @@ private fun RenderMarkdownLine(line: String, bodyFontSize: Int) {
             Row(modifier = Modifier.padding(vertical = 2.dp)) {
                 Text("• ", style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp))
                 Text(
-                    text = line.trim().substring(2),
+                    text = parseInlineMarkdown(line.trim().substring(2), bodyFontSize),
                     style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp)
                 )
             }
@@ -381,14 +563,11 @@ private fun InteractiveMarkdownView(
     // State für expandierte Sektionen - Key ist der Section-Title
     val expandedSections = remember { mutableStateMapOf<String, Boolean>() }
 
-    // Wenn expandAll sich ändert, aktualisiere alle Sektionen
+    // Wenn expandAll sich ändert, aktualisiere alle Sektionen mit Items
     LaunchedEffect(expandAll) {
         checklist.sections.forEach { section ->
-            if (section.title.isNotEmpty()) {
-                val isSubSection = section.title.length > 3 && !section.title.contains("Case") && !section.title.contains("Recovery")
-                if (isSubSection) {
-                    expandedSections[section.title] = expandAll
-                }
+            if (section.title.isNotEmpty() && section.items.isNotEmpty()) {
+                expandedSections[section.title] = expandAll
             }
         }
     }
@@ -413,10 +592,10 @@ private fun InteractiveMarkdownView(
         checklist.sections.forEach { section ->
             // Section-Überschrift (## level) - ohne Card
             if (section.title.isNotEmpty() && section.title != checklist.title) {
-                // Prüfe ob es eine ### Überschrift ist (Sub-Section)
-                val isSubSection = section.title.length > 3 && !section.title.contains("Case") && !section.title.contains("Recovery")
+                // Prüfe ob es eine Section mit Items ist (dann als Card anzeigen)
+                val isCardSection = section.items.isNotEmpty()
 
-                if (isSubSection) {
+                if (isCardSection) {
                     val isExpanded = expandedSections[section.title] ?: false // Default: collapsed
 
                     // ### Überschrift - in Card gruppieren mit Collapsible-Funktion
@@ -513,21 +692,34 @@ private fun ChecklistItemRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp),
+                .padding(vertical = 4.dp)
+                .padding(start = (item.indent * 12).dp),
             horizontalArrangement = Arrangement.Start
         ) {
-            Checkbox(
-                checked = item.isChecked,
-                onCheckedChange = { isChecked ->
-                    onCheckboxChange(item.id, isChecked)
-                }
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = item.text,
-                style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
-                modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
-            )
+            if (item.isTask) {
+                Checkbox(
+                    checked = item.isChecked,
+                    onCheckedChange = { isChecked ->
+                        onCheckboxChange(item.id, isChecked)
+                    }
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = item.text,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
+                    modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
+                )
+            } else {
+                Text(
+                    text = "• ",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp),
+                    modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
+                )
+                Text(
+                    text = item.text,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp)
+                )
+            }
         }
         HorizontalDivider(
             modifier = Modifier.padding(start = 8.dp, end = 8.dp),

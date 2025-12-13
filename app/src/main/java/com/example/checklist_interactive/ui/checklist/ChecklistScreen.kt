@@ -153,6 +153,6 @@ fun ChecklistItemComposable(item: ChecklistItem, checklistId: String, viewModel:
         .padding(4.dp), horizontalArrangement = Arrangement.Start) {
         Checkbox(checked = item.isChecked, onCheckedChange = { checked -> viewModel.onCheckboxChange(item.id, checked) })
         Spacer(modifier = Modifier.width(8.dp))
-        Text(text = item.text, modifier = Modifier.weight(1f), textDecoration = if (item.isChecked) TextDecoration.LineThrough else TextDecoration.None)
+        Text(text = parseInlineMarkdown(item.text, 16), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, textDecoration = if (item.isChecked) TextDecoration.LineThrough else TextDecoration.None)
     }
 }

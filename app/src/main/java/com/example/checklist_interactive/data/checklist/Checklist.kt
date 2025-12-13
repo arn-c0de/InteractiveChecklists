@@ -8,7 +8,8 @@ data class Checklist(
 
 data class ChecklistSection(
     val title: String,
-    val items: List<ChecklistItem>
+    val items: List<ChecklistItem>,
+    val level: Int = 2 // Heading level (2 for ##, 3 for ###, etc.)
 )
 
 data class ChecklistItem(
@@ -16,4 +17,5 @@ data class ChecklistItem(
     val text: String,
     val indent: Int = 0,
     val isChecked: Boolean = false,
+    val isTask: Boolean = false
 )
