@@ -16,16 +16,9 @@
 - [ ] **INTR WING SW** - NORM
 - [ ] **PROBE SW** - EXTEND
 
-### NOTE
-If engine feed tank fuel level is critical, external wing and centerline transfer should be in STOP or O'RIDE to ensure the fastest transfer of fuel to the engine feed tanks.
-
 ## Precontact
-
 - [ ] **A/P** - ON**
 - [ ] **EXT LT** - AS REQD***
-  - * 0.0 nm on tanker's Port Wing
-  - ** Reduces Control Authority
-  - *** Night ... Stdy Brt
 - [ ] **CONTACT**
 - [ ] **FUEL FLOW** - CHECK
 
