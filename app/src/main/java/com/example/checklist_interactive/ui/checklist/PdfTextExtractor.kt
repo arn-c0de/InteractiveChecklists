@@ -23,14 +23,20 @@ data class PdfTextBlock(
  */
 class PdfTextExtractor(private val context: Context) {
 
-    // Native parser - no caching needed (stateless)
     private val TAG = "PdfTextExtractor"
 
     /**
-     * No cleanup needed - stateless parser
+     * Cleanup resources used by the extractor.
+     * Currently clears the global `PdfStructureParser` cache so parsers are re-created
+     * on next use (helps free memory and resets state if needed).
      */
     fun cleanup() {
-        // Nothing to clean up
+        try {
+            PdfStructureParser.clearCache()
+            android.util.Log.d(TAG, "PdfTextExtractor.cleanup: cleared PdfStructureParser cache")
+        } catch (e: Exception) {
+            android.util.Log.w(TAG, "PdfTextExtractor.cleanup failed: ${e.message}")
+        }
     }
 
     /**
@@ -42,7 +48,9 @@ class PdfTextExtractor(private val context: Context) {
         val textBlocks = mutableListOf<PdfTextBlock>()
 
         try {
-            val parser = PdfStructureParser(pdfFile)
+            // Reuse cached parser to avoid rebuilding page list on every extraction
+            val parser = PdfStructureParser.getInstance(pdfFile)
+            android.util.Log.d(TAG, "Using PdfStructureParser instance for ${pdfFile.absolutePath}")
             val pageText = parser.extractPageText(pageIndex)
             
             if (pageText.isNotBlank()) {
@@ -70,7 +78,9 @@ class PdfTextExtractor(private val context: Context) {
      */
     suspend fun extractPageText(pdfFile: File, pageIndex: Int): String = withContext(Dispatchers.IO) {
         try {
-            val parser = PdfStructureParser(pdfFile)
+            // Reuse cached parser to avoid rebuilding page list on every extraction
+            val parser = PdfStructureParser.getInstance(pdfFile)
+            android.util.Log.d(TAG, "Using PdfStructureParser instance for ${pdfFile.absolutePath}")
             parser.extractPageText(pageIndex)
         } catch (e: Exception) {
             Log.e(TAG, "Error extracting page text: ${e.message}", e)
