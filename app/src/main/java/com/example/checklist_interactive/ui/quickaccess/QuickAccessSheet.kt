@@ -2,6 +2,7 @@ package com.example.checklist_interactive.ui.quickaccess
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -253,6 +254,13 @@ fun QuickAccessSheet(
     val sheetMin = 0.2f
     val sheetMax = 0.95f
 
+    // Transparency control (persisted)
+    val KEY_SHEET_OPACITY = "quick_access_sheet_opacity"
+    val savedOpacity = prefs.getFloat(KEY_SHEET_OPACITY, 1.0f)
+    // Ensure minimum opacity of 25% so sheet never becomes invisible
+    var sheetOpacity by rememberSaveable { mutableStateOf(savedOpacity.coerceIn(0.25f, 1.0f)) }
+    var showOpacitySlider by remember { mutableStateOf(false) }
+
     var searchQuery by remember { mutableStateOf("") }
     var showSearchBar by remember { mutableStateOf(false) }
     // Flight info expanded state
@@ -309,6 +317,11 @@ fun QuickAccessSheet(
     }
     LaunchedEffect(flightExpandedFlow) { flightExpanded = flightExpandedFlow }
 
+    // Auto-save opacity when it changes
+    LaunchedEffect(sheetOpacity) {
+        prefs.edit().putFloat(KEY_SHEET_OPACITY, sheetOpacity).apply()
+    }
+
     // Auto-save after 2 seconds of inactivity
     LaunchedEffect(currentNote, hasChanges) {
         if (hasChanges) {
@@ -335,7 +348,8 @@ fun QuickAccessSheet(
             onDismiss()
         },
         modifier = modifier,
-        sheetState = sheetState
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = sheetOpacity)
     ) {
         // Try to hide the system UI inside the dialog window that hosts the sheet.
         val dialogView = LocalView.current
@@ -408,6 +422,7 @@ fun QuickAccessSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(sheetHeightDp)
+                .alpha(sheetOpacity)
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 32.dp)
         ) {
@@ -469,6 +484,18 @@ fun QuickAccessSheet(
                 }
 
                 Row {
+                    // Transparency button
+                    FilledTonalIconButton(
+                        onClick = { showOpacitySlider = !showOpacitySlider },
+                        modifier = Modifier.padding(end = 4.dp)
+                    ) {
+                        Text(
+                            text = "${(sheetOpacity * 100).toInt()}%",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
                     // Search button
                     if (notes.size > 1) {
                         IconButton(onClick = { showSearchBar = !showSearchBar }) {
@@ -496,6 +523,27 @@ fun QuickAccessSheet(
                             Icon(Icons.Default.PushPin, contentDescription = "Dokument anheften")
                         }
                     }
+                }
+            }
+
+            // Opacity slider
+            AnimatedVisibility(visible = showOpacitySlider) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp)
+                ) {
+                    Text(
+                        text = "Transparenz: ${(sheetOpacity * 100).toInt()}% (min 25%)",
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                    Slider(
+                        value = sheetOpacity,
+                        onValueChange = { sheetOpacity = it },
+                        valueRange = 0.25f..1.0f,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
 
