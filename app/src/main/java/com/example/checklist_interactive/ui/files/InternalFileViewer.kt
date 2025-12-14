@@ -38,7 +38,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.example.checklist_interactive.R
 
 /**
- * Viewer für interne Dateien (MD und PDF)
+ * Viewer for internal files (MD and PDF)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -193,7 +193,7 @@ fun InternalFileViewer(
                             }, modifier = Modifier.size(40.dp)) {
                                 Icon(
                                     imageVector = if (expandAllSections) Icons.Default.UnfoldLess else Icons.Default.UnfoldMore,
-                                    contentDescription = if (expandAllSections) "Alle einklappen" else "Alle ausklappen",
+                                    contentDescription = if (expandAllSections) "Collapse all" else "Expand all",
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -219,7 +219,7 @@ fun InternalFileViewer(
                             containerColor = MaterialTheme.colorScheme.primaryContainer,
                             contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                         ) {
-                            Icon(Icons.Default.NoteAdd, contentDescription = "Schnellzugriff")
+                            Icon(Icons.Default.NoteAdd, contentDescription = "Quick access")
                         }
 
                         // Menu FAB - immer an fester Position

@@ -87,10 +87,10 @@ private fun expandCallsignPlaceholder(content: String, callsign: String): String
 
 // Format a com input as 3-digit whole + '.' + up to 3-digit fractional while typing
 private fun formatComInputToDot(input: String): String {
-    // Nur Ziffern extrahieren
+    // Extract digits only
     val digitsOnly = input.filter { it.isDigit() }
 
-    // Maximal 6 Ziffern (3 Vorkommastellen + 3 Nachkommastellen)
+    // Maximum 6 digits (3 whole + 3 fractional)
     val maxDigits = 6
     val trimmed = digitsOnly.take(maxDigits)
 
@@ -497,7 +497,7 @@ fun QuickAccessSheet(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "Schnellnotizen",
+                        text = "Quick Notes",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold
                     )
@@ -521,7 +521,7 @@ fun QuickAccessSheet(
                         IconButton(onClick = { showSearchBar = !showSearchBar }) {
                             Icon(
                                 if (showSearchBar) Icons.Default.Close else Icons.Default.Search,
-                                contentDescription = "Suchen"
+                                contentDescription = "Search"
                             )
                         }
                     }
@@ -533,14 +533,14 @@ fun QuickAccessSheet(
                                 val uri = "internal://open?file=${URLEncoder.encode(currentDocumentPath, "UTF-8")}${
                                     if (currentPageNumber != null) "&page=${currentPageNumber + 1}" else ""
                                 }"
-                                val label = if (currentPageNumber != null) "${currentDocumentName} (S. ${currentPageNumber + 1})" else currentDocumentName
+                                val label = if (currentPageNumber != null) "${currentDocumentName} (Page ${currentPageNumber + 1})" else currentDocumentName
                                 val linkText = "\n📌 [$label]($uri)\n"
                                 val newContent = currentNote + linkText
                                 currentNote = newContent
                                 hasChanges = true
                             }
                         ) {
-                            Icon(Icons.Default.PushPin, contentDescription = "Dokument anheften")
+                            Icon(Icons.Default.PushPin, contentDescription = "Pin document")
                         }
                     }
                 }
@@ -554,7 +554,7 @@ fun QuickAccessSheet(
                         .padding(bottom = 12.dp)
                 ) {
                     Text(
-                        text = "Transparenz: ${(sheetOpacity * 100).toInt()}% (min 25%)",
+                        text = "Opacity: ${(sheetOpacity * 100).toInt()}% (min 25%)",
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.padding(bottom = 4.dp)
                     )
@@ -575,14 +575,14 @@ fun QuickAccessSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 12.dp),
-                    placeholder = { Text("Notizen durchsuchen...") },
+                    placeholder = { Text("Search notes...") },
                     leadingIcon = {
                         Icon(Icons.Default.Search, contentDescription = null)
                     },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
                             IconButton(onClick = { searchQuery = "" }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Löschen")
+                                Icon(Icons.Default.Clear, contentDescription = "Clear")
                             }
                         }
                     },
@@ -606,7 +606,7 @@ fun QuickAccessSheet(
                 }) {
                     Icon(
                         imageVector = if (flightExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = if (flightExpanded) "Einklappen" else "Ausklappen"
+                        contentDescription = if (flightExpanded) "Collapse" else "Expand"
                     )
                 }
             }
@@ -706,12 +706,12 @@ fun QuickAccessSheet(
                     icon = {
                         Icon(Icons.Default.Edit, contentDescription = null)
                     },
-                    title = { Text("Notiz umbenennen") },
+                    title = { Text("Rename Note") },
                     text = {
                         OutlinedTextField(
                             value = renameText,
                             onValueChange = { renameText = it },
-                            label = { Text("Titel") },
+                            label = { Text("Title") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -725,12 +725,12 @@ fun QuickAccessSheet(
                                 showRenameDialog = false
                             }
                         ) {
-                            Text("Speichern")
+                            Text("Save")
                         }
                     },
                     dismissButton = {
                         TextButton(onClick = { showRenameDialog = false }) {
-                            Text("Abbrechen")
+                            Text("Cancel")
                         }
                     }
                 )
@@ -745,7 +745,7 @@ fun QuickAccessSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (showAdvancedEditor) "Markdown Editor" else "Notiz",
+                    text = if (showAdvancedEditor) "Markdown Editor" else "Note",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -790,7 +790,7 @@ fun QuickAccessSheet(
                             Text(
                                 "Markdown Editor\n\n" +
                                 "Links: [Text](internal://open?file=...)\n" +
-                                "**Fett**, *Kursiv*",
+                                "**Bold**, *Italic*",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -856,12 +856,12 @@ fun QuickAccessSheet(
                                     tint = MaterialTheme.colorScheme.outline
                                 )
                                 Text(
-                                    text = "Notiz ist leer",
+                                    text = "Note is empty",
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
-                                    text = "Verwende die Schnelleingabe unten",
+                                    text = "Use quick input below",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.outline
                                 )
@@ -918,7 +918,7 @@ fun QuickAccessSheet(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 Text(
-                                    text = if (note.title.isNotBlank()) note.title else "Unbenannt",
+                                    text = if (note.title.isNotBlank()) note.title else "Untitled",
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     style = MaterialTheme.typography.labelMedium,
@@ -941,7 +941,7 @@ fun QuickAccessSheet(
                                     // Two-step delete: first click arms, second click confirms
                                     Icon(
                                         Icons.Default.Delete,
-                                        contentDescription = if (pendingDeleteNoteId == note.id) "Erneut klicken zum Bestätigen" else "Löschen",
+                                        contentDescription = if (pendingDeleteNoteId == note.id) "Click again to confirm" else "Delete",
                                         modifier = Modifier
                                             .size(12.dp)
                                                 .clickable {
@@ -964,7 +964,7 @@ fun QuickAccessSheet(
                     item {
                         Surface(
                             onClick = {
-                                val id = noteManager.addNote(title = "Neue Notiz")
+                                val id = noteManager.addNote(title = "New Note")
                                 noteManager.setActiveNote(id)
                             },
                             modifier = Modifier
@@ -984,11 +984,11 @@ fun QuickAccessSheet(
                             ) {
                                 Icon(
                                     Icons.Default.Add,
-                                    contentDescription = "Neue Notiz",
+                                    contentDescription = "New note",
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Text(
-                                    "Neu",
+                                    "New",
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -1037,7 +1037,7 @@ fun QuickAccessSheet(
                                     newTextInput = TextFieldValue("")
                                 }
                             },
-                            label = { Text("Zahlen", style = MaterialTheme.typography.labelSmall) }
+                            label = { Text("Numbers", style = MaterialTheme.typography.labelSmall) }
                         )
                         FilterChip(
                             selected = quickInputMode == "freq",
@@ -1049,7 +1049,7 @@ fun QuickAccessSheet(
                                     focusRequester.requestFocus()
                                 }
                             },
-                            label = { Text("Frequenz", style = MaterialTheme.typography.labelSmall) }
+                            label = { Text("Frequency", style = MaterialTheme.typography.labelSmall) }
                         )
                         FilterChip(
                             selected = quickInputMode == "coord",
@@ -1061,19 +1061,19 @@ fun QuickAccessSheet(
                                     focusRequester.requestFocus()
                                 }
                             },
-                            label = { Text("Koordinaten", style = MaterialTheme.typography.labelSmall) }
+                            label = { Text("Coordinates", style = MaterialTheme.typography.labelSmall) }
                         )
                         FilterChip(
                             selected = quickInputMode == "fluglage",
                             onClick = {
                                 if (quickInputMode != "fluglage") {
                                     quickInputMode = "fluglage"
-                                    val tmpl = "Höhe: FL    / Speed:     / HDG:    "
+                                    val tmpl = "Alt: FL    / Speed:     / HDG:    "
                                     newTextInput = TextFieldValue(tmpl, selection = TextRange(9))
                                     focusRequester.requestFocus()
                                 }
                             },
-                            label = { Text("Fluglage", style = MaterialTheme.typography.labelSmall) }
+                            label = { Text("Flight State", style = MaterialTheme.typography.labelSmall) }
                         )
                         FilterChip(
                             selected = quickInputMode == "time",
@@ -1086,7 +1086,7 @@ fun QuickAccessSheet(
                                     focusRequester.requestFocus()
                                 }
                             },
-                            label = { Text("Zeit", style = MaterialTheme.typography.labelSmall) }
+                            label = { Text("Time", style = MaterialTheme.typography.labelSmall) }
                         )
                     }
 
@@ -1106,22 +1106,22 @@ fun QuickAccessSheet(
                             value = newTextInput,
                             onValueChange = { newVal ->
                                 if (quickInputMode == "coord") {
-                                    // Extrahiere alle Ziffern aus der neuen Eingabe
+                                    // Extract all digits from the new input
                                     val allDigits = newVal.text.filter { it.isDigit() }
 
-                                    // Maximal 12 Ziffern (6 für N, 6 für E), Minimum 0
+                                    // Maximum 12 digits (6 for N, 6 for E), minimum 0
                                     val digits = allDigits.take(12).ifEmpty { "" }
 
-                                    // North: erste 6 Ziffern, mit Leerzeichen auffüllen
+                                    // North: first 6 digits, pad with spaces
                                     val northDigits = digits.take(6).padEnd(6, ' ')
-                                    // East: nächste 6 Ziffern, mit Leerzeichen auffüllen
+                                    // East: next 6 digits, pad with spaces
                                     val eastDigits = if (digits.length > 6) {
                                         digits.drop(6).take(6).padEnd(6, ' ')
                                     } else {
                                         "      " // 6 Leerzeichen
                                     }
 
-                                    // Sichere Formatierung als "N DD DD DD E DD DD DD"
+                                    // Safe formatting as "N DD DD DD E DD DD DD"
                                     fun formatCoordPart(s: String): String {
                                         // Sicherstellen dass String mindestens 6 Zeichen hat
                                         val safe = s.padEnd(6, ' ')
@@ -1141,7 +1141,7 @@ fun QuickAccessSheet(
                                     val eastFmt = formatCoordPart(eastDigits)
                                     val formatted = "N $northFmt E $eastFmt"
 
-                                    // Cursor-Position basierend auf Anzahl der eingegebenen Ziffern
+                                    // Cursor position based on number of entered digits
                                     val numDigits = digits.length
                                     val cursorPos = when (numDigits) {
                                         0 -> 2  // Nach "N "
@@ -1170,30 +1170,30 @@ fun QuickAccessSheet(
                                     val filtered = newVal.text.filter { it.isDigit() }
                                     newTextInput = TextFieldValue(filtered, selection = TextRange(filtered.length))
                                 } else if (quickInputMode == "fluglage") {
-                                    // Extrahiere alle Ziffern
+                                    // Extract all digits
                                     val allDigits = newVal.text.filter { it.isDigit() }
 
-                                    // Maximal 11 Ziffern (4 FL + 3 Speed + 3 HDG + 1 optionales Zeichen)
+                                    // Maximum 11 digits (4 FL + 3 Speed + 3 HDG + 1 optional char)
                                     val digits = allDigits.take(10)
 
-                                    // FL: erste 4 Ziffern (z.B. 0350)
+                                    // FL: first 4 digits (e.g., 0350)
                                     val flDigits = digits.take(4).padEnd(4, ' ')
-                                    // Speed: nächste 3 Ziffern
+                                    // Speed: next 3 digits
                                     val speedDigits = if (digits.length > 4) {
                                         digits.drop(4).take(3).padEnd(3, ' ')
                                     } else {
                                         "   "
                                     }
-                                    // HDG: letzte 3 Ziffern
+                                    // HDG: last 3 digits
                                     val hdgDigits = if (digits.length > 7) {
                                         digits.drop(7).take(3).padEnd(3, ' ')
                                     } else {
                                         "   "
                                     }
 
-                                    // Formatiere: "Höhe: FL DDDD / Speed: DDD / HDG: DDD"
+                                    // Format: "Alt: FL DDDD / Speed: DDD / HDG: DDD"
                                     val formatted = buildString {
-                                        append("Höhe: FL ")
+                                        append("Alt: FL ")
                                         append(flDigits)
                                         append(" / Speed: ")
                                         append(speedDigits)
@@ -1201,13 +1201,13 @@ fun QuickAccessSheet(
                                         append(hdgDigits)
                                     }
 
-                                    // Cursor-Position basierend auf Anzahl der Ziffern
+                                    // Cursor position based on number of digits
                                     val numDigits = digits.length
                                     val cursorPos = when {
-                                        numDigits == 0 -> 9  // Nach "Höhe: FL "
-                                        numDigits <= 4 -> 9 + numDigits  // In FL Bereich
-                                        numDigits <= 7 -> 23 + (numDigits - 4)  // In Speed Bereich (nach " / Speed: ")
-                                        else -> 34 + (numDigits - 7)  // In HDG Bereich (nach " / HDG: ")
+                                        numDigits == 0 -> 9  // After "Alt: FL "
+                                        numDigits <= 4 -> 9 + numDigits  // In FL area
+                                        numDigits <= 7 -> 23 + (numDigits - 4)  // In speed area (after " / Speed: ")
+                                        else -> 34 + (numDigits - 7)  // In HDG area (after " / HDG: ")
                                     }
 
                                     newTextInput = TextFieldValue(
@@ -1230,7 +1230,7 @@ fun QuickAccessSheet(
                                                 val numDigits = digits.length
 
                                                 val pos = when (numDigits) {
-                                                    0 -> 2  // Nach "N "
+                                                    0 -> 2  // After "N "
                                                     1 -> 3
                                                     2 -> 4
                                                     3 -> 6
@@ -1255,7 +1255,7 @@ fun QuickAccessSheet(
                                                 val numDigits = digits.length
 
                                                 val pos = when {
-                                                    numDigits == 0 -> 9  // Nach "Höhe: FL "
+                                                    numDigits == 0 -> 9  // After "Alt: FL "
                                                     numDigits <= 4 -> 9 + numDigits
                                                     numDigits <= 7 -> 23 + (numDigits - 4)
                                                     else -> 34 + (numDigits - 7)
@@ -1270,12 +1270,12 @@ fun QuickAccessSheet(
                                 },
                             placeholder = {
                                 Text(when (quickInputMode) {
-                                    "coord" -> "Zahlen eingeben (z.B. 481234 für N48°12'34\")"
-                                    "freq" -> "z.B. 122.500"
-                                    "time" -> "z.B. 14:30"
-                                    "number" -> "Zahlen eingeben..."
-                                    "fluglage" -> "Zahlen eingeben (z.B. 0350250090 für FL350/250kt/HDG090)"
-                                    else -> "Text hinzufügen..."
+                                    "coord" -> "Enter numbers (e.g., 481234 for N48°12'34\")"
+                                    "freq" -> "e.g., 122.500"
+                                    "time" -> "e.g., 14:30"
+                                    "number" -> "Enter numbers..."
+                                    "fluglage" -> "Enter numbers (e.g., 0350250090 for FL350/250kt/HDG090)"
+                                    else -> "Add text..."
                                 })
                             },
                             maxLines = 2,
@@ -1314,7 +1314,7 @@ fun QuickAccessSheet(
                             },
                             enabled = newTextInput.text.isNotEmpty()
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = "Hinzufügen")
+                            Icon(Icons.Default.Add, contentDescription = "Add")
                         }
                     }
                 }
@@ -1322,113 +1322,115 @@ fun QuickAccessSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Action buttons
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Delete button with two-step confirmation
-                OutlinedButton(
-                    onClick = {
-                        if (pendingDeleteCurrentNoteConfirm) {
-                            currentNote = ""
-                            hasChanges = false
-                            noteManager.clearNote()
-                            pendingDeleteCurrentNoteConfirm = false
-                        } else {
-                            pendingDeleteCurrentNoteConfirm = true
-                            Toast.makeText(context, "Press again to delete", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(36.dp),
-                    enabled = currentNote.isNotEmpty()
+            Column {
+                // Action buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = if (pendingDeleteCurrentNoteConfirm) "Erneut klicken zum Bestätigen" else "Löschen",
-                        modifier = Modifier.size(14.dp),
-                        tint = if (pendingDeleteCurrentNoteConfirm) MaterialTheme.colorScheme.error else LocalContentColor.current
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Löschen", style = MaterialTheme.typography.labelSmall)
+                    // Delete button with two-step confirmation
+                        OutlinedButton(
+                        onClick = {
+                            if (pendingDeleteCurrentNoteConfirm) {
+                                currentNote = ""
+                                hasChanges = false
+                                noteManager.clearNote()
+                                pendingDeleteCurrentNoteConfirm = false
+                            } else {
+                                pendingDeleteCurrentNoteConfirm = true
+                                Toast.makeText(context, "Press again to delete", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(36.dp),
+                        enabled = currentNote.isNotEmpty()
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = if (pendingDeleteCurrentNoteConfirm) "Click again to confirm" else "Delete",
+                            modifier = Modifier.size(14.dp),
+                            tint = if (pendingDeleteCurrentNoteConfirm) MaterialTheme.colorScheme.error else LocalContentColor.current
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Delete", style = MaterialTheme.typography.labelSmall)
+                    }
+
+                    // Smaller save button
+                    Button(
+                        onClick = {
+                            noteManager.saveNote(currentNote)
+                            hasChanges = false
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(36.dp),
+                        enabled = hasChanges
+                    ) {
+                        Icon(
+                            Icons.Default.Save,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Save", style = MaterialTheme.typography.labelSmall)
+                    }
                 }
 
-                // Smaller save button
-                Button(
-                    onClick = {
-                        noteManager.saveNote(currentNote)
-                        hasChanges = false
-                    },
+                // Status indicator
+                Row(
                     modifier = Modifier
-                        .weight(1f)
-                        .height(36.dp),
-                    enabled = hasChanges
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        Icons.Default.Save,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Speichern", style = MaterialTheme.typography.labelSmall)
+                    when {
+                        hasChanges -> {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Not saved",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                        currentNote.isNotEmpty() -> {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Save,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.tertiary
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Saved",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.tertiary
+                                )
+                            }
+                        }
+                    }
+
+                    // Note count
+                    if (notes.isNotEmpty()) {
+                        Text(
+                            text = "${notes.size} ${if (notes.size == 1) "note" else "notes"}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
-
-            // Status indicator
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                when {
-                    hasChanges -> {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Default.Edit,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "Nicht gespeichert",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                    currentNote.isNotEmpty() -> {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Default.Save,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.tertiary
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "Gespeichert",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.tertiary
-                            )
-                        }
-                    }
-                }
-
-                // Note count
-                if (notes.isNotEmpty()) {
-                    Text(
-                        text = "${notes.size} ${if (notes.size == 1) "Notiz" else "Notizen"}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
             }
         }
     }
-}
 }

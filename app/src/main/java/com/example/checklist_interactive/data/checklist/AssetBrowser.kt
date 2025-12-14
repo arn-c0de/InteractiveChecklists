@@ -38,8 +38,8 @@ class AssetBrowser(private val context: Context) {
     }
 
     /**
-     * Scannt rekursiv alle Dateien im angegebenen Pfad und gruppiert sie nach Ordnernamen.
-     * @return Map mit Ordnername -> Liste von Dateien in diesem Ordner
+     * Scans files recursively under the given path and groups them by folder name.
+     * @return Map of folder name -> list of files in that folder
      */
     fun scanAllFilesGrouped(rootPath: String): Map<String, List<AssetNode>> {
         val grouped = mutableMapOf<String, MutableList<AssetNode>>()
@@ -62,12 +62,12 @@ class AssetBrowser(private val context: Context) {
                 val isDir = sub.isNotEmpty()
 
                 if (isDir) {
-                    // Rekursiv in Unterordner gehen
+                    // Recurse into subfolders
                     scanRecursively(rootPath, childPath, grouped)
                 } else {
-                    // Datei gefunden
+                    // File found
                     if (child.endsWith(".pdf") || child.endsWith(".md") || child.endsWith(".markdown")) {
-                        // Ordnername extrahieren (relativ zum Root)
+                        // Extract folder name (relative to root)
                         val folderName = if (normalized == rootPath || normalized.isEmpty()) {
                             "Root"
                         } else {

@@ -8,7 +8,7 @@ import java.io.FileOutputStream
 import java.io.InputStream
 
 /**
- * Datei-Informationen
+ * File information
  */
 data class FileInfo(
     val name: String,
@@ -23,8 +23,8 @@ data class FileInfo(
 )
 
 /**
- * Verwaltet das interne Dateisystem der App.
- * Erstellt Ordnerstruktur und importiert externe Dateien.
+ * Manages the app's internal file system.
+ * Creates folder structure and imports external files.
  */
 
 class InternalFileManager(private val context: Context) {
@@ -33,11 +33,11 @@ class InternalFileManager(private val context: Context) {
     internal val tagManager: FileTagManager by lazy { FileTagManager(context) }
 
     init {
-        // Erstelle nur Root-Verzeichnis
+        // Create root directory if missing
         if (!rootDir.exists()) {
             rootDir.mkdirs()
         }
-        // Lösche alle leeren Ordner beim Start (z.B. alte Dummy-Ordner)
+        // Delete empty folders on startup (e.g., old dummy folders)
         deleteEmptyFolders(rootDir)
     }
     
@@ -79,7 +79,7 @@ class InternalFileManager(private val context: Context) {
     
 
     /**
-     * Löscht rekursiv alle leeren Ordner (ohne PDF/MD/Markdown-Dateien) im angegebenen Verzeichnis
+     * Deletes empty folders recursively (excluding PDF/MD/Markdown files) under the given directory
      */
     private fun deleteEmptyFolders(dir: File) {
         dir.listFiles()?.forEach { file ->
@@ -97,14 +97,14 @@ class InternalFileManager(private val context: Context) {
     }
 
     /**
-     * Liefert den internen Root-Pfad als String
+     * Returns the internal root path as a String
      */
     fun getInternalRootPath(): String {
         return rootDir.absolutePath
     }
 
     /**
-     * Stellt sicher, dass das Root-Verzeichnis existiert
+     * Ensures that the root directory exists
      */
     private fun ensureDirectoryStructure() {
         if (!rootDir.exists()) {
@@ -113,7 +113,7 @@ class InternalFileManager(private val context: Context) {
     }
 
     /**
-     * Gibt alle Kategorien zurück (Ordner im Root-Verzeichnis)
+     * Returns all categories (folders in the root directory)
      */
     fun getCategories(): List<String> {
         ensureDirectoryStructure()
@@ -135,7 +135,7 @@ class InternalFileManager(private val context: Context) {
     }
 
     /**
-     * Prüft rekursiv, ob ein Ordner oder seine Unterordner unterstützte Dateien enthalten
+     * Checks recursively whether a folder or its subfolders contain supported files
      */
     private fun hasFilesRecursive(dir: File): Boolean {
         dir.listFiles()?.forEach { file ->
@@ -150,7 +150,7 @@ class InternalFileManager(private val context: Context) {
     }
 
     /**
-     * Erstellt eine neue Kategorie
+     * Creates a new category
      */
     fun createCategory(categoryName: String): Boolean {
         val categoryDir = File(rootDir, categoryName)
@@ -162,7 +162,7 @@ class InternalFileManager(private val context: Context) {
     }
 
     /**
-     * Löscht eine Kategorie und alle darin enthaltenen Dateien
+     * Deletes a category and all contained files
      */
     fun deleteCategory(categoryName: String): Boolean {
         val categoryDir = File(rootDir, categoryName)
@@ -170,7 +170,7 @@ class InternalFileManager(private val context: Context) {
     }
 
     /**
-     * Gibt alle Dateien in einer Kategorie zurück
+     * Returns all files in a category
      */
     fun getFilesInCategory(category: String): List<FileInfo> {
         val results = mutableListOf<FileInfo>()
@@ -208,7 +208,7 @@ class InternalFileManager(private val context: Context) {
     }
 
     /**
-     * Gibt alle Dateien gruppiert nach Kategorien zurück
+     * Returns all files grouped by categories
      */
     fun getAllFilesGrouped(): Map<String, List<FileInfo>> {
         return getCategories().associateWith { category ->
@@ -217,7 +217,7 @@ class InternalFileManager(private val context: Context) {
     }
 
     /**
-     * Liefert alle Kategorie-Pfade inklusive verschachtelter Pfade (relative Pfade unter rootDir)
+     * Returns all category paths including nested relative paths under rootDir
      */
     fun getAllCategoryPaths(): List<String> {
         val nodes = getFolderTree()
@@ -285,7 +285,7 @@ class InternalFileManager(private val context: Context) {
     }
 
     /**
-     * Repräsentiert einen Ordner- / Kategorie-Knoten mit verschachtelten Unterordnern und Dateien
+     * Represents a folder / category node with nested subfolders and files
      */
     data class FolderNode(
         val name: String,
@@ -295,11 +295,11 @@ class InternalFileManager(private val context: Context) {
     )
 
     /**
-     * Liefert die rekursive Ordnerstruktur des internen Root-Verzeichnisses
+     * Returns the recursive folder tree of the internal root directory
      */
     /**
-     * Liefert die rekursive Ordnerstruktur des internen Root-Verzeichnisses
-     * Zeigt ALLE Ordner aus dem internen Speicher an (auch leere)
+     * Returns the recursive folder tree of the internal root directory
+     * Shows ALL folders from internal storage (including empty ones)
      */
     fun getFolderTree(): List<FolderNode> {
         ensureDirectoryStructure()
@@ -423,7 +423,7 @@ class InternalFileManager(private val context: Context) {
     }
 
     /**
-     * Importiert eine Datei aus einem externen Uri in eine Kategorie
+     * Imports a file from an external Uri into a category
      */
     fun importFile(uri: Uri, category: String, fileName: String? = null): Result<FileInfo> {
         return try {
@@ -432,19 +432,19 @@ class InternalFileManager(private val context: Context) {
                 categoryDir.mkdirs()
             }
 
-            // Dateiname extrahieren oder bereitgestellten Namen verwenden
+            // Extract filename or use provided name
             val originalName = fileName ?: getFileNameFromUri(uri) ?: "imported_${System.currentTimeMillis()}"
 
-            // Prüfen ob Dateiendung PDF oder MD ist
+            // Check if file extension is PDF or MD
             val extension = originalName.substringAfterLast('.', "").lowercase()
             if (extension !in listOf("pdf", "md", "markdown")) {
-                return Result.failure(Exception("Nur PDF und Markdown Dateien werden unterstützt"))
+                return Result.failure(Exception("Only PDF and Markdown files are supported"))
             }
 
             // Zieldatei erstellen
             val destFile = File(categoryDir, originalName)
 
-            // Wenn Datei bereits existiert, neuen Namen generieren
+            // If file already exists, generate a new name
             val finalFile = if (destFile.exists()) {
                 val baseName = originalName.substringBeforeLast('.')
                 val ext = originalName.substringAfterLast('.')
@@ -477,7 +477,7 @@ class InternalFileManager(private val context: Context) {
     }
 
     /**
-     * Löscht eine Datei
+     * Deletes a file
      */
     fun deleteFile(filePath: String): Boolean {
         val file = File(filePath)
@@ -491,7 +491,7 @@ class InternalFileManager(private val context: Context) {
         return try {
             val sourceFile = File(filePath)
             if (!sourceFile.exists()) {
-                return Result.failure(Exception("Datei nicht gefunden"))
+                return Result.failure(Exception("File not found"))
             }
 
             val categoryDir = File(rootDir, newCategory)
@@ -501,9 +501,9 @@ class InternalFileManager(private val context: Context) {
 
             val destFile = File(categoryDir, sourceFile.name)
 
-            // Wenn Zieldatei existiert, Fehler
+            // If destination file exists, error
             if (destFile.exists()) {
-                return Result.failure(Exception("Datei existiert bereits in dieser Kategorie"))
+                return Result.failure(Exception("File already exists in this category"))
             }
 
             // Datei verschieben
@@ -524,7 +524,7 @@ class InternalFileManager(private val context: Context) {
                 )
                 Result.success(fileInfo)
             } else {
-                Result.failure(Exception("Datei konnte nicht verschoben werden"))
+                Result.failure(Exception("File could not be moved"))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -538,7 +538,7 @@ class InternalFileManager(private val context: Context) {
         return try {
             val sourceFile = File(filePath)
             if (!sourceFile.exists()) {
-                return Result.failure(Exception("Datei nicht gefunden"))
+                return Result.failure(Exception("File not found"))
             }
 
             val extension = sourceFile.extension
@@ -546,7 +546,7 @@ class InternalFileManager(private val context: Context) {
             val destFile = File(sourceFile.parent, newFileName)
 
             if (destFile.exists()) {
-                return Result.failure(Exception("Eine Datei mit diesem Namen existiert bereits"))
+                return Result.failure(Exception("A file with this name already exists"))
             }
 
             if (sourceFile.renameTo(destFile)) {
@@ -567,7 +567,7 @@ class InternalFileManager(private val context: Context) {
                 )
                 Result.success(fileInfo)
             } else {
-                Result.failure(Exception("Datei konnte nicht umbenannt werden"))
+                Result.failure(Exception("File could not be renamed"))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -589,7 +589,7 @@ class InternalFileManager(private val context: Context) {
     }
 
     /**
-     * Gibt Datei-Objekt für einen Pfad zurück
+     * Returns the FileInfo object for a given path
      */
     fun getFile(filePath: String): File? {
         val file = File(filePath)
@@ -597,8 +597,8 @@ class InternalFileManager(private val context: Context) {
     }
 
     /**
-     * Importiert eine Datei, die gebündelt in den App-Assets liegt, in eine Kategorie
-     * Beispiel assetPath: "checklists/OFS-FA18C-Checklist-v2.pdf"
+     * Imports a file bundled in the app assets into a category
+     * Example assetPath: "checklists/OFS-FA18C-Checklist-v2.pdf"
      */
     fun importAssetFile(assetPath: String, category: String): Result<FileInfo> {
         return try {
@@ -610,9 +610,9 @@ class InternalFileManager(private val context: Context) {
             val fileName = assetPath.substringAfterLast('/')
             val destFile = File(categoryDir, fileName)
 
-            // Wenn Datei bereits existiert, gib einen Fehler zurück
+            // If file already exists, return an error
             if (destFile.exists()) {
-                return Result.failure(Exception("Datei existiert bereits in dieser Kategorie"))
+                return Result.failure(Exception("File already exists in this category"))
             }
 
             context.assets.open(assetPath).use { input ->

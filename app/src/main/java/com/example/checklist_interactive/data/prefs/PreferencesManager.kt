@@ -8,7 +8,7 @@ import com.example.checklist_interactive.data.prefs.SourceEntry
 import com.example.checklist_interactive.data.prefs.ContributorEntry
 
 /**
- * Manager für App-Einstellungen und Präferenzen
+ * Manager for app settings and preferences
  */
 class PreferencesManager(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
@@ -32,21 +32,21 @@ class PreferencesManager(context: Context) {
     }
     
     /**
-     * Speichert ob eine Kategorie ausgeklappt ist
+     * Stores whether a category is expanded
      */
     fun setCategoryExpanded(category: String, expanded: Boolean) {
         prefs.edit().putBoolean(PREFIX_CATEGORY_EXPANDED + category, expanded).apply()
     }
     
     /**
-     * Lädt ob eine Kategorie ausgeklappt ist (Standard: true)
+     * Loads whether a category is expanded (default: true)
      */
     fun isCategoryExpanded(category: String): Boolean {
         return prefs.getBoolean(PREFIX_CATEGORY_EXPANDED + category, true)
     }
     
     /**
-     * Lädt alle gespeicherten Kategorien-Stati
+     * Loads all stored category states
      */
     fun getAllCategoryStates(): Map<String, Boolean> {
         return prefs.all
@@ -110,14 +110,14 @@ class PreferencesManager(context: Context) {
     }
 
     /**
-     * Speichert einen Integer-Wert
+     * Stores an integer value
      */
     fun setInt(key: String, value: Int) {
         prefs.edit().putInt(key, value).apply()
     }
 
     /**
-     * Lädt einen Integer-Wert (mit Standard-Fallback)
+     * Loads an integer value (with default fallback)
      */
     fun getInt(key: String, defaultValue: Int): Int {
         return prefs.getInt(key, defaultValue)

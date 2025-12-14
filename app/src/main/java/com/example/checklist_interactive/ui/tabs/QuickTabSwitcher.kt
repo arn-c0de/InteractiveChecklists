@@ -50,12 +50,12 @@ fun QuickTabSwitcherSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Geöffnete Tabs",
+                    text = "Open tabs",
                     style = MaterialTheme.typography.titleLarge
                 )
                 
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = "Schließen")
+                    Icon(Icons.Default.Close, contentDescription = "Close")
                 }
             }
             
@@ -64,7 +64,7 @@ fun QuickTabSwitcherSheet(
             // Recently used section
             if (navigationHistory.isNotEmpty()) {
                 Text(
-                    text = "Zuletzt verwendet",
+                    text = "Recently used",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -96,7 +96,7 @@ fun QuickTabSwitcherSheet(
             
             // All tabs section
             Text(
-                text = "Alle Tabs (${tabs.size})",
+                text = "All tabs (${tabs.size})",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp)
@@ -181,7 +181,7 @@ private fun TabHistoryItem(
                 
                 if (tabInfo.pageNumber >= 0) {
                     Text(
-                        text = "Seite ${tabInfo.pageNumber + 1}",
+                        text = "Page ${tabInfo.pageNumber + 1}",
                         style = MaterialTheme.typography.bodySmall,
                         color = if (isActive) {
                             MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
@@ -193,12 +193,12 @@ private fun TabHistoryItem(
             }
             
             if (isActive) {
-                Surface(
+                    Surface(
                     shape = MaterialTheme.shapes.small,
                     color = MaterialTheme.colorScheme.primary
                 ) {
                     Text(
-                        text = "Aktiv",
+                        text = "Active",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
@@ -225,7 +225,7 @@ fun QuickTabSwitchFAB(
     ) {
         Icon(
             imageVector = Icons.Default.History,
-            contentDescription = "Tabs wechseln"
+            contentDescription = "Switch tabs"
         )
     }
 }

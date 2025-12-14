@@ -44,7 +44,7 @@ private val LightColorScheme = lightColorScheme(
 fun ChecklistInteractiveTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = false,  // Deaktiviert für konsistente dunkle UI
+    dynamicColor: Boolean = false,  // Disabled for consistent dark UI
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {

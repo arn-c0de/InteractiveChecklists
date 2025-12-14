@@ -23,7 +23,7 @@ import com.example.checklist_interactive.data.checklist.AssetBrowser
 import com.example.checklist_interactive.data.checklist.AssetNode
 
 /**
- * Kategorisierte Dateiansicht - zeigt alle Dateien gruppiert nach Ordnern
+ * Categorized file view - shows all files grouped by folders
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,15 +41,15 @@ fun CategorizedFilesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Dateien in: $rootFolder") },
+                title = { Text("Files in: $rootFolder") },
                 navigationIcon = {
                     IconButton(onClick = onClose) {
-                        Icon(Icons.Default.Close, contentDescription = "Schließen")
+                        Icon(Icons.Default.Close, contentDescription = "Close")
                     }
                 },
                 actions = {
                     IconButton(onClick = onChangeRootFolder) {
-                        Icon(Icons.Default.FolderOpen, contentDescription = "Ordner ändern")
+                        Icon(Icons.Default.FolderOpen, contentDescription = "Change folder")
                     }
                 }
             )
@@ -71,13 +71,13 @@ fun CategorizedFilesScreen(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        "Keine Dateien gefunden",
+                        "No files found",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.outline
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     TextButton(onClick = onChangeRootFolder) {
-                        Text("Anderen Ordner wählen")
+                        Text("Select another folder")
                     }
                 }
             }

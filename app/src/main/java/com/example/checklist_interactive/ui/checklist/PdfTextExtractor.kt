@@ -14,7 +14,7 @@ import java.io.File
 import java.io.Writer
 
 /**
- * Repräsentiert einen Text-Block mit Position auf einer PDF-Seite
+ * Represents a text block with position on a PDF page
  */
 data class PdfTextBlock(
     val text: String,
@@ -26,7 +26,7 @@ data class PdfTextBlock(
 )
 
 /**
- * Extrahiert Text mit Positionen aus PDF-Dateien
+ * Extracts positioned text from PDF files
  */
 class PdfTextExtractor(private val context: Context) {
 
@@ -35,17 +35,17 @@ class PdfTextExtractor(private val context: Context) {
     private val documentMutex = Mutex()
 
     init {
-        // PDFBox für Android initialisieren
+        // Initialize PDFBox for Android
         PDFBoxResourceLoader.init(context)
     }
 
     /**
-     * Lädt das PDF-Dokument, verwendet Cache wenn möglich
+     * Loads the PDF document, using a cache when possible
      */
     private suspend fun getDocument(pdfFile: File): PDDocument = documentMutex.withLock {
         val currentPath = pdfFile.absolutePath
 
-        // Wenn ein anderes Dokument gecacht ist, schließe es zuerst
+            // If a different document is cached, close it first
         if (cachedFilePath != currentPath && cachedDocument != null) {
             try {
                 cachedDocument?.close()
@@ -56,7 +56,7 @@ class PdfTextExtractor(private val context: Context) {
             cachedFilePath = null
         }
 
-        // Lade neues Dokument wenn nötig
+        // Load a new document when needed
         if (cachedDocument == null) {
             cachedDocument = PDDocument.load(pdfFile)
             cachedFilePath = currentPath
@@ -66,7 +66,7 @@ class PdfTextExtractor(private val context: Context) {
     }
 
     /**
-     * Gibt das gecachte Dokument frei
+     * Releases the cached document
      */
     fun cleanup() {
         try {
@@ -79,7 +79,7 @@ class PdfTextExtractor(private val context: Context) {
     }
 
     /**
-     * Extrahiert Text-Blöcke für eine bestimmte Seite
+     * Extracts text blocks for a specific page
      */
     suspend fun extractTextBlocks(pdfFile: File, pageIndex: Int): List<PdfTextBlock> = withContext(Dispatchers.IO) {
         val textBlocks = mutableListOf<PdfTextBlock>()
@@ -96,7 +96,7 @@ class PdfTextExtractor(private val context: Context) {
                 override fun writeString(text: String, textPositions: MutableList<TextPosition>) {
                     if (text.trim().isEmpty()) return
 
-                    // Gruppiere zusammenhängende Textpositionen
+                    // Group contiguous text positions
                     var currentText = ""
                     var minX = Float.MAX_VALUE
                     var minY = Float.MAX_VALUE
@@ -134,9 +134,9 @@ class PdfTextExtractor(private val context: Context) {
             }
 
             stripper.getText(document)
-        } catch (e: OutOfMemoryError) {
+            } catch (e: OutOfMemoryError) {
             e.printStackTrace()
-            // Bei OOM-Fehler, versuche Cache zu leeren
+            // On OOM error, try to clear cache
             cleanup()
             System.gc()
         } catch (e: Exception) {
@@ -147,7 +147,7 @@ class PdfTextExtractor(private val context: Context) {
     }
 
     /**
-     * Extrahiert den gesamten Text einer Seite
+     * Extracts the entire text of a page
      */
     suspend fun extractPageText(pdfFile: File, pageIndex: Int): String = withContext(Dispatchers.IO) {
         try {
@@ -159,7 +159,7 @@ class PdfTextExtractor(private val context: Context) {
             stripper.getText(document)
         } catch (e: OutOfMemoryError) {
             e.printStackTrace()
-            // Bei OOM-Fehler, versuche Cache zu leeren
+            // On OOM error, try to clear cache
             cleanup()
             System.gc()
             ""

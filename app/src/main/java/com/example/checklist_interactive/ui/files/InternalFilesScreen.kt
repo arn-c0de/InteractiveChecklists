@@ -53,8 +53,8 @@ import com.example.checklist_interactive.ui.tags.TagChips
 import com.example.checklist_interactive.ui.quickaccess.QuickAccessSheet
 
 /**
- * Hauptscreen für interne Dateiverwaltung
- * Zeigt kategorisiert alle Dateien an
+ * Main screen for internal file management
+ * Shows files categorized by folder
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,7 +73,7 @@ fun InternalFilesScreen(
     val prefsManager = remember { PreferencesManager(context) }
     val shortcutManager = remember { ShortcutManager(context) }
     
-    // Lade alle Top-Level-Ordner aus assets dynamisch
+    // Load all top-level folders from assets dynamically
     val assetTopLevelFolders = remember {
         try {
             context.assets.list("")?.filter { entry ->
@@ -89,7 +89,7 @@ fun InternalFilesScreen(
         }
     }
     
-    // Lade alle Aircraft-Unterordner aus dem Checklists-Ordner (case-insensitive, dynamisch)
+    // Load all aircraft subfolders from the Checklists folder (case-insensitive, dynamic)
     val assetAircrafts = remember {
         try {
             val rootEntries = context.assets.list("") ?: emptyArray()
@@ -112,7 +112,7 @@ fun InternalFilesScreen(
     }
     
     // Keep a lowercase set for matching folder nodes which may be lowercased on import
-    // Kombiniere alle Top-Level-Ordner, Aircraft-Ordner und bereits importierte Kategorien
+    // Combine all top-level folders, aircraft folders, and already imported categories
     val assetAircraftsLower = remember(assetAircrafts, assetTopLevelFolders, fileManager) { 
         (assetTopLevelFolders + assetAircrafts + fileManager.getCategories()).map { it.lowercase() }.toSet() 
     }
@@ -206,7 +206,7 @@ fun InternalFilesScreen(
     }
     
 
-    // Expanded state für jede Kategorie + Shortcuts
+    // Expanded state for each category + shortcuts
     val expandedCategories = remember { mutableStateMapOf<String, Boolean>() }
 
     // Seed expandedCategories from groupedFiles and folderTree when they become available
@@ -323,7 +323,7 @@ fun InternalFilesScreen(
                 ) {
                     Icon(
                         Icons.Default.NoteAdd,
-                        contentDescription = "Schnellzugriff"
+                        contentDescription = "Quick access"
                     )
                 }
             }
@@ -495,7 +495,7 @@ fun InternalFilesScreen(
                     }
                 }
                 
-                // Shortcuts-Kategorie (immer zuerst)
+                // Shortcuts category (always first)
                 if (shortcuts.isNotEmpty()) {
                     item {
                         ShortcutsHeader(
@@ -641,7 +641,7 @@ fun InternalFilesScreen(
                         shortcutToRename = null
                     }
                 ) {
-                    Text("Speichern")
+                    Text("Save")
                 }
             },
             dismissButton = {
@@ -649,7 +649,7 @@ fun InternalFilesScreen(
                     showRenameDialog = false
                     shortcutToRename = null
                 }) {
-                    Text("Abbrechen")
+                    Text("Cancel")
                 }
             }
         )
@@ -682,12 +682,12 @@ fun InternalFilesScreen(
         )
     }
 
-    // Quick Access Bottom Sheet - zentrale Notizen ohne Dokument-Kontext
+    // Quick Access Bottom Sheet - central notes without document context
     if (showQuickAccess) {
         QuickAccessSheet(
             onDismiss = { showQuickAccess = false },
             onOpenDocument = onOpenLinkedDocument
-            // Keine currentDocument-Parameter = zentrale Notizen ohne Pin-Funktion
+            // No currentDocument parameter = central notes without pin functionality
         )
     }
 
@@ -735,9 +735,9 @@ private fun enrichNodeWithTags(
 }
 
 /**
- * Filtert rekursiv Aircraft-Unterordner basierend auf Sichtbarkeits-Einstellungen.
- * Alle Top-Level-Ordner (Checklists, Handbooks, radiocommunication, etc.) werden immer angezeigt.
- * Nur Aircraft-Unterordner innerhalb von "Checklists" werden nach Sichtbarkeit gefiltert.
+ * Recursively filter aircraft subfolders based on visibility settings.
+ * All top-level folders (Checklists, Handbooks, radiocommunication, etc.) are always shown.
+ * Only aircraft subfolders under "Checklists" are filtered by visibility.
  */
 private fun filterAircraftChildren(
     node: InternalFileManager.FolderNode,
@@ -1019,9 +1019,9 @@ private fun ShortcutListItem(
 ) {
     ListItem(
         headlineContent = { Text(shortcut.name) },
-        supportingContent = {
+            supportingContent = {
             Text(
-                "${shortcut.fileName} • Seite ${shortcut.pageNumber + 1}",
+                "${shortcut.fileName} • Page ${shortcut.pageNumber + 1}",
                 style = MaterialTheme.typography.labelSmall
             )
         },
@@ -1037,14 +1037,14 @@ private fun ShortcutListItem(
                 IconButton(onClick = onRename) {
                     Icon(
                         Icons.Default.Edit,
-                        contentDescription = "Umbenennen",
+                        contentDescription = "Rename",
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
                 IconButton(onClick = onDelete) {
                     Icon(
                         Icons.Default.Delete,
-                        contentDescription = "Löschen",
+                        contentDescription = "Delete",
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
@@ -1198,7 +1198,7 @@ private fun CategorySelectionDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Kategorie wählen") },
+        title = { Text("Select category") },
             text = {
             LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
                 items(categories) { category ->
@@ -1222,7 +1222,7 @@ private fun CategorySelectionDialog(
         confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Abbrechen")
+                Text("Cancel")
             }
         }
     )

@@ -1,26 +1,5 @@
 [Home](../README.md) | [Documentation Navigation](docnavigation.md)
 
-# Auto-Import von Dateien aus Imports-Ordner
-
-Die App lädt automatisch beim Start alle PDF- und Markdown-Dateien aus dem `Imports/` Ordner.
-
-## Ordnerstruktur
-
-Erstelle einen `Imports/` Ordner an einem der folgenden Orte:
-
-1. **App-spezifisch** (empfohlen, keine Berechtigung nötig):
-   ```
-   Android/data/com.example.checklist_interactive/files/Imports/
-   ```
-
-2. **Download-Ordner**:
-   ```
-   Download/Imports/
-   ```
-
-````markdown
-[Home](../README.md) | [Documentation Navigation](docnavigation.md)
-
 # Auto-importing Files from the Imports Folder
 
 The app automatically loads all PDF and Markdown files from the `Imports/` folder at startup.
@@ -30,19 +9,19 @@ The app automatically loads all PDF and Markdown files from the `Imports/` folde
 Create an `Imports/` folder in one of the following locations:
 
 1. **App-specific** (recommended — no additional permission required):
-   ```
-   Android/data/com.example.checklist_interactive/files/Imports/
-   ```
+    ```
+    Android/data/com.example.checklist_interactive/files/Imports/
+    ```
 
 2. **Downloads folder**:
-   ```
-   Download/Imports/
-   ```
+    ```
+    Download/Imports/
+    ```
 
 3. **External storage root**:
-   ```
-   /storage/emulated/0/Imports/
-   ```
+    ```
+    /storage/emulated/0/Imports/
+    ```
 
 ## Category System
 
@@ -62,25 +41,25 @@ Imports/
 │   ├── Emergency.pdf
 │   └── Standard.pdf
 └── Manuals/
-    └── Aircraft-Manual.pdf
+      └── Aircraft-Manual.pdf
 ```
 
 ### Result in the App:
 
 - **Checklists** (2 files)
-  - Checklist1.pdf
-  - Checklist2.pdf
+   - Checklist1.pdf
+   - Checklist2.pdf
 
 - **RadioCommunications** (2 files)
-  - Radio-Guide.pdf
-  - Frequencies.pdf
+   - Radio-Guide.pdf
+   - Frequencies.pdf
 
 - **Procedures** (2 files)
-  - Emergency.pdf
-  - Standard.pdf
+   - Emergency.pdf
+   - Standard.pdf
 
 - **Manuals** (1 file)
-  - Aircraft-Manual.pdf
+   - Aircraft-Manual.pdf
 
 ## Supported File Types
 
@@ -100,5 +79,3 @@ Imports/
 - Default categories (Checklists, Comms, Charts, Procedures, Manuals) are preserved
 - New categories can be added simply by creating subfolders in the `Imports/` folder
 - Duplicate filenames are **not** overwritten
-
-````
