@@ -1140,42 +1140,64 @@ fun QuickAccessSheet(
                                         "      " // 6 Leerzeichen
                                     }
 
-                                    // Safe formatting as "N DD DD DD E DD DD DD"
+                                    // Format coordinates as N 48°12'34" E 012°34'56"
                                     fun formatCoordPart(s: String): String {
-                                        // Sicherstellen dass String mindestens 6 Zeichen hat
                                         val safe = s.padEnd(6, ' ')
-                                        return buildString {
-                                            append(safe.getOrNull(0) ?: ' ')
-                                            append(safe.getOrNull(1) ?: ' ')
-                                            append(' ')
-                                            append(safe.getOrNull(2) ?: ' ')
-                                            append(safe.getOrNull(3) ?: ' ')
-                                            append(' ')
-                                            append(safe.getOrNull(4) ?: ' ')
-                                            append(safe.getOrNull(5) ?: ' ')
+                                        val deg = safe.substring(0, 2)
+                                        val min = safe.substring(2, 4)
+                                        val sec = safe.substring(4, 6)
+
+                                        val sb = StringBuilder()
+
+                                        // Degrees (show ° when two digits present)
+                                        if (deg.trim().isNotEmpty()) {
+                                            sb.append(deg.filter { it != ' ' })
+                                            if (!deg.contains(' ')) sb.append('°')
+                                        } else {
+                                            sb.append("  ")
                                         }
+
+                                        // Minutes (show ' when two digits present)
+                                        if (min.trim().isNotEmpty()) {
+                                            sb.append(min.filter { it != ' ' })
+                                            if (!min.contains(' ')) sb.append('\'')
+                                        }
+
+                                        // Seconds (show " when two digits present)
+                                        if (sec.trim().isNotEmpty()) {
+                                            sb.append(sec.filter { it != ' ' })
+                                            if (!sec.contains(' ')) sb.append('"')
+                                        }
+
+                                        return sb.toString().padEnd(9, ' ')
                                     }
 
                                     val northFmt = formatCoordPart(northDigits)
                                     val eastFmt = formatCoordPart(eastDigits)
                                     val formatted = "N $northFmt E $eastFmt"
 
-                                    // Cursor position based on number of entered digits
+                                    // Determine cursor: after last entered digit; if symbol follows it, place after symbol
                                     val numDigits = digits.length
-                                    val cursorPos = when (numDigits) {
-                                        0 -> 2  // Nach "N "
-                                        1 -> 3  // N X|
-                                        2 -> 4  // N XX|
-                                        3 -> 6  // N XX X|X (nach Leerzeichen)
-                                        4 -> 7  // N XX XX|
-                                        5 -> 9  // N XX XX X|X (nach Leerzeichen)
-                                        6 -> 10 // N XX XX XX|
-                                        7 -> formatted.indexOf('E') + 3  // E X|
-                                        8 -> formatted.indexOf('E') + 4  // E XX|
-                                        9 -> formatted.indexOf('E') + 6  // E XX X|X
-                                        10 -> formatted.indexOf('E') + 7 // E XX XX|
-                                        11 -> formatted.indexOf('E') + 9 // E XX XX X|X
-                                        else -> formatted.indexOf('E') + 10 // E XX XX XX|
+                                    val lastDigitIndex = if (numDigits > 0) {
+                                        var count = 0
+                                        var idx = -1
+                                        for (i in formatted.indices) {
+                                            if (formatted[i].isDigit()) {
+                                                count++
+                                                if (count == numDigits) {
+                                                    idx = i
+                                                    break
+                                                }
+                                            }
+                                        }
+                                        idx
+                                    } else -1
+
+                                    val cursorPos = if (lastDigitIndex >= 0) {
+                                        val next = if (lastDigitIndex + 1 < formatted.length) formatted[lastDigitIndex + 1] else '\u0000'
+                                        if (next == '°' || next == '\'' || next == '"') lastDigitIndex + 2 else lastDigitIndex + 1
+                                    } else {
+                                        2 // after "N "
                                     }
 
                                     newTextInput = TextFieldValue(
@@ -1248,20 +1270,26 @@ fun QuickAccessSheet(
                                                 val digits = txt.filter { it.isDigit() }
                                                 val numDigits = digits.length
 
-                                                val pos = when (numDigits) {
-                                                    0 -> 2  // After "N "
-                                                    1 -> 3
-                                                    2 -> 4
-                                                    3 -> 6
-                                                    4 -> 7
-                                                    5 -> 9
-                                                    6 -> 10
-                                                    7 -> txt.indexOf('E') + 3
-                                                    8 -> txt.indexOf('E') + 4
-                                                    9 -> txt.indexOf('E') + 6
-                                                    10 -> txt.indexOf('E') + 7
-                                                    11 -> txt.indexOf('E') + 9
-                                                    else -> txt.indexOf('E') + 10
+                                                val lastDigitIndex = if (numDigits > 0) {
+                                                    var count = 0
+                                                    var idx = -1
+                                                    for (i in txt.indices) {
+                                                        if (txt[i].isDigit()) {
+                                                            count++
+                                                            if (count == numDigits) {
+                                                                idx = i
+                                                                break
+                                                            }
+                                                        }
+                                                    }
+                                                    idx
+                                                } else -1
+
+                                                val pos = if (lastDigitIndex >= 0) {
+                                                    val next = if (lastDigitIndex + 1 < txt.length) txt[lastDigitIndex + 1] else '\u0000'
+                                                    if (next == '°' || next == '\'' || next == '"') lastDigitIndex + 2 else lastDigitIndex + 1
+                                                } else {
+                                                    2
                                                 }
 
                                                 newTextInput = newTextInput.copy(
