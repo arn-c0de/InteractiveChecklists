@@ -79,7 +79,7 @@ fun FileTagEditorDialog(
                     }
                 }
                 
-                Divider()
+                HorizontalDivider()
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 // Available tags

@@ -41,6 +41,9 @@ import com.example.checklist_interactive.data.prefs.ContributorEntry
 
 // The list of available aircraft folders is loaded from the assets/Checklists directory
 
+// Shared Json instance to avoid redundant creation
+private val json = Json { prettyPrint = true }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -227,11 +230,11 @@ fun SettingsScreen(
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Button(onClick = {
                                 try {
-                                    val json = Json { prettyPrint = true }.encodeToString(
+                                    val jsonString = json.encodeToString(
                                         kotlinx.serialization.builtins.ListSerializer(ContributorEntry.serializer()),
                                         contributors
                                     )
-                                    contributorsJsonContent = json
+                                    contributorsJsonContent = jsonString
                                 } catch (e: Exception) {
                                     contributorsJsonContent = "Error encoding contributors: ${e.message}"
                                 }
@@ -327,11 +330,11 @@ fun SettingsScreen(
                                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                     Button(onClick = {
                                         try {
-                                            val json = Json { prettyPrint = true }.encodeToString(
+                                            val jsonString = json.encodeToString(
                                                 kotlinx.serialization.builtins.ListSerializer(SourceEntry.serializer()),
                                                 sources
                                             )
-                                            sourcesJsonContent = json
+                                            sourcesJsonContent = jsonString
                                         } catch (e: Exception) {
                                             sourcesJsonContent = "Error encoding sources: ${'$'}{e.message}"
                                         }
@@ -469,7 +472,7 @@ fun SettingsScreen(
                                         // Load tags and display JSON
                                         try {
                                             val tags = fileManager.tagManager.loadFileTags()
-                                            val jsonStr = Json { prettyPrint = true }.encodeToString(
+                                            val jsonStr = json.encodeToString(
                                                 kotlinx.serialization.builtins.ListSerializer(FileTag.serializer()),
                                                 tags
                                             )

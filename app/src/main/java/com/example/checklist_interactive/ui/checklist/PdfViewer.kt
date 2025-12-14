@@ -24,18 +24,18 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Highlight
 import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Undo
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.NoteAdd
+import androidx.compose.material.icons.automirrored.filled.NoteAdd
 import androidx.compose.runtime.*
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -86,7 +86,7 @@ import kotlinx.coroutines.withContext
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.InvertColors
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.ViewList
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.CenterFocusWeak
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Link
@@ -570,7 +570,7 @@ fun PdfViewer(
                         onHintChange = { hoveredHint = it },
                         modifier = Modifier.size(40.dp)
                     ) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = context.getString(R.string.back), modifier = Modifier.size(18.dp))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = context.getString(R.string.back), modifier = Modifier.size(18.dp))
                     }
                 },
                 actions = {
@@ -582,7 +582,7 @@ fun PdfViewer(
                         modifier = Modifier.size(40.dp)
                     ) {
                         Icon(
-                            Icons.Default.ViewList,
+                            Icons.AutoMirrored.Filled.ViewList,
                             contentDescription = "Outline",
                             modifier = Modifier.size(18.dp)
                         )
@@ -636,7 +636,7 @@ fun PdfViewer(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ) {
-                    Icon(Icons.Default.NoteAdd, contentDescription = "Quick access")
+                    Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Quick access")
                 }
 
                 // Menu FAB - immer an fester Position (nur anzeigen wenn onShowFileList gesetzt ist)
@@ -705,7 +705,7 @@ fun PdfViewer(
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    Icons.Default.ViewList, // visible chapter/list icon
+                                    Icons.AutoMirrored.Filled.ViewList, // visible chapter/list icon
                                     contentDescription = "Inhaltsverzeichnis",
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -763,6 +763,7 @@ fun PdfViewer(
                             // Link to quick note
                             HintIconButton(
                                 onClick = {
+                                    @Suppress("DEPRECATION")
                                     quickNoteManager.addLinkedDocument(
                                         filePath = pdfPath,
                                         fileName = title,
@@ -812,7 +813,7 @@ fun PdfViewer(
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    Icons.Default.Undo,
+                                    Icons.AutoMirrored.Filled.Undo,
                                     contentDescription = "Undo",
                                     modifier = Modifier.size(20.dp)
                                 )

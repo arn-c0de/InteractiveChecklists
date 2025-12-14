@@ -2,13 +2,13 @@ package com.example.checklist_interactive.ui.checklist
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material.icons.filled.UnfoldLess
-import androidx.compose.material.icons.filled.NoteAdd
+import androidx.compose.material.icons.automirrored.filled.NoteAdd
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -108,7 +108,7 @@ fun MarkdownViewerScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
                         Icon(
-                            imageVector = Icons.Default.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
                             modifier = Modifier.size(20.dp)
                         )
@@ -131,7 +131,7 @@ fun MarkdownViewerScreen(
                         Icon(Icons.Default.Link, contentDescription = "Link to quick note", modifier = Modifier.size(20.dp))
                     }
                     IconButton(onClick = { showQuickAccess = true }, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Default.NoteAdd, contentDescription = "Quick access", modifier = Modifier.size(20.dp))
+                        Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Quick access", modifier = Modifier.size(20.dp))
                     }
                     IconButton(onClick = {
                         expandAllSections = !expandAllSections
@@ -167,7 +167,7 @@ fun MarkdownViewerScreen(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ) {
-                    Icon(Icons.Default.NoteAdd, contentDescription = "Quick access")
+                    Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Quick access")
                 }
 
                 // Menu FAB - only if onShowFileList is set

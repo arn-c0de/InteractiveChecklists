@@ -10,7 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -22,7 +22,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.NoteAdd
+import androidx.compose.material.icons.automirrored.filled.NoteAdd
 import androidx.compose.material3.*
 import android.widget.Toast
 import androidx.compose.material3.LocalContentColor
@@ -186,22 +186,25 @@ fun QuickAccessSheet(
             }
 
             // Also try to hide for the current view's window (covers dialog window from ModalBottomSheet)
-            androidx.core.view.ViewCompat.getWindowInsetsController(view)?.let { controller ->
-                controller.hide(WindowInsetsCompat.Type.systemBars())
-                // systemBarsBehavior exists on WindowInsetsControllerCompat; try set if available
-                try {
+            try {
+                val viewWindow = (view.context as? android.app.Activity)?.window
+                if (viewWindow != null) {
+                    val controller = WindowCompat.getInsetsController(viewWindow, view)
+                    controller.hide(WindowInsetsCompat.Type.systemBars())
                     controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                } catch (_: Throwable) {
                 }
+            } catch (_: Throwable) {
             }
 
             // Try rootView as well in case the modal sheet uses a different attach point
-            androidx.core.view.ViewCompat.getWindowInsetsController(view.rootView)?.let { controller ->
-                controller.hide(WindowInsetsCompat.Type.systemBars())
-                try {
+            try {
+                val rootWindow = (view.rootView.context as? android.app.Activity)?.window
+                if (rootWindow != null) {
+                    val controller = WindowCompat.getInsetsController(rootWindow, view.rootView)
+                    controller.hide(WindowInsetsCompat.Type.systemBars())
                     controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                } catch (_: Throwable) {
                 }
+            } catch (_: Throwable) {
             }
         }
 
@@ -376,7 +379,8 @@ fun QuickAccessSheet(
 
         // Immediately attempt to hide system UI before first draw to avoid flash.
         DisposableEffect(dialogView) {
-            val controller = ViewCompat.getWindowInsetsController(dialogView)
+            val dialogWindow = (dialogView.context as? android.app.Activity)?.window
+            val controller = dialogWindow?.let { WindowCompat.getInsetsController(it, dialogView) }
             // Also set old-style flags for older API's
             @Suppress("DEPRECATION")
             dialogView.systemUiVisibility = (
@@ -399,7 +403,8 @@ fun QuickAccessSheet(
             dialogView.viewTreeObserver.addOnPreDrawListener(preDrawListener)
             val attachListener = object : View.OnAttachStateChangeListener {
                 override fun onViewAttachedToWindow(v: View) {
-                    val c = ViewCompat.getWindowInsetsController(v)
+                    val vWindow = (v.context as? android.app.Activity)?.window
+                    val c = vWindow?.let { WindowCompat.getInsetsController(it, v) }
                     c?.hide(WindowInsetsCompat.Type.systemBars())
                     try {
                         c?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -428,7 +433,8 @@ fun QuickAccessSheet(
         // Also keep ensuring hide while it's visible (already present; keep loop for resilience).
         LaunchedEffect(dialogView, sheetState.isVisible) {
             if (sheetState.isVisible) {
-                val dialogController = ViewCompat.getWindowInsetsController(dialogView)
+                val dialogWindow = (dialogView.context as? android.app.Activity)?.window
+                val dialogController = dialogWindow?.let { WindowCompat.getInsetsController(it, dialogView) }
                 while (isActive && sheetState.isVisible) {
                     dialogController?.hide(WindowInsetsCompat.Type.systemBars())
                     delay(100L)
@@ -490,7 +496,7 @@ fun QuickAccessSheet(
                     modifier = Modifier.weight(1f)
                 ) {
                     Icon(
-                        Icons.Default.Article,
+                        Icons.AutoMirrored.Filled.Article,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(32.dp)
@@ -850,7 +856,7 @@ fun QuickAccessSheet(
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Icon(
-                                    Icons.Default.NoteAdd,
+                                    Icons.AutoMirrored.Filled.NoteAdd,
                                     contentDescription = null,
                                     modifier = Modifier.size(48.dp),
                                     tint = MaterialTheme.colorScheme.outline

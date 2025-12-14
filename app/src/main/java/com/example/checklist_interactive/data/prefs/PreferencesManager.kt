@@ -29,6 +29,9 @@ class PreferencesManager(context: Context) {
         private const val KEY_LAST_IMPORTED_VERSION = "last_imported_version"
         private const val KEY_DOCUMENT_SOURCES_JSON = "document_sources_json"
         private const val KEY_CONTRIBUTORS_JSON = "contributors_json"
+
+        // Shared Json instance to avoid redundant creation
+        private val json = Json { prettyPrint = true }
     }
     
     /**
@@ -255,8 +258,8 @@ class PreferencesManager(context: Context) {
      * Document sources persistence: JSON list of SourceEntry
      */
     fun setDocumentSources(sources: List<SourceEntry>) {
-        val json = Json { prettyPrint = true }.encodeToString(ListSerializer(SourceEntry.serializer()), sources)
-        prefs.edit().putString(KEY_DOCUMENT_SOURCES_JSON, json).apply()
+        val jsonString = json.encodeToString(ListSerializer(SourceEntry.serializer()), sources)
+        prefs.edit().putString(KEY_DOCUMENT_SOURCES_JSON, jsonString).apply()
     }
 
     fun getDocumentSources(): List<SourceEntry> {
@@ -266,7 +269,7 @@ class PreferencesManager(context: Context) {
             listOf(SourceEntry("PLATZHALTER)", "PLATZHALTER", "CC BY-NC-SA 3.0 DE"))
         } else {
             try {
-                Json.decodeFromString(ListSerializer(SourceEntry.serializer()), raw)
+                json.decodeFromString(ListSerializer(SourceEntry.serializer()), raw)
             } catch (e: Exception) {
                 // If parsing fails, reset to defaults
                 listOf(SourceEntry("PLATZHALTER", "PLATZHALTER", "CC BY-NC-SA 3.0 DE"))
@@ -282,8 +285,8 @@ class PreferencesManager(context: Context) {
      * Contributor persistence: JSON list of ContributorEntry
      */
     fun setContributors(contributors: List<ContributorEntry>) {
-        val json = Json { prettyPrint = true }.encodeToString(ListSerializer(ContributorEntry.serializer()), contributors)
-        prefs.edit().putString(KEY_CONTRIBUTORS_JSON, json).apply()
+        val jsonString = json.encodeToString(ListSerializer(ContributorEntry.serializer()), contributors)
+        prefs.edit().putString(KEY_CONTRIBUTORS_JSON, jsonString).apply()
     }
 
     fun getContributors(): List<ContributorEntry> {
@@ -292,7 +295,7 @@ class PreferencesManager(context: Context) {
             emptyList()
         } else {
             try {
-                Json.decodeFromString(ListSerializer(ContributorEntry.serializer()), raw)
+                json.decodeFromString(ListSerializer(ContributorEntry.serializer()), raw)
             } catch (e: Exception) {
                 emptyList()
             }

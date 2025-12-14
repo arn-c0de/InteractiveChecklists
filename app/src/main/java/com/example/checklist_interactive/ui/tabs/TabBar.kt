@@ -21,7 +21,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.consumePositionChange
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -142,7 +141,7 @@ fun TabBar(
                                         targetIndex.value = -1
                                     },
                                     onDrag = { change, dragAmount ->
-                                        change.consumePositionChange()
+                                        change.consume()
                                         dragOffset.value += dragAmount.x
 
                                         val from = draggingIndex.value

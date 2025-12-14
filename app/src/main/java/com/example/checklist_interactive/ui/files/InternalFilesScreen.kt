@@ -15,7 +15,7 @@ import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.InsertDriveFile
+import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.DarkMode
@@ -38,9 +38,9 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.NoteAdd
+import androidx.compose.material.icons.automirrored.filled.NoteAdd
 import androidx.compose.material.icons.filled.ViewModule
-import androidx.compose.material.icons.filled.ViewList
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -303,7 +303,7 @@ fun InternalFilesScreen(
                         prefsManager.setGridViewEnabled(isGridView)
                     }) {
                         Icon(
-                            imageVector = if (isGridView) Icons.Default.ViewList else Icons.Default.ViewModule,
+                            imageVector = if (isGridView) Icons.AutoMirrored.Filled.ViewList else Icons.Default.ViewModule,
                             contentDescription = if (isGridView) "List view" else "Grid view"
                         )
                     }
@@ -322,7 +322,7 @@ fun InternalFilesScreen(
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ) {
                     Icon(
-                        Icons.Default.NoteAdd,
+                        Icons.AutoMirrored.Filled.NoteAdd,
                         contentDescription = "Quick access"
                     )
                 }
@@ -1070,7 +1070,7 @@ private fun FileListItem(
     val fileIcon = when (file.extension.lowercase()) {
         "pdf" -> Icons.Default.PictureAsPdf
         "md", "markdown" -> Icons.Default.Description
-        else -> Icons.Default.InsertDriveFile
+        else -> Icons.AutoMirrored.Filled.InsertDriveFile
     }
 
     val fileColor = when (file.extension.lowercase()) {
@@ -1144,7 +1144,7 @@ private fun FileGridItem(
     val fileIcon = when (file.extension.lowercase()) {
         "pdf" -> Icons.Default.PictureAsPdf
         "md", "markdown" -> Icons.Default.Description
-        else -> Icons.Default.InsertDriveFile
+        else -> Icons.AutoMirrored.Filled.InsertDriveFile
     }
     val fileColor = when (file.extension.lowercase()) {
         "pdf" -> MaterialTheme.colorScheme.error
