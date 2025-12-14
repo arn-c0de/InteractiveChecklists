@@ -143,7 +143,7 @@ fun MarkdownViewer(
                     android.util.Log.d("MarkdownViewer", "checklist sections: ${checklist.sections.size}, total items: ${checklist.sections.sumOf { it.items.size }}")
                 }
                 if (hasItems && checklist != null && onCheckboxChange != null) {
-                    // Interaktive Ansicht mit Checkboxen
+                    // Interactive view with checkboxes
                     android.util.Log.d("MarkdownViewer", "Using InteractiveMarkdownView, resetTrigger=$resetTrigger, expandAll=$expandAllState")
                     InteractiveMarkdownView(
                         markdownContent = displayMarkdownContent,
@@ -280,7 +280,7 @@ private fun SimpleMarkdownView(
                             Column(
                                 modifier = Modifier.padding(12.dp)
                             ) {
-                                // Clickable Header mit Icon
+                                // Clickable header with icon
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -489,7 +489,7 @@ private fun SimpleMarkdownView(
                         Column(
                             modifier = Modifier.padding(12.dp)
                         ) {
-                            // Clickable Header mit Icon
+                            // Clickable header with icon
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -846,7 +846,7 @@ private fun InteractiveMarkdownView(
                         Column(
                             modifier = Modifier.padding(12.dp)
                         ) {
-                            // Clickable Header mit Icon
+                            // Clickable header with icon
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()

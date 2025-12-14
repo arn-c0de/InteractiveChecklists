@@ -839,7 +839,7 @@ class InternalFileManager(private val context: Context) {
                         val ext = child.extension.lowercase()
                         if (ext in listOf("pdf", "md", "markdown")) {
                             try {
-                                // Zielverzeichnis in INTERNAL rootDir anlegen: rootDir/<relativePath>
+                                        // Create target directory in INTERNAL rootDir: rootDir/<relativePath>
                                 val destDir = if (relativePath.isEmpty()) rootDir else File(rootDir, relativePath)
                                 if (!destDir.exists()) {
                                     destDir.mkdirs()
