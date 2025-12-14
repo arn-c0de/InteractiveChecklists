@@ -1,15 +1,8 @@
 package com.example.checklist_interactive.data.checklist
 
-import org.commonmark.ext.task.list.items.TaskListItemsExtension
-import org.commonmark.node.*
-import org.commonmark.parser.Parser
-import org.commonmark.ext.task.list.items.TaskListItemMarker
-
 class MarkdownChecklistParser {
 
-    private val parser: Parser = Parser.builder()
-        .extensions(listOf(TaskListItemsExtension.create()))
-        .build()
+    private val parser = MarkdownParser()
 
     fun parse(id: String, markdown: String): Checklist {
         val document = parser.parse(markdown.trim())
@@ -27,7 +20,7 @@ class MarkdownChecklistParser {
             }
         }
 
-        document.accept(object : AbstractVisitor() {
+        document.accept(object : AbstractMdVisitor() {
 
             override fun visit(heading: Heading) {
                 // Finish previous section
@@ -86,8 +79,8 @@ class MarkdownChecklistParser {
         return Checklist(id, checklistTitle, sections)
     }
 
-    private fun findMainTitle(node: Node): String {
-        val visitor = object : AbstractVisitor() {
+    private fun findMainTitle(node: MdNode): String {
+        val visitor = object : AbstractMdVisitor() {
             var title = ""
             override fun visit(heading: Heading) {
                 if (heading.level == 1 && title.isEmpty()) {
@@ -145,33 +138,4 @@ class MarkdownChecklistParser {
     }
 }
 
-// Helper extensions
-private fun Node.collectText(): String {
-    val sb = StringBuilder()
-    accept(object : AbstractVisitor() {
-        override fun visit(text: Text) { sb.append(text.literal) }
-        override fun visit(softLineBreak: SoftLineBreak) { sb.append(" ") }
-        override fun visit(hardLineBreak: HardLineBreak) { sb.append(" ") }
-        override fun visit(code: Code) { sb.append(code.literal) }
-    })
-    return sb.toString()
-}
-
-private inline fun <reified T : Node> Node.findDescendant(): T? {
-    var cur: Node? = this
-    while (cur != null) {
-        if (cur is T) return cur
-        // Prefer going down to children
-        if (cur.firstChild != null) {
-            cur = cur.firstChild
-            continue
-        }
-        // Otherwise, walk horizontally to the next or up and to the next
-        var next: Node? = cur
-        while (next != null && next.next == null) {
-            next = next.parent
-        }
-        cur = next?.next
-    }
-    return null
-}
+// Helper extensions are now in MarkdownParser.kt
