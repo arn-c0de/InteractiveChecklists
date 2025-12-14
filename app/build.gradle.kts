@@ -54,8 +54,6 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.datastore.preferences)
-    implementation(libs.commonmark)
-    implementation(libs.commonmark.ext.task.list.items)
     implementation(libs.kotlinx.serialization.json)
     implementation("androidx.documentfile:documentfile:1.0.1")
     // PDFBox removed - using native PDF parser (PdfStructureParser.kt)
