@@ -2,6 +2,7 @@ package com.example.checklist_interactive.data.tabs
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import com.example.checklist_interactive.data.files.FileInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +21,7 @@ class TabManager(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("tab_manager", Context.MODE_PRIVATE)
     
     companion object {
+        private const val TAG = "TabManager"
         private const val KEY_TAB_PATHS = "tab_paths"
         private const val KEY_TAB_PAGES = "tab_pages"
         private const val KEY_ACTIVE_TAB = "active_tab"
@@ -89,15 +91,17 @@ class TabManager(context: Context) {
     }
     
     /**
-     * Close a tab by index
+     * Close a tab by index. Returns the removed TabInfo or null if index invalid.
+     * This allows callers to update external state (eg. last-opened file) when a tab is closed.
      */
-    fun closeTab(index: Int) {
-        if (index < 0 || index >= _openTabs.value.size) return
-        
+    fun closeTab(index: Int): TabInfo? {
+        if (index < 0 || index >= _openTabs.value.size) return null
+
         val currentTabs = _openTabs.value.toMutableList()
-        currentTabs.removeAt(index)
+        val removed = currentTabs.removeAt(index)
+        Log.d(TAG, "closeTab: removed=${removed.fileInfo.path} index=$index")
         _openTabs.value = currentTabs
-        
+
         // Adjust active tab index
         if (currentTabs.isEmpty()) {
             _activeTabIndex.value = 0
@@ -106,9 +110,11 @@ class TabManager(context: Context) {
         } else if (_activeTabIndex.value > index) {
             _activeTabIndex.value -= 1
         }
-        
+
         // Persist synchronously so all tabs are removed immediately.
         saveTabsToPreferences(blocking = true)
+        Log.d(TAG, "closeTab: remaining=${_openTabs.value.map { it.fileInfo.path }} activeIndex=${_activeTabIndex.value}")
+        return removed
     }
     
     /**
@@ -244,8 +250,10 @@ class TabManager(context: Context) {
 
         if (blocking) {
             editor.commit()
+            Log.d(TAG, "saveTabsToPreferences(commit): paths='$paths' pages='$pages' active=${_activeTabIndex.value}")
         } else {
             editor.apply()
+            Log.d(TAG, "saveTabsToPreferences(apply): paths='$paths' pages='$pages' active=${_activeTabIndex.value}")
         }
     }
     
