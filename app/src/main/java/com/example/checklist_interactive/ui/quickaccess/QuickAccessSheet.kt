@@ -201,20 +201,18 @@ private class LinksVisualTransformation(private val content: String) : VisualTra
         val offsetMapping = object : OffsetMapping {
             override fun originalToTransformed(offset: Int): Int {
                 if (ranges.isEmpty()) return offset.coerceIn(0, transformed.length)
-                var lastEnd = 0
                 var delta = 0
                 for (r in ranges) {
                     if (offset < r.originalStart) {
                         // Before this link
                         return (offset - delta).coerceIn(0, transformed.length)
                     }
-                    if (offset <= r.originalEnd) {
+                    if (offset < r.originalEnd) {
                         // Inside this link
                         return r.transformedStart
                     }
                     // After this link, accumulate removed length
-                    delta += (r.originalEnd - r.originalStart + 1) - (r.transformedEnd - r.transformedStart)
-                    lastEnd = r.originalEnd + 1
+                    delta += (r.originalEnd - r.originalStart) - (r.transformedEnd - r.transformedStart)
                 }
                 // After all links
                 val mapped = (offset - delta)
@@ -223,7 +221,6 @@ private class LinksVisualTransformation(private val content: String) : VisualTra
 
             override fun transformedToOriginal(offset: Int): Int {
                 if (ranges.isEmpty()) return offset.coerceIn(0, content.length)
-                var lastEnd = 0
                 var delta = 0
                 for (r in ranges) {
                     if (offset < r.transformedStart) {
@@ -235,8 +232,7 @@ private class LinksVisualTransformation(private val content: String) : VisualTra
                         return r.originalStart
                     }
                     // After this link, accumulate removed length
-                    delta += (r.originalEnd - r.originalStart + 1) - (r.transformedEnd - r.transformedStart)
-                    lastEnd = r.transformedEnd
+                    delta += (r.originalEnd - r.originalStart) - (r.transformedEnd - r.transformedStart)
                 }
                 // After all links
                 val mapped = (offset + delta)
