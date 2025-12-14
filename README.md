@@ -19,6 +19,10 @@
 	<a href="COLLABORATORS.md">Collaborators</a>
 </div>
 
+<div align="center">
+	<a href="THIRD_PARTY_LICENSES.md">Third-Party Licenses</a>
+</div>
+
 
 # InteractiveChecklists
 
