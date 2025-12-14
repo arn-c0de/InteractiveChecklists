@@ -62,6 +62,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -546,7 +547,18 @@ fun PdfViewer(
             // Use a smaller TopAppBar variant by setting height and reduced sizes
             TopAppBar(
                 modifier = Modifier.height(48.dp),
-                title = { Text("$title (Page ${currentPage + 1}/$pageCount)", style = MaterialTheme.typography.titleSmall) },
+                // Build a short chapter title for the currently visible page (if available)
+                title = {
+                    val currentChapterTitle = remember(currentPage, chapters) {
+                        chapters.lastOrNull { it.second <= currentPage }?.first ?: ""
+                    }
+                    val titleText = if (currentChapterTitle.isNotBlank()) {
+                        "$title — $currentChapterTitle (Page ${currentPage + 1}/$pageCount)"
+                    } else {
+                        "$title (Page ${currentPage + 1}/$pageCount)"
+                    }
+                    Text(titleText, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                },
                 navigationIcon = {
                     HintIconButton(
                         onClick = {
