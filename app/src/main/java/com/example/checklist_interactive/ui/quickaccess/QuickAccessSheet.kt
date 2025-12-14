@@ -48,6 +48,9 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.horizontalScroll
@@ -124,8 +127,10 @@ private fun buildAnnotatedStringWithLinks(content: String): AnnotatedString {
         val page = match.groups[3]?.value ?: ""
         val annotationValue = "$fileEnc|$page"
 
+        // Show only pin emoji for clickable link in overlay
+        val display = "📌"
         val startIndex = builder.length
-        builder.append(label)
+        builder.append(display)
         val endIndex = builder.length
 
         builder.addStringAnnotation(
@@ -150,6 +155,97 @@ private fun buildAnnotatedStringWithLinks(content: String): AnnotatedString {
     }
 
     return builder.toAnnotatedString()
+}
+
+// Build a transformed display string and compute link ranges for visual mapping
+private data class LinkRange(val originalStart: Int, val originalEnd: Int, val transformedStart: Int, val transformedEnd: Int)
+
+private fun buildTransformedStringAndRanges(content: String): Pair<String, List<LinkRange>> {
+    val regex = Regex("\\[([^]]+)]\\(internal://open\\?file=([^)&]+)(?:&page=(\\d+))?\\)")
+    val sb = StringBuilder()
+    val ranges = mutableListOf<LinkRange>()
+    var last = 0
+    var transIndex = 0
+
+    regex.findAll(content).forEach { match ->
+        val range = match.range
+        if (range.first > last) {
+            val before = content.substring(last, range.first)
+            sb.append(before)
+            transIndex += before.length
+        }
+
+        // Replace entire link markdown with a single SPACE so the raw text shows nothing
+        val display = " "
+        val tStart = transIndex
+        sb.append(display)
+        transIndex += display.length
+        val tEnd = transIndex
+
+        ranges.add(LinkRange(range.first, range.last + 1, tStart, tEnd))
+        last = range.last + 1
+    }
+
+    if (last < content.length) {
+        val tail = content.substring(last)
+        sb.append(tail)
+    }
+
+    return sb.toString() to ranges
+}
+
+private class LinksVisualTransformation(private val content: String) : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        val (transformed, ranges) = buildTransformedStringAndRanges(content)
+
+        val offsetMapping = object : OffsetMapping {
+            override fun originalToTransformed(offset: Int): Int {
+                if (ranges.isEmpty()) return offset.coerceIn(0, transformed.length)
+                var lastEnd = 0
+                var delta = 0
+                for (r in ranges) {
+                    if (offset < r.originalStart) {
+                        // Before this link
+                        return (offset - delta).coerceIn(0, transformed.length)
+                    }
+                    if (offset <= r.originalEnd) {
+                        // Inside this link
+                        return r.transformedStart
+                    }
+                    // After this link, accumulate removed length
+                    delta += (r.originalEnd - r.originalStart + 1) - (r.transformedEnd - r.transformedStart)
+                    lastEnd = r.originalEnd + 1
+                }
+                // After all links
+                val mapped = (offset - delta)
+                return mapped.coerceIn(0, transformed.length)
+            }
+
+            override fun transformedToOriginal(offset: Int): Int {
+                if (ranges.isEmpty()) return offset.coerceIn(0, content.length)
+                var lastEnd = 0
+                var delta = 0
+                for (r in ranges) {
+                    if (offset < r.transformedStart) {
+                        // Before this link
+                        return (offset + delta).coerceIn(0, content.length)
+                    }
+                    if (offset < r.transformedEnd) {
+                        // Inside this link
+                        return r.originalStart
+                    }
+                    // After this link, accumulate removed length
+                    delta += (r.originalEnd - r.originalStart + 1) - (r.transformedEnd - r.transformedStart)
+                    lastEnd = r.transformedEnd
+                }
+                // After all links
+                val mapped = (offset + delta)
+                return mapped.coerceIn(0, content.length)
+            }
+        }
+
+        return TransformedText(AnnotatedString(transformed), offsetMapping)
+    }
 }
 
 /**
@@ -810,38 +906,123 @@ fun QuickAccessSheet(
                         )
                     )
                 } else {
-                    // Normal mode with clickable links
+                    // Normal mode: editable text field with clickable links overlay
                     if (currentNote.isNotEmpty()) {
                         val displayNote = expandCallsignPlaceholder(currentNote, callsign)
-                        val annotatedString = buildAnnotatedStringWithLinks(displayNote)
-                        @Suppress("DEPRECATION")
-                        ClickableText(
-                            text = annotatedString,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = MaterialTheme.colorScheme.onSurface,
-                                lineHeight = 20.sp
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp)
-                                .verticalScroll(rememberScrollState()),
-                            onClick = { offset ->
-                                annotatedString.getStringAnnotations("OPEN_LINK", offset, offset)
-                                    .firstOrNull()?.let { annotation ->
-                                        val parts = annotation.item.split("|")
-                                        val filePath = URLDecoder.decode(
-                                            parts.getOrNull(0) ?: "",
-                                            "UTF-8"
-                                        )
-                                        // Normalize clicked page number to 0-based index (allow stored links to be 1-based)
-                                        val rawPage = parts.getOrNull(1)?.toIntOrNull()
-                                        val pageNumber = rawPage?.let { if (it > 0) it - 1 else it }
-
-                                        onOpenDocument?.invoke(filePath, pageNumber)
-                                        onDismiss()
+                        
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            // Editable text field (background layer) with visual transformation
+                            OutlinedTextField(
+                                value = currentNote,
+                                onValueChange = {
+                                    currentNote = it
+                                    hasChanges = true
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 200.dp),
+                                placeholder = {
+                                    Text(
+                                        "Write your notes here...",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                },
+                                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                    lineHeight = 20.sp
+                                ),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Color.Transparent,
+                                    unfocusedBorderColor = Color.Transparent
+                                ),
+                                visualTransformation = LinksVisualTransformation(currentNote)
+                            )
+                            
+                            // Clickable links overlay (foreground layer)
+                            // Build overlay using the transformed text structure (with pin emoji replaced)
+                            val (transformedText, _) = buildTransformedStringAndRanges(displayNote)
+                            val overlayString = buildAnnotatedString {
+                                val regex = Regex("\\[([^]]+)]\\(internal://open\\?file=([^)&]+)(?:&page=(\\d+))?\\)")
+                                var transformedIndex = 0
+                                var originalIndex = 0
+                                
+                                regex.findAll(displayNote).forEach { match ->
+                                    val range = match.range
+                                    // Add spacing for text before this link
+                                    if (range.first > originalIndex) {
+                                        val beforeText = displayNote.substring(originalIndex, range.first)
+                                        append(beforeText)
+                                        transformedIndex += beforeText.length
                                     }
+                                    
+                                    // Add single space where pin emoji is (TextField shows emoji, overlay shows space + link)
+                                    append(" ")
+                                    transformedIndex += 1
+                                    
+                                    // Add clickable link label right after the space
+                                    val label = match.groups[1]?.value ?: ""
+                                    val fileEnc = match.groups[2]?.value ?: ""
+                                    val page = match.groups[3]?.value ?: ""
+                                    val annotationValue = "$fileEnc|$page"
+                                    val start = length
+                                    append(label)
+                                    val end = length
+                                    addStringAnnotation(
+                                        tag = "OPEN_LINK",
+                                        annotation = annotationValue,
+                                        start = start,
+                                        end = end
+                                    )
+                                    addStyle(
+                                        SpanStyle(
+                                            color = Color(0xFF0066CC),
+                                            textDecoration = TextDecoration.Underline
+                                        ),
+                                        start,
+                                        end
+                                    )
+                                    originalIndex = range.last + 1
+                                }
+                                
+                                // Add remaining text after last link
+                                if (originalIndex < displayNote.length) {
+                                    append(displayNote.substring(originalIndex))
+                                }
                             }
-                        )
+                            
+                            if (overlayString.text.trim().isNotEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp)
+                                ) {
+                                    @Suppress("DEPRECATION")
+                                    ClickableText(
+                                        text = overlayString,
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            lineHeight = 20.sp
+                                        ),
+                                        modifier = Modifier.fillMaxWidth(),
+                                        onClick = { offset ->
+                                            overlayString.getStringAnnotations("OPEN_LINK", offset, offset)
+                                                .firstOrNull()?.let { annotation ->
+                                                    val parts = annotation.item.split("|")
+                                                    val filePath = URLDecoder.decode(
+                                                        parts.getOrNull(0) ?: "",
+                                                        "UTF-8"
+                                                    )
+                                                    val rawPage = parts.getOrNull(1)?.toIntOrNull()
+                                                    val pageNumber = rawPage?.let { if (it > 0) it - 1 else it }
+
+                                                    onOpenDocument?.invoke(filePath, pageNumber)
+                                                    onDismiss()
+                                                }
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     } else {
                         // Empty state
                         Box(
