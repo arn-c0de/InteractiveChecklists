@@ -18,58 +18,146 @@
 </div>
 
 
-#  InteractiveChecklists
+# InteractiveChecklists
 
-InteractiveChecklists is an Android application designed for viewing and interacting with markdown and PDF checklists. It's built with Jetpack Compose and follows an MVVM architecture.
+InteractiveChecklists is an Android application for viewing and interacting with Markdown and PDF checklists. It is built with Jetpack Compose and follows an MVVM-style architecture.
 
-> **Development status:** This repository is a development version and not an official release. The app is functional and usable, but is still under active development and may contain experimental features or instabilities.
+> **Development status:** This repository is a development version and not an official release. The app is functional but under active development and may contain experimental features.
 
-## Collaborations
+**Table of Contents**
 
-- We welcome contributions and collaborators. See the [Collaborators](COLLABORATORS.md) document for detailed guidelines on filing issues, submitting pull requests, code style, and communication.
-- Quick ways to contribute: improve documentation, add tests, fix small bugs, or suggest UI/UX improvements through issues or PRs.
-- For larger or breaking changes, please open an issue first to discuss design and scope before starting work.
+- [Features](#features)
+- [Screenshots](#screenshots)
+- [Installation](#installation)
+- [System Requirements](#system-requirements)
+- [How to Build & Run](#how-to-build--run)
+- [Key Components](#key-components)
+- [Contributing](#contributing)
+- [Roadmap](#roadmap)
+- [Support & Contact](#support--contact)
+- [FAQ](#faq)
+- [Acknowledgements & Credits](#acknowledgements--credits)
+- [License](#license)
+
 
 ## Features
 
--   **Unified File System**: The app manages files from both bundled assets and internal storage, presenting them in a single, hierarchical view.
--   **Multi-Tab System**: Open multiple documents (MD/PDF) simultaneously. Includes a scrollable Tab Bar with file icons, close buttons, active tab highlighting, swipe navigation, a Quick Tab Switcher bottom sheet for rapid switching, navigation history, and tab persistence across restarts.
--   **PDF Viewer**: A custom-built PDF viewer with support for annotations (drawing, highlighting, erasing), pinch-to-zoom, page-snapping, and color inversion.
--   **Interactive Markdown Checklists**: View and interact with markdown checklists, with support for collapsible sections and stateful checkboxes.
--   **Tagging System**: Assign multiple tags to files for easy filtering and organization.
--   **Data Persistence**: User preferences, annotations, shortcuts, tags, and open tabs are all saved locally.
- -   **QuickNotes**: In-app persistent notes using Room database and repository pattern, with migration from SharedPreferences, search, autosave, markdown editor, clickable internal links, and a compact Quick Access sheet.
+- **Unified File System:** Manage files from bundled assets and internal storage in a single hierarchical view.
+- **Multi-Tab System:** Open multiple documents (MD/PDF) with a scrollable tab bar, quick tab switcher, swipe navigation, and tab persistence.
+- **PDF Viewer:** PDF viewer with annotations (draw/highlight/erase), pinch-to-zoom, page snapping, and color inversion.
+- **Interactive Markdown Checklists:** Stateful checkboxes and collapsible sections for interactive checklists.
+- **Tagging System:** Assign tags to files for filtering and organization.
+- **QuickNotes:** Persistent notes powered by Room, with search, autosave, and markdown support.
+- **Data Persistence:** Stores user preferences, annotations, shortcuts, tags, and open tabs locally.
 
-## Architecture
 
 ## Screenshots
 
 <p align="center">
-	<img src="images/1.0.6_FileExplorer.png" alt="File explorer - list of files and folders" width="360" />
-	<img src="images/1.0.6_MD-Viewer.png" alt="Markdown viewer showing interactive checklists" width="360" />
-	<img src="images/1.0.6_Pdf-Viewer.png" alt="PDF viewer with annotation tools" width="360" />
-	<img src="images/1.0.6_Notes.png" alt="QuickNotes bottom sheet and editor" width="360" />
+		<img src="images/1.0.6_FileExplorer.png" alt="File explorer - list of files and folders" width="360" />
+		<img src="images/1.0.6_MD-Viewer.png" alt="Markdown viewer showing interactive checklists" width="360" />
+		<img src="images/1.0.6_Pdf-Viewer.png" alt="PDF viewer with annotation tools" width="360" />
+		<img src="images/1.0.6_Notes.png" alt="QuickNotes bottom sheet and editor" width="360" />
 </p>
 
-The app is a single-activity application, with `MainActivity.kt` serving as the entry point. It uses a state-driven `when` block to switch between composable screens. The architecture is a variant of MVVM, with several manager classes handling business logic.
 
-### Key Components
+## Installation
 
--   **`MainActivity.kt`**: The orchestrator of the entire app, handling navigation, permission handling, and startup file imports.
--   **`data/files/InternalFileManager.kt`**: Manages the unified file system, providing a consistent data source for the UI.
--   **`ui/files/InternalFilesScreen.kt`**: The main screen of the app, displaying the file list and the tagging system UI.
--   **`ui/checklist/PdfViewer.kt`**: A custom-built PDF viewer with advanced annotation features.
--   **`ui/checklist/MarkdownViewer.kt`**: A dual-mode viewer for interactive and plain markdown files.
--   **`data/tags/FileTagManager.kt`**: Manages the file tagging system.
--   **`data/prefs/PreferencesManager.kt`**: Handles user settings and preferences.
- -   **`data/tabs/TabManager.kt`**: Manages open tabs, history, persistence, and exposes APIs to open/close/switch between tabs.
- -   **`ui/tabs/TabBar.kt`** and **`ui/tabs/QuickTabSwitcher.kt`**: Composable UI for the tab bar and the quick tab switcher sheet.
- -   **`data/quicknotes/QuickNoteManager.kt`** and **`ui/quickaccess/QuickAccessSheet.kt`**: The QuickNotes manager and UI.
+Step-by-step instructions to get the project running locally.
 
-## How to build
+1. Prerequisites
+	 - Install Android Studio (Arctic Fox or later recommended).
+	 - Install a compatible JDK (Java 11 or later recommended).
+	 - Configure Android SDK and at least one emulator or use a physical device.
+
+2. Clone the repository
+
+```bash
+git clone https://github.com/<your-org>/ChecklistInteractive.git
+cd ChecklistInteractive
+```
+
+3. Build with Gradle (command-line)
+
+```bash
+./gradlew assembleDebug
+```
+
+4. Open in Android Studio
+	 - Open the `ChecklistInteractive` directory in Android Studio.
+	 - Let Gradle sync and allow Android Studio to download any missing SDK components.
+	 - Run the app on an emulator or connected device.
 
 
-This is a standard Android project. You can build it using Android Studio or by running `./gradlew assembleDebug` from the command line.
+## System Requirements
+
+- Supported OS: Windows, macOS, Linux (for development).
+- Android Studio: Arctic Fox or newer recommended.
+- JDK: Java 11+ recommended.
+- Android SDK: API level corresponding to the project's `compileSdk` and `targetSdk` (see `build.gradle.kts`).
+
+
+## How to Build & Run
+
+- From Android Studio: Open the project, wait for Gradle to finish syncing, then select a target device and click **Run**.
+- From the command line: `./gradlew assembleDebug` builds an APK; use `./gradlew installDebug` to install on a connected device.
+
+
+## Key Components
+
+- `MainActivity.kt`: App entry point and navigation orchestration.
+- `data/files/InternalFileManager.kt`: Unified file management.
+- `ui/files/InternalFilesScreen.kt`: File browser and tagging UI.
+- `ui/checklist/MarkdownViewer.kt`: Interactive markdown checklist viewer.
+- `ui/checklist/PdfViewer.kt`: PDF viewer and annotation tools.
+- `data/quicknotes/QuickNoteManager.kt`: QuickNotes data layer.
+
+
+## Contributing
+
+We welcome contributions. For guidelines, issue workflow, and coding standards, see [COLLABORATORS.md](COLLABORATORS.md).
+
+Quick contribution ideas:
+- Improve documentation or add examples.
+- Add or extend tests.
+- Fix small UI/UX bugs or accessibility issues.
+
+For larger or breaking changes, please open an issue first to discuss design and scope.
+
+
+## Roadmap
+
+Planned features and long-term improvements are tracked in the [FUTURE_PLANS](docs/FUTURE_PLANS.md) document.
+
+
+## Support & Contact
+
+If you encounter issues or have questions:
+
+- Open an issue in this repository.
+- For security-sensitive issues, please follow the instructions in [SECURITY.md](SECURITY.md).
+- For contribution coordination and discussions, see [COLLABORATORS.md](COLLABORATORS.md).
+
+
+## FAQ
+
+- Q: How do I run tests?
+	- A: There are unit tests under `app/src/test`. Run them via `./gradlew test`.
+- Q: What is the license?
+	- A: This project is licensed under CC-BY-NC-SA 4.0. See the `LICENSE` file for details.
+- Q: Where is the documentation?
+	- A: See the `docs/` folder or the [Documentation index](docs/docnavigation.md).
+
+
+## Acknowledgements & Credits
+
+Thanks to all contributors and to the Jetpack Compose and Android open-source ecosystems used in this project.
+
+
+## License
+
+This project is licensed under the terms in the `LICENSE` file (CC BY-NC-SA 4.0).
+
 
 
 
