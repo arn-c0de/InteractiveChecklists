@@ -29,11 +29,11 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 
 /**
- * MarkdownViewer - Composable zur Anzeige von Markdown-Dateien mit Checkbox-Unterstützung
+ * MarkdownViewer - Composable for displaying markdown files with checkbox support
  *
- * @param assetPath Pfad zur Markdown-Datei in den Assets
- * @param checklist Optional: Checklist mit Checkbox-Stati
- * @param onCheckboxChange Callback wenn eine Checkbox geändert wird
+ * @param assetPath path to the markdown file in the assets
+ * @param checklist Optional: checklist with checkbox states
+ * @param onCheckboxChange Callback when a checkbox is changed
  */
 @Composable
 fun MarkdownViewer(
@@ -62,7 +62,7 @@ fun MarkdownViewer(
     var isLoading by remember { mutableStateOf(markdownContentOverride == null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    // Markdown-Datei laden nur wenn kein Override vorhanden
+    // Load markdown file only when no override is present
     LaunchedEffect(assetPath, isInternalFile, markdownContentOverride) {
         if (markdownContentOverride != null) {
             markdownContent = markdownContentOverride

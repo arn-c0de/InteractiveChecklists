@@ -744,7 +744,7 @@ private fun filterAircraftChildren(
     assetAircraftsLower: Set<String>,
     prefsManager: PreferencesManager
 ): InternalFileManager.FolderNode {
-    // Wenn der aktuelle Knoten "Checklists" ist, filtere Aircraft-Unterordner nach Sichtbarkeit
+    // If the current node is "Checklists", filter aircraft subfolders by visibility
     return if (node.name.equals("Checklists", ignoreCase = true)) {
         // Filtere die Kinder: Nur sichtbare Aircraft-Ordner behalten
         val filteredChildren = node.children.filter { child ->
@@ -754,13 +754,13 @@ private fun filterAircraftChildren(
                 true // Nicht-Aircraft-Ordner immer anzeigen
             }
         }.map { child ->
-            // Rekursiv für Unterordner anwenden
+            // Apply recursively to subfolders
             filterAircraftChildren(child, assetAircraftsLower, prefsManager)
         }
         node.copy(children = filteredChildren)
     } else {
-        // Für alle anderen Top-Level-Ordner (Handbooks, radiocommunication, etc.): 
-        // Behalte ALLE Kinder, wende Filterung nur rekursiv an
+        // For all other top-level folders (Handbooks, radiocommunication, etc.): 
+        // Keep ALL children; apply filtering only recursively
         val filteredChildren = node.children.map { child ->
             filterAircraftChildren(child, assetAircraftsLower, prefsManager)
         }

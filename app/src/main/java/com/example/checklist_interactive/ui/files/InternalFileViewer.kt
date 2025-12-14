@@ -59,8 +59,8 @@ fun InternalFileViewer(
             val lastPage = remember(fileInfo.path) { prefsManager.getInt("pdf_last_page_${fileInfo.path}", com.example.checklist_interactive.data.shortcuts.LastPageManager(context).getLastPage(fileInfo.path)) }
             var currentPage by remember(fileInfo.path) { mutableStateOf(lastPage) }
 
-            // Aktualisiere currentPage wenn initialPage sich ändert (z.B. durch Link-Klick)
-            // initialPage = -1 bedeutet "nicht gesetzt, verwende lastPage"
+            // Update currentPage when initialPage changes (e.g., by link click)
+            // initialPage = -1 means "not set, use lastPage"
             androidx.compose.runtime.LaunchedEffect(initialPage) {
                 if (initialPage >= 0) {
                     currentPage = initialPage
@@ -155,7 +155,7 @@ fun InternalFileViewer(
 
             val displayAssetAsInternal = !isAsset
 
-            // State für Expand/Collapse All
+            // State for Expand/Collapse All
             var expandAllSections by remember { mutableStateOf(prefsManager.areMarkdownSectionsExpandedByDefault()) }
             var showQuickAccess by remember { mutableStateOf(false) }
             var resetTrigger by remember { mutableStateOf(0) }
