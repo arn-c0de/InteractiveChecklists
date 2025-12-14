@@ -83,7 +83,9 @@ class TabManager(context: Context) {
         addToHistory(fileInfo.path)
         
         // Persist
-        saveTabsToPreferences()
+        // Use blocking save to ensure the closed tab state is persisted immediately
+        // (prevents the closed tab from being restored after an app restart).
+        saveTabsToPreferences(blocking = true)
     }
     
     /**
@@ -105,7 +107,8 @@ class TabManager(context: Context) {
             _activeTabIndex.value -= 1
         }
         
-        saveTabsToPreferences()
+        // Persist synchronously so all tabs are removed immediately.
+        saveTabsToPreferences(blocking = true)
     }
     
     /**
@@ -223,16 +226,26 @@ class TabManager(context: Context) {
     /**
      * Save tabs to SharedPreferences
      */
-    private fun saveTabsToPreferences() {
+    /**
+     * Save tabs to SharedPreferences.
+     * If [blocking] is true this will use a synchronous commit() so the
+     * changes are immediately persisted (useful when closing tabs before
+     * the process may be killed).
+     */
+    private fun saveTabsToPreferences(blocking: Boolean = false) {
         val tabs = _openTabs.value
         val paths = tabs.joinToString("|") { it.fileInfo.path }
         val pages = tabs.joinToString("|") { it.pageNumber.toString() }
-        
-        prefs.edit().apply {
-            putString(KEY_TAB_PATHS, paths)
-            putString(KEY_TAB_PAGES, pages)
-            putInt(KEY_ACTIVE_TAB, _activeTabIndex.value)
-            apply()
+
+        val editor = prefs.edit()
+        editor.putString(KEY_TAB_PATHS, paths)
+        editor.putString(KEY_TAB_PAGES, pages)
+        editor.putInt(KEY_ACTIVE_TAB, _activeTabIndex.value)
+
+        if (blocking) {
+            editor.commit()
+        } else {
+            editor.apply()
         }
     }
     

@@ -172,6 +172,8 @@ fun PdfViewer(
     val outlineExtractor = remember { PdfOutlineExtractor(context) }
     var showQuickAccess by remember { mutableStateOf(false) }
     var showToolbar by remember { mutableStateOf(true) }
+    // Track if outline has been extracted for this document to avoid re-extracting on every page change
+    var outlineExtracted by remember(pdfPath) { mutableStateOf(false) }
 
     // Text extraction
     val textExtractor = remember { PdfTextExtractor(context) }
@@ -322,21 +324,28 @@ fun PdfViewer(
                 }
 
                     // Extract PDF outline (bookmarks) asynchronously to avoid blocking
-                    backgroundScope.launch(Dispatchers.IO) {
-                    try {
-                        val extracted = outlineExtractor.extractOutline(loadedPdfFile)
-                        withContext(Dispatchers.Main) {
-                            outlineItems = extracted
-                            android.util.Log.d("PdfViewer", "Extracted outline items: ${outlineItems.size} -> ${outlineItems.joinToString(", ") { it.title + ":" + it.pageNumber }}")
-                            // Recompute chapters if no outline was previously available
-                            if (outlineItems.isNotEmpty()) {
-                                chapters = outlineItems.map { it.title to it.pageNumber }
+                    // Only extract once per document to avoid re-extraction on every page change
+                    if (!outlineExtracted) {
+                        backgroundScope.launch(Dispatchers.IO) {
+                            try {
+                                val extracted = outlineExtractor.extractOutline(loadedPdfFile)
+                                withContext(Dispatchers.Main) {
+                                    outlineItems = extracted
+                                    outlineExtracted = true
+                                    android.util.Log.d("PdfViewer", "Extracted outline items: ${outlineItems.size} -> ${outlineItems.joinToString(", ") { it.title + ":" + it.pageNumber }}")
+                                    // Recompute chapters if no outline was previously available
+                                    if (outlineItems.isNotEmpty()) {
+                                        chapters = outlineItems.map { it.title to it.pageNumber }
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                android.util.Log.d("PdfViewer", "Outline extraction failed: ${e.message}")
+                                withContext(Dispatchers.Main) {
+                                    outlineExtracted = true // Mark as extracted even on failure to prevent retries
+                                }
                             }
                         }
-                    } catch (e: Exception) {
-                        android.util.Log.d("PdfViewer", "Outline extraction failed: ${e.message}")
                     }
-                }
 
                 // Render only an initial subset of pages (effectiveInitialPage and nearby), rest are loaded on demand.
                 val initialIndices = listOf(effectiveInitialPage - 1, effectiveInitialPage, effectiveInitialPage + 1).distinct().filter { it in 0 until pageCount }
@@ -494,26 +503,29 @@ fun PdfViewer(
         for (idx in indices) maybeRequestRender(idx, screenWidthPx)
 
         // Extract text for visible pages
+        // Only extract if not already cached or being extracted
         pdfFile?.let { file ->
             for (idx in indices) {
-                if (!pageTextBlocks.containsKey(idx)) {
-                    // Cancel a running job for this page
-                    textExtractionJobs[idx]?.cancel()
+                // Skip if already extracted or currently extracting
+                if (pageTextBlocks.containsKey(idx) || textExtractionJobs.containsKey(idx)) continue
 
-                    val job = backgroundScope.launch(Dispatchers.IO) {
-                        try {
-                            val textBlocks = textExtractor.extractTextBlocks(file, idx)
-                            withContext(Dispatchers.Main) {
-                                pageTextBlocks[idx] = textBlocks
-                                textExtractionJobs.remove(idx)
-                            }
-                        } catch (e: Exception) {
-                            e.printStackTrace()
+                val job = backgroundScope.launch(Dispatchers.IO) {
+                    try {
+                        val textBlocks = textExtractor.extractTextBlocks(file, idx)
+                        withContext(Dispatchers.Main) {
+                            pageTextBlocks[idx] = textBlocks
+                            textExtractionJobs.remove(idx)
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        // Mark as extracted even on error to prevent retry spam
+                        withContext(Dispatchers.Main) {
+                            pageTextBlocks[idx] = emptyList()
                             textExtractionJobs.remove(idx)
                         }
                     }
-                    textExtractionJobs[idx] = job
                 }
+                textExtractionJobs[idx] = job
             }
         }
     }

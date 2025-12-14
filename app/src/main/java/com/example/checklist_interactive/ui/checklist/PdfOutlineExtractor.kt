@@ -42,7 +42,8 @@ class PdfOutlineExtractor(private val context: Context) {
         // Parse outline if not cached
         val outlineItems = mutableListOf<PdfOutlineItem>()
         try {
-            val parser = PdfStructureParser(pdfFile)
+            val parser = PdfStructureParser.getInstance(pdfFile)
+            android.util.Log.d("PdfOutlineExtractor", "Using PdfStructureParser instance for ${pdfFile.absolutePath}")
             val parsed = parser.parseOutline()
             outlineItems.addAll(parsed)
 

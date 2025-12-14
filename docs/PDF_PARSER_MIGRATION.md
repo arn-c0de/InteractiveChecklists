@@ -52,6 +52,8 @@ The `com.tom_roush:pdfbox-android` dependency has been **completely removed** an
 ✅ **Destination resolution** (page references, indirect references)
 ✅ **Traditional XRef tables** (PDF 1.4 and earlier)
 ✅ **XRef streams** (PDF 1.5+) with automatic detection
+✅ **Compressed object streams** (type 2 in xref) - full support for /ObjStm decompression
+✅ **PNG Predictor support** for XRef stream decompression (Predictor 10-15)
 ✅ **Multi-level XRef chains** (/Prev tracking for incremental updates)
 ✅ **Robust dictionary parsing** (handles missing spaces, e.g. `/Title(Text)`)
 ✅ **Flexible page tree traversal** (works even without /Type entries)
@@ -60,7 +62,6 @@ The `com.tom_roush:pdfbox-android` dependency has been **completely removed** an
 ### Limitations of the native implementation:
 ⚠️ **Text positions**: `extractTextBlocks()` no longer provides precise X/Y coordinates (only approximate values)
 ⚠️ **Encrypted PDFs**: Not yet supported
-⚠️ **Compressed content streams**: FlateDecode within XRef streams is skipped (fallback to file scan)
 ⚠️ **Named destinations**: Basic support present, complex cases not fully covered yet
 
 ### What continues to work as before:
@@ -79,13 +80,22 @@ The new `PdfStructureParser` parses PDFs at the binary level with high robustnes
 2. **XRef stream (PDF 1.5+)**:
    - Detects missing `xref` keyword
    - Reads dictionary from stream object
+   - Decompresses with FlateDecode
+   - **Applies PNG Predictor** (types 10-15: None, Sub, Up, Average, Paeth)
+   - Parses DecodeParms (Predictor, Columns) for proper decompression
    - Extracts `/Root` for catalog
    - Follows `/Prev` chain to older XRef tables
-3. **Fallback scan**:
-   - For compressed streams: Scans file for object definitions
+3. **Compressed object streams** (PDF 1.5+):
+   - Tracks type 2 entries in xref streams (compressed objects)
+   - Decompresses object streams (/Type /ObjStm) on demand
+   - Parses /N (object count) and /First (data offset) from stream dictionary
+   - Extracts objects by parsing header (object number + offset pairs)
+   - Caches decompressed objects for performance
+4. **On-demand scanning** (for missing objects):
+   - **Targeted object scan**: When an object is not in the xref table or compressed objects, scans for that specific object only
+   - Much faster than bulk scanning (5s timeout, stops immediately when found)
    - Chunk-based (512KB) with 256-byte overlap
    - Regex-based pattern detection: `(\d+) \d+ obj`
-   - Uses `/Index` range from XRef stream for targeted scanning
 
 ### Outline Extraction:
 1. Finds catalog via trailer or XRef stream `/Root`
@@ -136,8 +146,10 @@ If you want to use `PdfStructureParser` in other projects:
 ### Optimizations:
 - **Chunk-based reading**: 512KB chunks instead of line-by-line (100x faster)
 - **Overlap strategy**: 256 bytes overlap between chunks prevents lost objects
-- **Targeted scan**: Uses `/Index` from XRef streams for range-based scanning
-- **Early exit**: Stops scan as soon as all required objects are found
+- **On-demand scanning**: Only scans for objects when actually needed (vs bulk scanning)
+  - Skips compressed objects (type 2) that won't be found by scanning
+  - 5-second timeout per object (vs 15 seconds for bulk scanning)
+  - Early exit as soon as target object is found
 - **Object caching**: Parsed objects are cached (prevents redundant parsing)
 - **Outline caching**: Parsed outlines are persistently stored
   - First open: full parsing (~200ms for 51 items)
@@ -145,16 +157,21 @@ If you want to use `PdfStructureParser` in other projects:
   - Automatic invalidation on file modification
 
 ### Benchmark (17MB PDF with 8000+ objects):
-- **XRef parsing**: ~1-2 seconds (fallback scan)
-- **Outline extraction**: ~200ms (51 outline items)
+- **XRef parsing**: ~500ms (XRef stream decompression + /Prev chain)
+- **Outline extraction**: ~200ms (51 outline items, with on-demand scanning)
 - **Page list building**: ~150ms (51 pages)
+- **Total first load**: ~850ms (cached for subsequent opens)
 
-Comparable to PDFBox performance with significantly smaller APK size.
+Comparable to PDFBox performance with significantly smaller APK size and no 15-second timeout delays.
 
 ## Lessons Learned
 
 ### Challenges solved:
-1. **XRef streams without decompression**: Fallback to file scan instead of FlateDecode implementation
+1. **Compressed object streams** (type 2 in xref streams):
+   - Implemented full /ObjStm decompression support
+   - Parses object stream header (object numbers + offsets)
+   - Extracts individual objects from decompressed stream data
+   - Critical for modern PDFs where most objects are compressed
 2. **Missing /Type entries**: Check for `/Kids` instead of `/Type` for page trees
 3. **Dictionary parsing edge cases**:
    - `/Title(Text)` without spaces
@@ -162,6 +179,7 @@ Comparable to PDFBox performance with significantly smaller APK size.
    - Escaped parentheses in strings
 4. **Chunk boundaries**: Overlap strategy for object pattern matching
 5. **Multi-level XRef chains**: Recursive `/Prev` tracking
+6. **15-second timeout issue**: Replaced bulk scanning with efficient on-demand + compression support
 
 ## License Notice
 

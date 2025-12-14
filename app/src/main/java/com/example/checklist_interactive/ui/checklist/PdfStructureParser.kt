@@ -13,12 +13,62 @@ import java.nio.charset.StandardCharsets
 class PdfStructureParser(private val pdfFile: File) {
     
     private val TAG = "PdfStructureParser"
+
+    init {
+        android.util.Log.d(TAG, "Created PdfStructureParser for ${pdfFile.absolutePath}")
+    }
+
+    companion object {
+        private val globalCache = mutableMapOf<String, PdfStructureParser>()
+        // Track which file paths already had their xref parsed (global guard)
+        private val parsedXrefFiles = mutableSetOf<String>()
+
+        fun getInstance(file: File): PdfStructureParser {
+            val path = file.absolutePath
+            synchronized(globalCache) {
+                return globalCache.getOrPut(path) {
+                    PdfStructureParser(file)
+                }
+            }
+        }
+
+        fun markXrefParsedFor(filePath: String) {
+            synchronized(parsedXrefFiles) {
+                parsedXrefFiles.add(filePath)
+            }
+        }
+
+        fun isXrefParsedFor(filePath: String): Boolean {
+            synchronized(parsedXrefFiles) {
+                return parsedXrefFiles.contains(filePath)
+            }
+        }
+
+        fun clearCache() {
+            synchronized(globalCache) {
+                globalCache.clear()
+            }
+            synchronized(parsedXrefFiles) {
+                parsedXrefFiles.clear()
+            }
+        }
+    }
     
     // PDF cross-reference table: maps object numbers to byte offsets
     private val xrefTable = mutableMapOf<Int, Long>()
-    
+
+    // Compressed object references: maps object number to (object stream number, index)
+    private val compressedObjects = mutableMapOf<Int, Pair<Int, Int>>()
+
     // Cached parsed objects
     private val objectCache = mutableMapOf<Int, PdfObject>()
+    
+    // Cached page list to avoid rebuilding on every text extraction
+    private var cachedPageList: List<Int>? = null
+
+    // Flag indicating whether the xref table has been parsed successfully
+    @Volatile
+    private var xrefParsed: Boolean = false
     
     /**
      * Parses the PDF document outline (bookmarks/table of contents)
@@ -90,9 +140,9 @@ class PdfStructureParser(private val pdfFile: File) {
                 }
                 Log.d(TAG, "First outline item reference: $firstRef")
 
-                // 7. Build page list for page number resolution
-                Log.d(TAG, "Step 7: Building page list")
-                val pages = buildPageList(raf, catalog)
+                // 7. Build page list for page number resolution (use cached if available)
+                Log.d(TAG, "Step 7: Obtaining page list (cached=${cachedPageList != null})")
+                val pages = getOrBuildPageList(raf, catalog)
                 Log.d(TAG, "Found ${pages.size} pages")
 
                 // 8. Recursively parse outline tree
@@ -119,10 +169,13 @@ class PdfStructureParser(private val pdfFile: File) {
                 
                 val catalogRef = getCatalogReference(raf) ?: return ""
                 val catalog = parseObject(raf, catalogRef) ?: return ""
-                val pages = buildPageList(raf, catalog)
                 
+                // Use cached page list if available to avoid rebuilding on every call
+                Log.d(TAG, "Obtaining page list for extractPageText (cached=${cachedPageList != null})")
+                val pages = getOrBuildPageList(raf, catalog)
+
                 if (pageIndex !in pages.indices) return ""
-                
+
                 val pageRef = pages[pageIndex]
                 val page = parseObject(raf, pageRef) ?: return ""
                 
@@ -147,33 +200,45 @@ class PdfStructureParser(private val pdfFile: File) {
      * Parses the cross-reference (xref) table at the end of the PDF
      */
     private fun parseXrefTable(raf: RandomAccessFile): Boolean {
-        try {
-            // Find "startxref" keyword from end of file
-            val fileSize = raf.length()
-            val searchSize = 1024L.coerceAtMost(fileSize)
-            raf.seek(fileSize - searchSize)
+        // Return early if xref has already been parsed for this instance or globally
+        if (xrefParsed || Companion.isXrefParsedFor(pdfFile.absolutePath)) {
+            Log.d(TAG, "parseXrefTable: already parsed, skipping for ${pdfFile.absolutePath}")
+            return true
+        }
 
-            val buffer = ByteArray(searchSize.toInt())
-            raf.read(buffer)
-            val tail = String(buffer, StandardCharsets.ISO_8859_1)
-
-            val startxrefIdx = tail.lastIndexOf("startxref")
-            if (startxrefIdx < 0) {
-                Log.w(TAG, "startxref keyword not found in PDF")
-                return false
+        synchronized(this) {
+            if (xrefParsed || Companion.isXrefParsedFor(pdfFile.absolutePath)) {
+                Log.d(TAG, "parseXrefTable: already parsed (sync), skipping for ${pdfFile.absolutePath}")
+                return true
             }
 
-            // Extract xref offset
-            val afterStartxref = tail.substring(startxrefIdx + 9).trim()
-            Log.d(TAG, "After startxref: '${afterStartxref.take(50)}'")
-            val offsetStr = afterStartxref.split("\\s+".toRegex())[0]
-            val xrefOffset = offsetStr.toLongOrNull()
-            if (xrefOffset == null) {
-                Log.w(TAG, "Failed to parse xref offset from: '$offsetStr'")
-                return false
-            }
+            try {
+                // Find "startxref" keyword from end of file
+                val fileSize = raf.length()
+                val searchSize = 1024L.coerceAtMost(fileSize)
+                raf.seek(fileSize - searchSize)
 
-            Log.d(TAG, "Found xref offset: $xrefOffset")
+                val buffer = ByteArray(searchSize.toInt())
+                raf.read(buffer)
+                val tail = String(buffer, StandardCharsets.ISO_8859_1)
+
+                val startxrefIdx = tail.lastIndexOf("startxref")
+                if (startxrefIdx < 0) {
+                    Log.w(TAG, "startxref keyword not found in PDF")
+                    return false
+                }
+
+                // Extract xref offset
+                val afterStartxref = tail.substring(startxrefIdx + 9).trim()
+                Log.d(TAG, "After startxref: '${afterStartxref.take(50)}'")
+                val offsetStr = afterStartxref.split("\\s+".toRegex())[0]
+                val xrefOffset = offsetStr.toLongOrNull()
+                if (xrefOffset == null) {
+                    Log.w(TAG, "Failed to parse xref offset from: '$offsetStr'")
+                    return false
+                }
+
+                Log.d(TAG, "Found xref offset: $xrefOffset")
 
             // Parse xref table
             raf.seek(xrefOffset)
@@ -217,10 +282,17 @@ class PdfStructureParser(private val pdfFile: File) {
             }
 
             Log.d(TAG, "Parsed $entryCount xref entries")
-            return entryCount > 0
+            if (entryCount > 0) {
+                xrefParsed = true
+                Companion.markXrefParsedFor(pdfFile.absolutePath)
+                Log.d(TAG, "Marked xref parsed for ${pdfFile.absolutePath}")
+                return true
+            }
+            return false
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing xref: ${e.message}", e)
             return false
+        }
         }
     }
 
@@ -278,13 +350,131 @@ class PdfStructureParser(private val pdfFile: File) {
 
             Log.d(TAG, "Object ranges in this xref stream: $objRanges")
 
-            // Scan file for objects in these ranges
-            if (objRanges.isNotEmpty()) {
-                var foundCount = 0
-                for ((start, count) in objRanges) {
-                    foundCount += scanForObjectRange(raf, start, start + count - 1)
+            // Attempt to read and decode the xref stream bytes (if present) to directly extract offsets.
+            try {
+                // Move RAF to after the dictionary and find 'stream' token
+                var posAfterDict = raf.filePointer
+                var attempts = 0
+                var foundStream = false
+                while (attempts < 20 && raf.filePointer < raf.length()) {
+                    val linePos = raf.filePointer
+                    val line = readLine(raf).trim()
+                    if (line == "stream") {
+                        // Position is at start of stream data (next byte)
+                        posAfterDict = raf.filePointer
+                        foundStream = true
+                        break
+                    }
+                    attempts++
                 }
-                Log.d(TAG, "Scanned and found $foundCount objects from /Index ranges")
+
+                if (foundStream) {
+                    val lengthVal = dict["Length"]
+                    val length = when (lengthVal) {
+                        is Int -> lengthVal
+                        is String -> lengthVal.toIntOrNull() ?: -1
+                        else -> -1
+                    }
+
+                    if (length > 0) {
+                        // Read raw stream bytes
+                        raf.seek(posAfterDict)
+                        val raw = ByteArray(length)
+                        raf.readFully(raw)
+
+                        // If Filter says FlateDecode, decompress
+                        val filters = (dict["Filter"] as? String)?.let { listOf(it) } ?: emptyList()
+                        var decoded = raw
+                        if (filters.any { it.contains("FlateDecode") }) {
+                            try {
+                                val bais = java.io.ByteArrayInputStream(raw)
+                                val baos = java.io.ByteArrayOutputStream()
+                                java.util.zip.InflaterInputStream(bais).use { ins ->
+                                    ins.copyTo(baos)
+                                }
+                                decoded = baos.toByteArray()
+
+                                // Apply PNG predictor if specified in DecodeParms
+                                val decodeParmsValue = dict["DecodeParms"]
+                                if (decodeParmsValue is String) {
+                                    // Parse DecodeParms dictionary
+                                    val predictor = extractDictValue(decodeParmsValue, "Predictor")?.toIntOrNull() ?: 1
+                                    val columns = extractDictValue(decodeParmsValue, "Columns")?.toIntOrNull() ?: 1
+
+                                    if (predictor >= 10) {
+                                        // PNG predictor (10-15)
+                                        decoded = applyPngPredictor(decoded, columns)
+                                        Log.d(TAG, "Applied PNG predictor $predictor with $columns columns")
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Failed to inflate xref stream: ${e.message}")
+                            }
+                        }
+
+                        // Parse W array to get field widths
+                        val wVal = dict["W"] as? String
+                        val wArray = wVal?.replace("[", "")?.replace("]", "")?.trim()
+                            ?.split("\\s+".toRegex())?.mapNotNull { it.toIntOrNull() } ?: listOf()
+
+                        val indexArray = objRanges.ifEmpty {
+                            // If /Index missing, default 0..Size-1
+                            val size = (dict["Size"] as? Int) ?: 0
+                            if (size > 0) listOf(Pair(0, size)) else listOf()
+                        }
+
+                        if (wArray.size >= 3 && indexArray.isNotEmpty()) {
+                            var bytePos = 0
+                            for ((startObj, count) in indexArray) {
+                                for (i in 0 until count) {
+                                    if (bytePos + wArray.sum() > decoded.size) break
+                                    // Read fields per W
+                                    var fieldValues = mutableListOf<Long>()
+                                    for (w in wArray) {
+                                        var v = 0L
+                                        for (b in 0 until w) {
+                                            v = (v shl 8) or (decoded[bytePos].toInt() and 0xFF).toLong()
+                                            bytePos++
+                                        }
+                                        fieldValues.add(v)
+                                    }
+
+                                    val objNum = startObj + i
+                                    val ftype = fieldValues.getOrNull(0)?.toInt() ?: 0
+                                    val f2 = fieldValues.getOrNull(1) ?: 0L
+                                    val f3 = fieldValues.getOrNull(2)?.toInt() ?: 0
+                                    when (ftype) {
+                                        1 -> {
+                                            // uncompressed object, f2 is offset
+                                            xrefTable[objNum] = f2
+                                        }
+                                        2 -> {
+                                            // compressed in object stream
+                                            // f2 = object stream number, f3 = index within stream
+                                            compressedObjects[objNum] = Pair(f2.toInt(), f3)
+                                        }
+                                        else -> {
+                                            // free or unknown
+                                        }
+                                    }
+                                }
+                            }
+                            Log.d(TAG, "Parsed ${xrefTable.size} uncompressed + ${compressedObjects.size} compressed entries from xref stream")
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to parse xref stream bytes: ${e.message}")
+            }
+
+            // Skip bulk scanning for missing objects - use on-demand scanning instead
+            // Most missing objects are likely compressed (type 2) and won't be found by scanning
+            // Individual objects will be scanned on-demand when needed
+            if (objRanges.isNotEmpty()) {
+                val totalMissing = objRanges.sumOf { (start, count) ->
+                    (start until start + count).count { !xrefTable.containsKey(it) }
+                }
+                Log.d(TAG, "Skipping bulk scan for $totalMissing potentially compressed objects (will scan on-demand)")
             }
 
             // Check for /Prev pointing to an older xref table
@@ -299,17 +489,217 @@ class PdfStructureParser(private val pdfFile: File) {
                     // It's a traditional xref table! Parse it
                     Log.d(TAG, "Previous xref is traditional format, parsing it")
                     raf.seek(prevOffset)
-                    parseTraditionalXref(raf)
+                    val okPrev = parseTraditionalXref(raf)
+                    if (okPrev) {
+                        xrefParsed = true
+                        Companion.markXrefParsedFor(pdfFile.absolutePath)
+                        Log.d(TAG, "Marked xref parsed (prev traditional) for ${pdfFile.absolutePath}")
+                    }
                 } else if (prevLine.matches(Regex("\\d+\\s+\\d+\\s+obj"))) {
                     // It's another xref stream, recurse
                     Log.d(TAG, "Previous xref is also a stream, recursing")
-                    parseXrefStream(raf, prevOffset)
+                    val okPrev = parseXrefStream(raf, prevOffset)
+                    if (okPrev) {
+                        xrefParsed = true
+                        Companion.markXrefParsedFor(pdfFile.absolutePath)
+                        Log.d(TAG, "Marked xref parsed (prev stream) for ${pdfFile.absolutePath}")
+                    }
                 }
+            }
+
+            if (xrefTable.isNotEmpty()) {
+                xrefParsed = true
+                Companion.markXrefParsedFor(pdfFile.absolutePath)
+                Log.d(TAG, "Marked xref parsed (stream path) for ${pdfFile.absolutePath}")
             }
 
             return xrefTable.isNotEmpty()
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing xref stream: ${e.message}", e)
+            return false
+        }
+    }
+
+    /**
+     * Parses a compressed object from an object stream
+     */
+    private fun parseCompressedObject(raf: RandomAccessFile, objNum: Int, streamObjNum: Int, index: Int): PdfObject? {
+        try {
+            // Parse the object stream
+            val streamObj = parseObject(raf, streamObjNum)
+            if (streamObj == null) {
+                Log.w(TAG, "Could not find object stream $streamObjNum")
+                return null
+            }
+
+            val streamData = streamObj.streamData
+            if (streamData == null) {
+                Log.w(TAG, "Object stream $streamObjNum has no stream data")
+                return null
+            }
+
+            // Decompress if needed
+            val filters = (streamObj.dictContent["Filter"] as? String)?.let { listOf(it) } ?: emptyList()
+            var decodedData = streamData
+            if (filters.any { it.contains("FlateDecode") }) {
+                try {
+                    val bais = java.io.ByteArrayInputStream(streamData)
+                    val baos = java.io.ByteArrayOutputStream()
+                    java.util.zip.InflaterInputStream(bais).use { it.copyTo(baos) }
+                    decodedData = baos.toByteArray()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to decompress object stream: ${e.message}")
+                    return null
+                }
+            }
+
+            // Parse object stream format:
+            // /N = number of objects
+            // /First = offset to first object data
+            val n = (streamObj.dictContent["N"] as? Int) ?: 0
+            val first = (streamObj.dictContent["First"] as? Int) ?: 0
+
+            if (n == 0 || first == 0) {
+                Log.w(TAG, "Object stream has invalid /N=$n or /First=$first")
+                return null
+            }
+
+            // Parse the header (object numbers and offsets)
+            val header = String(decodedData, 0, first.coerceAtMost(decodedData.size), StandardCharsets.ISO_8859_1)
+            val tokens = header.trim().split("\\s+".toRegex())
+
+            if (tokens.size < n * 2) {
+                Log.w(TAG, "Object stream header has insufficient tokens: ${tokens.size} < ${n * 2}")
+                return null
+            }
+
+            // Find our object in the header
+            for (i in 0 until n) {
+                val currentObjNum = tokens[i * 2].toIntOrNull() ?: continue
+                val relativeOffset = tokens[i * 2 + 1].toIntOrNull() ?: continue
+
+                if (currentObjNum == objNum) {
+                    // Found it! Extract the object data
+                    val absoluteOffset = first + relativeOffset
+                    if (absoluteOffset >= decodedData.size) {
+                        Log.w(TAG, "Object offset $absoluteOffset beyond stream size ${decodedData.size}")
+                        return null
+                    }
+
+                    // Determine end offset (next object or end of stream)
+                    val endOffset = if (i + 1 < n) {
+                        val nextRelativeOffset = tokens[(i + 1) * 2 + 1].toIntOrNull() ?: decodedData.size
+                        first + nextRelativeOffset
+                    } else {
+                        decodedData.size
+                    }
+
+                    // Extract object data
+                    val objData = String(decodedData, absoluteOffset, endOffset - absoluteOffset, StandardCharsets.ISO_8859_1)
+                    Log.d(TAG, "Extracted compressed object $objNum data (${objData.length} bytes): '${objData.take(200)}'")
+
+                    // Parse as dictionary if it starts with <<
+                    val trimmed = objData.trim()
+                    if (trimmed.startsWith("<<")) {
+                        val dict = mutableMapOf<String, Any>()
+                        parseDictionaryContent(trimmed, dict)
+                        val obj = PdfObject(objNum, dict)
+                        objectCache[objNum] = obj
+                        return obj
+                    } else {
+                        // Simple value object
+                        val dict = mapOf("value" to parseValue(trimmed))
+                        val obj = PdfObject(objNum, dict)
+                        objectCache[objNum] = obj
+                        return obj
+                    }
+                }
+            }
+
+            Log.w(TAG, "Object $objNum not found in object stream $streamObjNum (has $n objects)")
+            return null
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing compressed object $objNum: ${e.message}", e)
+            return null
+        }
+    }
+
+    /**
+     * Scans for a specific object number in the PDF file
+     * Returns true if found and added to xrefTable
+     */
+    private fun scanForSpecificObject(raf: RandomAccessFile, targetObj: Int): Boolean {
+        try {
+            Log.d(TAG, "Scanning for specific object: $targetObj")
+            val fileSize = raf.length()
+            val chunkSize = 524288 // 512KB chunks
+            val overlap = 256
+            val objPattern = Regex("^($targetObj)\\s+\\d+\\s+obj", RegexOption.MULTILINE)
+
+            val startTime = System.currentTimeMillis()
+            val timeoutMs = 5000L // 5 second timeout for single object
+
+            // Helper to process a chunk
+            fun processChunk(pos: Long, chunk: String): Boolean {
+                val match = objPattern.find(chunk)
+                if (match != null) {
+                    val idx = match.range.first
+                    val objPos = pos + idx
+                    xrefTable[targetObj] = objPos
+                    Log.d(TAG, "Found object $targetObj at offset $objPos")
+                    return true
+                }
+                return false
+            }
+
+            // Scan backward from end (often faster for high object numbers)
+            var position = (fileSize - chunkSize).coerceAtLeast(0)
+            while (position >= 0) {
+                if (System.currentTimeMillis() - startTime > timeoutMs) {
+                    Log.w(TAG, "Scan for object $targetObj timed out")
+                    break
+                }
+
+                raf.seek(position)
+                val readSize = (fileSize - position).coerceAtMost(chunkSize.toLong()).toInt()
+                val buffer = ByteArray(readSize)
+                raf.read(buffer)
+                val chunk = String(buffer, StandardCharsets.ISO_8859_1)
+
+                if (processChunk(position, chunk)) {
+                    return true
+                }
+
+                if (position == 0L) break
+                position = (position - (chunkSize - overlap)).coerceAtLeast(0)
+            }
+
+            // If not found backward, try forward scan
+            if (!xrefTable.containsKey(targetObj)) {
+                position = 0L
+                while (position < fileSize) {
+                    if (System.currentTimeMillis() - startTime > timeoutMs) {
+                        Log.w(TAG, "Scan for object $targetObj timed out")
+                        break
+                    }
+
+                    raf.seek(position)
+                    val readSize = (fileSize - position).coerceAtMost(chunkSize.toLong()).toInt()
+                    val buffer = ByteArray(readSize)
+                    raf.read(buffer)
+                    val chunk = String(buffer, StandardCharsets.ISO_8859_1)
+
+                    if (processChunk(position, chunk)) {
+                        return true
+                    }
+
+                    position += readSize - overlap
+                }
+            }
+
+            return xrefTable.containsKey(targetObj)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error scanning for object $targetObj: ${e.message}", e)
             return false
         }
     }
@@ -321,43 +711,82 @@ class PdfStructureParser(private val pdfFile: File) {
     private fun scanForObjectRange(raf: RandomAccessFile, startObj: Int, endObj: Int): Int {
         try {
             Log.d(TAG, "Fast scanning for objects $startObj to $endObj")
+
             val fileSize = raf.length()
             val chunkSize = 524288 // 512KB chunks
             val overlap = 256 // Overlap to catch objects at boundaries
-            val objPattern = Regex("(\\d+)\\s+\\d+\\s+obj")
+            // Require match at line start to avoid false positives inside streams
+            val objPattern = Regex("^(\\d+)\\s+\\d+\\s+obj", RegexOption.MULTILINE)
             val foundObjects = mutableSetOf<Int>()
 
-            var position = 0L
-            raf.seek(0)
+            // Timebox scanning to avoid pathological cases
+            val startTime = System.currentTimeMillis()
+            val timeoutMs = 15_000L
 
-            while (position < fileSize) {
+            // Helper to process a chunk at absolute `pos`
+            fun processChunk(pos: Long, chunk: String) {
+                objPattern.findAll(chunk).forEach { match ->
+                    val group = match.groups[1]
+                    val objNum = group?.value?.toIntOrNull()
+                    val idx = group?.range?.first ?: match.range.first
+                    if (objNum != null && objNum in startObj..endObj && !foundObjects.contains(objNum)) {
+                        val objPos = pos + idx
+                        xrefTable[objNum] = objPos
+                        foundObjects.add(objNum)
+                    }
+                }
+            }
+
+            // First: scan backwards from the end (often faster for large doc object numbers)
+            var position = (fileSize - chunkSize).coerceAtLeast(0)
+            while (position >= 0) {
+                if (System.currentTimeMillis() - startTime > timeoutMs) {
+                    Log.w(TAG, "Scanning timed out after ${timeoutMs}ms (backward)")
+                    break
+                }
+
+                raf.seek(position)
                 val readSize = (fileSize - position).coerceAtMost(chunkSize.toLong()).toInt()
                 val buffer = ByteArray(readSize)
                 raf.read(buffer)
                 val chunk = String(buffer, StandardCharsets.ISO_8859_1)
 
-                // Find all object definitions in this chunk
-                objPattern.findAll(chunk).forEach { match ->
-                    val objNum = match.groupValues[1].toIntOrNull()
-                    if (objNum != null && objNum in startObj..endObj && !foundObjects.contains(objNum)) {
-                        // Calculate absolute file position
-                        val objPos = position + match.range.first
-                        xrefTable[objNum] = objPos
-                        foundObjects.add(objNum)
-                    }
-                }
+                processChunk(position, chunk)
 
-                // Progress
-                if (foundObjects.size % 50 == 0 && foundObjects.isNotEmpty()) {
-                    Log.d(TAG, "Found ${foundObjects.size} objects, ${position * 100 / fileSize}% scanned")
-                }
-
-                // Early exit if all found
                 if (foundObjects.size >= (endObj - startObj + 1)) break
 
-                // Move forward with overlap
-                position += readSize - overlap
-                raf.seek(position.coerceAtLeast(0))
+                // Move backwards with overlap
+                if (position == 0L) break
+                position = (position - (chunkSize - overlap)).coerceAtLeast(0)
+            }
+
+            // If not all found, do a forward scan as a fallback (covers cases objects are earlier in file)
+            if (foundObjects.size < (endObj - startObj + 1)) {
+                position = 0L
+                raf.seek(0)
+                while (position < fileSize) {
+                    if (System.currentTimeMillis() - startTime > timeoutMs) {
+                        Log.w(TAG, "Scanning timed out after ${timeoutMs}ms (forward)")
+                        break
+                    }
+
+                    val readSize = (fileSize - position).coerceAtMost(chunkSize.toLong()).toInt()
+                    val buffer = ByteArray(readSize)
+                    raf.read(buffer)
+                    val chunk = String(buffer, StandardCharsets.ISO_8859_1)
+
+                    processChunk(position, chunk)
+
+                    // Progress log occasionally
+                    if (foundObjects.size > 0 && foundObjects.size % 50 == 0) {
+                        Log.d(TAG, "Found ${foundObjects.size} objects, ${position * 100 / fileSize}% scanned")
+                    }
+
+                    if (foundObjects.size >= (endObj - startObj + 1)) break
+
+                    position += readSize - overlap
+                    raf.seek(position.coerceAtLeast(0))
+                }
             }
 
             Log.d(TAG, "Found ${foundObjects.size}/${endObj - startObj + 1} objects in range")
@@ -405,7 +834,13 @@ class PdfStructureParser(private val pdfFile: File) {
             }
 
             Log.d(TAG, "Parsed traditional xref: $entryCount entries")
-            return entryCount > 0
+            if (entryCount > 0) {
+                xrefParsed = true
+                Companion.markXrefParsedFor(pdfFile.absolutePath)
+                Log.d(TAG, "Marked xref parsed (traditional) for ${pdfFile.absolutePath}")
+                return true
+            }
+            return false
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing traditional xref: ${e.message}", e)
             return false
@@ -544,10 +979,27 @@ class PdfStructureParser(private val pdfFile: File) {
         // Check cache first
         objectCache[objNum]?.let { return it }
 
-        val offset = xrefTable[objNum]
+        // Check if object is in an object stream (compressed)
+        val compressedInfo = compressedObjects[objNum]
+        if (compressedInfo != null) {
+            Log.d(TAG, "Object $objNum is compressed in object stream ${compressedInfo.first}, index ${compressedInfo.second}")
+            return parseCompressedObject(raf, objNum, compressedInfo.first, compressedInfo.second)
+        }
+
+        var offset = xrefTable[objNum]
         if (offset == null) {
-            Log.w(TAG, "Object $objNum not found in xref table")
-            return null
+            Log.w(TAG, "Object $objNum not found in xref table, attempting targeted scan")
+            // Try to find this specific object by scanning
+            val found = scanForSpecificObject(raf, objNum)
+            if (!found) {
+                Log.w(TAG, "Object $objNum not found even after scanning")
+                return null
+            }
+            offset = xrefTable[objNum]
+            if (offset == null) {
+                Log.w(TAG, "Object $objNum still not in xref table after scan")
+                return null
+            }
         }
 
         try {
@@ -874,6 +1326,19 @@ class PdfStructureParser(private val pdfFile: File) {
 
         return pages
     }
+
+    /**
+     * Thread-safe get-or-build for cached page list to avoid concurrent rebuilds
+     */
+    private fun getOrBuildPageList(raf: RandomAccessFile, catalog: PdfObject): List<Int> {
+        synchronized(this) {
+            cachedPageList?.let { return it }
+            Log.d(TAG, "Building page list (no cache present)")
+            val pages = buildPageList(raf, catalog)
+            cachedPageList = pages
+            return pages
+        }
+    }
     
     /**
      * Recursively collects page references from page tree
@@ -1108,7 +1573,7 @@ class PdfStructureParser(private val pdfFile: File) {
     private fun readLine(raf: RandomAccessFile): String {
         val buffer = StringBuilder()
         var c: Int
-        
+
         while (raf.filePointer < raf.length()) {
             c = raf.read()
             if (c < 0 || c == '\n'.code) break
@@ -1121,8 +1586,72 @@ class PdfStructureParser(private val pdfFile: File) {
             }
             buffer.append(c.toChar())
         }
-        
+
         return buffer.toString()
+    }
+
+    /**
+     * Extracts a value from a dictionary string (e.g., "<</Key Value>>" -> extractDictValue(dict, "Key") = "Value")
+     */
+    private fun extractDictValue(dictStr: String, key: String): String? {
+        val pattern = Regex("/$key\\s+(\\d+)")
+        val match = pattern.find(dictStr)
+        return match?.groupValues?.get(1)
+    }
+
+    /**
+     * Applies PNG predictor algorithm to decompressed data.
+     * PNG predictor adds prediction bytes at the start of each row.
+     * Predictor types: 10=None, 11=Sub, 12=Up, 13=Average, 14=Paeth, 15=Optimum
+     */
+    private fun applyPngPredictor(data: ByteArray, columns: Int): ByteArray {
+        if (data.isEmpty()) return data
+
+        val rowSize = columns + 1 // +1 for predictor byte
+        val rowCount = data.size / rowSize
+        val output = ByteArray(rowCount * columns)
+
+        var outputPos = 0
+        for (row in 0 until rowCount) {
+            val rowStart = row * rowSize
+            val predictor = data[rowStart].toInt() and 0xFF
+
+            for (col in 0 until columns) {
+                val rawByte = data[rowStart + 1 + col].toInt() and 0xFF
+                val a = if (col > 0) output[outputPos - 1].toInt() and 0xFF else 0
+                val b = if (row > 0) output[outputPos - columns].toInt() and 0xFF else 0
+                val c = if (row > 0 && col > 0) output[outputPos - columns - 1].toInt() and 0xFF else 0
+
+                val decoded = when (predictor) {
+                    0, 10 -> rawByte // None
+                    11 -> (rawByte + a) and 0xFF // Sub
+                    12 -> (rawByte + b) and 0xFF // Up
+                    13 -> (rawByte + ((a + b) / 2)) and 0xFF // Average
+                    14 -> (rawByte + paethPredictor(a, b, c)) and 0xFF // Paeth
+                    else -> rawByte // Unknown predictor, use as-is
+                }
+
+                output[outputPos++] = decoded.toByte()
+            }
+        }
+
+        return output
+    }
+
+    /**
+     * Paeth predictor algorithm (used by PNG)
+     */
+    private fun paethPredictor(a: Int, b: Int, c: Int): Int {
+        val p = a + b - c
+        val pa = kotlin.math.abs(p - a)
+        val pb = kotlin.math.abs(p - b)
+        val pc = kotlin.math.abs(p - c)
+
+        return when {
+            pa <= pb && pa <= pc -> a
+            pb <= pc -> b
+            else -> c
+        }
     }
 }
 
