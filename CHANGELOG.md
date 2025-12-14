@@ -2,9 +2,20 @@
 
 All relevant changes are summarized here by version.
 
+## [1.0.9] - 2025-12-14
+### Added
+- Standalone PDF outline parser and improved PDF outline caching for faster navigation.
+- New PDF parser initialization and cross-reference cache for better performance.
+
+### Fixed
+- Fixed bug where PDF pages could get stuck while swiping.
+- Fixed bug with quicknote manual delete selection.
+
+
 ## [1.0.8] - 2025-12-14
-### Changed
-- Minor update in MainActivity.kt (init, 1 line changed)
+### Summary
+- Quicknote and PDF navigation improvements, bug fixes, and UI tweaks
+- Minor update in MainActivity.kt (init)
 
 ## [1.0.7] - 2025-12-14
 ### Changed
