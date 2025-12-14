@@ -12,7 +12,7 @@
 <div align="center">
 	<a href="CHANGELOG.md">Changelog</a> |
 	<a href="docs/docnavigation.md">Documentation</a> |
-	<a href="docs/FUTURE_PLANS.md">Future Plans</a> |
+	<a href="docs/roadmap.md">Roadmap</a> |
 	<a href="SECURITY.md">Security Policy</a> |
 	<a href="LICENSE">License</a> |
 	<a href="COLLABORATORS.md">Collaborators</a>
@@ -37,7 +37,6 @@ InteractiveChecklists is an Android application for viewing and interacting with
 - [How to Build & Run](#how-to-build--run)
 - [Key Components](#key-components)
 - [Contributing](#contributing)
-- [Roadmap](#roadmap)
 - [Support & Contact](#support--contact)
 - [FAQ](#faq)
 - [Acknowledgements & Credits](#acknowledgements--credits)
