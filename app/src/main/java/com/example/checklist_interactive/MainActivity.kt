@@ -338,7 +338,13 @@ class MainActivity : ComponentActivity() {
                                     }
                                 },
                                 onTabClosed = { index ->
-                                    tabManager.closeTab(index)
+                                    val removed = tabManager.closeTab(index)
+                                    if (removed != null) {
+                                        scope.launch {
+                                            val currentActive = tabManager.getActiveTab()?.fileInfo?.path ?: ""
+                                            repository.saveLastOpenedFile(currentActive)
+                                        }
+                                    }
                                 },
                                 onNewTab = {
                                     // Show file list to select new file
@@ -357,8 +363,18 @@ class MainActivity : ComponentActivity() {
                                         if (openTabs.size == 1) {
                                             tabManager.closeAllTabs()
                                             showFileList = true
+                                            scope.launch {
+                                                // Clear last opened file when all tabs closed
+                                                repository.saveLastOpenedFile("")
+                                            }
                                         } else {
-                                            tabManager.closeTab(activeTabIndex)
+                                            val removed = tabManager.closeTab(activeTabIndex)
+                                            if (removed != null) {
+                                                scope.launch {
+                                                    val currentActive = tabManager.getActiveTab()?.fileInfo?.path ?: ""
+                                                    repository.saveLastOpenedFile(currentActive)
+                                                }
+                                            }
                                         }
                                     },
                                     onShowFileList = {
