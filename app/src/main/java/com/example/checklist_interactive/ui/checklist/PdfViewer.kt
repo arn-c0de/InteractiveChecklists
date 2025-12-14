@@ -461,10 +461,35 @@ fun PdfViewer(
     }
 
     // Current page based on scroll position — render current and neighbors on demand
-    LaunchedEffect(listState.firstVisibleItemIndex) {
-        currentPage = listState.firstVisibleItemIndex
-        onPageChange?.invoke(currentPage)
-        val cur = currentPage
+    // Use debouncing to avoid rapid page changes during scroll
+    var pageUpdateJob by remember { mutableStateOf<Job?>(null) }
+    LaunchedEffect(listState.firstVisibleItemIndex, listState.isScrollInProgress) {
+        val visibleIndex = listState.firstVisibleItemIndex
+        // Ignore invalid indices
+        if (visibleIndex !in 0 until pageCount) return@LaunchedEffect
+        
+        // Cancel previous update job
+        pageUpdateJob?.cancel()
+        
+        // If scrolling, debounce the update
+        if (listState.isScrollInProgress) {
+            pageUpdateJob = coroutineScope.launch {
+                delay(100L) // Wait for scroll to stabilize
+                if (visibleIndex == listState.firstVisibleItemIndex && visibleIndex != currentPage) {
+                    currentPage = visibleIndex
+                    onPageChange?.invoke(currentPage)
+                }
+            }
+        } else {
+            // Scroll finished, update immediately if changed
+            if (visibleIndex != currentPage) {
+                currentPage = visibleIndex
+                onPageChange?.invoke(currentPage)
+            }
+        }
+        
+        // Render visible pages
+        val cur = visibleIndex
         val indices = listOf(cur - 1, cur, cur + 1).filter { it in 0 until pageCount }
         for (idx in indices) maybeRequestRender(idx, screenWidthPx)
 
@@ -495,21 +520,60 @@ fun PdfViewer(
 
     // Scroll to page when initialPage or the document (pdfPath/pageCount) changes.
     // This ensures the last opened page is loaded when re-entering the same file.
+    var initialScrollDone by remember(pdfPath) { mutableStateOf(false) }
     LaunchedEffect(pdfPath, pageCount, initialPage) {
-        if (pageCount > 0) {
+        if (pageCount > 0 && !initialScrollDone) {
             val target = if (initialPage >= 0) initialPage else lastPageManager.getLastPage(docIdForLastPage)
             val clamped = target.coerceIn(0, pageCount - 1)
-            if (clamped != currentPage) {
-                listState.scrollToItem(clamped)
-                currentPage = clamped
+            
+            // Wait for layout to be ready
+            delay(100L)
+            
+            // Retry scroll up to 3 times if needed
+            var scrollSuccess = false
+            for (attempt in 1..3) {
+                try {
+                    listState.scrollToItem(clamped)
+                    delay(50L)
+                    
+                    // Verify scroll was successful
+                    if (listState.firstVisibleItemIndex == clamped) {
+                        scrollSuccess = true
+                        break
+                    }
+                } catch (e: Exception) {
+                    if (attempt == 3) {
+                        android.util.Log.w("PdfViewer", "Failed to scroll to page $clamped after $attempt attempts")
+                    } else {
+                        delay(100L) // Wait before retry
+                    }
+                }
+            }
+            
+            // Update currentPage only after successful scroll
+            if (scrollSuccess || listState.firstVisibleItemIndex in 0 until pageCount) {
+                currentPage = listState.firstVisibleItemIndex.coerceIn(0, pageCount - 1)
+                initialScrollDone = true
             }
         }
     }
 
-    // Save the current page on every page change
+    // Save the current page on every page change (debounced)
+    var savePageJob by remember { mutableStateOf<Job?>(null) }
     LaunchedEffect(currentPage) {
-        if (pageCount > 0) {
-            lastPageManager.saveLastPage(docIdForLastPage, currentPage)
+        if (pageCount > 0 && currentPage in 0 until pageCount) {
+            // Cancel previous save job
+            savePageJob?.cancel()
+            
+            // Debounce saves to avoid excessive writes during rapid scrolling
+            savePageJob = coroutineScope.launch {
+                delay(300L)
+                try {
+                    lastPageManager.saveLastPage(docIdForLastPage, currentPage)
+                } catch (e: Exception) {
+                    android.util.Log.w("PdfViewer", "Failed to save last page: ${e.message}")
+                }
+            }
         }
     }
 
@@ -1137,7 +1201,9 @@ fun PdfViewer(
                                 state = listState,
                                 modifier = Modifier.fillMaxSize(), // Weight is now on the parent Box
                                 userScrollEnabled = !(annotateMode || eraseMode),
-                                flingBehavior = flingBehavior
+                                flingBehavior = flingBehavior,
+                                // Ensure each page takes exactly one screen height for reliable snapping
+                                verticalArrangement = Arrangement.spacedBy(0.dp)
                             ) {
                                 items(
                                     count = pageCount,
@@ -1179,9 +1245,18 @@ fun PdfViewer(
                                     }
 
                                     if (bitmap != null) {
-                                        PdfPageWithAnnotations(
-                                            modifier = Modifier.fillMaxWidth().aspectRatio(bitmap.width.toFloat() / bitmap.height.toFloat()),
-                                            bitmap = bitmap,
+                                        // Each page should fill parent height for reliable snapping
+                                        Box(
+                                            modifier = Modifier
+                                                .fillParentMaxHeight()
+                                                .fillMaxWidth(),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            PdfPageWithAnnotations(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .aspectRatio(bitmap.width.toFloat() / bitmap.height.toFloat()),
+                                                bitmap = bitmap,
                                             pageIndex = pageIndex,
                                             currentPage = currentPage,
                                             strokes = pageStrokes,
@@ -1242,15 +1317,24 @@ fun PdfViewer(
                                             },
                                             onSave = { AnnotationsRepository.save(context, pdfPath, strokes.toList()) }
                                         )
+                                        }
                                     } else {
+                                        // Each loading placeholder should also fill parent height
                                         Box(
                                             modifier = Modifier
-                                                .fillMaxWidth()
-                                                .aspectRatio(aspectRatio)
-                                                .padding(8.dp)
-                                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                                .fillParentMaxHeight()
+                                                .fillMaxWidth(),
+                                            contentAlignment = Alignment.Center
                                         ) {
-                                            // No progress indicator to prevent flickering
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .aspectRatio(aspectRatio)
+                                                    .padding(8.dp)
+                                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                            ) {
+                                                // No progress indicator to prevent flickering
+                                            }
                                         }
                                         LaunchedEffect(Unit) {
                                             if (pdfRenderer != null && !isRendering && pageBitmap == null) {
