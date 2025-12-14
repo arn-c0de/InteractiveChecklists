@@ -24,6 +24,9 @@ InteractiveChecklists is an Android application for viewing and interacting with
 
 > **Development status:** This repository is a development version and not an official release. The app is functional but under active development and may contain experimental features.
 
+> **Note:** A preview APK for version 1.1 is planned. If you are not familiar with Android Studio or building apps from source, please wait for the official preview release to test the app.
+
+
 **Table of Contents**
 
 - [Features](#features)
