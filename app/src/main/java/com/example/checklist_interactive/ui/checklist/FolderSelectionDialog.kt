@@ -16,7 +16,7 @@ import com.example.checklist_interactive.data.checklist.AssetBrowser
 import com.example.checklist_interactive.data.checklist.AssetNode
 
 /**
- * Dialog zur Auswahl eines Root-Ordners aus den Assets
+ * Dialog to select a root folder from the assets
  */
 @Composable
 fun FolderSelectionDialog(
@@ -32,7 +32,7 @@ fun FolderSelectionDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Ordner auswählen") },
+        title = { Text("Select folder") },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 // Navigation
@@ -45,7 +45,7 @@ fun FolderSelectionDialog(
                             val segments = currentPath.split('/')
                             currentPath = segments.dropLast(1).joinToString("/")
                         }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                         }
                     }
                     Text(
@@ -66,7 +66,7 @@ fun FolderSelectionDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            "Keine Unterordner gefunden",
+                            "No subfolders found",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.outline
                         )
@@ -102,12 +102,12 @@ fun FolderSelectionDialog(
                     onFolderSelected(currentPath)
                 }
             ) {
-                Text("Diesen Ordner wählen")
+                Text("Select this folder")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Abbrechen")
+                Text("Cancel")
             }
         }
     )

@@ -22,16 +22,16 @@ import androidx.compose.runtime.getValue
 import com.example.checklist_interactive.R
 
 /**
- * UnifiedViewer - Universeller Viewer der automatisch zwischen PDF und Markdown wählt
- * 
- * Unterstützt:
- * - .pdf Dateien (wenn PDF-Bibliothek verfügbar)
- * - .md, .markdown Dateien
- * 
- * @param assetPath Pfad zur Datei in den Assets
- * @param checklist Optional: Checklist-Daten für Checkbox-Interaktion
- * @param onCheckboxChange Callback für Checkbox-Änderungen
- * @param modifier Modifier für das Layout
+ * UnifiedViewer - Universal viewer that automatically chooses between PDF and Markdown
+ *
+ * Supports:
+ * - .pdf files (if PDF library available)
+ * - .md, .markdown files
+ *
+ * @param assetPath path to the file in assets
+ * @param checklist Optional: Checklist data for checkbox interactions
+ * @param onCheckboxChange Callback for checkbox changes
+ * @param modifier Modifier for layout
  */
 @Composable
 fun UnifiedViewer(
@@ -45,7 +45,7 @@ fun UnifiedViewer(
     val context = LocalContext.current
     when (fileExtension) {
         "md", "markdown" -> {
-            // Markdown-Viewer verwenden
+            // Use Markdown viewer
             val prefsManager = remember { PreferencesManager(context) }
             if (checklist != null) {
                 // For interactive checklists, create a viewmodel so states persist
@@ -80,8 +80,8 @@ fun UnifiedViewer(
             }
         }
         "pdf" -> {
-            // PDF-Viewer wird in UnifiedViewerScreen verwendet
-            // (PdfViewer benötigt eine TopBar und Navigation)
+            // PDF viewer is used in UnifiedViewerScreen
+            // (PdfViewer requires a TopBar and navigation)
             Box(
                 modifier = modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -111,8 +111,8 @@ fun UnifiedViewer(
 }
 
 /**
- * UnifiedViewerScreen - Screen-Wrapper für den UnifiedViewer
- * Zeigt automatisch den passenden Viewer basierend auf dem Dateityp
+ * UnifiedViewerScreen - Screen wrapper for UnifiedViewer
+ * Automatically shows the appropriate viewer based on file type
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -127,8 +127,8 @@ fun UnifiedViewerScreen(
     val fileName = assetPath.substringAfterLast('/').substringBeforeLast('.')
     val fileExtension = assetPath.substringAfterLast('.', "").lowercase()
     
-    // Für Markdown-Dateien verwenden wir den MarkdownViewerScreen direkt
-    // (dieser hat bereits TopBar und Navigation)
+    // For Markdown files we use the MarkdownViewerScreen directly
+    // (it already has TopBar and navigation)
     when (fileExtension) {
         "md", "markdown" -> {
             MarkdownViewerScreen(
@@ -141,7 +141,7 @@ fun UnifiedViewerScreen(
             )
         }
         "pdf" -> {
-            // PDF-Viewer verwenden
+            // Use PDF viewer
             PdfViewer(
                 pdfPath = assetPath,
                 title = fileName,
@@ -150,16 +150,16 @@ fun UnifiedViewerScreen(
             )
         }
         else -> {
-            // Unbekanntes Format
+            // Unknown format
             Scaffold(
                 topBar = {
                     TopAppBar(
                         title = { Text(fileName) },
                         navigationIcon = {
                             IconButton(onClick = onBack) {
-                                Icon(
-                                    imageVector = Icons.Default.ArrowBack,
-                                    contentDescription = "Zurück"
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowBack,
+                                        contentDescription = "Back"
                                 )
                             }
                         }
@@ -173,7 +173,7 @@ fun UnifiedViewerScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Nicht unterstütztes Dateiformat: .$fileExtension\nUnterstützt: .md, .markdown",
+                        text = "Unsupported file format: .$fileExtension\nSupported: .md, .markdown",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.error,
                         textAlign = TextAlign.Center

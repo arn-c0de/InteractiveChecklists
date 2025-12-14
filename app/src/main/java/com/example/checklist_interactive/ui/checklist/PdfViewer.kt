@@ -99,10 +99,10 @@ import com.example.checklist_interactive.ui.quickaccess.QuickAccessSheet
 import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
 
 /**
- * Eigener PDF-Viewer ohne externe Abhängigkeiten.
- * Verwendet Android's eingebauten PdfRenderer (verfügbar ab API 21).
- * Mit Annotation-Unterstützung (Zeichnen, Highlighten, Löschen).
- * Mit Zoom, Seiten-Highlights und Shortcuts.
+ * Custom PDF viewer with no external heavy dependencies.
+ * Uses Android's built-in PdfRenderer (available since API 21).
+ * Supports annotations (draw, highlight, delete).
+ * Includes zoom, page highlights and shortcuts.
  */
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -125,14 +125,14 @@ fun PdfViewer(
     // LastPageManager keeps a stable key across container lifecycles.
     val context = LocalContext.current
 
-    // Manager für Shortcuts, Highlights und letzte Seite
+    // Managers for shortcuts, highlights and last-page state
     val shortcutManager = remember { ShortcutManager(context) }
     val highlightManager = remember { PageHighlightManager(context) }
     val lastPageManager = remember { LastPageManager(context) }
     val providedNoteManager = com.example.checklist_interactive.ui.quickaccess.LocalQuickNoteManager.current
     val quickNoteManager = providedNoteManager ?: remember { QuickNoteManager(context) }
 
-    // Lade zuletzt geöffnete Seite, falls initialPage nicht explizit gesetzt wurde (< 0 = nicht gesetzt)
+    // Load last-opened page unless initialPage is explicitly set (<0 = not set)
     // Use a stable ID for storing last-page info; allow callers to pass an explicit documentId
     // so that temporary / cache paths (e.g., asset temp files) map to a stable identifier.
     val docIdForLastPage = documentId ?: pdfPath
@@ -173,7 +173,7 @@ fun PdfViewer(
     var showQuickAccess by remember { mutableStateOf(false) }
     var showToolbar by remember { mutableStateOf(true) }
 
-    // Text-Extraktion
+    // Text extraction
     val textExtractor = remember { PdfTextExtractor(context) }
     val pageTextBlocks = remember { mutableStateMapOf<Int, List<PdfTextBlock>>() }
     var textSelectionEnabled by remember { mutableStateOf(true) }
@@ -181,7 +181,7 @@ fun PdfViewer(
     var dialogPageText by remember { mutableStateOf("") }
     val textExtractionJobs = remember { mutableMapOf<Int, Job>() }
 
-    // Cleanup textExtractor beim Verlassen
+    // Cleanup textExtractor on dispose
     DisposableEffect(Unit) {
         onDispose {
             textExtractionJobs.values.forEach { it.cancel() }
@@ -292,7 +292,7 @@ fun PdfViewer(
                     // Interne Datei direkt verwenden
                     File(pdfPath)
                 } else {
-                    // Asset in temporäre Datei kopieren
+                    // Copy asset to temporary file
                     val assetManager = context.assets
                     val inputStream = assetManager.open(pdfPath)
                     val tempFile = File(context.cacheDir, "temp_${pdfPath.hashCode()}.pdf")
@@ -398,7 +398,7 @@ fun PdfViewer(
             chapters = if (outlineItems.isNotEmpty()) {
                 outlineItems.map { it.title to it.pageNumber }
             } else {
-                (0 until pageCount).map { idx -> "Seite ${idx + 1}" to idx }
+                (0 until pageCount).map { idx -> "Page ${idx + 1}" to idx }
             }
         } catch (e: Exception) {
             errorMessage = context.getString(R.string.error_loading_pdf, e.message ?: "")
@@ -445,7 +445,7 @@ fun PdfViewer(
         }
     }
 
-    // Annotationen laden (async auf Background-Thread)
+    // Load annotations (async on background thread)
     LaunchedEffect(pdfPath) {
         withContext(Dispatchers.IO) {
             val loadedStrokes = AnnotationsRepository.load(context, pdfPath)
@@ -460,7 +460,7 @@ fun PdfViewer(
         // Note: The main PDF loading coroutine populates `chapters` after pages are loaded.
     }
 
-    // Aktuelle Seite basierend auf Scroll-Position — render current and neighbors on demand
+    // Current page based on scroll position — render current and neighbors on demand
     LaunchedEffect(listState.firstVisibleItemIndex) {
         currentPage = listState.firstVisibleItemIndex
         onPageChange?.invoke(currentPage)
@@ -468,11 +468,11 @@ fun PdfViewer(
         val indices = listOf(cur - 1, cur, cur + 1).filter { it in 0 until pageCount }
         for (idx in indices) maybeRequestRender(idx, screenWidthPx)
 
-        // Extrahiere Text für sichtbare Seiten
+        // Extract text for visible pages
         pdfFile?.let { file ->
             for (idx in indices) {
                 if (!pageTextBlocks.containsKey(idx)) {
-                    // Abbrechen eines laufenden Jobs für diese Seite
+                    // Cancel a running job for this page
                     textExtractionJobs[idx]?.cancel()
 
                     val job = backgroundScope.launch(Dispatchers.IO) {
@@ -493,8 +493,8 @@ fun PdfViewer(
         }
     }
 
-    // Scrolle zur Seite wenn initialPage oder das Dokument (pdfPath/pageCount) sich ändert.
-    // Dies sorgt dafür, dass beim Re-Entrypunkt in dieselbe Datei die zuletzt geöffnete Seite geladen wird.
+    // Scroll to page when initialPage or the document (pdfPath/pageCount) changes.
+    // This ensures the last opened page is loaded when re-entering the same file.
     LaunchedEffect(pdfPath, pageCount, initialPage) {
         if (pageCount > 0) {
             val target = if (initialPage >= 0) initialPage else lastPageManager.getLastPage(docIdForLastPage)
@@ -506,7 +506,7 @@ fun PdfViewer(
         }
     }
 
-    // Speichere die aktuelle Seite bei jedem Seitenwechsel
+    // Save the current page on every page change
     LaunchedEffect(currentPage) {
         if (pageCount > 0) {
             lastPageManager.saveLastPage(docIdForLastPage, currentPage)
@@ -574,10 +574,10 @@ fun PdfViewer(
                     }
                 },
                 actions = {
-                    // Outline Button neben Seitenzahl
+                    // Outline button next to the page number
                     HintIconButton(
                         onClick = { showTocDialog = true },
-                        hint = if (outlineItems.isNotEmpty()) "Outline anzeigen" else "Seitenliste anzeigen",
+                        hint = if (outlineItems.isNotEmpty()) "Show outline" else "Show page list",
                         onHintChange = { hoveredHint = it },
                         modifier = Modifier.size(40.dp)
                     ) {
@@ -626,7 +626,7 @@ fun PdfViewer(
                         },
                         containerColor = MaterialTheme.colorScheme.secondaryContainer
                     ) {
-                        Icon(Icons.Default.CenterFocusWeak, contentDescription = "Zoom zurücksetzen")
+                        Icon(Icons.Default.CenterFocusWeak, contentDescription = "Reset zoom")
                     }
                 }
 
@@ -636,7 +636,7 @@ fun PdfViewer(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ) {
-                    Icon(Icons.Default.NoteAdd, contentDescription = "Schnellzugriff")
+                    Icon(Icons.Default.NoteAdd, contentDescription = "Quick access")
                 }
 
                 // Menu FAB - immer an fester Position (nur anzeigen wenn onShowFileList gesetzt ist)
@@ -674,7 +674,7 @@ fun PdfViewer(
                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f))
                             .padding(vertical = 4.dp, horizontal = 8.dp)
                     ) {
-                        // Erste Reihe: Zeichnen & Annotationen
+                        // First row: drawing & annotations
                         var showDeleteAllDialog by remember { mutableStateOf(false) }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -734,20 +734,20 @@ fun PdfViewer(
                                     val isHighlighted = highlightManager.togglePageHighlight(pdfPath, currentPage)
                                     pageHighlights = highlightManager.getHighlightsForFile(pdfPath).map { it.pageNumber }
                                 },
-                                hint = "Seite highlighten",
+                                hint = "Highlight page",
                                 onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
                                     Icons.Default.Star,
-                                    contentDescription = "Seite highlighten",
+                                    contentDescription = "Highlight page",
                                     tint = if (pageHighlights.contains(currentPage)) Color.Yellow else LocalContentColor.current,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
                             HintIconButton(
                                 onClick = {
-                                    shortcutName = "$title - Seite ${currentPage + 1}"
+                                    shortcutName = "$title - Page ${currentPage + 1}"
                                     showShortcutDialog = true
                                 },
                                 hint = "Shortcut erstellen",
@@ -760,7 +760,7 @@ fun PdfViewer(
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
-                            // Link zu Schnellnotiz
+                            // Link to quick note
                             HintIconButton(
                                 onClick = {
                                     quickNoteManager.addLinkedDocument(
@@ -769,7 +769,7 @@ fun PdfViewer(
                                         pageNumber = currentPage
                                     )
                                 },
-                                hint = "Zu Schnellnotiz verlinken",
+                                hint = "Link to quick note",
                                 onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
@@ -819,7 +819,7 @@ fun PdfViewer(
                             }
                             HintIconButton(
                                 onClick = { showDeleteAllDialog = true },
-                                hint = "Alle Anmerkungen löschen",
+                                hint = "Delete all annotations",
                                 onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
@@ -833,7 +833,7 @@ fun PdfViewer(
                                 onClick = {
                                     AnnotationsRepository.save(context, pdfPath, strokes.toList())
                                 },
-                                hint = "Speichern",
+                                hint = "Save",
                                 onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
@@ -849,19 +849,19 @@ fun PdfViewer(
                         if (showDeleteAllDialog) {
                             AlertDialog(
                                 onDismissRequest = { showDeleteAllDialog = false },
-                                title = { Text("Alle Zeichnungen löschen?") },
-                                text = { Text("Möchten Sie wirklich alle Zeichnungen/Annotationen auf dieser Seite unwiderruflich löschen?") },
+                                title = { Text("Delete all drawings?") },
+                                text = { Text("Do you really want to permanently delete all drawings/annotations on this page?") },
                                 confirmButton = {
                                     TextButton(onClick = {
                                         strokes.removeAll { it.page == currentPage }
                                         showDeleteAllDialog = false
                                     }) {
-                                        Text("Löschen")
+                                        Text("Delete")
                                     }
                                 },
                                 dismissButton = {
                                     TextButton(onClick = { showDeleteAllDialog = false }) {
-                                        Text("Abbrechen")
+                                        Text("Cancel")
                                     }
                                 }
                             )
@@ -882,7 +882,7 @@ fun PdfViewer(
                                         pageOffsetsY[currentPage] = 0f
                                     }
                                 },
-                                hint = "Verkleinern",
+                                hint = "Zoom out",
                                 onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
@@ -905,7 +905,7 @@ fun PdfViewer(
                                         pageScales[currentPage] = (cur + 0.5f).coerceAtMost(3f)
                                     }
                                 },
-                                hint = "Vergrößern",
+                                hint = "Zoom in",
                                 onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
@@ -948,7 +948,7 @@ fun PdfViewer(
                     }
                     }
 
-                    // Toolbar Toggle Button - schwebt über dem Inhalt
+                    // Toolbar Toggle Button - floats over content
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1285,7 +1285,7 @@ fun PdfViewer(
                 title = { Text("Shortcut erstellen") },
                 text = {
                     Column {
-                        Text("Erstelle einen Shortcut zu Seite ${currentPage + 1}")
+                        Text("Create a shortcut to page ${currentPage + 1}")
                         Spacer(modifier = Modifier.height(8.dp))
                         OutlinedTextField(
                             value = shortcutName,
@@ -1312,14 +1312,14 @@ fun PdfViewer(
                 },
                 dismissButton = {
                     TextButton(onClick = { showShortcutDialog = false }) {
-                        Text("Abbrechen")
+                        Text("Cancel")
                     }
                 }
             )
         }
         // Inhaltsverzeichnis / Kapitel-Dialog mit hierarchischer Outline-Anzeige
         if (showTocDialog) {
-            // LazyListState für TOC, startet bei aktueller Seite
+            // LazyListState for TOC, starts at current page
             val tocListState = rememberLazyListState()
             var tocSearchQuery by remember { mutableStateOf("") }
             // Build a unified list of (title, page, level) for displaying in the TOC
@@ -1333,7 +1333,7 @@ fun PdfViewer(
                 else raw.filter { it.first.contains(tocSearchQuery, ignoreCase = true) }
             }
 
-            // Scrolle beim Öffnen zur aktuellen Seite und zentriere sie
+            // Scroll to current page on open and center it
             LaunchedEffect(Unit) {
                 if (chapters.isNotEmpty()) {
                     val targetIndex = currentPage.coerceIn(0, chapters.size - 1)
@@ -1344,7 +1344,7 @@ fun PdfViewer(
             LaunchedEffect(showTocDialog) {
                 if (showTocDialog) tocSearchQuery = ""
             }
-            // Wenn der Suchbegriff sich ändert, scrolle ggf. an den Anfang der gefilterten Liste
+            // When the search term changes, optionally scroll to the start of the filtered list
             LaunchedEffect(tocSearchQuery) {
                 if (tocDisplayList.isNotEmpty()) {
                     tocListState.scrollToItem(0)
@@ -1357,7 +1357,7 @@ fun PdfViewer(
                 text = {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         if (chapters.isEmpty()) {
-                            Text("Keine Kapitel gefunden. Zeige Seitenliste als Fallback.")
+                            Text("No chapters found. Showing page list as fallback.")
                         }
                         // Suchfeld
                         OutlinedTextField(
@@ -1403,7 +1403,7 @@ fun PdfViewer(
                                             )
                                         )
                                         Text(
-                                            text = "Seite ${pageIndex + 1}",
+                                            text = "Page ${pageIndex + 1}",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -1414,7 +1414,7 @@ fun PdfViewer(
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = { showTocDialog = false }) { Text("Schließen") }
+                    TextButton(onClick = { showTocDialog = false }) { Text("Close") }
                 }
             )
         }
@@ -1423,13 +1423,13 @@ fun PdfViewer(
         if (showTextDialog) {
             AlertDialog(
                 onDismissRequest = { showTextDialog = false },
-                title = { Text("Seitentext (Seite ${currentPage + 1})") },
+                title = { Text("Page text (Page ${currentPage + 1})") },
                 text = {
                     SelectionContainer {
                         LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
                             item {
                                 Text(
-                                    text = dialogPageText.ifEmpty { "Kein Text auf dieser Seite gefunden." },
+                                    text = dialogPageText.ifEmpty { "No text found on this page." },
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                             }
@@ -1447,7 +1447,7 @@ fun PdfViewer(
                 },
                 dismissButton = {
                     TextButton(onClick = { showTextDialog = false }) {
-                        Text("Schließen")
+                        Text("Close")
                     }
                 }
             )
@@ -1632,10 +1632,10 @@ private fun PdfPageWithAnnotations(
                 )
             ) else null
         }
-        // PDF-Seite als Bitmap
+        // PDF page as bitmap
         Image(
             bitmap = remember(bitmap) { bitmap.asImageBitmap() },
-            contentDescription = "PDF Seite ${pageIndex + 1}",
+            contentDescription = "PDF page ${pageIndex + 1}",
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer(
@@ -1650,7 +1650,7 @@ private fun PdfPageWithAnnotations(
             colorFilter = colorFilter
         )
 
-        // Seiten-Highlight (wenn aktiviert) - immer die Originalfarbe verwenden
+        // Page highlight (when enabled) - always use the original color
         if (isPageHighlighted) {
             val highlightCol = Color.Yellow.copy(alpha = 0.2f)
             Box(
@@ -1835,7 +1835,7 @@ private fun PdfPageWithAnnotations(
                                     isHighlight = highlightMode
                                 )
                                 currentStroke = newStroke
-                                // NICHT zur Liste hinzufügen während des Zeichnens - wird erst bei onDragEnd hinzugefügt
+                                // DO NOT add to list while drawing - add only on onDragEnd
                             }
                         },
                         onDrag = { change, _ ->
@@ -1880,7 +1880,7 @@ private fun PdfPageWithAnnotations(
                             }
                             if (annotateMode && isCurrentPage) {
                                 brushPosition = null
-                                // Jetzt zur Liste hinzufügen nach dem Zeichnen
+                                // Now add to the list after drawing
                                 currentStroke?.let { onStrokeAdd(it) }
                                 currentStroke = null
                                 onSave()
@@ -1889,7 +1889,7 @@ private fun PdfPageWithAnnotations(
                     )
                 }
         ) {
-            // Zeichne alle Annotationen für diese Seite
+            // Draw all annotations for this page
             for (stroke in strokes) {
                 val path = Path().apply {
                     stroke.points.forEachIndexed { i, p ->
@@ -1915,7 +1915,7 @@ private fun PdfPageWithAnnotations(
                 )
             }
 
-            // Zeichne den aktuellen Stroke live während des Zeichnens
+            // Draw the current stroke live while drawing
             currentStroke?.let { stroke ->
                 if (stroke.points.isNotEmpty()) {
                     val path = Path().apply {
@@ -1971,7 +1971,7 @@ private fun PdfPageWithAnnotations(
                     maxOf(2f, strokeWidth * renderScale / 2f)
                 }
 
-                // Äußerer Ring in der ausgewählten Farbe (Original-Farbe, nicht invertiert)
+                // Outer ring in the selected color (original color, not inverted)
                 val selOuter = selectedColor.copy(alpha = 0.5f)
                 val selInner = selectedColor.copy(alpha = if (highlightMode) 0.3f else 0.2f)
                 drawCircle(
@@ -1980,7 +1980,7 @@ private fun PdfPageWithAnnotations(
                     center = brushPosition!!,
                     style = Stroke(width = 2f)
                 )
-                // Innerer gefüllter Kreis
+                // Inner filled circle
                 drawCircle(
                     color = selInner,
                     radius = brushRadius,

@@ -76,7 +76,7 @@ fun TabBar(
             val scope = rememberCoroutineScope()
             if (tabs.isEmpty()) {
                 Text(
-                    text = "Keine Tabs",
+                    text = "No tabs",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 8.dp)
@@ -173,7 +173,7 @@ fun TabBar(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Add,
-                                contentDescription = "Neuer Tab",
+                                contentDescription = "New tab",
                                 modifier = Modifier.size(18.dp),
                                 tint = MaterialTheme.colorScheme.primary
                             )
@@ -271,7 +271,7 @@ private fun TabItem(
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
-                    contentDescription = "Tab schließen",
+                    contentDescription = "Close tab",
                     modifier = Modifier.size(12.dp),
                     tint = if (isActive) {
                         MaterialTheme.colorScheme.onPrimaryContainer
@@ -352,14 +352,14 @@ fun TabbedDocumentViewer(
                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                     )
                     Text(
-                        text = "Keine geöffneten Tabs",
+                        text = "No open tabs",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                     TextButton(onClick = onNewTab) {
                         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Datei öffnen")
+                        Text("Open file")
                     }
                 }
             }

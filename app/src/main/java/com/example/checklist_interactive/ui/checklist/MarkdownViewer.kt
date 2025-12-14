@@ -30,7 +30,7 @@ import java.io.InputStreamReader
 
 /**
  * MarkdownViewer - Composable zur Anzeige von Markdown-Dateien mit Checkbox-Unterstützung
- * 
+ *
  * @param assetPath Pfad zur Markdown-Datei in den Assets
  * @param checklist Optional: Checklist mit Checkbox-Stati
  * @param onCheckboxChange Callback wenn eine Checkbox geändert wird
@@ -136,7 +136,7 @@ fun MarkdownViewer(
                 }
             }
             else -> {
-                // Prüfe ob die Checklist Items hat
+                // Check if the checklist has items
                 val hasItems = checklist?.sections?.any { it.items.isNotEmpty() } == true
                 android.util.Log.d("MarkdownViewer", "hasItems=$hasItems, checklist=${checklist != null}, onCheckboxChange=${onCheckboxChange != null}")
                 if (checklist != null) {
@@ -154,16 +154,16 @@ fun MarkdownViewer(
                         resetTrigger = resetTrigger
                     )
                 } else {
-                    // Einfache Markdown-Ansicht ohne Interaktion (oder keine Checkboxen gefunden)
+                    // Simple markdown view without interaction (or no checkboxes found)
                     android.util.Log.d("MarkdownViewer", "Using SimpleMarkdownView, resetTrigger=$resetTrigger, expandAll=$expandAllState")
-                        SimpleMarkdownView(
-                            markdownContent = displayMarkdownContent,
-                            assetId = assetPath,
-                            bodyFontSize = fontSizeState,
-                            expandAll = expandAllState,
-                            onCheckboxChange = onCheckboxChange,
-                            resetTrigger = resetTrigger
-                        )
+                    SimpleMarkdownView(
+                        markdownContent = displayMarkdownContent,
+                        assetId = assetPath,
+                        bodyFontSize = fontSizeState,
+                        expandAll = expandAllState,
+                        onCheckboxChange = onCheckboxChange,
+                        resetTrigger = resetTrigger
+                    )
                 }
             }
         }
@@ -171,16 +171,16 @@ fun MarkdownViewer(
 }
 
 /**
- * Datenklasse für eine Markdown-Sektion mit ### Überschrift
+ * Data class for a Markdown section with ### heading
  */
 private data class MarkdownSection(
     val heading: String,
     val content: List<String>
-)
+) 
 
 /**
- * Einfache Markdown-Ansicht - rendert grundlegendes Markdown
- * Gruppiert Inhalte zwischen ### Überschriften in Containern
+ * Simple markdown view - renders basic Markdown
+ * Groups content between ### headings into containers
  */
 @Composable
 private fun SimpleMarkdownView(
@@ -193,10 +193,10 @@ private fun SimpleMarkdownView(
 ) {
     val scrollState = rememberScrollState()
 
-    // Parse Markdown in Sektionen
-    val sections = parseMarkdownSections(markdownContent)
+    // Parse markdown into sections
+    val sections = parseMarkdownSections(markdownContent) 
 
-    // State für expandierte Sektionen - Key ist der Index der Sektion
+    // State for expanded sections - key is the section index
     // Remember per assetId so each file gets its own expand/collapse state
     val expandedSections = remember(assetId) { mutableStateMapOf<Int, Boolean>() }
 
@@ -219,11 +219,11 @@ private fun SimpleMarkdownView(
                 expandedSections[index] = expandAll
             }
         }
-        
+
         // Load saved checkbox states from repository
         val savedStates = repository.getChecklistState(assetId)
         android.util.Log.d("MarkdownViewer", "Loaded saved states for $assetId: ${savedStates.keys.size} entries")
-        
+
         sections.forEachIndexed { index, section ->
             section.content.forEachIndexed { lineIndex, line ->
                 if (isCheckboxLine(line)) {
@@ -263,7 +263,7 @@ private fun SimpleMarkdownView(
     ) {
         sections.forEachIndexed { index, section ->
             when {
-                // Hauptüberschrift (# oder ##) - wenn es Checkboxen enthält, zeige als Card
+                // Main heading (# or ##) - if it contains checkboxes, show as Card
                 section.heading.startsWith("# ") || section.heading.startsWith("## ") -> {
                     val hasCheckboxes = section.content.any { it.trim().startsWith("- [") }
                     if (hasCheckboxes) {
@@ -308,7 +308,7 @@ private fun SimpleMarkdownView(
                                     )
                                 }
 
-                                // Render Inhalt der Sektion nur wenn expanded
+                                // Render section content only when expanded
                                 if (isExpanded) {
                                     section.content.forEachIndexed { lineIndex, line ->
                                         if (isCheckboxLine(line)) {
@@ -395,41 +395,41 @@ private fun SimpleMarkdownView(
                             }
                         }
                     } else {
-                        // Render Überschrift
+                        // Render heading
                         RenderMarkdownLine(section.heading, bodyFontSize)
 
-                        // Render Inhalt
+                        // Render content
                         section.content.forEachIndexed { lineIndex, line ->
                             if (isCheckboxLine(line)) {
                                 val key = Pair(index, lineIndex)
                                 val checked = checkboxStates[key] ?: false
                                 Column(modifier = Modifier.fillMaxWidth()) {
                                     Row(modifier = Modifier.padding(vertical = 2.dp), horizontalArrangement = Arrangement.Start) {
-                                            Checkbox(
-                                                checked = checked,
-                                                onCheckedChange = { newChecked ->
-                                                    checkboxStates[key] = newChecked
-                                                    val syntheticId = "$assetId-simple-$index-$lineIndex"
-                                                    onCheckboxChange?.invoke(syntheticId, newChecked)
-                                                    if (onCheckboxChange == null) {
-                                                        coroutineScope.launch {
-                                                            repository.saveChecklistItemState(assetId, syntheticId, newChecked)
-                                                        }
-                                                    }
-
-                                                    // If all checkboxes in this subsection are now checked, collapse the subsection container
-                                                    val totalCheckboxesInSection = section.content.count { it.trim().startsWith("- [") }
-                                                    if (totalCheckboxesInSection > 0) {
-                                                        val checkedCount = section.content.mapIndexed { lidx, line ->
-                                                            if (line.trim().startsWith("- [")) checkboxStates[Pair(index, lidx)] ?: (line.trim().startsWith("- [x]") || line.trim().startsWith("- [X]")) else false
-                                                        }.count { it }
-                                                        if (checkedCount == totalCheckboxesInSection) {
-                                                            android.util.Log.d("MarkdownViewer", "Auto-closing simple subsection index=$index for $assetId (all checked)")
-                                                            expandedSections[index] = false
-                                                        }
+                                        Checkbox(
+                                            checked = checked,
+                                            onCheckedChange = { newChecked ->
+                                                checkboxStates[key] = newChecked
+                                                val syntheticId = "$assetId-simple-$index-$lineIndex"
+                                                onCheckboxChange?.invoke(syntheticId, newChecked)
+                                                if (onCheckboxChange == null) {
+                                                    coroutineScope.launch {
+                                                        repository.saveChecklistItemState(assetId, syntheticId, newChecked)
                                                     }
                                                 }
-                                            )
+
+                                                // If all checkboxes in this subsection are now checked, collapse the subsection container
+                                                val totalCheckboxesInSection = section.content.count { it.trim().startsWith("- [") }
+                                                if (totalCheckboxesInSection > 0) {
+                                                    val checkedCount = section.content.mapIndexed { lidx, line ->
+                                                        if (line.trim().startsWith("- [")) checkboxStates[Pair(index, lidx)] ?: (line.trim().startsWith("- [x]") || line.trim().startsWith("- [X]")) else false
+                                                    }.count { it }
+                                                    if (checkedCount == totalCheckboxesInSection) {
+                                                        android.util.Log.d("MarkdownViewer", "Auto-closing simple subsection index=$index for $assetId (all checked)")
+                                                        expandedSections[index] = false
+                                                    }
+                                                }
+                                            }
+                                        )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
                                             text = parseInlineMarkdown(line.trim().substring(5).trim(), bodyFontSize),
@@ -460,7 +460,7 @@ private fun SimpleMarkdownView(
                                                             expandedSections[index] = false
                                                         }
                                                     }
-                                                } 
+                                                }
                                         )
                                     }
                                     HorizontalDivider(
@@ -474,7 +474,7 @@ private fun SimpleMarkdownView(
                         }
                     }
                 }
-                // ### Überschrift - in Card gruppieren mit Collapsible-Funktion
+                // ### heading - group into Card with collapsible function
                 section.heading.startsWith("### ") -> {
                     val isExpanded = expandedSections[index] ?: false // Default: collapsed
 
@@ -517,7 +517,7 @@ private fun SimpleMarkdownView(
                                 )
                             }
 
-                            // Render Inhalt der Sektion nur wenn expanded
+                            // Render section content only when expanded
                             if (isExpanded) {
                                 section.content.forEachIndexed { lineIndex, line ->
                                     if (isCheckboxLine(line)) {
@@ -563,7 +563,7 @@ private fun SimpleMarkdownView(
                         }
                     }
                 }
-                // Inhalt ohne Überschrift
+                // Content without heading
                 else -> {
                     section.content.forEachIndexed { lineIndex, line ->
                         if (isCheckboxLine(line)) {
@@ -631,7 +631,7 @@ private fun SimpleMarkdownView(
 }
 
 /**
- * Rendert eine einzelne Markdown-Zeile
+ * Renders a single markdown line
  */
 @Composable
 private fun RenderMarkdownLine(line: String, bodyFontSize: Int) {
@@ -691,7 +691,7 @@ private fun RenderMarkdownLine(line: String, bodyFontSize: Int) {
             }
         }
         line.trim().startsWith("- ") -> {
-            // Normaler Listeneintrag
+            // Normal list item
             Row(modifier = Modifier.padding(vertical = 2.dp)) {
                 Text("• ", style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp))
                 Text(
@@ -728,7 +728,7 @@ private fun RenderMarkdownLine(line: String, bodyFontSize: Int) {
 }
 
 /**
- * Parst Markdown-Inhalt in Sektionen basierend auf Überschriften
+ * Parses markdown content into sections based on headings
  */
 private fun parseMarkdownSections(markdownContent: String): List<MarkdownSection> {
     val lines = markdownContent.lines()
@@ -738,24 +738,24 @@ private fun parseMarkdownSections(markdownContent: String): List<MarkdownSection
 
     lines.forEach { line ->
         when {
-            // Neue Überschrift gefunden
+            // New heading found
             line.startsWith("# ") || line.startsWith("## ") || line.startsWith("### ") -> {
-                // Speichere vorherige Sektion wenn vorhanden
+                // Save previous section if present
                 if (currentHeading.isNotEmpty() || currentContent.isNotEmpty()) {
                     sections.add(MarkdownSection(currentHeading, currentContent.toList()))
                 }
-                // Starte neue Sektion
+                // Start new section
                 currentHeading = line
                 currentContent = mutableListOf()
             }
-            // Normaler Inhalt
+            // Normal content
             else -> {
                 currentContent.add(line)
             }
         }
     }
 
-    // Füge letzte Sektion hinzu
+    // Add last section
     if (currentHeading.isNotEmpty() || currentContent.isNotEmpty()) {
         sections.add(MarkdownSection(currentHeading, currentContent.toList()))
     }
@@ -764,9 +764,9 @@ private fun parseMarkdownSections(markdownContent: String): List<MarkdownSection
 }
 
 /**
- * Interaktive Markdown-Ansicht mit Checkbox-Unterstützung
- * Zeigt Checkboxen basierend auf dem Checklist-Status an
- * Gruppiert ### Sektionen in Containern
+ * Interactive markdown view with checkbox support
+ * Shows checkboxes based on the checklist status
+ * Groups ### sections into containers
  */
 @Composable
 private fun InteractiveMarkdownView(
@@ -779,10 +779,10 @@ private fun InteractiveMarkdownView(
 ) {
     val scrollState = rememberScrollState()
 
-    // State für expandierte Sektionen - Key ist der Section-Title
+    // State for expanded sections - key is the section title
     val expandedSections = remember { mutableStateMapOf<String, Boolean>() }
 
-    // Wenn expandAll sich ändert, aktualisiere alle Sektionen mit Items
+    // When expandAll changes, update all sections with items
     LaunchedEffect(expandAll) {
         checklist.sections.forEach { section ->
             if (section.title.isNotEmpty() && section.items.isNotEmpty()) {
@@ -791,7 +791,7 @@ private fun InteractiveMarkdownView(
         }
     }
 
-    // Auto-collapse: Wenn alle Items einer Sektion abgehakt sind, klappe die Sektion automatisch zu
+    // Auto-collapse: if all items of a section are checked, automatically collapse the section
     LaunchedEffect(checklist) {
         checklist.sections.forEach { section ->
             val isExpanded = expandedSections[section.title] ?: false
@@ -814,7 +814,7 @@ private fun InteractiveMarkdownView(
             .verticalScroll(scrollState)
             .padding(16.dp)
     ) {
-        // Zeige Checklist-Titel als Hauptüberschrift
+        // Show checklist title as main heading
         if (checklist.title.isNotEmpty()) {
             Text(
                 text = checklist.title,
@@ -824,11 +824,11 @@ private fun InteractiveMarkdownView(
             )
         }
 
-        // Sections mit Checkboxen und Überschriften - gruppiert in Cards
+        // Sections with checkboxes and headings - grouped in Cards
         checklist.sections.forEach { section ->
-            // Section-Überschrift (## level) - ohne Card
+            // Section heading (## level) - without Card
             if (section.title.isNotEmpty() && section.title != checklist.title) {
-                // Prüfe ob es eine ### Überschrift ist (Sub-Section)
+                // Check if it is a ### heading (sub-section)
                 val isSubSection = section.title.length > 3 && !section.title.contains("Case") && !section.title.contains("Recovery")
 
                 if (section.items.isNotEmpty()) {
@@ -885,7 +885,7 @@ private fun InteractiveMarkdownView(
                         }
                     }
                 } else {
-                    // ## Überschrift - ohne Card
+                    // ## heading - without Card
                     Text(
                         text = section.title,
                         style = MaterialTheme.typography.headlineMedium,
@@ -903,7 +903,7 @@ private fun InteractiveMarkdownView(
                     }
                 }
             } else {
-                // Keine Überschrift oder Haupttitel
+                // No heading or main title
                 section.items.forEach { item ->
                     ChecklistItemRow(
                         item = item,
@@ -917,7 +917,7 @@ private fun InteractiveMarkdownView(
 }
 
 /**
- * Einzelne Checkbox-Zeile für ein Checklist-Item
+ * Single checkbox row for a checklist item
  */
 @Composable
 private fun ChecklistItemRow(
@@ -958,7 +958,7 @@ private fun ChecklistItemRow(
 }
 
 /**
- * Lädt Markdown-Inhalt aus den Assets
+ * Loads markdown content from assets
  */
 private suspend fun loadMarkdownFromAssets(context: Context, assetPath: String): String {
     return withContext(Dispatchers.IO) {
@@ -967,20 +967,20 @@ private suspend fun loadMarkdownFromAssets(context: Context, assetPath: String):
             val reader = BufferedReader(InputStreamReader(inputStream))
             reader.use { it.readText() }
         } catch (e: Exception) {
-            throw Exception("Datei nicht gefunden: $assetPath", e)
+            throw Exception("File not found: $assetPath", e)
         }
     }
-}
+} 
 
 /**
- * Lädt Markdown-Inhalt aus einer internen Datei
+ * Loads markdown content from an internal file
  */
 private suspend fun loadMarkdownFromFile(filePath: String): String {
     return withContext(Dispatchers.IO) {
         try {
             java.io.File(filePath).readText()
         } catch (e: Exception) {
-            throw Exception("Datei nicht gefunden: $filePath", e)
+            throw Exception("File not found: $filePath", e)
         }
     }
 }

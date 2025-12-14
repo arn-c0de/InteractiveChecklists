@@ -39,16 +39,16 @@ The tab system enables opening multiple Markdown and PDF documents simultaneousl
 
 ## Architecture
 
-### Komponenten
+### Components
 
 #### 1. TabManager (Data Layer)
 **Path:** `app/src/main/java/com/example/checklist_interactive/data/tabs/TabManager.kt`
 
 **Responsibilities:**
-- State-Management für Tabs (StateFlow)
+- State management for tabs (StateFlow)
 - Persistence via SharedPreferences
-- Navigation-History-Verwaltung
-- Tab-Lifecycle (open, close, switch)
+- Navigation history management
+- Tab lifecycle (open, close, switch)
 
 **Important Methods:**
 ```kotlin
@@ -126,41 +126,41 @@ tabManager.openTab(fileInfo, pageNumber)
 showFileList = false
 ```
 
-### Tab schließen
+### Close tab
 
 ```kotlin
-// Einzelnen Tab schließen
+// Close a single tab
 tabManager.closeTab(index)
 
-// Alle Tabs schließen
+// Close all tabs
 tabManager.closeAllTabs()
 ```
 
-## Verwendung
+## Usage
 
-### Für Endnutzer
+### For end users
 
 1. **Open a Tab:**
-   - Datei aus Liste auswählen
+   - Select a file from the list
    - The file opens in a new tab
-   - Existierende Tabs bleiben erhalten
+   - Existing tabs remain open
 
-2. **Zwischen Tabs wechseln:**
+2. **Switching between tabs:**
    - **Swipe:** Swipe left/right across the document
-   - **Tab-Bar:** Auf Tab in oberer Leiste tippen
-   - **Quick Switcher:** FAB drücken → Tab auswählen
+   - **Tab bar:** Tap a tab in the top bar
+   - **Quick Switcher:** Press the FAB → choose a tab
 
-3. **Tab schließen:**
-   - X-Button auf Tab klicken
-   - Long-Press auf Tab
+3. **Closing a tab:**
+   - Click the X button on a tab
+   - Long-press on a tab
    - Back button (closes the active tab)
 
-4. **Schnellwechsel:**
+4. **Quick switching:**
    - Open Quick Tab Switcher
    - "Recently used" shows frequently used documents
-   - Ein Tap zum Wechseln
+   - Tap to switch
 
-### Für Entwickler
+### For developers
 
 #### Add New Tab Features
 
@@ -187,10 +187,10 @@ fun duplicateTab(index: Int) {
 
 ### SharedPreferences-Keys
 
-- `tab_paths` - Pipe-separated Liste der Dateipfade
-- `tab_pages` - Pipe-separated Liste der Seitennummern
-- `active_tab` - Index des aktiven Tabs
-- `tab_history` - Pipe-separated Navigationshistorie
+ - `tab_paths` - Pipe-separated list of file paths
+ - `tab_pages` - Pipe-separated list of page numbers
+ - `active_tab` - Index of the active tab
+ - `tab_history` - Pipe-separated navigation history
 
 ### Format example
 
@@ -206,12 +206,12 @@ tab_history: "/storage/manual.pdf|asset://checklists/A320.md"
 ### Performance
 
 1. **Lazy Loading:**
-   - HorizontalPager rendert nur sichtbare + benachbarte Seiten
+   - HorizontalPager renders only visible + adjacent pages
    - Documents are loaded on-demand
 
-2. **State-Management:**
-   - StateFlow für reaktive Updates
-   - remember() für UI-State
+2. **State management:**
+   - StateFlow for reactive updates
+   - remember() for UI state
 
 3. **Memory Management:**
    - Tab limit (10) prevents memory issues
@@ -233,23 +233,23 @@ tab_history: "/storage/manual.pdf|asset://checklists/A320.md"
 
 ## Extensibility
 
-### Geplante Features
+### Planned Features
 
 1. **Tab groups:**
    - Group related documents
-   - Farb-Coding
+   - Color coding
 
 2. **Tab pinning:**
-   - Wichtige Tabs fixieren
+   - Pin important tabs
    - Prevent from being closed automatically
 
-3. **Tab-Suche:**
+3. **Tab search:**
    - Search across all open tabs
-   - Filter nach Typ (MD/PDF)
+   - Filter by type (MD/PDF)
 
 4. **Keyboard-Shortcuts:**
-   - Ctrl+Tab für Tab-Wechsel
-   - Ctrl+W zum Schließen
+   - Ctrl+Tab for tab switch
+   - Ctrl+W to close
 
 ### Code examples for extensions
 
@@ -264,7 +264,7 @@ data class TabInfo(
 
 fun closeTab(index: Int) {
     val tab = _openTabs.value.getOrNull(index) ?: return
-    if (tab.isPinned) return  // Nicht schließen wenn gepinnt
+   if (tab.isPinned) return  // Do not close when pinned
     // ... rest of implementation
 }
 ```
@@ -343,7 +343,7 @@ fun testTabSwitchBySwipe() {
     onView(withId(R.id.pager))
         .perform(swipeLeft())
     
-    // Prüfe ob Tab 2 aktiv
+   // Check if tab 2 is active
     onView(withText("Tab 2"))
         .check(matches(isDisplayed()))
 }
@@ -379,8 +379,8 @@ implementation("androidx.compose.material3:material3:1.1.2")
 - ✅ Initial tab system implementation
 - ✅ TabManager with persistence
 - ✅ TabBar UI-Komponente
-- ✅ HorizontalPager für Swipe-Gesten
-- ✅ QuickTabSwitcher für schnellen Zugriff
+- ✅ HorizontalPager for swipe gestures
+- ✅ QuickTabSwitcher for quick access
 - ✅ Navigation-History
 - ✅ MainActivity-Integration
 

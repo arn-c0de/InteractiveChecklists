@@ -205,7 +205,7 @@ class QuickNoteManager(private val context: Context) {
                 // No old data, create a default note
                 val defaultNote = QuickNote(
                     id = "note_${System.currentTimeMillis()}",
-                    title = "Meine Notizen",
+                    title = "My Notes",
                     content = ""
                 )
                 repository.insertNote(defaultNote)
@@ -245,7 +245,7 @@ class QuickNoteManager(private val context: Context) {
         if (oldContent != null) {
             val note = QuickNote(
                 id = "note_${System.currentTimeMillis()}",
-                title = "Notizen",
+                title = "Notes",
                 content = oldContent,
                 linkedDocuments = emptyList()
             )
@@ -385,7 +385,7 @@ class QuickNoteManager(private val context: Context) {
                         // Create markdown link instead of using LinkedDocuments
                         val encodedPath = java.net.URLEncoder.encode(filePath, "UTF-8")
                         val pageParam = if (pageNumber != null) "&page=${pageNumber + 1}" else ""
-                        val label = if (pageNumber != null) "$fileName (S. ${pageNumber + 1})" else fileName
+                        val label = if (pageNumber != null) "$fileName (Page ${pageNumber + 1})" else fileName
                         val markdownLink = "\n📎 [$label](internal://open?file=$encodedPath$pageParam)\n"
 
                         val newContent = note.content + markdownLink

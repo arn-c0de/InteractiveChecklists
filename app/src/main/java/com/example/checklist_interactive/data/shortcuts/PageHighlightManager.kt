@@ -8,18 +8,18 @@ import java.io.File
 import java.net.URLDecoder
 
 /**
- * Repräsentiert ein Seiten-Highlight (gesamte Seite ist markiert)
+ * Represents a page highlight (whole page is marked)
  */
 @Serializable
 data class PageHighlight(
     val filePath: String,
     val pageNumber: Int,
-    val color: Long = 0xFFFFFF00, // Default: Gelb
+    val color: Long = 0xFFFFFF00, // Default: Yellow
     val createdAt: Long = System.currentTimeMillis()
 )
 
 /**
- * Verwaltet Seiten-Highlights
+ * Manages page highlights
  */
 class PageHighlightManager(private val context: Context) {
     
@@ -32,7 +32,7 @@ class PageHighlightManager(private val context: Context) {
         get() = File(context.filesDir, "page_highlights.json")
     
     /**
-     * Lädt alle Highlights
+     * Loads all highlights
      */
     fun loadHighlights(): List<PageHighlight> {
         return try {
@@ -48,7 +48,7 @@ class PageHighlightManager(private val context: Context) {
     }
     
     /**
-     * Speichert alle Highlights
+     * Saves all highlights
      */
     private fun saveHighlights(highlights: List<PageHighlight>) {
         try {
@@ -60,7 +60,7 @@ class PageHighlightManager(private val context: Context) {
     }
     
     /**
-     * Fügt ein Highlight hinzu oder entfernt es, wenn es bereits existiert
+     * Adds a highlight or removes it if it already exists
      */
     fun togglePageHighlight(filePath: String, pageNumber: Int, color: Long = 0xFFFFFF00): Boolean {
         val highlights = loadHighlights().toMutableList()
@@ -70,12 +70,12 @@ class PageHighlightManager(private val context: Context) {
         }
         
         return if (existing != null) {
-            // Entfernen
+            // Remove
             highlights.removeAll { it.filePath == filePath && it.pageNumber == pageNumber }
             saveHighlights(highlights)
             false
         } else {
-            // Hinzufügen
+            // Add
             highlights.add(PageHighlight(norm, pageNumber, color))
             saveHighlights(highlights)
             true
@@ -83,7 +83,7 @@ class PageHighlightManager(private val context: Context) {
     }
     
     /**
-     * Prüft ob eine Seite highlighted ist
+     * Checks if a page is highlighted
      */
     fun isPageHighlighted(filePath: String, pageNumber: Int): Boolean {
         val norm = normalizePath(filePath)
@@ -93,7 +93,7 @@ class PageHighlightManager(private val context: Context) {
     }
     
     /**
-     * Gibt alle Highlights für eine Datei zurück
+     * Returns all highlights for a file
      */
     fun getHighlightsForFile(filePath: String): List<PageHighlight> {
         val norm = normalizePath(filePath)
@@ -101,7 +101,7 @@ class PageHighlightManager(private val context: Context) {
     }
     
     /**
-     * Löscht alle Highlights für eine Datei
+     * Clears all highlights for a file
      */
     fun clearHighlightsForFile(filePath: String) {
         val highlights = loadHighlights().toMutableList()

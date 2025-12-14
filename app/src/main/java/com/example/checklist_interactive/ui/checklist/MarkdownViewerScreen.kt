@@ -29,14 +29,14 @@ import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
 import androidx.compose.material.icons.filled.Link
 
 /**
- * MarkdownViewerScreen - Screen-Komponente für die Markdown-Anzeige
- * Zeigt eine Markdown-Datei mit optionaler Checkbox-Interaktion an
- * 
- * @param assetPath Pfad zur Markdown-Datei in den Assets
- * @param checklist Optional: Checklist-Daten für Checkbox-Stati
- * @param onBack Navigation zurück
- * @param onCheckboxChange Callback wenn eine Checkbox geändert wird
- * @param onSettings Optional: Settings-Button-Handler
+ * MarkdownViewerScreen - component for displaying Markdown files
+ * Shows a markdown file with optional checkbox interaction
+ *
+ * @param assetPath path to the markdown file in assets
+ * @param checklist Optional: checklist data for checkbox states
+ * @param onBack Navigation back
+ * @param onCheckboxChange Callback when a checkbox is toggled
+ * @param onSettings Optional: Settings button handler
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,7 +48,7 @@ fun MarkdownViewerScreen(
     onSettings: (() -> Unit)? = null,
     onShowFileList: (() -> Unit)? = null
 ) {
-    // Extrahiere Dateinamen für den Titel
+    // Extract filename for the title
     val fileName = remember(assetPath) {
         assetPath.substringAfterLast('/').substringBeforeLast('.')
     }
@@ -89,7 +89,7 @@ fun MarkdownViewerScreen(
         state
     } ?: checklist
 
-    // State für Expand/Collapse All
+    // State for Expand/Collapse All
     var expandAllSections by remember { mutableStateOf(prefsManager.areMarkdownSectionsExpandedByDefault()) }
     var showQuickAccess by remember { mutableStateOf(false) }
     var resetTrigger by remember { mutableStateOf(0) }
@@ -109,7 +109,7 @@ fun MarkdownViewerScreen(
                     IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Zurück",
+                            contentDescription = "Back",
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -128,10 +128,10 @@ fun MarkdownViewerScreen(
                             pageNumber = null
                         )
                     }, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Default.Link, contentDescription = "Zu Schnellnotiz verlinken", modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Link, contentDescription = "Link to quick note", modifier = Modifier.size(20.dp))
                     }
                     IconButton(onClick = { showQuickAccess = true }, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Default.NoteAdd, contentDescription = "Schnellzugriff", modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.NoteAdd, contentDescription = "Quick access", modifier = Modifier.size(20.dp))
                     }
                     IconButton(onClick = {
                         expandAllSections = !expandAllSections
@@ -139,7 +139,7 @@ fun MarkdownViewerScreen(
                     }, modifier = Modifier.size(40.dp)) {
                         Icon(
                             imageVector = if (expandAllSections) Icons.Default.UnfoldLess else Icons.Default.UnfoldMore,
-                            contentDescription = if (expandAllSections) "Alle einklappen" else "Alle ausklappen",
+                            contentDescription = if (expandAllSections) "Collapse all" else "Expand all",
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -147,7 +147,7 @@ fun MarkdownViewerScreen(
                         IconButton(onClick = onSettings, modifier = Modifier.size(40.dp)) {
                             Icon(
                                 imageVector = Icons.Default.Settings,
-                                contentDescription = "Einstellungen",
+                                contentDescription = "Settings",
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -161,22 +161,22 @@ fun MarkdownViewerScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 horizontalAlignment = androidx.compose.ui.Alignment.End
             ) {
-                // Quick Access FAB - immer sichtbar
+                // Quick Access FAB - always visible
                 FloatingActionButton(
                     onClick = { showQuickAccess = true },
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ) {
-                    Icon(Icons.Default.NoteAdd, contentDescription = "Schnellzugriff")
+                    Icon(Icons.Default.NoteAdd, contentDescription = "Quick access")
                 }
 
-                // Menu FAB - nur wenn onShowFileList gesetzt ist
+                // Menu FAB - only if onShowFileList is set
                 if (onShowFileList != null) {
                     FloatingActionButton(
                         onClick = onShowFileList,
                         containerColor = MaterialTheme.colorScheme.primaryContainer
                     ) {
-                        Icon(Icons.Default.Menu, contentDescription = "Dateiliste")
+                        Icon(Icons.Default.Menu, contentDescription = "File list")
                     }
                 }
             }

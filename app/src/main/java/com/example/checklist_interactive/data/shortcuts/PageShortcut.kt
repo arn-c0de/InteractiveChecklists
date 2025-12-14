@@ -7,7 +7,7 @@ import kotlinx.serialization.json.Json
 import java.io.File
 
 /**
- * Repräsentiert einen Shortcut zu einer bestimmten Seite in einer Datei
+ * Represents a shortcut to a specific page in a file
  */
 @Serializable
 data class PageShortcut(
@@ -23,7 +23,7 @@ data class PageShortcut(
 }
 
 /**
- * Verwaltet Shortcuts zu Dateiseiten
+ * Manages shortcuts to file pages
  */
 class ShortcutManager(private val context: Context) {
     
@@ -36,7 +36,7 @@ class ShortcutManager(private val context: Context) {
         get() = File(context.filesDir, "page_shortcuts.json")
     
     /**
-     * Lädt alle Shortcuts
+     * Loads all shortcuts
      */
     fun loadShortcuts(): List<PageShortcut> {
         return try {
@@ -52,7 +52,7 @@ class ShortcutManager(private val context: Context) {
     }
     
     /**
-     * Speichert alle Shortcuts
+     * Saves all shortcuts
      */
     private fun saveShortcuts(shortcuts: List<PageShortcut>) {
         try {
@@ -64,7 +64,7 @@ class ShortcutManager(private val context: Context) {
     }
     
     /**
-     * Erstellt einen neuen Shortcut
+     * Creates a new shortcut
      */
     fun createShortcut(
         name: String,
@@ -85,7 +85,7 @@ class ShortcutManager(private val context: Context) {
     }
     
     /**
-     * Löscht einen Shortcut
+     * Deletes a shortcut
      */
     fun deleteShortcut(id: String) {
         val shortcuts = loadShortcuts().toMutableList()
@@ -94,7 +94,7 @@ class ShortcutManager(private val context: Context) {
     }
     
     /**
-     * Benennt einen Shortcut um
+     * Renames a shortcut
      */
     fun renameShortcut(id: String, newName: String): Boolean {
         val shortcuts = loadShortcuts().toMutableList()
@@ -108,7 +108,7 @@ class ShortcutManager(private val context: Context) {
     }
     
     /**
-     * Aktualisiert den Highlighted-Status eines Shortcuts
+     * Updates the highlighted status of a shortcut
      */
     fun updateHighlightStatus(id: String, isHighlighted: Boolean) {
         val shortcuts = loadShortcuts().toMutableList()
@@ -120,7 +120,7 @@ class ShortcutManager(private val context: Context) {
     }
     
     /**
-     * Gibt alle Shortcuts für eine bestimmte Datei zurück
+     * Returns all shortcuts for a given file
      */
     fun getShortcutsForFile(filePath: String): List<PageShortcut> {
         return loadShortcuts().filter { it.filePath == filePath }

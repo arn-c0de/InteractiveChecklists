@@ -8,7 +8,7 @@ import java.io.File
 import java.net.URLDecoder
 
 /**
- * Repräsentiert die zuletzt geöffnete Seite einer Datei
+ * Represents the last opened page of a file
  */
 @Serializable
 data class LastPageRecord(
@@ -18,7 +18,7 @@ data class LastPageRecord(
 )
 
 /**
- * Verwaltet die zuletzt geöffneten Seiten für PDFs
+ * Manages last-opened pages for PDFs
  */
 class LastPageManager(private val context: Context) {
 
@@ -31,7 +31,7 @@ class LastPageManager(private val context: Context) {
         get() = File(context.filesDir, "last_pages.json")
 
     /**
-     * Lädt alle gespeicherten letzten Seiten
+     * Loads all stored last-page entries
      */
     private fun loadLastPages(): List<LastPageRecord> {
         return try {
@@ -47,7 +47,7 @@ class LastPageManager(private val context: Context) {
     }
 
     /**
-     * Speichert alle letzten Seiten
+     * Saves all last-page entries
      */
     private fun saveLastPages(lastPages: List<LastPageRecord>) {
         try {
@@ -59,24 +59,24 @@ class LastPageManager(private val context: Context) {
     }
 
     /**
-     * Speichert die zuletzt geöffnete Seite für eine Datei
+     * Saves the last opened page for a file
      */
     fun saveLastPage(filePath: String, pageNumber: Int) {
         val lastPages = loadLastPages().toMutableList()
 
         val norm = normalizePath(filePath)
-        // Entferne vorhandenen Eintrag für diese Datei
+        // Remove any existing entry for this file
         lastPages.removeAll { it.filePath == norm }
 
-        // Füge neuen Eintrag hinzu
+        // Add new entry
         lastPages.add(LastPageRecord(norm, pageNumber))
 
         saveLastPages(lastPages)
     }
 
     /**
-     * Lädt die zuletzt geöffnete Seite für eine Datei
-     * Gibt 0 zurück, wenn keine Seite gespeichert ist
+     * Loads the last opened page for a file
+     * Returns 0 if no page is stored
      */
     fun getLastPage(filePath: String): Int {
         val norm = normalizePath(filePath)
@@ -86,7 +86,7 @@ class LastPageManager(private val context: Context) {
     }
 
     /**
-     * Löscht den Eintrag für eine Datei
+     * Deletes the entry for a file
      */
     fun clearLastPage(filePath: String) {
         val lastPages = loadLastPages().toMutableList()
@@ -105,7 +105,7 @@ class LastPageManager(private val context: Context) {
     }
 
     /**
-     * Löscht alle Einträge, die älter als die angegebene Anzahl von Tagen sind
+     * Clears all entries older than the specified number of days
      */
     fun clearOldEntries(daysToKeep: Int = 30) {
         val cutoffTime = System.currentTimeMillis() - (daysToKeep * 24 * 60 * 60 * 1000L)

@@ -29,7 +29,7 @@ class FileTagManager(private val context: Context) {
     private val tagsFile: File
         get() = File(context.filesDir, "file_tags.json")
     
-    // Cache für geladene Tags - wird bei App-Session beibehalten
+    // Cache for loaded tags - retained for the app session
     @Volatile
     private var tagsCache: List<FileTag>? = null
     // Map caches for fast lookups (normalized path -> tags) and name -> tags

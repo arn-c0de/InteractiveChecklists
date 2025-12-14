@@ -198,11 +198,11 @@ fun SettingsScreen(
                 )
             }
 
-            // === Mitwirkende ===
+            // === Contributors ===
             item {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "Mitwirkende",
+                    text = "Contributors",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(vertical = 8.dp)
@@ -213,13 +213,13 @@ fun SettingsScreen(
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "Mitwirkende",
+                            text = "Contributors",
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Füge Mitwirkende hinzu. Jede Person kann eine Webseite und optional eine Rolle haben.",
+                            text = "Add contributors. Each person can have a website and an optional role.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -264,7 +264,7 @@ fun SettingsScreen(
                                         }
                                         if (!entry.role.isNullOrBlank()) {
                                             Text(
-                                                text = "Rolle: ${entry.role}",
+                                                text = "Role: ${entry.role}",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
@@ -278,11 +278,11 @@ fun SettingsScreen(
                 }
             }
 
-            // === Dokumentquellen ===
+            // === Document Sources ===
             item {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "Dokumentquellen",
+                    text = "Document Sources",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(vertical = 8.dp)
@@ -300,7 +300,7 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Dokumentquellen",
+                                text = "Document Sources",
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.weight(1f)
@@ -319,7 +319,7 @@ fun SettingsScreen(
                             Column {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = "Quellen für Dokumente. Jede Quelle kann Webseite und Lizenz haben.",
+                                    text = "Sources for documents. Each source can have a website and a license.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -364,7 +364,7 @@ fun SettingsScreen(
                                                 }
                                                 if (!entry.license.isNullOrBlank()) {
                                                     Text(
-                                                        text = "Lizenz: ${entry.license}",
+                                                        text = "License: ${entry.license}",
                                                         style = MaterialTheme.typography.bodySmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                                     )
@@ -513,7 +513,7 @@ fun SettingsScreen(
                                 }, modifier = Modifier.fillMaxWidth()) {
                                     Icon(Icons.Default.Refresh, contentDescription = null)
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Tags importieren & neu laden")
+                                    Text("Import & Reload Tags")
                                 }
                                 Spacer(modifier = Modifier.height(16.dp))
                                 // Tag statistics
@@ -524,11 +524,11 @@ fun SettingsScreen(
                                     Pair(uniqueTags.size, filesWithTags)
                                 }
                                 Text(
-                                    text = "Gesamtzahl unterschiedlicher Tags: ${tagStats.first}",
+                                    text = "Total unique tags: ${tagStats.first}",
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                                 Text(
-                                    text = "Dateien mit mindestens einem Tag: ${tagStats.second}",
+                                    text = "Files with at least one tag: ${tagStats.second}",
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                             }
