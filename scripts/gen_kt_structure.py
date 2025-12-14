@@ -29,7 +29,7 @@ def extract_structure_from_file(path: Path):
     # Regex to find top-level declarations
     # class/object/interface declarations
     classes = []
-    class_pattern = re.compile(r'^(?P<prefix>\s*(?:public|private|protected|internal|open|abstract|sealed|data|annotation|expect|actual|final|suspend|inline|tailrec|operator|infix)\s+)*(?P<type>class|object|interface)\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)', re.MULTILINE)
+    class_pattern = re.compile(r'^\s*(?P<prefix>(?:(?:public|private|protected|internal|open|abstract|sealed|data|annotation|expect|actual|final|suspend|inline|tailrec|operator|infix)\s+)*)(?P<type>class|object|interface)\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)', re.MULTILINE)
     for cm in class_pattern.finditer(text):
         classes.append({'name': cm.group('name'), 'type': cm.group('type'), 'line': text[:cm.start()].count('\n') + 1, 'methods': [], 'properties': []})
 
@@ -48,9 +48,9 @@ def extract_structure_from_file(path: Path):
     brace_depth = 0
     current_class = None
     class_lookup = { (c['type'], c['name']): c for c in classes }
-    decl_fun_pattern = re.compile(r'^\s*(?:public|private|protected|internal|open|abstract|suspend|inline|tailrec|operator|infix|external|expect|actual\s+)*fun\s+([A-Za-z_][A-Za-z0-9_]*)')
-    decl_prop_pattern = re.compile(r'^\s*(?:public|private|protected|internal|lateinit|const|open|override|val|var|vararg|expect|actual\s+)*(val|var)\s+([A-Za-z_][A-Za-z0-9_]*)')
-    class_header_pattern = re.compile(r'^\s*(?:public|private|protected|internal|open|abstract|sealed|data|annotation|expect|actual|final|suspend|inline|tailrec|operator|infix)*\s*(class|object|interface)\s+([A-Za-z_][A-Za-z0-9_]*)')
+    decl_fun_pattern = re.compile(r'^\s*(?:(?:public|private|protected|internal|open|abstract|suspend|inline|tailrec|operator|infix|external|expect|actual)\s+)*fun\s+([A-Za-z_][A-Za-z0-9_]*)')
+    decl_prop_pattern = re.compile(r'^\s*(?:(?:public|private|protected|internal|lateinit|const|open|override|val|var|vararg|expect|actual)\s+)*(val|var)\s+([A-Za-z_][A-Za-z0-9_]*)')
+    class_header_pattern = re.compile(r'^\s*(?:(?:public|private|protected|internal|open|abstract|sealed|data|annotation|expect|actual|final|suspend|inline|tailrec|operator|infix)\s+)*(class|object|interface)\s+([A-Za-z_][A-Za-z0-9_]*)')
 
     # Track a stack of class names with brace counts
     class_stack = []
