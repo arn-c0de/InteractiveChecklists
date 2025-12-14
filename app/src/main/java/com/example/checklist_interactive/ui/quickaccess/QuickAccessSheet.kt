@@ -1214,25 +1214,25 @@ fun QuickAccessSheet(
                                     // Extract all digits
                                     val allDigits = newVal.text.filter { it.isDigit() }
 
-                                    // Maximum 11 digits (4 FL + 3 Speed + 3 HDG + 1 optional char)
-                                    val digits = allDigits.take(10)
+                                    // Maximum 11 digits (5 FL + 3 Speed + 3 HDG)
+                                    val digits = allDigits.take(11)
 
-                                    // FL: first 4 digits (e.g., 0350)
-                                    val flDigits = digits.take(4).padEnd(4, ' ')
+                                    // FL: first 5 digits (e.g., 02000 for 20000ft)
+                                    val flDigits = digits.take(5).padEnd(5, ' ')
                                     // Speed: next 3 digits
-                                    val speedDigits = if (digits.length > 4) {
-                                        digits.drop(4).take(3).padEnd(3, ' ')
+                                    val speedDigits = if (digits.length > 5) {
+                                        digits.drop(5).take(3).padEnd(3, ' ')
                                     } else {
                                         "   "
                                     }
                                     // HDG: last 3 digits
-                                    val hdgDigits = if (digits.length > 7) {
-                                        digits.drop(7).take(3).padEnd(3, ' ')
+                                    val hdgDigits = if (digits.length > 8) {
+                                        digits.drop(8).take(3).padEnd(3, ' ')
                                     } else {
                                         "   "
                                     }
 
-                                    // Format: "Alt: FL DDDD / Speed: DDD / HDG: DDD"
+                                    // Format: "Alt: FL DDDDD / Speed: DDD / HDG: DDD"
                                     val formatted = buildString {
                                         append("Alt: FL ")
                                         append(flDigits)
@@ -1242,14 +1242,24 @@ fun QuickAccessSheet(
                                         append(hdgDigits)
                                     }
 
-                                    // Cursor position based on number of digits
+                                    // Cursor: after last entered digit (robust)
                                     val numDigits = digits.length
-                                    val cursorPos = when {
-                                        numDigits == 0 -> 9  // After "Alt: FL "
-                                        numDigits <= 4 -> 9 + numDigits  // In FL area
-                                        numDigits <= 7 -> 23 + (numDigits - 4)  // In speed area (after " / Speed: ")
-                                        else -> 34 + (numDigits - 7)  // In HDG area (after " / HDG: ")
-                                    }
+                                    val lastDigitIndex = if (numDigits > 0) {
+                                        var count = 0
+                                        var idx = -1
+                                        for (i in formatted.indices) {
+                                            if (formatted[i].isDigit()) {
+                                                count++
+                                                if (count == numDigits) {
+                                                    idx = i
+                                                    break
+                                                }
+                                            }
+                                        }
+                                        idx
+                                    } else -1
+
+                                    val cursorPos = if (lastDigitIndex >= 0) lastDigitIndex + 1 else formatted.indexOf("Alt: FL ") + "Alt: FL ".length
 
                                     newTextInput = TextFieldValue(
                                         text = formatted,
@@ -1301,12 +1311,22 @@ fun QuickAccessSheet(
                                                 val digits = txt.filter { it.isDigit() }
                                                 val numDigits = digits.length
 
-                                                val pos = when {
-                                                    numDigits == 0 -> 9  // After "Alt: FL "
-                                                    numDigits <= 4 -> 9 + numDigits
-                                                    numDigits <= 7 -> 23 + (numDigits - 4)
-                                                    else -> 34 + (numDigits - 7)
-                                                }
+                                                val lastDigitIndex = if (numDigits > 0) {
+                                                    var count = 0
+                                                    var idx = -1
+                                                    for (i in txt.indices) {
+                                                        if (txt[i].isDigit()) {
+                                                            count++
+                                                            if (count == numDigits) {
+                                                                idx = i
+                                                                break
+                                                            }
+                                                        }
+                                                    }
+                                                    idx
+                                                } else -1
+
+                                                val pos = if (lastDigitIndex >= 0) lastDigitIndex + 1 else txt.indexOf("Alt: FL ") + "Alt: FL ".length
 
                                                 newTextInput = newTextInput.copy(
                                                     selection = TextRange(pos.coerceIn(0, txt.length))
@@ -1321,7 +1341,7 @@ fun QuickAccessSheet(
                                     "freq" -> "e.g., 122.500"
                                     "time" -> "e.g., 14:30"
                                     "number" -> "Enter numbers..."
-                                    "fluglage" -> "Enter numbers (e.g., 0350250090 for FL350/250kt/HDG090)"
+                                    "fluglage" -> "Enter numbers (e.g., 020000250090 for FL20000/250kt/HDG090)"
                                     else -> "Add text..."
                                 })
                             },
