@@ -1471,9 +1471,11 @@ fun PdfViewer(
                                         .padding(vertical = 8.dp)
                                 ) {
                                     Spacer(modifier = Modifier.width((level * 16).dp + 16.dp))
-                                    Column {
+                                            Column {
+                                        val displayTitle = titleText.trim().takeIf { it.isNotBlank() } ?: "Page ${pageIndex + 1}"
+                                        val safeTitle = displayTitle.replace(Regex("[\u0000-\u001F\u007F]+"), " ").trim()
                                         Text(
-                                            text = titleText,
+                                            text = safeTitle,
                                             style = MaterialTheme.typography.bodyMedium.copy(
                                                 fontWeight = if (level == 0) FontWeight.Bold else FontWeight.Normal
                                             )
