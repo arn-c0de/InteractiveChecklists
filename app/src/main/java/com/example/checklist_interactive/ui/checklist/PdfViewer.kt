@@ -289,7 +289,7 @@ fun PdfViewer(
         try {
             withContext(Dispatchers.IO) {
                 val loadedPdfFile = if (isInternalFile) {
-                    // Interne Datei direkt verwenden
+                    // Use internal file directly
                     File(pdfPath)
                 } else {
                     // Copy asset to temporary file
@@ -615,7 +615,7 @@ fun PdfViewer(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 horizontalAlignment = Alignment.End
             ) {
-                // Zoom Reset FAB - nur anzeigen wenn gezoomt (oben, damit es die Position der anderen nicht verschiebt)
+                // Zoom Reset FAB - only show when zoomed (top, so it doesn't move other items)
                 val currentScale = pageScales[currentPage] ?: 1f
                 if (currentScale != 1f) {
                     FloatingActionButton(
@@ -1961,13 +1961,13 @@ private fun PdfPageWithAnnotations(
                 )
             }
 
-            // Zeichne den Pinsel-Cursor wenn Zeichnen-Modus aktiv ist
+            // Draw the brush cursor when annotate mode is active
             if (annotateMode && !eraseMode && brushPosition != null && isCurrentPage) {
                 val brushRadius = if (highlightMode) {
-                    // Highlight: dicker Pinsel
+                    // Highlight: thicker brush
                     maxOf(7.5f, strokeWidth * renderScale * 2.5f)
                 } else {
-                    // Normal: normaler Pinsel
+                    // Normal: regular brush
                     maxOf(2f, strokeWidth * renderScale / 2f)
                 }
 

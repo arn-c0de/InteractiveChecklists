@@ -441,7 +441,7 @@ class InternalFileManager(private val context: Context) {
                 return Result.failure(Exception("Only PDF and Markdown files are supported"))
             }
 
-            // Zieldatei erstellen
+            // Create destination file
             val destFile = File(categoryDir, originalName)
 
             // If file already exists, generate a new name
@@ -453,7 +453,7 @@ class InternalFileManager(private val context: Context) {
                 destFile
             }
 
-            // Datei kopieren
+            // Copy file
             context.contentResolver.openInputStream(uri)?.use { input ->
                 FileOutputStream(finalFile).use { output ->
                     input.copyTo(output)
@@ -485,7 +485,7 @@ class InternalFileManager(private val context: Context) {
     }
 
     /**
-     * Verschiebt eine Datei in eine andere Kategorie
+     * Moves a file to another category
      */
     fun moveFile(filePath: String, newCategory: String): Result<FileInfo> {
         return try {
@@ -506,7 +506,7 @@ class InternalFileManager(private val context: Context) {
                 return Result.failure(Exception("File already exists in this category"))
             }
 
-            // Datei verschieben
+            // Move file
             if (sourceFile.renameTo(destFile)) {
                 // Update tags with new path
                 val oldRelativePath = getRelativePath(sourceFile.absolutePath)
@@ -532,7 +532,7 @@ class InternalFileManager(private val context: Context) {
     }
 
     /**
-     * Benennt eine Datei um
+     * Renames a file
      */
     fun renameFile(filePath: String, newName: String): Result<FileInfo> {
         return try {
@@ -575,7 +575,7 @@ class InternalFileManager(private val context: Context) {
     }
 
     /**
-     * Hilfsfunktion um Dateinamen aus Uri zu extrahieren
+     * Helper to extract filename from a Uri
      */
     private fun getFileNameFromUri(uri: Uri): String? {
         var fileName: String? = null
@@ -617,6 +617,7 @@ class InternalFileManager(private val context: Context) {
 
             context.assets.open(assetPath).use { input ->
                 FileOutputStream(destFile).use { output ->
+                    // Create destination file and copy contents
                     input.copyTo(output)
                 }
             }
@@ -638,8 +639,8 @@ class InternalFileManager(private val context: Context) {
     }
 
     /**
-     * Kopiert rekursiv alle unterstützten Checklists (pdf/md) aus den App-Assets ins interne Root-Verzeichnis.
-     * Behält die komplette Ordnerstruktur bei.
+     * Copies supported checklists (pdf/md) recursively from the app assets into the internal root directory.
+     * Preserves the complete folder structure.
      * Returns number of imported files.
      */
     fun importAllBundledAssets(rootAssetPath: String = ""): Int {
@@ -770,7 +771,7 @@ class InternalFileManager(private val context: Context) {
     }
 
     /**
-     * Löscht alle Dateien und Ordner unter dem internen Root (Reset), behält Root-Ordner selbst bei.
+     * Deletes all files and folders under the internal root (reset), keeping the root folder itself.
      */
     fun wipeInternalRoot() {
         rootDir.listFiles()?.forEach { it.deleteRecursively() }
@@ -778,14 +779,14 @@ class InternalFileManager(private val context: Context) {
     }
     
     /**
-     * Importiert alle Dateien aus dem externen Imports/ Ordner automatisch.
-     * Jeder Unterordner wird zu einer Kategorie.
-     * Returns Anzahl der importierten Dateien.
+     * Imports all files from the external Imports/ folder automatically.
+     * Each subfolder becomes a category.
+     * Returns number of imported files.
      */
     fun importFromExternalImportsFolder(): Int {
         var imported = 0
         try {
-            // 1. Prüfe im app-spezifischen Verzeichnis: Android/data/<package>/files/Imports/
+            // 1. Check in app-specific directory: Android/data/<package>/files/Imports/
             context.getExternalFilesDir(null)?.let { appFiles ->
                 val importsFolder = File(appFiles, "Imports")
                 if (importsFolder.exists() && importsFolder.isDirectory) {
@@ -793,7 +794,7 @@ class InternalFileManager(private val context: Context) {
                 }
             }
             
-            // 2. Prüfe im Download-Ordner: /storage/emulated/0/Download/Imports/
+            // 2. Check in Download folder: /storage/emulated/0/Download/Imports/
             try {
                 val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(
                     android.os.Environment.DIRECTORY_DOWNLOADS
@@ -803,10 +804,10 @@ class InternalFileManager(private val context: Context) {
                     imported += importFromFolder(downloadImports)
                 }
             } catch (e: Exception) {
-                // Ignore wenn kein Zugriff
+                // Ignore if no access
             }
             
-            // 3. Prüfe im Root des externen Speichers: /storage/emulated/0/Imports/
+            // 3. Check in the root of external storage: /storage/emulated/0/Imports/
             try {
                 val externalStorage = android.os.Environment.getExternalStorageDirectory()
                 val rootImports = File(externalStorage, "Imports")
@@ -814,7 +815,7 @@ class InternalFileManager(private val context: Context) {
                     imported += importFromFolder(rootImports)
                 }
             } catch (e: Exception) {
-                // Ignore wenn kein Zugriff
+                // Ignore if no access
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -823,8 +824,8 @@ class InternalFileManager(private val context: Context) {
     }
     
     /**
-     * Importiert alle Dateien aus einem Ordner rekursiv.
-     * Unterordner werden zu Kategorien.
+     * Imports all files from a folder recursively.
+     * Subfolders become categories.
      */
     private fun importFromFolder(folder: File): Int {
         var imported = 0

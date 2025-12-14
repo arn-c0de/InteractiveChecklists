@@ -194,7 +194,7 @@ class MainActivity : ComponentActivity() {
 
                     // Auto-open last file on startup and restore tabs
                     LaunchedEffect(Unit) {
-                        // 1. Importiere Dateien aus externem Imports/ Ordner
+                        // 1. Import files from external Imports/ folder
                         // Check permissions and request if needed
                         val permissionsToRequest = mutableListOf<String>()
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

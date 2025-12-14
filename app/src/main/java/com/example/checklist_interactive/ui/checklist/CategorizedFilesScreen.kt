@@ -89,7 +89,7 @@ fun CategorizedFilesScreen(
             ) {
                 groupedFiles.forEach { (category, files) ->
                     item {
-                        // Kategorie-Header
+                        // Category header
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
                             color = MaterialTheme.colorScheme.surfaceVariant
@@ -113,7 +113,7 @@ fun CategorizedFilesScreen(
                                 )
                                 Spacer(modifier = Modifier.weight(1f))
                                 Text(
-                                    text = "${files.size} ${if (files.size == 1) "Datei" else "Dateien"}",
+                                    text = "${files.size} ${if (files.size == 1) "file" else "files"}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
