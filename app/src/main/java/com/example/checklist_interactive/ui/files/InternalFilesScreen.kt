@@ -243,7 +243,7 @@ fun InternalFilesScreen(
             selectedCategory?.let { category ->
                 val result = fileManager.importFile(selectedUri, category)
                 result.onSuccess {
-                    // Refresh file list und filter folderTree nach Sichtbarkeit
+                    // Refresh file list and filter folder tree by visibility
                     coroutineScope.launch {
                         isLoadingFiles = true
                         refreshFilesWithTags()
@@ -746,12 +746,12 @@ private fun filterAircraftChildren(
 ): InternalFileManager.FolderNode {
     // If the current node is "Checklists", filter aircraft subfolders by visibility
     return if (node.name.equals("Checklists", ignoreCase = true)) {
-        // Filtere die Kinder: Nur sichtbare Aircraft-Ordner behalten
+        // Filter the children: keep only visible aircraft folders
         val filteredChildren = node.children.filter { child ->
             if (assetAircraftsLower.contains(child.name.lowercase())) {
                 prefsManager.isAircraftVisible(child.name)
             } else {
-                true // Nicht-Aircraft-Ordner immer anzeigen
+                true // Always show non-aircraft folders
             }
         }.map { child ->
             // Apply recursively to subfolders

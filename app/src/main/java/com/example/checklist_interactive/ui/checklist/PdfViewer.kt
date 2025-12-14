@@ -22,6 +22,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.border
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -48,6 +49,7 @@ import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -104,6 +106,8 @@ import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
  * Supports annotations (draw, highlight, delete).
  * Includes zoom, page highlights and shortcuts.
  */
+enum class BrushType { Pen, Marker, Special }
+
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun PdfViewer(
@@ -147,7 +151,9 @@ fun PdfViewer(
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var annotateMode by remember { mutableStateOf(false) }
-    var highlightMode by remember { mutableStateOf(false) }
+    var brushType by remember { mutableStateOf(BrushType.Pen) }
+    // Backwards-compatible derived flag used by drawing/rendering logic
+    val highlightMode by remember(brushType) { derivedStateOf { brushType == BrushType.Marker } }
     var eraseMode by remember { mutableStateOf(false) }
     var strokeWidth by remember { mutableStateOf(4f) }
     var selectedColor by remember { mutableStateOf(Color.Red) }
@@ -668,7 +674,7 @@ fun PdfViewer(
                             invertColors = !invertColors
                             invertColorPrefManager.setInverted(pdfPath, invertColors)
                         },
-                        hint = "Farben invertieren",
+                        hint = "Invert colors",
                         onHintChange = { hoveredHint = it },
                         modifier = Modifier.size(40.dp)
                     ) {
@@ -729,7 +735,7 @@ fun PdfViewer(
                 )
             } else {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    // Kompakte Toolbar mit Scroll - ein-/ausklappbar
+                    // Compact toolbar with scroll - collapsible
                     AnimatedVisibility(
                         visible = showToolbar,
                         enter = expandVertically() + slideInVertically(),
@@ -753,34 +759,34 @@ fun PdfViewer(
                                     annotateMode = !annotateMode
                                     if (annotateMode) eraseMode = false
                                 },
-                                hint = "Zeichnen",
+                                hint = "Draw",
                                 onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
                                     Icons.Default.Create,
-                                    contentDescription = "Zeichnen",
+                                    contentDescription = "Draw",
                                     tint = if (annotateMode) MaterialTheme.colorScheme.primary else LocalContentColor.current,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
-                            // Inhaltsverzeichnis / Kapitel (TOC) - opens a dialog with chapters
+                            // Table of contents / chapters (TOC) - opens a dialog with chapters
                             HintIconButton(
                                 onClick = { showTocDialog = true },
-                                hint = "Inhaltsverzeichnis",
+                                hint = "Table of contents",
                                 onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
                                     Icons.AutoMirrored.Filled.ViewList, // visible chapter/list icon
-                                    contentDescription = "Inhaltsverzeichnis",
+                                    contentDescription = "Table of contents",
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
                             HintIconButton(
                                 onClick = {
-                                    highlightMode = !highlightMode
-                                    if (highlightMode) {
+                                    brushType = if (brushType == BrushType.Marker) BrushType.Pen else BrushType.Marker
+                                    if (brushType == BrushType.Marker) {
                                         annotateMode = true
                                         eraseMode = false
                                     }
@@ -934,7 +940,7 @@ fun PdfViewer(
                             )
                         }
 
-                        // Zweite Reihe: Zoom & Radierer
+                        // Second row: Zoom & Eraser
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -987,27 +993,27 @@ fun PdfViewer(
                                 onClick = {
                                     eraseMode = !eraseMode
                                     if (eraseMode) {
-                                        annotateMode = false
-                                        highlightMode = false
+                                        if (brushType == BrushType.Marker) brushType = BrushType.Pen
                                     }
                                 },
-                                hint = "Radierer",
+                                hint = "Eraser",
                                 onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
                                     Icons.Default.Delete,
-                                    contentDescription = "Radierer",
+                                    contentDescription = "Eraser",
                                     tint = if (eraseMode) MaterialTheme.colorScheme.primary else LocalContentColor.current,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
                             Spacer(modifier = Modifier.weight(1f))
                             Text(
-                                text = if (eraseMode) "Radierer"
-                                       else if (annotateMode && highlightMode) "Highlight"
-                                       else if (annotateMode) "Zeichnen"
-                                       else "Ansicht",
+                                text = if (eraseMode) "Eraser"
+                                       else if (annotateMode && brushType == BrushType.Marker) "Highlight"
+                                       else if (annotateMode && brushType == BrushType.Special) "Special"
+                                       else if (annotateMode) "Draw"
+                                       else "View",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold
                             )
@@ -1048,7 +1054,7 @@ fun PdfViewer(
                         )
                     }
 
-                    // Farb- und Strichbreiten-Kontrolle: nur anzeigen wenn Zeichnen aktiv ist
+                    // Color and stroke width controls: only show when draw mode is active
                     if (annotateMode) {
                         Row(
                             modifier = Modifier
@@ -1059,40 +1065,103 @@ fun PdfViewer(
                         ) {
                         val colors = listOf(Color.Red, Color.Yellow, Color.Green, Color.Blue, Color.Magenta)
                         colors.forEach { c ->
+                            val isSelected = selectedColor == c
+                            val borderColor = if (c.luminance() > 0.6f) Color.Black else Color.White
                             Box(
                                 modifier = Modifier
-                                    .size(28.dp)
                                     .padding(4.dp)
-                                    .background(c, CircleShape)
+                                    .size(32.dp)
+                                    .border(width = if (isSelected) 2.dp else 0.dp, color = if (isSelected) borderColor else Color.Transparent, shape = CircleShape)
+                                    .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent, CircleShape)
                                     .clickable {
                                         selectedColor = c
                                         eraseMode = false
-                                    }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Box(modifier = Modifier.size(24.dp).background(c, CircleShape))
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                        // Brush type buttons (Pen, Marker, Special)
+                        HintIconButton(
+                            onClick = {
+                                brushType = BrushType.Pen
+                                annotateMode = true
+                                eraseMode = false
+                            },
+                            hint = "Pen",
+                            onHintChange = { hoveredHint = it },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Create,
+                                contentDescription = "Pen",
+                                tint = if (brushType == BrushType.Pen) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                         Spacer(modifier = Modifier.width(4.dp))
-                        // Radierer-Button hier bei den Farben
+                        HintIconButton(
+                            onClick = {
+                                brushType = BrushType.Marker
+                                annotateMode = true
+                                eraseMode = false
+                            },
+                            hint = "Marker",
+                            onHintChange = { hoveredHint = it },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Highlight,
+                                contentDescription = "Marker",
+                                tint = if (brushType == BrushType.Marker) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                        HintIconButton(
+                            onClick = {
+                                brushType = BrushType.Special
+                                annotateMode = true
+                                eraseMode = false
+                            },
+                            hint = "Special",
+                            onHintChange = { hoveredHint = it },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Star,
+                                contentDescription = "Special brush",
+                                tint = if (brushType == BrushType.Special) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        // Eraser button here near the colors
                         HintIconButton(
                             onClick = {
                                 eraseMode = !eraseMode
                                 if (eraseMode) {
-                                    highlightMode = false
+                                    // Wenn Draw-Tools nicht offen, beim Aktivieren des Radierers öffnen
+                                    if (!annotateMode) annotateMode = true
+                                    if (brushType == BrushType.Marker) brushType = BrushType.Pen
                                 }
                             },
-                            hint = "Radierer",
+                            hint = "Eraser",
                             onHintChange = { hoveredHint = it },
                             modifier = Modifier.size(36.dp)
                         ) {
                             Icon(
                                 Icons.Default.Delete,
-                                contentDescription = "Radierer",
+                                contentDescription = "Eraser",
                                 tint = if (eraseMode) MaterialTheme.colorScheme.primary else LocalContentColor.current,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         if (eraseMode) {
-                            Text("Radierer:", style = MaterialTheme.typography.labelSmall)
+                            Text("Eraser:", style = MaterialTheme.typography.labelSmall)
                             Slider(
                                 value = eraseRadius,
                                 onValueChange = { eraseRadius = it },
@@ -1101,12 +1170,23 @@ fun PdfViewer(
                             )
                         } else {
                             Text("Breite:", style = MaterialTheme.typography.labelSmall)
-                            Slider(
-                                value = strokeWidth,
-                                onValueChange = { strokeWidth = it },
-                                valueRange = 1f..30f,
-                                modifier = Modifier.width(120.dp).padding(start = 8.dp)
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 8.dp)) {
+                                Slider(
+                                    value = strokeWidth,
+                                    onValueChange = { strokeWidth = it },
+                                    valueRange = 1f..30f,
+                                    modifier = Modifier.width(120.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                val visualWidthPx = if (brushType == BrushType.Marker) strokeWidth * 4f else strokeWidth * 1.8f
+                                val previewSize = with(LocalDensity.current) { visualWidthPx.coerceIn(8f, 64f).toDp() }
+                                Box(
+                                    modifier = Modifier
+                                        .size(previewSize)
+                                        .background(selectedColor, CircleShape)
+                                        .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f), CircleShape)
+                                )
+                            }
                         }
                         }
                     }
@@ -1137,6 +1217,7 @@ fun PdfViewer(
                                     selectedColor = selectedColor,
                                     strokeWidth = strokeWidth,
                                     highlightMode = highlightMode,
+                                    brushType = brushType,
                                     eraseRadius = eraseRadius,
                                     scale = pageScales[pageIndex] ?: 1f,
                                     offsetX = pageOffsetsX[pageIndex] ?: 0f,
@@ -1278,6 +1359,7 @@ fun PdfViewer(
                                             strokeWidth = strokeWidth,
                                             highlightMode = highlightMode,
                                             eraseRadius = eraseRadius,
+                                            brushType = brushType,
                                             scale = pageScale,
                                             offsetX = pageOffsetX,
                                             offsetY = pageOffsetY,
@@ -1405,7 +1487,7 @@ fun PdfViewer(
                 }
             )
         }
-        // Inhaltsverzeichnis / Kapitel-Dialog mit hierarchischer Outline-Anzeige
+        // Table of contents / chapters dialog with hierarchical outline display
         if (showTocDialog) {
             // LazyListState for TOC, starts at current page
             val tocListState = rememberLazyListState()
@@ -1441,13 +1523,13 @@ fun PdfViewer(
 
             AlertDialog(
                 onDismissRequest = { showTocDialog = false },
-                title = { Text(if (outlineItems.isNotEmpty()) "Outline" else "Inhaltsverzeichnis") },
+                title = { Text(if (outlineItems.isNotEmpty()) "Outline" else "Table of contents") },
                 text = {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         if (chapters.isEmpty()) {
                             Text("No chapters found. Showing page list as fallback.")
                         }
-                        // Suchfeld
+                        // Search field
                         OutlinedTextField(
                             value = tocSearchQuery,
                             onValueChange = { tocSearchQuery = it },
@@ -1635,6 +1717,7 @@ private fun PdfPageWithAnnotations(
     selectedColor: Color,
     strokeWidth: Float,
     highlightMode: Boolean,
+    brushType: BrushType,
     eraseRadius: Float,
     scale: Float,
     offsetX: Float,
@@ -1888,7 +1971,7 @@ private fun PdfPageWithAnnotations(
                     }
                 }
                 // Custom pointer handling: Draw/Erase. Active when drawing or erase mode is enabled.
-                .pointerInput(annotateMode, eraseMode, pageIndex, isCurrentPage) {
+                .pointerInput(annotateMode, eraseMode, pageIndex, isCurrentPage, selectedColor, strokeWidth, brushType, eraseRadius) {
                     // This block handles drawing/erasing. Active when drawing/erase mode is on.
                     if (!isCurrentPage) return@pointerInput
                     if (!annotateMode && !eraseMode) return@pointerInput
@@ -1909,6 +1992,10 @@ private fun PdfPageWithAnnotations(
                                     }
                                 }
                                 onStrokesErase(toErase)
+                                if (toErase.isNotEmpty()) {
+                                    // Use the provided onSave callback so saving is done by the parent with correct context/path
+                                    onSave()
+                                }
                                 return@detectDragGestures
                             }
 
@@ -1917,12 +2004,21 @@ private fun PdfPageWithAnnotations(
                                 // Transform screen coords to document coords accounting for bitmap bounds
                                 val docX = (offset.x - bitmapDisplayOffset.x - renderOffsetX) / renderScale
                                 val docY = (offset.y - bitmapDisplayOffset.y - renderOffsetY) / renderScale
+                                val colorValue = when (brushType) {
+                                    BrushType.Special -> selectedColor.copy(alpha = 0.85f).value.toLong()
+                                    else -> selectedColor.value.toLong()
+                                }
+                                val initWidth = when (brushType) {
+                                    BrushType.Marker -> strokeWidth
+                                    BrushType.Special -> (strokeWidth * 1.5f).coerceAtMost(60f)
+                                    else -> strokeWidth
+                                }
                                 val newStroke = AnnotationStroke(
                                     page = pageIndex,
-                                    color = selectedColor.value.toLong(),
-                                    strokeWidth = strokeWidth,
+                                    color = colorValue,
+                                    strokeWidth = initWidth,
                                     points = listOf(Pair(docX, docY)),
-                                    isHighlight = highlightMode
+                                    isHighlight = (brushType == BrushType.Marker)
                                 )
                                 currentStroke = newStroke
                                 // DO NOT add to list while drawing - add only on onDragEnd
@@ -1944,6 +2040,10 @@ private fun PdfPageWithAnnotations(
                                     }
                                 }
                                 onStrokesErase(toErase)
+                                if (toErase.isNotEmpty()) {
+                                    // Use the provided onSave callback so saving is done by the parent with correct context/path
+                                    onSave()
+                                }
                                 return@detectDragGestures
                             }
 
@@ -1959,7 +2059,7 @@ private fun PdfPageWithAnnotations(
                                         add(Pair(docX, docY))
                                     }
                                     val updatedStroke = stroke.copy(points = newPoints)
-                                    // Aktualisiere nur currentStroke, nicht die Liste
+                                    // Update only currentStroke, not the list
                                     currentStroke = updatedStroke
                                 }
                             }
@@ -1996,12 +2096,14 @@ private fun PdfPageWithAnnotations(
                     maxOf(1f, stroke.strokeWidth * renderScale)
                 }
                 val strokeBaseColor = Color(stroke.color.toULong())
+                // Compute alpha: highlights use fixed low alpha; special brush may have reduced alpha encoded in color
+                val strokeAlpha = if (stroke.isHighlight) 0.4f else strokeBaseColor.alpha.coerceIn(0.1f, 1f)
                 // Annotations/Highlights/Drawing should NOT be affected by page color inversion
                 drawPath(
                     path = path,
                     color = strokeBaseColor,
                     style = Stroke(width = widthPx),
-                    alpha = if (stroke.isHighlight) 0.4f else 1f
+                    alpha = strokeAlpha
                 )
             }
 
@@ -2023,17 +2125,18 @@ private fun PdfPageWithAnnotations(
                         maxOf(1f, stroke.strokeWidth * renderScale)
                     }
                     val strokeBaseColor = Color(stroke.color.toULong())
+                    val strokeAlpha = if (stroke.isHighlight) 0.4f else strokeBaseColor.alpha.coerceIn(0.1f, 1f)
                     // Live stroke uses the original color as well
                     drawPath(
                         path = path,
                         color = strokeBaseColor,
                         style = Stroke(width = widthPx),
-                        alpha = if (stroke.isHighlight) 0.4f else 1f
+                        alpha = strokeAlpha
                     )
                 }
             }
 
-            // Zeichne den Radierer-Cursor wenn Radierer-Modus aktiv ist
+            // Draw the eraser cursor when erase mode is active
             if (eraseMode && eraserPosition != null && isCurrentPage) {
                 // Eraser cursor should keep its original color regardless of inversion
                 val eraserOuter = Color.Red.copy(alpha = 0.3f)

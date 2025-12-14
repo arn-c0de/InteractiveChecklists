@@ -339,7 +339,7 @@ fun testTabSwitchBySwipe() {
     onView(withId(R.id.file_list))
         .perform(click())
     
-    // Swipe nach links
+    // Swipe left
     onView(withId(R.id.pager))
         .perform(swipeLeft())
     
