@@ -1,6 +1,7 @@
 
 <!-- Badges -->
 <p align="left">
+	<a href="https://github.com/arn-c0de/InteractiveChecklists"><img src="https://img.shields.io/badge/GitHub-arn--c0de%2FInteractiveChecklists-181717?logo=github" alt="GitHub" /></a>
 	<img src="https://img.shields.io/badge/version-1.0-blue.svg" alt="Version" />
 	<img src="https://img.shields.io/badge/platform-Android-green.svg" alt="Platform" />
 	<img src="https://img.shields.io/badge/built_with-Jetpack%20Compose-orange.svg" alt="Jetpack Compose" />
