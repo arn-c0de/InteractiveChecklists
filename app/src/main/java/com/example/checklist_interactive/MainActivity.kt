@@ -53,7 +53,7 @@ import com.example.checklist_interactive.ui.tabs.TabbedDocumentViewer
 
 class MainActivity : ComponentActivity() {
         companion object {
-            const val SOFTWARE_VERSION = "1.0.7"
+            const val SOFTWARE_VERSION = "1.0.8"
         }
 
         val softwareVersion = SOFTWARE_VERSION
