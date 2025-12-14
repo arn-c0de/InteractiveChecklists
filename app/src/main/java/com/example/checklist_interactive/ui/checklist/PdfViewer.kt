@@ -587,15 +587,6 @@ fun PdfViewer(
                             modifier = Modifier.size(18.dp)
                         )
                     }
-                    if (onToggleTheme != null) {
-                        HintIconButton(onClick = onToggleTheme, hint = context.getString(R.string.toggle_dark_mode), onHintChange = { hoveredHint = it }) {
-                            Icon(
-                                imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                                contentDescription = context.getString(R.string.toggle_dark_mode),
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
                     HintIconButton(
                         onClick = {
                             invertColors = !invertColors
@@ -630,16 +621,7 @@ fun PdfViewer(
                     }
                 }
 
-                // Quick Access FAB - immer sichtbar an fester Position
-                FloatingActionButton(
-                    onClick = { showQuickAccess = true },
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Quick access")
-                }
-
-                // Menu FAB - immer an fester Position (nur anzeigen wenn onShowFileList gesetzt ist)
+                // Menu FAB - always visible at a fixed position (only show when onShowFileList is set)
                 if (onShowFileList != null) {
                     FloatingActionButton(
                         onClick = onShowFileList,
@@ -647,6 +629,15 @@ fun PdfViewer(
                     ) {
                         Icon(Icons.Default.Menu, contentDescription = context.getString(R.string.file_list))
                     }
+                }
+
+                // Quick Access FAB - always anchored to bottom-right (place last so it's closest to the screen edge)
+                FloatingActionButton(
+                    onClick = { showQuickAccess = true },
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Quick access")
                 }
             }
         }
@@ -763,8 +754,7 @@ fun PdfViewer(
                             // Link to quick note
                             HintIconButton(
                                 onClick = {
-                                    @Suppress("DEPRECATION")
-                                    quickNoteManager.addLinkedDocument(
+                                    quickNoteManager.addMarkdownLink(
                                         filePath = pdfPath,
                                         fileName = title,
                                         pageNumber = currentPage
@@ -1136,7 +1126,8 @@ fun PdfViewer(
                                                                     // No progress indicator to prevent flickering
                                                                 }
                                 LaunchedEffect(pageIndex) {
-                                    if (pdfRenderer == null || renderingPages.contains(pageIndex) || bitmap != null) return@LaunchedEffect
+                                    // Only run if pdfRenderer is available and this page is not already rendering
+                                    if (pdfRenderer == null || renderingPages.contains(pageIndex)) return@LaunchedEffect
                                     try { renderPageToCache(pageIndex, screenWidthPx) } catch (_: Exception) {}
                                 }
                             }

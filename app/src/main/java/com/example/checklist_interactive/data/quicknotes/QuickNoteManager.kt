@@ -376,13 +376,27 @@ class QuickNoteManager(private val context: Context) {
         pageNumber: Int? = null,
         noteId: String? = null
     ) {
+        // Backwards-compatible wrapper - forward to the new API
+        addMarkdownLink(filePath = filePath, fileName = fileName, pageNumber = pageNumber, noteId = noteId)
+    }
+
+    /**
+     * Adds a markdown-style internal link to the specified (or active) note's content.
+     * This is the preferred API for linking documents from UI code.
+     */
+    fun addMarkdownLink(
+        filePath: String,
+        fileName: String,
+        pageNumber: Int? = null,
+        noteId: String? = null
+    ) {
         scope.launch {
             try {
                 val targetId = noteId ?: _activeNoteId.value
                 if (targetId != null) {
                     val note = repository.getNoteByIdOnce(targetId)
                     if (note != null) {
-                        // Create markdown link instead of using LinkedDocuments
+                        // Create markdown link pointing to internal URI handled by the app
                         val encodedPath = java.net.URLEncoder.encode(filePath, "UTF-8")
                         val pageParam = if (pageNumber != null) "&page=${pageNumber + 1}" else ""
                         val label = if (pageNumber != null) "$fileName (Page ${pageNumber + 1})" else fileName
@@ -393,7 +407,7 @@ class QuickNoteManager(private val context: Context) {
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error adding linked document", e)
+                Log.e(TAG, "Error adding markdown link", e)
             }
         }
     }
