@@ -1,54 +1,73 @@
-# Collaborators
+[← Back to README](README.md)
 
-Thank you for your interest in contributing to InteractiveChecklists! This guide explains how to get started, how we review work, and where to ask questions.
+# 🚀 Contributing Guide
 
-## Maintainers
+Thank you for your interest in making InteractiveChecklists better! This guide will help you get started, contribute effectively, and understand our process.
 
-- The maintainers are the project owners and active contributors listed on the repository. If you need to contact maintainers directly, open an issue or use the project's Discussions tab.
+---
 
-## Quick Start for Contributors
+## 📋 Quick Start
 
-1. Fork the repository on GitHub and clone your fork.
-2. Create a topic branch: `git checkout -b feat/short-description`.
-3. Run the project locally and add tests for your change when applicable.
-4. Commit with a clear message and open a pull request against the main branch.
+1. **Fork** the repository and clone your fork.
+2. **Create a branch:**
+	 - `git checkout -b feat/short-description`
+3. **Develop locally:**
+	 - Add or update tests for your change.
+	 - Use these commands:
+		 - Build: `./gradlew assembleDebug`
+		 - Test: `./gradlew test`
+		 - Lint: `./gradlew lint`
+4. **Commit & PR:**
+	 - Write a clear commit message.
+	 - Open a pull request (PR) against `main`.
 
-Recommended local commands:
+---
 
-- Build the app: `./gradlew assembleDebug`
-- Run unit tests: `./gradlew test`
-- Run static checks or lint: `./gradlew lint`
+## 🛠️ Contribution Process
 
-## Contribution Process
+- **Propose features or report bugs:**
+	- File an issue with a clear title, steps to reproduce (if needed), and expected behavior.
+- **Reference issues:**
+	- Use `Fixes #<issue-number>` in your PR if it resolves an issue.
+- **Keep PRs focused:**
+	- Small, focused PRs are easier to review. Split large changes into multiple PRs.
 
-- File an issue to propose features or report bugs. Include a clear title, steps to reproduce (if applicable), and expected behavior.
-- Reference the issue in your pull request using `Fixes #<issue-number>` when appropriate.
-- Keep pull requests focused and small to simplify review. Large refactors are better split into multiple PRs.
+---
 
-## PR Checklist
+## ✅ PR Checklist
 
-- Link to a related issue (if any).
-- Include a clear description of what changed and why.
-- Add or update tests covering your change.
-- Ensure the project builds and checks pass locally.
-- Keep formatting and style consistent with existing code.
+- [ ] Link to a related issue (if any)
+- [ ] Clear description of what changed and why
+- [ ] Add or update tests
+- [ ] Project builds and checks pass locally
+- [ ] Code style matches project conventions
 
-## Coding Guidelines
+---
 
-- Prefer idiomatic Kotlin and Jetpack Compose patterns used in the project.
-- Keep UI changes small and easy to visually verify.
-- If adding dependencies, explain why and keep them minimal.
+## 💡 Coding Guidelines
 
-## Communication & Support
+- Use idiomatic Kotlin and Jetpack Compose patterns
+- Keep UI changes small and easy to review visually
+- Minimize new dependencies and explain additions
 
-- Use GitHub Issues and Pull Requests for discussion and review.
-- For broader planning or coordination, use GitHub Discussions (if enabled) or open an issue with the `discussion` tag.
+---
 
-## Code of Conduct & License
+## 💬 Communication & Support
 
-- Please follow the project's Code of Conduct. If a `CODE_OF_CONDUCT.md` is not present yet, maintain respectful and inclusive behaviour in issues, PRs, and discussions.
-- By contributing, you agree to the repository license. Larger contributions may require a signed CLA depending on the maintainer's policy.
+- Use **GitHub Issues** and **Pull Requests** for discussion and review
+- For planning or coordination, use **GitHub Discussions** (if enabled) or open an issue with the `discussion` tag
 
-## Thank you
+---
 
-We appreciate your time and contributions — thank you for helping make InteractiveChecklists better!
+## 🤝 Code of Conduct & License
+
+- Please follow our Code of Conduct (see `CODE_OF_CONDUCT.md` if present)
+- Be respectful and inclusive in all project spaces
+- By contributing, you agree to the repository license
+- Large contributions may require a signed CLA (at maintainer's discretion)
+
+---
+
+## 🙏 Thank You
+
+We appreciate your time and effort — your contributions make InteractiveChecklists better for everyone!

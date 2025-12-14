@@ -1,54 +1,62 @@
-[Home](README.md) | [Documentation Navigation](docs/docnavigation.md)
 
-# Security Policy
+[← Back to README](README.md) | [Documentation Index](docs/docnavigation.md)
 
-The Checklist Interactive project takes the security of our software seriously. We appreciate your efforts to responsibly disclose security vulnerabilities and help us improve the security of our application.
+# 🛡️ Security Policy
 
-## Supported Versions
+ChecklistInteractive takes security seriously. We appreciate responsible disclosure and your help in keeping our users safe.
 
-We are committed to providing security updates for the following versions of Checklist Interactive:
+---
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 1.0.0   | :white_check_mark: |
+## 🔒 Supported Versions
 
-## Reporting a Vulnerability
+| Version | Supported           |
+| ------- | ------------------- |
+| 1.0.0   | ✅ Supported        |
 
-If you discover a security vulnerability, please report it to us as quickly as possible. We encourage you to contact us via email at [arn-c0de@protonmail.com](mailto:arn-c0de@protonmail.com).
+---
 
-Please include the following information in your report:
+## 🐞 Reporting a Vulnerability
 
-*   A clear and concise description of the vulnerability.
-*   Steps to reproduce the vulnerability.
-*   The version(s) of Checklist Interactive affected.
-*   Any proof-of-concept code or exploits.
-*   Your contact information (optional, but appreciated for follow-up questions).
+If you discover a security issue, please report it promptly:
 
-## Our Commitment
+- Email: [arn-c0de@protonmail.com](mailto:arn-c0de@protonmail.com)
 
-We are committed to:
+Include in your report:
+- Clear description of the vulnerability
+- Steps to reproduce
+- Affected version(s)
+- Proof-of-concept or exploit code (if available)
+- Your contact info (optional, for follow-up)
 
-*   Acknowledging your report within 2 business days.
-*   Providing an estimated timeline for addressing the vulnerability.
-*   Keeping you informed of our progress.
-*   Not pursuing legal action against individuals who report vulnerabilities in good faith and adhere to responsible disclosure practices.
+---
 
-## Disclosure Policy
+## 🤝 Our Commitment
 
-We follow a coordinated vulnerability disclosure model. This means:
+We will:
+- Acknowledge your report within **2 business days**
+- Provide an estimated timeline for a fix
+- Keep you updated on progress
+- Never pursue legal action against good-faith reporters
 
-1.  **Private Notification**: You report the vulnerability to us privately.
-2.  **Validation and Remediation**: We validate the vulnerability and work to develop a fix.
-3.  **Public Disclosure**: Once a fix is available and deployed, we will publicly disclose the vulnerability, crediting the reporter (unless they prefer anonymity). We aim to do this within a reasonable timeframe, typically after a fix has been rolled out to users.
+---
 
-Please **do not** disclose the vulnerability publicly until we have had a chance to investigate, fix, and release an update. Public disclosure before a fix is available can put users at risk.
+## 📢 Disclosure Policy
 
-## Security Best Practices for Users
+We follow **coordinated vulnerability disclosure**:
+1. **Private Notification:** Report vulnerabilities to us privately
+2. **Validation & Remediation:** We confirm and fix the issue
+3. **Public Disclosure:** After a fix is released, we publicly disclose the vulnerability and credit the reporter (unless anonymity is requested)
 
-To help keep your Checklist Interactive experience secure:
+**Please do not disclose vulnerabilities publicly until a fix is available.**
 
-*   **Keep your app updated**: Always ensure you are running the latest version of Checklist Interactive to benefit from the newest security patches.
-*   **Be cautious with external files**: Only import files from trusted sources.
-*   **Report suspicious behavior**: If you notice anything unusual or potentially insecure within the app, please report it immediately.
+---
 
-We thank you for your contribution to the security of Checklist Interactive.
+## 🧑‍💻 Security Best Practices for Users
+
+- **Keep your app updated:** Always use the latest version for security patches
+- **Be cautious with external files:** Only import from trusted sources
+- **Report suspicious behavior:** Notify us immediately if you notice anything unusual
+
+---
+
+Thank you for helping keep ChecklistInteractive secure!
