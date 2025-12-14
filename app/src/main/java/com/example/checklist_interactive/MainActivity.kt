@@ -7,8 +7,6 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.core.view.WindowCompat
-import android.view.View
-import android.view.WindowManager
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.activity.compose.setContent
@@ -33,8 +31,9 @@ import androidx.compose.runtime.DisposableEffect
 import android.os.FileObserver
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Modifier
+import java.io.File
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.checklist_interactive.ui.theme.ChecklistInteractiveTheme
 import com.example.checklist_interactive.data.prefs.PreferencesManager
@@ -60,27 +59,19 @@ class MainActivity : ComponentActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
+        // Apply fullscreen immediately BEFORE any UI setup
+        applyFullscreenSettings()
+
         // Permission checks and SAF fallback are handled inside the Compose UI via
         // rememberLauncherForActivityResult and the in-composition logic.
         enableEdgeToEdge()
 
-        // Enable immersive full-screen for the activity: hide Android status/navigation bars and allow transient reveal by swipe
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        val controller = WindowInsetsControllerCompat(window, window.decorView)
-        controller.hide(WindowInsetsCompat.Type.systemBars())
-        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        // Also set compatibility flags for older APIs and ensure the window stays fullscreen
-        @Suppress("DEPRECATION")
-        window.decorView.systemUiVisibility = (
-            View.SYSTEM_UI_FLAG_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-        )
-        window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
         setContent {
+            // Maintain fullscreen during composition
+            androidx.compose.runtime.SideEffect {
+                applyFullscreenSettings()
+            }
             val prefsManager = remember { PreferencesManager(this@MainActivity) }
             var isDarkTheme by remember { mutableStateOf(prefsManager.isDarkModeEnabled()) }
             val toggleTheme: () -> Unit = {
@@ -279,7 +270,8 @@ class MainActivity : ComponentActivity() {
                     // Observe internal storage rootDir for changes and refresh UI automatically
                     DisposableEffect(Unit) {
                         val rootPath = fileManager.getInternalRootPath()
-                        val observer = object : FileObserver(rootPath, FileObserver.CREATE or FileObserver.DELETE or FileObserver.MOVED_TO or FileObserver.MOVED_FROM or FileObserver.MODIFY) {
+                        val rootFile = File(rootPath)
+                        val observer = object : FileObserver(rootFile, FileObserver.CREATE or FileObserver.DELETE or FileObserver.MOVED_TO or FileObserver.MOVED_FROM or FileObserver.MODIFY) {
                             override fun onEvent(event: Int, path: String?) {
                                 // Only react to events that are files with supported extensions
                                 if (path == null) return
@@ -448,25 +440,24 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun applyFullscreenSettings() {
+        // Enable immersive fullscreen mode using modern WindowInsetsController API
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+    }
+
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) {
-            WindowCompat.setDecorFitsSystemWindows(window, false)
-            val controller = WindowInsetsControllerCompat(window, window.decorView)
-            controller.hide(WindowInsetsCompat.Type.systemBars())
-            try {
-                controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            } catch (_: Throwable) {
-            }
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = (
-                View.SYSTEM_UI_FLAG_FULLSCREEN
-                    or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                    or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                    or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                    or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-            )
+            applyFullscreenSettings()
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        applyFullscreenSettings()
     }
 }
 

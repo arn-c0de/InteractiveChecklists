@@ -8,9 +8,9 @@ import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.InsertDriveFile
+import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.Alignment
@@ -67,16 +67,16 @@ fun ChecklistScreen(viewModel: ChecklistViewModel, checklistId: String, onBack: 
                                             popupPath = if (parent.isEmpty()) "" else parent
                                         }
                                     }) {
-                                        Icon(Icons.Default.ArrowBack, contentDescription = LocalContext.current.getString(R.string.up))
+                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = LocalContext.current.getString(R.string.up))
                                     }
                                     Text(popupPath.ifBlank { "Assets" }, modifier = Modifier.padding(start = 8.dp))
                                 }
-                                Divider()
+                                HorizontalDivider()
                                 LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
                                     items(popupNodes) { node: AssetNode ->
                                         ListItem(headlineContent = { Text(node.name) }, leadingContent = {
                                             if (node.isDirectory) Icon(Icons.Default.Folder, contentDescription = "folder")
-                                            else Icon(Icons.Default.InsertDriveFile, contentDescription = "file")
+                                            else Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = "file")
                                         }, modifier = Modifier.clickable {
                                             if (node.isDirectory) {
                                                 popupPath = node.path
@@ -101,7 +101,7 @@ fun ChecklistScreen(viewModel: ChecklistViewModel, checklistId: String, onBack: 
                     Spacer(modifier = Modifier.width(6.dp))
 
                     IconButton(onClick = { onBack?.invoke() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = LocalContext.current.getString(R.string.back))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = LocalContext.current.getString(R.string.back))
                     }
                 }
             }, actions = {
@@ -110,7 +110,7 @@ fun ChecklistScreen(viewModel: ChecklistViewModel, checklistId: String, onBack: 
                 }
                 IconButton(onClick = {
                     val md = viewModel.exportChecklistMarkdown()
-                    if (md != null) onExport?.invoke(md)
+                    onExport?.invoke(md)
                 }) {
                     Icon(Icons.Default.Share, contentDescription = LocalContext.current.getString(R.string.export))
                 }

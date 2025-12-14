@@ -2,13 +2,13 @@ package com.example.checklist_interactive.ui.files
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material.icons.filled.UnfoldLess
-import androidx.compose.material.icons.filled.NoteAdd
+import androidx.compose.material.icons.automirrored.filled.NoteAdd
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -174,7 +174,7 @@ fun InternalFileViewer(
                         navigationIcon = {
                             IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
                                 Icon(
-                                    Icons.Default.ArrowBack, 
+                                    Icons.AutoMirrored.Filled.ArrowBack, 
                                     contentDescription = LocalContext.current.getString(R.string.back),
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -219,7 +219,7 @@ fun InternalFileViewer(
                             containerColor = MaterialTheme.colorScheme.primaryContainer,
                             contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                         ) {
-                            Icon(Icons.Default.NoteAdd, contentDescription = "Quick access")
+                            Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Quick access")
                         }
 
                         // Menu FAB - immer an fester Position
@@ -262,7 +262,7 @@ fun InternalFileViewer(
                         title = { Text(fileInfo.displayName) },
                         navigationIcon = {
                             IconButton(onClick = onBack) {
-                                Icon(Icons.Default.ArrowBack, contentDescription = LocalContext.current.getString(R.string.back))
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = LocalContext.current.getString(R.string.back))
                             }
                         },
                         actions = {

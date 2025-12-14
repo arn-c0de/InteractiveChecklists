@@ -6,9 +6,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.InsertDriveFile
+import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.*
 import androidx.compose.foundation.shape.CircleShape
@@ -73,7 +73,7 @@ fun BrowseScreen(
                                 currentPath = if (parent.isEmpty()) startPath else parent
                             }
                         }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
                     }
                 },
@@ -94,7 +94,7 @@ fun BrowseScreen(
                     if (!isLast) Text("/")
                 }
             }
-            Divider()
+            HorizontalDivider()
             LazyColumn(modifier = Modifier.fillMaxWidth()) {
                 items(nodes) { node ->
                     BrowseListItem(node = node, onClick = { n ->
@@ -126,18 +126,18 @@ fun BrowseScreen(
                                 popupPath = if (parent.isEmpty()) startPath else parent
                             }
                         }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Up")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Up")
                         }
                         Text(popupPath, modifier = Modifier.padding(start = 8.dp))
                     }
-                    Divider()
+                    HorizontalDivider()
                     LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
                         items(popupNodes) { node ->
                             ListItem(
                                 headlineContent = { Text(node.name) },
                                 leadingContent = {
                                     if (node.isDirectory) Icon(Icons.Default.Folder, contentDescription = "folder")
-                                    else Icon(Icons.Default.InsertDriveFile, contentDescription = "file")
+                                    else Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = "file")
                                 },
                                 modifier = Modifier.clickable {
                                     if (node.isDirectory) {
@@ -178,7 +178,7 @@ fun BrowseListItem(node: AssetNode, onClick: (AssetNode) -> Unit) {
         headlineContent = { Text(displayName) },
         leadingContent = {
             if (node.isDirectory) Icon(Icons.Default.Folder, contentDescription = "folder")
-            else Icon(Icons.Default.InsertDriveFile, contentDescription = "file")
+            else Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = "file")
         },
         modifier = Modifier.clickable { onClick(node) }
     )

@@ -44,6 +44,7 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
@@ -58,6 +59,9 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+
+    // SplashScreen API for Android 12+
+    implementation("androidx.core:core-splashscreen:1.0.1")
 
     // Room Database
     implementation(libs.androidx.room.runtime)
