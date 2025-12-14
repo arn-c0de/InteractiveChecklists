@@ -70,6 +70,14 @@ class PdfStructureParser(private val pdfFile: File) {
     @Volatile
     private var xrefParsed: Boolean = false
     
+    // Recursion guards to prevent infinite loops
+    private val scanningObjects = mutableSetOf<Int>()
+    private val indexingStreams = mutableSetOf<Int>()
+    private var scanDepth = 0
+    private val maxScanDepth = 5
+    private var failedStreamIndexingAttempts = 0
+    private val maxFailedStreamAttempts = 20
+    
     /**
      * Parses the PDF document outline (bookmarks/table of contents)
      */
@@ -211,6 +219,12 @@ class PdfStructureParser(private val pdfFile: File) {
                 Log.d(TAG, "parseXrefTable: already parsed (sync), skipping for ${pdfFile.absolutePath}")
                 return true
             }
+            
+            // Reset failure counters for new parsing session
+            failedStreamIndexingAttempts = 0
+            scanDepth = 0
+            scanningObjects.clear()
+            indexingStreams.clear()
 
             try {
                 // Find "startxref" keyword from end of file
@@ -460,6 +474,19 @@ class PdfStructureParser(private val pdfFile: File) {
                                 }
                             }
                             Log.d(TAG, "Parsed ${xrefTable.size} uncompressed + ${compressedObjects.size} compressed entries from xref stream")
+
+                            // If the xref stream declared object ranges but we failed to collect
+                            // any compressed entries, try scanning for object streams as a
+                            // fallback to index compressed objects (ObjStm).
+                            if (objRanges.isNotEmpty() && compressedObjects.isEmpty()) {
+                                var added = 0
+                                for ((start, count) in objRanges) {
+                                    val end = start + count - 1
+                                    val found = scanForObjectStreamsInRange(raf, start, end)
+                                    added += found
+                                }
+                                Log.d(TAG, "After ObjStm scan: discovered $added objects inside object streams")
+                            }
                         }
                     }
                 }
@@ -629,15 +656,27 @@ class PdfStructureParser(private val pdfFile: File) {
      * Returns true if found and added to xrefTable
      */
     private fun scanForSpecificObject(raf: RandomAccessFile, targetObj: Int): Boolean {
+        // Guard against infinite recursion
+        if (targetObj in scanningObjects) {
+            Log.w(TAG, "Already scanning for object $targetObj, breaking recursion")
+            return false
+        }
+        if (scanDepth >= maxScanDepth) {
+            Log.w(TAG, "Max scan depth reached ($maxScanDepth), aborting scan for object $targetObj")
+            return false
+        }
+        
+        scanningObjects.add(targetObj)
+        scanDepth++
         try {
-            Log.d(TAG, "Scanning for specific object: $targetObj")
+            Log.d(TAG, "Scanning for specific object: $targetObj (depth: $scanDepth)")
             val fileSize = raf.length()
             val chunkSize = 524288 // 512KB chunks
             val overlap = 256
             val objPattern = Regex("^($targetObj)\\s+\\d+\\s+obj", RegexOption.MULTILINE)
 
             val startTime = System.currentTimeMillis()
-            val timeoutMs = 5000L // 5 second timeout for single object
+            val timeoutMs = 15000L // 15 second timeout for single object (increase for large PDFs)
 
             // Helper to process a chunk
             fun processChunk(pos: Long, chunk: String): Boolean {
@@ -697,10 +736,26 @@ class PdfStructureParser(private val pdfFile: File) {
                 }
             }
 
+            // If still not found, attempt to index object streams in the file
+            // Some objects are stored inside ObjStm (object streams) and won't appear
+            // as "<obj> 0 obj" entries. Try scanning for ObjStm objects and index them.
+            // Only do this if we're not too deep in recursion
+            if (!xrefTable.containsKey(targetObj) && !compressedObjects.containsKey(targetObj) && scanDepth < maxScanDepth - 1) {
+                Log.d(TAG, "Attempting to find object $targetObj inside object streams (depth: $scanDepth)")
+                scanForObjectStreamsInRange(raf, targetObj, targetObj)
+                if (compressedObjects.containsKey(targetObj)) {
+                    Log.d(TAG, "Found object $targetObj inside an object stream (indexed)")
+                    return true
+                }
+            }
+
             return xrefTable.containsKey(targetObj)
         } catch (e: Exception) {
             Log.e(TAG, "Error scanning for object $targetObj: ${e.message}", e)
             return false
+        } finally {
+            scanningObjects.remove(targetObj)
+            scanDepth--
         }
     }
 
@@ -793,6 +848,219 @@ class PdfStructureParser(private val pdfFile: File) {
             return foundObjects.size
         } catch (e: Exception) {
             Log.e(TAG, "Error scanning: ${e.message}", e)
+            return 0
+        }
+    }
+
+    /**
+     * Indexes a parsed object stream (`ObjStm`) by reading its header and mapping
+     * contained object numbers to (streamObjNum, index).
+     */
+    private fun indexObjectStream(raf: RandomAccessFile, streamObjNum: Int): Boolean {
+        // Guard against re-indexing the same stream (prevents loops)
+        if (streamObjNum in indexingStreams) {
+            Log.w(TAG, "Already indexing stream $streamObjNum, breaking recursion")
+            return false
+        }
+        
+        indexingStreams.add(streamObjNum)
+        try {
+            // Ensure xref has an entry for this stream object so parseObject can read it
+            val offset = xrefTable[streamObjNum]
+            if (offset == null) {
+                Log.d(TAG, "indexObjectStream: no xref entry for stream $streamObjNum, skipping")
+                return false
+            }
+
+            val streamObj = parseObject(raf, streamObjNum) ?: return false
+            val streamData = streamObj.streamData ?: return false
+
+            val n = (streamObj.dictContent["N"] as? Int) ?: return false
+            val first = (streamObj.dictContent["First"] as? Int) ?: return false
+            if (n <= 0 || first < 0) return false
+
+            val headerLen = first.coerceAtMost(streamData.size)
+            val header = String(streamData, 0, headerLen, StandardCharsets.ISO_8859_1)
+            val tokens = header.trim().split("\\s+".toRegex())
+
+            if (tokens.size < n * 2) {
+                Log.w(TAG, "Object stream $streamObjNum header has insufficient tokens: ${tokens.size} < ${n * 2}")
+                failedStreamIndexingAttempts++
+                return false
+            }
+
+            var addedCount = 0
+            for (i in 0 until n) {
+                val objNum = tokens.getOrNull(i * 2)?.toIntOrNull() ?: continue
+                compressedObjects[objNum] = Pair(streamObjNum, i)
+                addedCount++
+            }
+
+            if (addedCount > 0) {
+                Log.d(TAG, "Indexed object stream $streamObjNum: added $addedCount entries")
+                return true
+            } else {
+                failedStreamIndexingAttempts++
+                return false
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error indexing object stream $streamObjNum: ${e.message}")
+            return false
+        } finally {
+            indexingStreams.remove(streamObjNum)
+        }
+    }
+
+    /**
+     * Reads a simple indirect integer object (e.g., object that contains plain '120')
+     * Returns null if it cannot be resolved.
+     */
+    private fun readIndirectInteger(raf: RandomAccessFile, objNum: Int): Int? {
+        try {
+            var offset = xrefTable[objNum]
+            if (offset == null) {
+                // Don't scan if we're already in a deep scan - prevents infinite loops
+                if (scanDepth >= maxScanDepth - 1) {
+                    Log.w(TAG, "Skipping scan for indirect integer $objNum - too deep (depth: $scanDepth)")
+                    return null
+                }
+                if (!scanForSpecificObject(raf, objNum)) return null
+                offset = xrefTable[objNum] ?: return null
+            }
+
+            raf.seek(offset)
+            // skip header line
+            readLine(raf)
+
+            // Read up to a short window until 'endobj'
+            val sb = StringBuilder()
+            var bytes = 0
+            while (bytes < 512 && raf.filePointer < raf.length()) {
+                val c = raf.read()
+                if (c < 0) break
+                sb.append(c.toChar())
+                bytes++
+                if (sb.endsWith("endobj")) break
+            }
+
+            val s = sb.toString()
+            val match = Regex("\\b(\\d+)\\b").find(s)
+            return match?.groupValues?.get(1)?.toIntOrNull()
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to read indirect integer for $objNum: ${e.message}")
+            return null
+        }
+    }
+
+    /**
+     * Scans the file for object streams (ObjStm) and indexes them. If a numeric
+     * range is provided, it will still index any object streams found and return
+     * how many objects in the requested range were discovered.
+     */
+    private fun scanForObjectStreamsInRange(raf: RandomAccessFile, startObj: Int, endObj: Int): Int {
+        try {
+            Log.d(TAG, "Scanning for object streams (looking for ObjStm) to cover $startObj..$endObj (depth: $scanDepth)")
+
+            val fileSize = raf.length()
+            val chunkSize = 524288
+            val overlap = 512
+            val objHeader = Regex("^(\\d+)\\s+\\d+\\s+obj", RegexOption.MULTILINE)
+
+            val startTime = System.currentTimeMillis()
+            val timeoutMs = 10_000L // Reduced to 10 seconds
+            val newlyIndexed = mutableSetOf<Int>()
+            val maxStreamsToIndex = 20 // Reduced limit
+            var consecutiveFailures = 0
+            val maxConsecutiveFailures = 10
+
+            fun processChunk(pos: Long, chunk: String) {
+                // Stop if we've indexed enough streams, timed out, or too many failures
+                if (newlyIndexed.size >= maxStreamsToIndex) return
+                if (System.currentTimeMillis() - startTime > timeoutMs) return
+                if (failedStreamIndexingAttempts >= maxFailedStreamAttempts) {
+                    Log.w(TAG, "Aborting ObjStm scan - too many failed attempts ($failedStreamIndexingAttempts)")
+                    return
+                }
+                if (consecutiveFailures >= maxConsecutiveFailures) {
+                    Log.w(TAG, "Aborting ObjStm scan - too many consecutive failures ($consecutiveFailures)")
+                    return
+                }
+                
+                objHeader.findAll(chunk).forEach { match ->
+                    if (newlyIndexed.size >= maxStreamsToIndex) return@forEach
+                    
+                    val num = match.groups[1]?.value?.toIntOrNull() ?: return@forEach
+                    if (newlyIndexed.contains(num)) return@forEach
+
+                    val afterPos = match.range.last + 1
+                    val look = chunk.substring(afterPos.coerceAtMost(chunk.length - 1).coerceAtLeast(0),
+                        (afterPos + 512).coerceAtMost(chunk.length))
+
+                    if (look.contains("ObjStm") || look.contains("/ObjStm")) {
+                        val absolute = pos + match.range.first
+                        Log.d(TAG, "Found ObjStm candidate: $num at $absolute")
+                        xrefTable[num] = absolute
+                        val ok = indexObjectStream(raf, num)
+                        if (ok) {
+                            newlyIndexed.add(num)
+                            consecutiveFailures = 0 // Reset on success
+                        } else {
+                            consecutiveFailures++
+                        }
+                    }
+                }
+            }
+
+            // Backwards scan
+            var position = (fileSize - chunkSize).coerceAtLeast(0)
+            while (position >= 0 && newlyIndexed.size < maxStreamsToIndex) {
+                if (System.currentTimeMillis() - startTime > timeoutMs) {
+                    Log.w(TAG, "ObjStm scan timed out (backward) after ${timeoutMs}ms")
+                    break
+                }
+                if (failedStreamIndexingAttempts >= maxFailedStreamAttempts || consecutiveFailures >= maxConsecutiveFailures) {
+                    Log.w(TAG, "Aborting ObjStm backward scan - too many failures")
+                    break
+                }
+                raf.seek(position)
+                val readSize = (fileSize - position).coerceAtMost(chunkSize.toLong()).toInt()
+                val buffer = ByteArray(readSize)
+                raf.read(buffer)
+                val chunk = String(buffer, StandardCharsets.ISO_8859_1)
+                processChunk(position, chunk)
+                if (position == 0L) break
+                position = (position - (chunkSize - overlap)).coerceAtLeast(0)
+            }
+
+            // Forward scan if still within time and limit
+            if (System.currentTimeMillis() - startTime < timeoutMs && newlyIndexed.size < maxStreamsToIndex 
+                && failedStreamIndexingAttempts < maxFailedStreamAttempts && consecutiveFailures < maxConsecutiveFailures) {
+                position = 0L
+                while (position < fileSize && newlyIndexed.size < maxStreamsToIndex) {
+                    if (System.currentTimeMillis() - startTime > timeoutMs) {
+                        Log.w(TAG, "ObjStm scan timed out (forward) after ${timeoutMs}ms")
+                        break
+                    }
+                    if (failedStreamIndexingAttempts >= maxFailedStreamAttempts || consecutiveFailures >= maxConsecutiveFailures) {
+                        Log.w(TAG, "Aborting ObjStm forward scan - too many failures")
+                        break
+                    }
+                    raf.seek(position)
+                    val readSize = (fileSize - position).coerceAtMost(chunkSize.toLong()).toInt()
+                    val buffer = ByteArray(readSize)
+                    raf.read(buffer)
+                    val chunk = String(buffer, StandardCharsets.ISO_8859_1)
+                    processChunk(position, chunk)
+                    position += readSize - overlap
+                }
+            }
+
+            // Count how many objects in requested range were mapped to compressedObjects
+            val countInRange = (startObj..endObj).count { compressedObjects.containsKey(it) }
+            Log.d(TAG, "Indexed ${newlyIndexed.size} object streams, found $countInRange objects in range")
+            return countInRange
+        } catch (e: Exception) {
+            Log.w(TAG, "Error scanning for object streams: ${e.message}")
             return 0
         }
     }
@@ -1068,19 +1336,41 @@ class PdfStructureParser(private val pdfFile: File) {
                 val lengthRef = dictContent["Length"]
                 val length = when (lengthRef) {
                     is Int -> {
-                        // Indirect reference
-                        val lengthObj = parseObject(raf, lengthRef)
-                        lengthObj?.dictContent?.get("value") as? Int ?: 0
+                        // Could be a direct numeric length or an indirect reference (obj Num)
+                        // Try to resolve as indirect first; fall back to direct value
+                        val indirect = readIndirectInteger(raf, lengthRef)
+                        indirect ?: lengthRef
                     }
                     is String -> lengthRef.toIntOrNull() ?: 0
                     else -> 0
                 }
-                
+
                 if (length > 0) {
-                    raf.seek(streamPos + 7) // Skip "stream\n"
+                    // Move to the start of stream data. After reading the 'stream' line,
+                    // the file pointer is at the end of that line so we need to position
+                    // correctly. Look for the first byte after linebreak
+                    raf.seek(streamPos)
+                    // consume until 'stream' line consumed
+                    var tmpLine = readLine(raf)
+                    // consume the newline after stream marker if present
+                    if (raf.filePointer < raf.length()) {
+                        val b = raf.read()
+                        if (b == '\n'.code) {
+                            // ok
+                        } else if (b == '\r'.code) {
+                            // handle CRLF
+                            if (raf.filePointer < raf.length() && raf.read() != '\n'.code) raf.seek(raf.filePointer - 1)
+                        } else {
+                            // not a newline, step back
+                            raf.seek(raf.filePointer - 1)
+                        }
+                    }
+
                     val streamBytes = ByteArray(length)
-                    raf.read(streamBytes)
+                    raf.readFully(streamBytes)
                     obj.streamData = streamBytes
+                } else {
+                    Log.w(TAG, "Object $objNum: stream length unknown or zero (Length=$lengthRef)")
                 }
             }
             
