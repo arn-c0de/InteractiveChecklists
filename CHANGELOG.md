@@ -2,6 +2,15 @@
 
 All relevant changes are summarized here by version.
 
+## [1.0.8] - 2025-12-14
+### Changed
+- Minor update in MainActivity.kt (init, 1 line changed)
+
+## [1.0.7] - 2025-12-14
+### Changed
+- Translated files to English (MainActivity, InternalFileManager, CategorizedFilesScreen, MarkdownViewer, PdfViewer, InternalFileViewer, InternalFilesScreen)
+- LICENSE updated
+
 ## [1.0.6] - 2025-12-13
 ### Added
 - **Multi-Tab System**: Open multiple MD/PDF files simultaneously
