@@ -122,7 +122,7 @@ fun MarkdownViewerScreen(
                         Icon(Icons.Default.Refresh, contentDescription = "Reset Checklist", modifier = Modifier.size(20.dp))
                     }
                     IconButton(onClick = {
-                        quickNoteManager.addLinkedDocument(
+                        quickNoteManager.addMarkdownLink(
                             filePath = assetPath,
                             fileName = fileName,
                             pageNumber = null
@@ -161,16 +161,7 @@ fun MarkdownViewerScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 horizontalAlignment = androidx.compose.ui.Alignment.End
             ) {
-                // Quick Access FAB - always visible
-                FloatingActionButton(
-                    onClick = { showQuickAccess = true },
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Quick access")
-                }
-
-                // Menu FAB - only if onShowFileList is set
+                // Menu FAB - only if onShowFileList is set (placed above Quick Access so Quick Access is bottom-most)
                 if (onShowFileList != null) {
                     FloatingActionButton(
                         onClick = onShowFileList,
@@ -178,6 +169,15 @@ fun MarkdownViewerScreen(
                     ) {
                         Icon(Icons.Default.Menu, contentDescription = "File list")
                     }
+                }
+
+                // Quick Access FAB - always anchored to bottom-right (place last so it's closest to the screen edge)
+                FloatingActionButton(
+                    onClick = { showQuickAccess = true },
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Quick access")
                 }
             }
         }

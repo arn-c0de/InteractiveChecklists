@@ -213,21 +213,21 @@ fun InternalFileViewer(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                         horizontalAlignment = Alignment.End
                     ) {
-                        // Quick Access FAB - immer sichtbar an fester Position
+                        // Menu FAB - always at a fixed position (placed above Quick Access)
+                        FloatingActionButton(
+                            onClick = onShowFileList,
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Icon(Icons.Default.Menu, contentDescription = LocalContext.current.getString(R.string.file_list))
+                        }
+
+                        // Quick Access FAB - always anchored to bottom-right (place last so it's closest to the screen edge)
                         FloatingActionButton(
                             onClick = { showQuickAccess = true },
                             containerColor = MaterialTheme.colorScheme.primaryContainer,
                             contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                         ) {
                             Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Quick access")
-                        }
-
-                        // Menu FAB - immer an fester Position
-                        FloatingActionButton(
-                            onClick = onShowFileList,
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
-                        ) {
-                            Icon(Icons.Default.Menu, contentDescription = LocalContext.current.getString(R.string.file_list))
                         }
                     }
                 }
