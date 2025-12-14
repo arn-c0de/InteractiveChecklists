@@ -116,7 +116,7 @@ class PdfStructureParser(private val pdfFile: File) {
                 Log.d(TAG, "Step 4: Getting outline reference from catalog")
                 val outlineValue = catalog.getDictValue("Outlines")
                 Log.d(TAG, "Outlines raw value: $outlineValue (type: ${outlineValue?.javaClass?.simpleName})")
-                val outlineRef = outlineValue as? Int
+                val outlineRef = resolveRef(outlineValue)
                 if (outlineRef == null) {
                     Log.d(TAG, "No Outlines entry in catalog or wrong type (available keys: ${catalog.dictContent.keys})")
                     Log.d(TAG, "All catalog values: ${catalog.dictContent}")
@@ -141,7 +141,7 @@ class PdfStructureParser(private val pdfFile: File) {
 
                 // 6. Get first outline item
                 Log.d(TAG, "Step 6: Getting first outline item")
-                val firstRef = outlineDict.getDictValue("First") as? Int
+                val firstRef = resolveRef(outlineDict.getDictValue("First"))
                 if (firstRef == null) {
                     Log.d(TAG, "No First entry in outline (available keys: ${outlineDict.dictContent.keys})")
                     return emptyList()
@@ -188,7 +188,7 @@ class PdfStructureParser(private val pdfFile: File) {
                 val page = parseObject(raf, pageRef) ?: return ""
                 
                 // Get content stream
-                val contentsRef = page.getDictValue("Contents") as? Int ?: return ""
+                val contentsRef = resolveRef(page.getDictValue("Contents")) ?: return ""
                 val contents = parseObject(raf, contentsRef) ?: return ""
                 
                 // Decode and parse content stream
@@ -331,19 +331,20 @@ class PdfStructureParser(private val pdfFile: File) {
             // Read the xref stream dictionary to check for /Prev
             raf.seek(xrefOffset)
             readLine(raf) // Skip header
-            var attempts = 0
-            while (attempts < 10) {
+            var dictSeekAttempts = 0
+            while (dictSeekAttempts < 10) {
                 val pos = raf.filePointer
                 val line = readLine(raf)
                 if (line.contains("<<")) {
                     raf.seek(pos)
                     break
                 }
-                attempts++
+                dictSeekAttempts++
             }
 
             val dict = readDictionary(raf)
             Log.d(TAG, "XRef stream dict keys: ${dict.keys}")
+            Log.d(TAG, "XRef stream dict Filter entry: '${dict["Filter"]}' (type: ${dict["Filter"]?.javaClass?.simpleName})")
 
             // Try to extract /Index to know which objects this stream defines
             val indexValue = dict["Index"]
@@ -368,9 +369,9 @@ class PdfStructureParser(private val pdfFile: File) {
             try {
                 // Move RAF to after the dictionary and find 'stream' token
                 var posAfterDict = raf.filePointer
-                var attempts = 0
+                var streamSeekAttempts = 0
                 var foundStream = false
-                while (attempts < 20 && raf.filePointer < raf.length()) {
+                while (streamSeekAttempts < 20 && raf.filePointer < raf.length()) {
                     val linePos = raf.filePointer
                     val line = readLine(raf).trim()
                     if (line == "stream") {
@@ -379,7 +380,7 @@ class PdfStructureParser(private val pdfFile: File) {
                         foundStream = true
                         break
                     }
-                    attempts++
+                    streamSeekAttempts++
                 }
 
                 if (foundStream) {
@@ -397,9 +398,16 @@ class PdfStructureParser(private val pdfFile: File) {
                         raf.readFully(raw)
 
                         // If Filter says FlateDecode, decompress
-                        val filters = (dict["Filter"] as? String)?.let { listOf(it) } ?: emptyList()
+                        val filterValue = dict["Filter"]
+                        Log.d(TAG, "XRef stream Filter value: '$filterValue' (type: ${filterValue?.javaClass?.simpleName})")
+                        val filters = when (filterValue) {
+                            is String -> listOf(filterValue)
+                            is List<*> -> filterValue.mapNotNull { it as? String }
+                            else -> emptyList()
+                        }
                         var decoded = raw
-                        if (filters.any { it.contains("FlateDecode") }) {
+                        Log.d(TAG, "XRef stream: length=$length, raw size=${raw.size}, filters=$filters")
+                        if (filters.any { it.contains("FlateDecode") || it == "FlateDecode" }) {
                             try {
                                 val bais = java.io.ByteArrayInputStream(raw)
                                 val baos = java.io.ByteArrayOutputStream()
@@ -407,22 +415,42 @@ class PdfStructureParser(private val pdfFile: File) {
                                     ins.copyTo(baos)
                                 }
                                 decoded = baos.toByteArray()
+                                Log.d(TAG, "After FlateDecode: ${decoded.size} bytes")
 
                                 // Apply PNG predictor if specified in DecodeParms
                                 val decodeParmsValue = dict["DecodeParms"]
-                                if (decodeParmsValue is String) {
-                                    // Parse DecodeParms dictionary
-                                    val predictor = extractDictValue(decodeParmsValue, "Predictor")?.toIntOrNull() ?: 1
-                                    val columns = extractDictValue(decodeParmsValue, "Columns")?.toIntOrNull() ?: 1
-
-                                    if (predictor >= 10) {
-                                        // PNG predictor (10-15)
-                                        decoded = applyPngPredictor(decoded, columns)
-                                        Log.d(TAG, "Applied PNG predictor $predictor with $columns columns")
+                                Log.d(TAG, "DecodeParms type: ${decodeParmsValue?.javaClass?.simpleName}, value: $decodeParmsValue")
+                                
+                                var predictor = 1
+                                var columns = 1
+                                
+                                when (decodeParmsValue) {
+                                    is String -> {
+                                        // Parse DecodeParms dictionary string
+                                        predictor = extractDictValue(decodeParmsValue, "Predictor")?.toIntOrNull() ?: 1
+                                        columns = extractDictValue(decodeParmsValue, "Columns")?.toIntOrNull() ?: 1
                                     }
+                                    is Map<*, *> -> {
+                                        // DecodeParms is a dictionary object
+                                        predictor = (decodeParmsValue["Predictor"] as? Int) ?: 1
+                                        columns = (decodeParmsValue["Columns"] as? Int) ?: 1
+                                    }
+                                }
+
+                                Log.d(TAG, "DecodeParms: Predictor=$predictor, Columns=$columns")
+                                if (predictor >= 10) {
+                                    // PNG predictor (10-15)
+                                    val beforeSize = decoded.size
+                                    val firstBytes = decoded.take(30).joinToString(" ") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }
+                                    Log.d(TAG, "Before PNG predictor, first 30 bytes: $firstBytes")
+                                    decoded = applyPngPredictor(decoded, columns)
+                                    val firstBytesAfter = decoded.take(30).joinToString(" ") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }
+                                    Log.d(TAG, "After PNG predictor, first 30 bytes: $firstBytesAfter")
+                                    Log.d(TAG, "Applied PNG predictor $predictor with $columns columns: $beforeSize -> ${decoded.size} bytes")
                                 }
                             } catch (e: Exception) {
                                 Log.w(TAG, "Failed to inflate xref stream: ${e.message}")
+                                e.printStackTrace()
                             }
                         }
 
@@ -431,17 +459,28 @@ class PdfStructureParser(private val pdfFile: File) {
                         val wArray = wVal?.replace("[", "")?.replace("]", "")?.trim()
                             ?.split("\\s+".toRegex())?.mapNotNull { it.toIntOrNull() } ?: listOf()
 
+                        Log.d(TAG, "XRef stream W array: $wArray, decoded size: ${decoded.size} bytes")
+
                         val indexArray = objRanges.ifEmpty {
                             // If /Index missing, default 0..Size-1
-                            val size = (dict["Size"] as? Int) ?: 0
+                            val size = resolveRef(dict["Size"]) ?: 0
                             if (size > 0) listOf(Pair(0, size)) else listOf()
                         }
+                        
+                        Log.d(TAG, "XRef stream index ranges: $indexArray")
 
                         if (wArray.size >= 3 && indexArray.isNotEmpty()) {
                             var bytePos = 0
+                            var uncompressedCount = 0
+                            var compressedCount = 0
+                            var freeCount = 0
+                            
                             for ((startObj, count) in indexArray) {
                                 for (i in 0 until count) {
-                                    if (bytePos + wArray.sum() > decoded.size) break
+                                    if (bytePos + wArray.sum() > decoded.size) {
+                                        Log.w(TAG, "Ran out of xref stream data at object ${startObj + i} (pos=$bytePos, size=${decoded.size})")
+                                        break
+                                    }
                                     // Read fields per W
                                     var fieldValues = mutableListOf<Long>()
                                     for (w in wArray) {
@@ -454,26 +493,44 @@ class PdfStructureParser(private val pdfFile: File) {
                                     }
 
                                     val objNum = startObj + i
-                                    val ftype = fieldValues.getOrNull(0)?.toInt() ?: 0
+                                    // If W[0]=0, type defaults to 1 (uncompressed)
+                                    val ftype = if (wArray[0] == 0) 1 else (fieldValues.getOrNull(0)?.toInt() ?: 1)
                                     val f2 = fieldValues.getOrNull(1) ?: 0L
                                     val f3 = fieldValues.getOrNull(2)?.toInt() ?: 0
+                                    
+                                    // Debug first few and problematic entries
+                                    if (objNum <= 5 || objNum == 100 || objNum == 2) {
+                                        Log.d(TAG, "XRef entry $objNum: type=$ftype, f2=$f2, f3=$f3, fieldValues=$fieldValues")
+                                    }
+                                    
                                     when (ftype) {
+                                        0 -> {
+                                            // free object
+                                            freeCount++
+                                        }
                                         1 -> {
                                             // uncompressed object, f2 is offset
                                             xrefTable[objNum] = f2
+                                            uncompressedCount++
                                         }
                                         2 -> {
                                             // compressed in object stream
                                             // f2 = object stream number, f3 = index within stream
                                             compressedObjects[objNum] = Pair(f2.toInt(), f3)
+                                            compressedCount++
+                                            // Log first few compressed objects for debugging
+                                            if (compressedCount <= 5) {
+                                                Log.d(TAG, "Compressed object $objNum -> stream $f2, index $f3")
+                                            }
                                         }
                                         else -> {
-                                            // free or unknown
+                                            // unknown type
+                                            Log.w(TAG, "Unknown xref entry type $ftype for object $objNum")
                                         }
                                     }
                                 }
                             }
-                            Log.d(TAG, "Parsed ${xrefTable.size} uncompressed + ${compressedObjects.size} compressed entries from xref stream")
+                            Log.d(TAG, "Parsed xref stream: $uncompressedCount uncompressed + $compressedCount compressed + $freeCount free entries")
 
                             // If the xref stream declared object ranges but we failed to collect
                             // any compressed entries, try scanning for object streams as a
@@ -505,7 +562,7 @@ class PdfStructureParser(private val pdfFile: File) {
             }
 
             // Check for /Prev pointing to an older xref table
-            val prevOffset = (dict["Prev"] as? Int)?.toLong() ?: (dict["Prev"] as? String)?.toLongOrNull()
+            val prevOffset = resolveRef(dict["Prev"])?.toLong() ?: (dict["Prev"] as? String)?.toLongOrNull()
             if (prevOffset != null && prevOffset > 0) {
                 Log.d(TAG, "Found /Prev pointing to offset $prevOffset, trying to parse previous xref")
                 raf.seek(prevOffset)
@@ -878,6 +935,13 @@ class PdfStructureParser(private val pdfFile: File) {
             val n = (streamObj.dictContent["N"] as? Int) ?: return false
             val first = (streamObj.dictContent["First"] as? Int) ?: return false
             if (n <= 0 || first < 0) return false
+            
+            // Sanity check - if N is huge or First is beyond stream size, skip it
+            if (n > 10000 || first > streamData.size) {
+                Log.w(TAG, "Object stream $streamObjNum has suspicious N=$n or First=$first (stream size=${streamData.size}), skipping")
+                failedStreamIndexingAttempts++
+                return false
+            }
 
             val headerLen = first.coerceAtMost(streamData.size)
             val header = String(streamData, 0, headerLen, StandardCharsets.ISO_8859_1)
@@ -1231,7 +1295,7 @@ class PdfStructureParser(private val pdfFile: File) {
             val dict = readDictionary(raf)
             Log.d(TAG, "XRef stream dict parsed: $dict")
 
-            val rootRef = dict["Root"] as? Int
+            val rootRef = resolveRef(dict["Root"])
             Log.d(TAG, "Catalog ref from parsed dict: $rootRef")
             return rootRef
         } catch (e: Exception) {
@@ -1256,7 +1320,7 @@ class PdfStructureParser(private val pdfFile: File) {
 
         var offset = xrefTable[objNum]
         if (offset == null) {
-            Log.w(TAG, "Object $objNum not found in xref table, attempting targeted scan")
+            Log.w(TAG, "Object $objNum not found in xref table (size=${xrefTable.size}) or compressed objects (size=${compressedObjects.size}), attempting targeted scan")
             // Try to find this specific object by scanning
             val found = scanForSpecificObject(raf, objNum)
             if (!found) {
@@ -1277,15 +1341,15 @@ class PdfStructureParser(private val pdfFile: File) {
             // Skip to dictionary start
             var dictStart = -1L
             var line: String
-            var attempts = 0
-            while (attempts < 20) {
+            var dictAttempts = 0
+            while (dictAttempts < 20) {
                 val pos = raf.filePointer
                 line = readLine(raf)
                 if (line.contains("<<")) {
                     dictStart = pos
                     break
                 }
-                attempts++
+                dictAttempts++
             }
 
             if (dictStart < 0) {
@@ -1330,22 +1394,39 @@ class PdfStructureParser(private val pdfFile: File) {
             val obj = PdfObject(objNum, dictContent)
             
             // Check if object has stream
-            val streamPos = raf.filePointer
-            val nextLine = readLine(raf).trim()
+            // Skip empty lines and look for "stream" keyword
+            var streamPos = raf.filePointer
+            var nextLine = ""
+            var streamAttempts = 0
+            while (streamAttempts < 10 && raf.filePointer < raf.length()) {
+                streamPos = raf.filePointer
+                nextLine = readLine(raf).trim()
+                if (nextLine.isNotEmpty()) break
+                streamAttempts++
+            }
+            
+            if (objNum <= 5 || objNum == 1) {
+                Log.d(TAG, "Object $objNum: nextLine after dict='$nextLine' (first 50 chars)")
+            }
             if (nextLine == "stream") {
                 val lengthRef = dictContent["Length"]
                 val length = when (lengthRef) {
-                    is Int -> {
-                        // Could be a direct numeric length or an indirect reference (obj Num)
-                        // Try to resolve as indirect first; fall back to direct value
-                        val indirect = readIndirectInteger(raf, lengthRef)
-                        indirect ?: lengthRef
+                    is IndirectRef -> {
+                        // It's an indirect reference like '123 0 R'
+                        if (scanDepth < maxScanDepth - 2) {
+                            val indirect = readIndirectInteger(raf, lengthRef.ref)
+                            indirect ?: 0
+                        } else {
+                            0
+                        }
                     }
+                    is Int -> lengthRef
                     is String -> lengthRef.toIntOrNull() ?: 0
                     else -> 0
                 }
 
-                if (length > 0) {
+                // Sanity check on length (must be positive and reasonable)
+                if (length > 0 && length < 100_000_000) {
                     // Move to the start of stream data. After reading the 'stream' line,
                     // the file pointer is at the end of that line so we need to position
                     // correctly. Look for the first byte after linebreak
@@ -1369,8 +1450,40 @@ class PdfStructureParser(private val pdfFile: File) {
                     val streamBytes = ByteArray(length)
                     raf.readFully(streamBytes)
                     obj.streamData = streamBytes
+                    if (objNum <= 5 || objNum == 1) {
+                        Log.d(TAG, "Object $objNum: read stream data successfully, size=$length")
+                    }
+                } else if (length <= 0) {
+                    Log.w(TAG, "Object $objNum: stream length is zero or negative (Length=$lengthRef), falling back to searching for 'endstream'")
+
+                    // Fallback: read until 'endstream' marker when Length is missing/invalid
+                    try {
+                        raf.seek(streamPos)
+                        var tmpLine = readLine(raf)
+                        // consume possible newline after 'stream' line
+                        if (raf.filePointer < raf.length()) {
+                            val b = raf.read()
+                            if (b == '\n'.code) {
+                                // ok
+                            } else if (b == '\r'.code) {
+                                if (raf.filePointer < raf.length() && raf.read() != '\n'.code) raf.seek(raf.filePointer - 1)
+                            } else {
+                                raf.seek(raf.filePointer - 1)
+                            }
+                        }
+
+                        val fallback = readStreamUntilEnd(raf, maxLength = 50_000_000)
+                        if (fallback != null) {
+                            obj.streamData = fallback
+                            Log.d(TAG, "Object $objNum: read stream via fallback (size=${'$'}{fallback.size})")
+                        } else {
+                            Log.w(TAG, "Object $objNum: fallback stream read failed or timed out")
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Object $objNum: fallback stream read error: ${'$'}{e.message}")
+                    }
                 } else {
-                    Log.w(TAG, "Object $objNum: stream length unknown or zero (Length=$lengthRef)")
+                    Log.w(TAG, "Object $objNum: stream length unreasonably large: $length (Length=$lengthRef)")
                 }
             }
             
@@ -1440,6 +1553,9 @@ class PdfStructureParser(private val pdfFile: File) {
     private fun parseDictionaryContent(content: String, dict: MutableMap<String, Any>) {
         try {
             val trimmed = content.removePrefix("<<").removeSuffix(">>").trim()
+            if (content.contains("/Filter")) {
+                Log.d(TAG, "parseDictionaryContent: raw content (first 300 chars): '${content.take(300)}'")
+            }
 
             // New robust parser using regex to find /Name value pairs
             // This handles cases where there's no space between entries (e.g., "R/Name")
@@ -1512,8 +1628,13 @@ class PdfStructureParser(private val pdfFile: File) {
                             }
                         }
                         ch == '/' && !inString && bracketDepth == 0 && angleDepth == 0 -> {
-                            // Start of next key
-                            break
+                            // Could be a name value (e.g., /FlateDecode) or start of next key
+                            if (valueEnd == valueStart) {
+                                // This is the value itself (a name), continue scanning
+                            } else {
+                                // Already scanned some value, this must be next key
+                                break
+                            }
                         }
                         ch.isWhitespace() && !inString && bracketDepth == 0 && angleDepth == 0 -> {
                             // Check if this ends an indirect reference (e.g., "123 0 R")
@@ -1522,11 +1643,15 @@ class PdfStructureParser(private val pdfFile: File) {
                                 valueEnd++
                                 break
                             }
-                            // Check if value is a simple token (number, name, etc.)
-                            if (!beforeSpace.contains(' ') || beforeSpace.matches(Regex("\\d+\\s+\\d+\\s+R"))) {
-                                // It's a simple value or reference, continue
+                            // For simple tokens (numbers, single names), whitespace ends the value
+                            if (!beforeSpace.contains(' ')) {
+                                // Simple token - break here
+                                break
+                            } else if (beforeSpace.matches(Regex("\\d+\\s+\\d+\\s+R"))) {
+                                // Indirect reference - already complete
+                                break
                             } else {
-                                // End of value
+                                // Complex value - end here
                                 break
                             }
                         }
@@ -1551,7 +1676,11 @@ class PdfStructureParser(private val pdfFile: File) {
 
                 val value = trimmed.substring(valueStart, valueEnd).trim()
                 if (value.isNotEmpty()) {
-                    dict[name] = parseValue(value)
+                    val parsedValue = parseValue(value)
+                    dict[name] = parsedValue
+                    if (trimmed.contains("/Filter")) {
+                        Log.d(TAG, "parseDictionaryContent: extracted key='$name', valueStart=$valueStart, valueEnd=$valueEnd, value='$value', parsed='$parsedValue'")
+                    }
                 }
                 pos = valueEnd
             }
@@ -1565,10 +1694,12 @@ class PdfStructureParser(private val pdfFile: File) {
      */
     private fun parseValue(token: String): Any {
         return when {
-            token.matches(Regex("\\d+\\s+\\d+\\s+R")) -> {
-                // Indirect reference with R
-                token.split("\\s+".toRegex())[0].toIntOrNull() ?: token
-            }
+                token.matches(Regex("\\d+\\s+\\d+\\s+R")) -> {
+                    // Indirect reference with R
+                    // Represent indirect references explicitly so callers can distinguish
+                    val ref = token.split("\\s+".toRegex())[0].toIntOrNull()
+                    if (ref != null) IndirectRef(ref) else token
+                }
             token.matches(Regex("\\d+\\s+\\d+")) -> {
                 // Indirect reference without R (the R was parsed separately)
                 token.split("\\s+".toRegex())[0].toIntOrNull() ?: token
@@ -1586,6 +1717,23 @@ class PdfStructureParser(private val pdfFile: File) {
             else -> token
         }
     }
+
+        /**
+         * Wrapper type representing an indirect reference like "123 0 R".
+         */
+        private data class IndirectRef(val ref: Int)
+
+        /**
+         * Resolves a value that may be an Int, IndirectRef, or String to an Int reference if possible.
+         */
+        private fun resolveRef(value: Any?): Int? {
+            return when (value) {
+                is IndirectRef -> value.ref
+                is Int -> value
+                is String -> value.toIntOrNull()
+                else -> null
+            }
+        }
     
     /**
      * Builds a flat list of all page object references
@@ -1596,7 +1744,7 @@ class PdfStructureParser(private val pdfFile: File) {
         try {
             val pagesValue = catalog.getDictValue("Pages")
             Log.d(TAG, "Pages value from catalog: $pagesValue (type: ${pagesValue?.javaClass?.simpleName})")
-            val pagesRef = pagesValue as? Int
+            val pagesRef = resolveRef(pagesValue)
             if (pagesRef == null) {
                 Log.w(TAG, "Pages reference is null or not an Int")
                 return pages
@@ -1685,13 +1833,13 @@ class PdfStructureParser(private val pdfFile: File) {
         }
         
         // Process children
-        val firstChild = item.getDictValue("First") as? Int
+        val firstChild = resolveRef(item.getDictValue("First"))
         if (firstChild != null) {
             parseOutlineItems(raf, firstChild, pages, result, level + 1)
         }
         
         // Process siblings
-        val next = item.getDictValue("Next") as? Int
+        val next = resolveRef(item.getDictValue("Next"))
         if (next != null) {
             parseOutlineItems(raf, next, pages, result, level)
         }
@@ -1709,7 +1857,7 @@ class PdfStructureParser(private val pdfFile: File) {
             }
             
             // Try A (Action) -> D (Destination)
-            val actionRef = item.getDictValue("A") as? Int
+            val actionRef = resolveRef(item.getDictValue("A"))
             if (actionRef != null) {
                 val action = parseObject(raf, actionRef) ?: return -1
                 val d = action.dictContent["D"]
@@ -1730,6 +1878,11 @@ class PdfStructureParser(private val pdfFile: File) {
     private fun resolveDestination(raf: RandomAccessFile, destValue: Any, pages: List<Int>): Int {
         try {
             when (destValue) {
+                is IndirectRef -> {
+                    val destObj = parseObject(raf, destValue.ref) ?: return -1
+                    val destArray = destObj.dictContent["value"]?.toString() ?: return -1
+                    return parseDestinationArray(destArray, pages)
+                }
                 is Int -> {
                     // Indirect reference to destination
                     val destObj = parseObject(raf, destValue) ?: return -1
@@ -1881,6 +2034,56 @@ class PdfStructureParser(private val pdfFile: File) {
     }
 
     /**
+     * Read raw stream bytes until the 'endstream' token is reached.
+     * Returns null on timeout or if the marker could not be found within `maxLength`.
+     */
+    private fun readStreamUntilEnd(raf: RandomAccessFile, maxLength: Int = 50_000_000): ByteArray? {
+        val pattern = "endstream".toByteArray(StandardCharsets.ISO_8859_1)
+        val baos = java.io.ByteArrayOutputStream()
+        var matched = 0
+        val startPos = raf.filePointer
+
+        try {
+            val limit = minOf(raf.length(), startPos + maxLength)
+
+            while (raf.filePointer < raf.length() && raf.filePointer < limit) {
+                val r = raf.read()
+                if (r < 0) break
+                val b = r.toByte()
+                baos.write(b.toInt())
+
+                if (b == pattern[matched]) {
+                    matched++
+                    if (matched == pattern.size) {
+                        // Found endstream - return everything before the marker
+                        val all = baos.toByteArray()
+                        val result = all.copyOf(all.size - pattern.size)
+
+                        // Position RAF just after the endstream marker
+                        // raf.filePointer is already after the last read byte
+                        // consume possible newline after endstream
+                        if (raf.filePointer < raf.length()) {
+                            val c = raf.read()
+                            if (c != '\n'.code) raf.seek(raf.filePointer - 1)
+                        }
+
+                        return result
+                    }
+                } else {
+                    matched = if (b == pattern[0]) 1 else 0
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error reading stream until end: ${'$'}{e.message}")
+            try {
+                raf.seek(startPos)
+            } catch (_: Exception) { }
+        }
+
+        return null
+    }
+
+    /**
      * Extracts a value from a dictionary string (e.g., "<</Key Value>>" -> extractDictValue(dict, "Key") = "Value")
      */
     private fun extractDictValue(dictStr: String, key: String): String? {
@@ -1904,7 +2107,11 @@ class PdfStructureParser(private val pdfFile: File) {
         var outputPos = 0
         for (row in 0 until rowCount) {
             val rowStart = row * rowSize
-            val predictor = data[rowStart].toInt() and 0xFF
+            val predictorByte = data[rowStart].toInt() and 0xFF
+            
+            // PNG predictor bytes use 0-4, but PDF DecodeParms use 10-14
+            // Normalize: 0=None(10), 1=Sub(11), 2=Up(12), 3=Average(13), 4=Paeth(14)
+            val predictor = if (predictorByte < 10) predictorByte + 10 else predictorByte
 
             for (col in 0 until columns) {
                 val rawByte = data[rowStart + 1 + col].toInt() and 0xFF
@@ -1926,6 +2133,17 @@ class PdfStructureParser(private val pdfFile: File) {
         }
 
         return output
+    }
+
+    /**
+     * Reads an integer from a byte array (big-endian)
+     */
+    private fun readIntFromBytes(data: ByteArray, offset: Int, numBytes: Int): Int {
+        var result = 0
+        for (i in 0 until numBytes) {
+            result = (result shl 8) or (data[offset + i].toInt() and 0xFF)
+        }
+        return result
     }
 
     /**
