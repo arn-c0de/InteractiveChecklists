@@ -1,16 +1,6 @@
 package com.example.checklist_interactive.ui.checklist
 
 import android.content.Context
-import android.graphics.pdf.PdfRenderer
-import android.os.ParcelFileDescriptor
-import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
-import com.tom_roush.pdfbox.pdmodel.PDDocument
-import com.tom_roush.pdfbox.pdmodel.PDPage
-import com.tom_roush.pdfbox.pdmodel.interactive.action.PDActionGoTo
-import com.tom_roush.pdfbox.pdmodel.interactive.documentnavigation.destination.PDNamedDestination
-import com.tom_roush.pdfbox.pdmodel.interactive.documentnavigation.destination.PDPageDestination
-import com.tom_roush.pdfbox.pdmodel.interactive.documentnavigation.outline.PDDocumentOutline
-import com.tom_roush.pdfbox.pdmodel.interactive.documentnavigation.outline.PDOutlineItem
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -28,14 +18,9 @@ data class PdfOutlineItem(
 
 /**
  * Extracts the document outline (table of contents / bookmarks) from a PDF file.
- * Uses Apache PDFBox to parse the PDF outline structure.
+ * Uses native PDF parsing without external dependencies.
  */
 class PdfOutlineExtractor(private val context: Context) {
-    
-    init {
-        // Initialize PDFBox resource loader
-        PDFBoxResourceLoader.init(context)
-    }
 
     /**
      * Extracts outline items from a PDF file.
@@ -45,7 +30,27 @@ class PdfOutlineExtractor(private val context: Context) {
     suspend fun extractOutline(pdfFile: File): List<PdfOutlineItem> = withContext(Dispatchers.IO) {
         val outlineItems = mutableListOf<PdfOutlineItem>()
         try {
+            val parser = PdfStructureParser(pdfFile)
+            val parsed = parser.parseOutline()
+            outlineItems.addAll(parsed)
+            
+            if (outlineItems.isEmpty()) {
+                Log.d("PdfOutlineExtractor", "No outline found in ${pdfFile.name}")
+            } else {
+                Log.d("PdfOutlineExtractor", "Found ${outlineItems.size} outline items in ${pdfFile.name}")
+            }
+        } catch (e: Exception) {
+            Log.e("PdfOutlineExtractor", "Failed to extract outline: ${e.message}", e)
+        }
+        outlineItems
+    }
+}
+
+// Remove all old PDFBox-based code below
+/*
             PDDocument.load(pdfFile).use { document ->
+                // OLD PDFBox code removed
+                /*
                 val outline = document.documentCatalog.documentOutline
                 if (outline == null) {
                     Log.d("PdfOutlineExtractor", "Document outline is null for ${pdfFile.name}")
@@ -112,11 +117,14 @@ class PdfOutlineExtractor(private val context: Context) {
             Log.d("PdfOutlineExtractor", "Failed to extract outline: ${e.message}")
         }
         outlineItems
-    }
+    } // OLD CODE END
+    */
 
     /**
-     * Recursively processes outline nodes to build a flat list with level information
+     * OLD: Recursively processes outline nodes to build a flat list with level information
+     * (replaced by PdfStructureParser)
      */
+    /*
     private fun processOutlineNode(
         node: PDOutlineItem?,
         document: PDDocument,
@@ -206,4 +214,4 @@ class PdfOutlineExtractor(private val context: Context) {
             current = current.nextSibling
         }
     }
-}
+    */

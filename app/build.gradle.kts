@@ -58,7 +58,7 @@ dependencies {
     implementation(libs.commonmark.ext.task.list.items)
     implementation(libs.kotlinx.serialization.json)
     implementation("androidx.documentfile:documentfile:1.0.1")
-    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+    // PDFBox removed - using native PDF parser (PdfStructureParser.kt)
 
     // SplashScreen API for Android 12+
     implementation("androidx.core:core-splashscreen:1.0.1")
