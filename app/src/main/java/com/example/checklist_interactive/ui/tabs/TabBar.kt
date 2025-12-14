@@ -3,7 +3,7 @@ package com.example.checklist_interactive.ui.tabs
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
+
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
@@ -19,6 +19,17 @@ import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.consumePositionChange
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -35,7 +46,7 @@ import kotlinx.coroutines.launch
  * - Active tab highlighting
  * - Close button on each tab
  * - File type icons (MD/PDF)
- * - Long press to close
+ * - Long press to reorder (drag)
  */
 @Composable
 fun TabBar(
@@ -44,6 +55,7 @@ fun TabBar(
     onTabSelected: (Int) -> Unit,
     onTabClosed: (Int) -> Unit,
     onNewTab: () -> Unit,
+    onTabsReordered: (fromIndex: Int, toIndex: Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -60,42 +72,113 @@ fun TabBar(
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             // Scrollable tabs (include New Tab button inside so it sits beside last tab)
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (tabs.isEmpty()) {
-                    Text(
-                        text = "Keine Tabs",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 8.dp)
-                    )
-                } else {
-                    tabs.forEachIndexed { index, tabInfo ->
-                        TabItem(
-                            tabInfo = tabInfo,
-                            isActive = index == activeTabIndex,
-                            onSelect = { onTabSelected(index) },
-                            onClose = { onTabClosed(index) }
-                        )
-                    }
-                }
+            // Use LazyRow so items can report drag gestures and be reordered
+            val scope = rememberCoroutineScope()
+            if (tabs.isEmpty()) {
+                Text(
+                    text = "Keine Tabs",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+            } else {
+                // Shared drag state for reorder behavior
+                val draggingIndex = remember { mutableStateOf(-1) }
+                val dragOffset = remember { mutableStateOf(0f) }
+                val targetIndex = remember { mutableStateOf(-1) }
+                val itemWidthDp = 110.dp
+                val itemWidthPx = with(LocalDensity.current) { itemWidthDp.toPx() }
 
-                // New Tab button inside scrollable row so it appears right after the last tab
-                IconButton(
-                    onClick = onNewTab,
-                    modifier = Modifier.size(32.dp)
+                androidx.compose.foundation.lazy.LazyRow(
+                    modifier = Modifier
+                        .weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Neuer Tab",
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+                    itemsIndexed(tabs, key = { index, t -> t.fileInfo.path ?: index }) { index, tabInfo ->
+                        // Per-item animated translation based on drag state
+                        val isDragging = index == draggingIndex.value
+
+                        val translationForOthers = remember(draggingIndex.value, targetIndex.value) {
+                            if (draggingIndex.value == -1) 0f
+                            else {
+                                val from = draggingIndex.value
+                                val to = targetIndex.value
+                                when {
+                                    from < to && index in (from + 1)..to -> -itemWidthPx
+                                    from > to && index in to..(from - 1) -> itemWidthPx
+                                    else -> 0f
+                                }
+                            }
+                        }
+
+                        val translation = if (isDragging) dragOffset.value else translationForOthers
+                        val animatedX by animateFloatAsState(targetValue = translation, animationSpec = tween(durationMillis = 150))
+
+                        val reorderModifier = Modifier
+                            .offset { IntOffset(animatedX.roundToInt(), 0) }
+                            .zIndex(if (isDragging) 1f else 0f)
+                            .pointerInput(index, tabs) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = {
+                                        // begin dragging this item
+                                        draggingIndex.value = index
+                                        targetIndex.value = index
+                                        dragOffset.value = 0f
+                                    },
+                                    onDragEnd = {
+                                        val from = draggingIndex.value
+                                        val to = targetIndex.value
+                                        if (from >= 0 && to >= 0 && from != to) {
+                                            onTabsReordered(from, to)
+                                        }
+                                        // reset
+                                        draggingIndex.value = -1
+                                        dragOffset.value = 0f
+                                        targetIndex.value = -1
+                                    },
+                                    onDragCancel = {
+                                        draggingIndex.value = -1
+                                        dragOffset.value = 0f
+                                        targetIndex.value = -1
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consumePositionChange()
+                                        dragOffset.value += dragAmount.x
+
+                                        val from = draggingIndex.value
+                                        if (from >= 0) {
+                                            val deltaIndex = (dragOffset.value / itemWidthPx).roundToInt()
+                                            val newTarget = (from + deltaIndex).coerceIn(0, tabs.size - 1)
+                                            if (newTarget != targetIndex.value) targetIndex.value = newTarget
+                                        }
+                                    }
+                                )
+                            }
+
+                        Box(modifier = reorderModifier) {
+                            TabItem(
+                                tabInfo = tabInfo,
+                                isActive = index == activeTabIndex,
+                                onSelect = { onTabSelected(index) },
+                                onClose = { onTabClosed(index) }
+                            )
+                        }
+                    }
+
+                    // New Tab button inside lazy row so it appears right after the last tab
+                    item {
+                        IconButton(
+                            onClick = onNewTab,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Neuer Tab",
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -130,11 +213,7 @@ private fun TabItem(
     Card(
         modifier = Modifier
             .widthIn(min = 80.dp, max = 140.dp)
-            .height(32.dp)
-            .combinedClickable(
-                onClick = onSelect,
-                onLongClick = onClose
-            ),
+            .height(32.dp),
         shape = RoundedCornerShape(6.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isActive) {
@@ -150,6 +229,7 @@ private fun TabItem(
         Row(
             modifier = Modifier
                 .fillMaxSize()
+                .clickable(onClick = onSelect)
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
@@ -220,6 +300,7 @@ fun TabbedDocumentViewer(
     onTabChanged: (Int) -> Unit,
     onTabClosed: (Int) -> Unit,
     onNewTab: () -> Unit,
+    onTabsReordered: (fromIndex: Int, toIndex: Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
     content: @Composable (TabManager.TabInfo) -> Unit
 ) {
@@ -227,14 +308,14 @@ fun TabbedDocumentViewer(
         initialPage = if (tabs.isEmpty()) 0 else activeTabIndex.coerceIn(0, tabs.size - 1),
         pageCount = { tabs.size }
     )
-    
+
     // Sync pager state with active tab index
     LaunchedEffect(activeTabIndex, tabs.size) {
         if (tabs.isNotEmpty() && activeTabIndex != pagerState.currentPage && activeTabIndex in 0 until tabs.size) {
             pagerState.animateScrollToPage(activeTabIndex)
         }
     }
-    
+
     // Notify when pager changes page
     LaunchedEffect(pagerState.currentPage) {
         if (tabs.isNotEmpty() && pagerState.currentPage != activeTabIndex) {
@@ -249,7 +330,8 @@ fun TabbedDocumentViewer(
             activeTabIndex = activeTabIndex,
             onTabSelected = onTabChanged,
             onTabClosed = onTabClosed,
-            onNewTab = onNewTab
+            onNewTab = onNewTab,
+            onTabsReordered = onTabsReordered
         )
         
         // Content area
