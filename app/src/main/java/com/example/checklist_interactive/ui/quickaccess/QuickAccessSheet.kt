@@ -1088,7 +1088,7 @@ fun QuickAccessSheet(
                                     quickInputMode = "time"
                                     val now = java.time.LocalTime.now()
                                     val tmpl = "${now.hour.toString().padStart(2, '0')}:${now.minute.toString().padStart(2, '0')} "
-                                    newTextInput = TextFieldValue(tmpl, selection = TextRange(tmpl.length))
+                                    newTextInput = TextFieldValue(tmpl, selection = TextRange(0, tmpl.length))
                                     focusRequester.requestFocus()
                                 }
                             },
@@ -1111,7 +1111,20 @@ fun QuickAccessSheet(
                         OutlinedTextField(
                             value = newTextInput,
                             onValueChange = { newVal ->
-                                if (quickInputMode == "coord") {
+                                if (quickInputMode == "time") {
+                                    // Allow only digits and colon for time input
+                                    val filtered = newVal.text.filter { it.isDigit() || it == ':' }
+                                    // Format as HH:MM
+                                    val digits = filtered.filter { it.isDigit() }
+                                    val formatted = when {
+                                        digits.isEmpty() -> ""
+                                        digits.length == 1 -> digits
+                                        digits.length == 2 -> digits
+                                        digits.length == 3 -> "${digits.take(2)}:${digits.drop(2)}"
+                                        else -> "${digits.take(2)}:${digits.drop(2).take(2)}"
+                                    }
+                                    newTextInput = TextFieldValue(formatted, selection = TextRange(formatted.length))
+                                } else if (quickInputMode == "coord") {
                                     // Extract all digits from the new input
                                     val allDigits = newVal.text.filter { it.isDigit() }
 
