@@ -24,6 +24,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.NoteAdd
 import androidx.compose.material3.*
+import android.widget.Toast
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -243,6 +245,10 @@ fun QuickAccessSheet(
     var quickInputMode by remember { mutableStateOf("text") }
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
+
+    // Pending delete confirmations (double-press to confirm)
+    var pendingDeleteNoteId by remember { mutableStateOf<String?>(null) }
+    var pendingDeleteCurrentNoteConfirm by remember { mutableStateOf(false) }
     val configuration = LocalConfiguration.current
     val isLargeScreen = configuration.screenWidthDp >= 600 || configuration.screenHeightDp >= 800
 
@@ -320,6 +326,20 @@ fun QuickAccessSheet(
     // Auto-save opacity when it changes
     LaunchedEffect(sheetOpacity) {
         prefs.edit().putFloat(KEY_SHEET_OPACITY, sheetOpacity).apply()
+    }
+
+    // Reset pending delete confirmations after timeout
+    LaunchedEffect(pendingDeleteNoteId) {
+        if (pendingDeleteNoteId != null) {
+            kotlinx.coroutines.delay(3000L)
+            pendingDeleteNoteId = null
+        }
+    }
+    LaunchedEffect(pendingDeleteCurrentNoteConfirm) {
+        if (pendingDeleteCurrentNoteConfirm) {
+            kotlinx.coroutines.delay(3000L)
+            pendingDeleteCurrentNoteConfirm = false
+        }
     }
 
     // Auto-save after 2 seconds of inactivity
@@ -918,13 +938,22 @@ fun QuickAccessSheet(
                                     )
                                 }
                                 if (note.id == activeNoteId && notes.size > 1) {
+                                    // Two-step delete: first click arms, second click confirms
                                     Icon(
                                         Icons.Default.Delete,
-                                        contentDescription = "Löschen",
+                                        contentDescription = if (pendingDeleteNoteId == note.id) "Erneut klicken zum Bestätigen" else "Löschen",
                                         modifier = Modifier
-                                            .size(14.dp)
-                                            .clickable { noteManager.removeNote(note.id) },
-                                        tint = MaterialTheme.colorScheme.error
+                                            .size(12.dp)
+                                                .clickable {
+                                                    if (pendingDeleteNoteId == note.id) {
+                                                        noteManager.removeNote(note.id)
+                                                        pendingDeleteNoteId = null
+                                                    } else {
+                                                        pendingDeleteNoteId = note.id
+                                                        Toast.makeText(context, "Press again to delete", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                },
+                                        tint = if (pendingDeleteNoteId == note.id) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.error.copy(alpha = 0.9f)
                                     )
                                 }
                             }
@@ -1298,39 +1327,52 @@ fun QuickAccessSheet(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // Delete button with two-step confirmation
                 OutlinedButton(
                     onClick = {
-                        currentNote = ""
-                        hasChanges = true
-                        noteManager.clearNote()
+                        if (pendingDeleteCurrentNoteConfirm) {
+                            currentNote = ""
+                            hasChanges = false
+                            noteManager.clearNote()
+                            pendingDeleteCurrentNoteConfirm = false
+                        } else {
+                            pendingDeleteCurrentNoteConfirm = true
+                            Toast.makeText(context, "Press again to delete", Toast.LENGTH_SHORT).show()
+                        }
                     },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(36.dp),
                     enabled = currentNote.isNotEmpty()
                 ) {
                     Icon(
                         Icons.Default.Delete,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
+                        contentDescription = if (pendingDeleteCurrentNoteConfirm) "Erneut klicken zum Bestätigen" else "Löschen",
+                        modifier = Modifier.size(14.dp),
+                        tint = if (pendingDeleteCurrentNoteConfirm) MaterialTheme.colorScheme.error else LocalContentColor.current
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Löschen")
+                    Text("Löschen", style = MaterialTheme.typography.labelSmall)
                 }
 
+                // Smaller save button
                 Button(
                     onClick = {
                         noteManager.saveNote(currentNote)
                         hasChanges = false
                     },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(36.dp),
                     enabled = hasChanges
                 ) {
                     Icon(
                         Icons.Default.Save,
                         contentDescription = null,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(14.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Speichern")
+                    Text("Speichern", style = MaterialTheme.typography.labelSmall)
                 }
             }
 
