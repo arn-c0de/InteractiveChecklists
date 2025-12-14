@@ -19,30 +19,58 @@ data class PdfOutlineItem(
 /**
  * Extracts the document outline (table of contents / bookmarks) from a PDF file.
  * Uses native PDF parsing without external dependencies.
+ * Implements caching to avoid re-parsing on subsequent opens.
  */
 class PdfOutlineExtractor(private val context: Context) {
+
+    private val cacheManager = PdfOutlineCacheManager(context)
 
     /**
      * Extracts outline items from a PDF file.
      * Returns a list of outline items with titles, page numbers, and hierarchical levels.
      * If no outline is found, returns an empty list.
+     * Uses cached data if available and file hasn't been modified.
      */
     suspend fun extractOutline(pdfFile: File): List<PdfOutlineItem> = withContext(Dispatchers.IO) {
+        // Check cache first
+        val cachedOutline = cacheManager.getCachedOutline(pdfFile)
+        if (cachedOutline != null) {
+            Log.d("PdfOutlineExtractor", "Loaded ${cachedOutline.size} cached outline items for ${pdfFile.name}")
+            return@withContext cachedOutline
+        }
+
+        // Parse outline if not cached
         val outlineItems = mutableListOf<PdfOutlineItem>()
         try {
             val parser = PdfStructureParser(pdfFile)
             val parsed = parser.parseOutline()
             outlineItems.addAll(parsed)
-            
+
             if (outlineItems.isEmpty()) {
                 Log.d("PdfOutlineExtractor", "No outline found in ${pdfFile.name}")
             } else {
-                Log.d("PdfOutlineExtractor", "Found ${outlineItems.size} outline items in ${pdfFile.name}")
+                Log.d("PdfOutlineExtractor", "Parsed ${outlineItems.size} outline items in ${pdfFile.name}")
+                // Cache the parsed outline
+                cacheManager.cacheOutline(pdfFile, outlineItems)
             }
         } catch (e: Exception) {
             Log.e("PdfOutlineExtractor", "Failed to extract outline: ${e.message}", e)
         }
         outlineItems
+    }
+
+    /**
+     * Clears all cached outlines (useful for troubleshooting or memory management).
+     */
+    fun clearCache() {
+        cacheManager.clearAllCache()
+    }
+
+    /**
+     * Removes cached outline for a specific file.
+     */
+    fun invalidateCache(pdfFile: File) {
+        cacheManager.removeCachedOutline(pdfFile)
     }
 }
 
