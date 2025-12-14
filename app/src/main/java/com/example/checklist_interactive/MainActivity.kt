@@ -53,7 +53,7 @@ import com.example.checklist_interactive.ui.tabs.TabbedDocumentViewer
 
 class MainActivity : ComponentActivity() {
         companion object {
-            const val SOFTWARE_VERSION = "1.0.6"
+            const val SOFTWARE_VERSION = "1.0.7"
         }
 
         val softwareVersion = SOFTWARE_VERSION
@@ -351,6 +351,9 @@ class MainActivity : ComponentActivity() {
                                 onNewTab = {
                                     // Show file list to select new file
                                     showFileList = true
+                                },
+                                onTabsReordered = { from, to ->
+                                    tabManager.moveTab(from, to)
                                 }
                             ) { tabInfo ->
                                 // Render the document viewer for each tab

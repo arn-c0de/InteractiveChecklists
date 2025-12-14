@@ -174,6 +174,30 @@ class TabManager(context: Context) {
         _activeTabIndex.value = 0
         saveTabsToPreferences()
     }
+
+    /**
+     * Move a tab from one index to another (reordering)
+     */
+    fun moveTab(fromIndex: Int, toIndex: Int) {
+        val current = _openTabs.value.toMutableList()
+        if (fromIndex < 0 || fromIndex >= current.size) return
+        if (toIndex < 0 || toIndex >= current.size) return
+
+        val item = current.removeAt(fromIndex)
+        current.add(toIndex, item)
+        _openTabs.value = current
+
+        // Update active tab index if necessary
+        val active = _activeTabIndex.value
+        _activeTabIndex.value = when {
+            active == fromIndex -> toIndex
+            fromIndex < active && toIndex >= active -> active - 1
+            fromIndex > active && toIndex <= active -> active + 1
+            else -> active
+        }
+
+        saveTabsToPreferences()
+    }
     
     /**
      * Add path to navigation history
