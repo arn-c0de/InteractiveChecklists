@@ -189,6 +189,10 @@ fun PdfViewer(
     // Sharpening feature
     var sharpenEnabled by remember { mutableStateOf(false) }
     var sharpenIntensity by remember { mutableStateOf(1.5f) }
+    // When true: always apply sharpening to the currently visible page
+    // even when switching pages. When false: sharpening is disabled
+    // and the slider is only used to set intensity.
+    var sharpenApplyToCurrentPage by remember { mutableStateOf(false) }
 
     // Text extraction
     val textExtractor = remember { PdfTextExtractor(context) }
@@ -1053,6 +1057,23 @@ fun PdfViewer(
                                 steps = 6,
                                 modifier = Modifier.weight(1f)
                             )
+
+                            // Checkbox to control whether sharpening should be applied
+                            // automatically to the current page when switching pages.
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(
+                                    checked = sharpenApplyToCurrentPage,
+                                    onCheckedChange = { sharpenApplyToCurrentPage = it }
+                                )
+                                Text(
+                                    "Apply to current page",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    modifier = Modifier.padding(start = 4.dp).widthIn(max = 140.dp),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
                             Text(
                                 "${String.format("%.1f", sharpenIntensity)}x",
                                 style = MaterialTheme.typography.labelSmall,
@@ -1233,7 +1254,7 @@ fun PdfViewer(
                                     offsetY = pageOffsetsY[pageIndex] ?: 0f,
                                         isPageHighlighted = pageHighlights.contains(pageIndex),
                                         invertColors = invertColors,
-                                    sharpenEnabled = sharpenEnabled,
+                                    sharpenEnabled = if (sharpenApplyToCurrentPage) pageIndex == currentPage else false,
                                     sharpenIntensity = sharpenIntensity,
                                     onStrokeAdd = { stroke -> strokes.add(stroke) },
                                     onStrokeUpdate = { oldStroke, newStroke ->
@@ -1377,7 +1398,7 @@ fun PdfViewer(
                                             offsetY = pageOffsetY,
                                             isPageHighlighted = isHighlighted,
                                             invertColors = invertColors,
-                                            sharpenEnabled = sharpenEnabled,
+                                            sharpenEnabled = if (sharpenApplyToCurrentPage) pageIndex == currentPage else false,
                                             sharpenIntensity = sharpenIntensity,
                                             onStrokeAdd = { strokes.add(it) },
                                             onStrokeUpdate = { old, new ->
