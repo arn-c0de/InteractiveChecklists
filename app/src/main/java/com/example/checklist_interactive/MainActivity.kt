@@ -49,6 +49,9 @@ import kotlinx.coroutines.launch
 import androidx.activity.compose.BackHandler
 import com.example.checklist_interactive.data.tabs.TabManager
 import com.example.checklist_interactive.ui.tabs.TabbedDocumentViewer
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.ExperimentalFoundationApi
 
 class MainActivity : ComponentActivity() {
         companion object {
@@ -57,6 +60,7 @@ class MainActivity : ComponentActivity() {
 
         val softwareVersion = SOFTWARE_VERSION
     
+    @OptIn(ExperimentalFoundationApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -312,6 +316,25 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
+                    // Horizontal pager for swipe navigation between file list and tabs
+                    val mainPagerState = rememberPagerState(
+                        initialPage = if (showFileList) 0 else 1,
+                        pageCount = { 2 }
+                    )
+                    
+                    // Sync pager state with showFileList
+                    LaunchedEffect(mainPagerState.currentPage) {
+                        showFileList = (mainPagerState.currentPage == 0)
+                    }
+                    
+                    LaunchedEffect(showFileList) {
+                        if (showFileList && mainPagerState.currentPage != 0) {
+                            mainPagerState.animateScrollToPage(0)
+                        } else if (!showFileList && mainPagerState.currentPage != 1) {
+                            mainPagerState.animateScrollToPage(1)
+                        }
+                    }
+
                     when {
                         showSettings -> {
                             // Settings screen
@@ -323,9 +346,60 @@ class MainActivity : ComponentActivity() {
                                 onFilesRefreshed = { refreshTrigger++ }
                             )
                         }
-                        !showFileList -> {
-                            // Tabbed document viewer with swipe support (always shown, even with 0 tabs)
-                            TabbedDocumentViewer(
+                        else -> {
+                            // Main pager with file list and tab viewer
+                            HorizontalPager(
+                                state = mainPagerState,
+                                modifier = Modifier.fillMaxSize(),
+                                userScrollEnabled = true
+                            ) { page ->
+                                when (page) {
+                                    0 -> {
+                                        // File list (My Files)
+                                        InternalFilesScreen(
+                                            fileManager = fileManager,
+                                            onFileOpen = { fileInfo ->
+                                                tabManager.openTab(fileInfo)
+                                                showFileList = false
+                                                scope.launch {
+                                                    repository.saveLastOpenedFile(fileInfo.path)
+                                                }
+                                            },
+                                            onShortcutOpen = { shortcut: PageShortcut ->
+                                                val allFiles = fileManager.getAllFilesGrouped().values.flatten()
+                                                val targetFile = allFiles.find { it.path == shortcut.filePath }
+                                                if (targetFile != null) {
+                                                    tabManager.openTab(targetFile, shortcut.pageNumber)
+                                                    showFileList = false
+                                                    scope.launch {
+                                                        repository.saveLastOpenedFile(targetFile.path)
+                                                    }
+                                                }
+                                            },
+                                            onRefresh = {
+                                                fileManager.importAllBundledAssets("")
+                                                refreshTrigger++
+                                            },
+                                            refreshTrigger = refreshTrigger,
+                                            isDarkTheme = isDarkTheme,
+                                            onToggleTheme = toggleTheme,
+                                            onShowSettings = { showSettings = true },
+                                            onOpenLinkedDocument = { filePath, pageNumber ->
+                                                val allFiles = fileManager.getAllFilesGrouped().values.flatten()
+                                                val targetFile = allFiles.find { it.path == filePath || it.path.endsWith(filePath) }
+                                                if (targetFile != null) {
+                                                    tabManager.openTab(targetFile, pageNumber ?: 0)
+                                                    showFileList = false
+                                                    scope.launch {
+                                                        repository.saveLastOpenedFile(targetFile.path)
+                                                    }
+                                                }
+                                            }
+                                        )
+                                    }
+                                    1 -> {
+                                        // Tabbed document viewer
+                                        TabbedDocumentViewer(
                                 tabs = openTabs,
                                 activeTabIndex = activeTabIndex,
                                 onTabChanged = { index ->
@@ -404,49 +478,9 @@ class MainActivity : ComponentActivity() {
                                     }
                                 )
                             }
-                        }
-                        else -> {
-                            // File list (home screen)
-                            InternalFilesScreen(
-                                fileManager = fileManager,
-                                onFileOpen = { fileInfo ->
-                                    tabManager.openTab(fileInfo)
-                                    showFileList = false
-                                    scope.launch {
-                                        repository.saveLastOpenedFile(fileInfo.path)
-                                    }
-                                },
-                                onShortcutOpen = { shortcut: PageShortcut ->
-                                    val allFiles = fileManager.getAllFilesGrouped().values.flatten()
-                                    val targetFile = allFiles.find { it.path == shortcut.filePath }
-                                    if (targetFile != null) {
-                                        tabManager.openTab(targetFile, shortcut.pageNumber)
-                                        showFileList = false
-                                        scope.launch {
-                                            repository.saveLastOpenedFile(targetFile.path)
-                                        }
-                                    }
-                                },
-                                onRefresh = {
-                                    fileManager.importAllBundledAssets("")
-                                    refreshTrigger++
-                                },
-                                refreshTrigger = refreshTrigger,
-                                isDarkTheme = isDarkTheme,
-                                onToggleTheme = toggleTheme,
-                                onShowSettings = { showSettings = true },
-                                onOpenLinkedDocument = { filePath, pageNumber ->
-                                    val allFiles = fileManager.getAllFilesGrouped().values.flatten()
-                                    val targetFile = allFiles.find { it.path == filePath || it.path.endsWith(filePath) }
-                                    if (targetFile != null) {
-                                        tabManager.openTab(targetFile, pageNumber ?: 0)
-                                        showFileList = false
-                                        scope.launch {
-                                            repository.saveLastOpenedFile(targetFile.path)
-                                        }
                                     }
                                 }
-                            )
+                            }
                         }
                     }
                     }
