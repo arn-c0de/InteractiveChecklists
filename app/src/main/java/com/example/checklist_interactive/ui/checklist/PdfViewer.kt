@@ -173,6 +173,8 @@ fun PdfViewer(
     var showShortcutDialog by remember { mutableStateOf(false) }
     var shortcutName by remember { mutableStateOf("") }
     val pageAspectRatios = remember { mutableStateMapOf<Int, Float>() }
+    // Transient scale cache per page so UI (e.g., percent label) can show live values without committing to persistent state
+    val transientScaleMap = remember { mutableStateMapOf<Int, Float>() }
     var pageHighlights by remember { mutableStateOf<List<Int>>(emptyList()) }
     val invertColorPrefManager = remember { InvertColorPrefManager(context) }
     var invertColors by remember { mutableStateOf(false) }
@@ -922,8 +924,9 @@ fun PdfViewer(
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
+                            val displayScale = transientScaleMap[currentPage] ?: (pageScales[currentPage] ?: 1f)
                             Text(
-                                text = "${(((pageScales[currentPage] ?: 1f) * 100).toInt())}%",
+                                text = "${((displayScale * 100).toInt())}%",
                                 style = MaterialTheme.typography.labelSmall,
                                 modifier = Modifier.width(45.dp),
                                 textAlign = TextAlign.Center
@@ -1151,7 +1154,8 @@ fun PdfViewer(
                     // Main content area: uses weight to fill remaining space, preventing overlap with toolbars.
                     Box(modifier = Modifier.weight(1f)) {
                         val curScale = pageScales[currentPage] ?: 1f
-                        if (curScale != 1f) {
+                        val isZoomed = kotlin.math.abs(curScale - 1f) > 0.01f
+                        if (isZoomed) {
                             // Show only the current page when zoomed — prevents other pages from showing partially.
                             val pageIndex = currentPage
                             val pageBitmapState = getPageBitmapState(pageIndex)
@@ -1225,6 +1229,7 @@ fun PdfViewer(
                                         pageOffsetsX[pageIndex] = newOffsetX
                                         pageOffsetsY[pageIndex] = newOffsetY
                                     },
+                                    onTransientScaleChange = { s -> transientScaleMap[pageIndex] = s },
                                     onSave = { AnnotationsRepository.save(context, pdfPath, strokes.toList()) }
                                 )
                             } else {
@@ -1366,6 +1371,7 @@ fun PdfViewer(
                                                 pageOffsetsX[pageIndex] = newOffsetX
                                                 pageOffsetsY[pageIndex] = newOffsetY
                                             },
+                                            onTransientScaleChange = { s -> transientScaleMap[pageIndex] = s },
                                             onSave = { AnnotationsRepository.save(context, pdfPath, strokes.toList()) }
                                         )
                                         }
@@ -1415,11 +1421,12 @@ fun PdfViewer(
                         fabSizePx = fabSizePx,
                         defaultX = 1.0f,
                         defaultY = 0.7f,
-                        visible = (pageScales[currentPage] ?: 1f) != 1f,
+                        visible = kotlin.math.abs((pageScales[currentPage] ?: 1f) - 1f) > 0.01f,
                         onClick = {
                             pageScales[currentPage] = 1f
                             pageOffsetsX[currentPage] = 0f
                             pageOffsetsY[currentPage] = 0f
+                            transientScaleMap[currentPage] = 1f
                         },
                         content = { Icon(Icons.Default.CenterFocusWeak, contentDescription = "Reset zoom") }
                     )
@@ -1738,6 +1745,7 @@ private fun PdfPageWithAnnotations(
     onScaleChange: (Float, Offset, IntSize) -> Unit,
     onOffsetChange: (Float, Float, IntSize) -> Unit,
     onScaleAndOffsetChange: (Float, Float, Float) -> Unit,
+    onTransientScaleChange: ((Float) -> Unit)? = null,
     onSave: () -> Unit
 ) {
     var overlaySize by remember { mutableStateOf(IntSize(0, 0)) }
@@ -1750,6 +1758,10 @@ private fun PdfPageWithAnnotations(
     var transientScale by remember { mutableStateOf(1f) }
     var transientOffsetX by remember { mutableStateOf(0f) }
     var transientOffsetY by remember { mutableStateOf(0f) }
+
+    // Gesture commit debounce job: we avoid writing to parent state on every motion
+    var commitGestureJob by remember { mutableStateOf<Job?>(null) }
+    val gestureScope = rememberCoroutineScope()
 
     // Sync transient state with persistent state when not gesturing
     LaunchedEffect(scale, offsetX, offsetY) {
@@ -1854,58 +1866,70 @@ private fun PdfPageWithAnnotations(
                     // Don't handle zoom/pan in drawing/erase mode
                     if (annotateMode || eraseMode) return@pointerInput
 
+                    // Custom multi-touch detection: only handle pinch zoom, let single-finger pass through for scrolling
                     awaitPointerEventScope {
                         while (true) {
                             val event = awaitPointerEvent()
                             val pointers = event.changes.filter { it.pressed }
-
-                            // Multi-touch: always handle zoom + pan (even from scale 1f)
+                            
+                            // Only handle multi-touch gestures (pinch zoom)
                             if (pointers.size >= 2) {
                                 // Early exit if overlay not initialized
                                 if (overlaySize.width == 0 || overlaySize.height == 0) continue
-
+                                
+                                // Consume the event to prevent other handlers from processing it
+                                pointers.forEach { it.consume() }
+                                
                                 val pos1 = pointers[0].position
                                 val pos2 = pointers[1].position
                                 val centroid = (pos1 + pos2) / 2f
-
                                 var prevDist = hypot((pos1.x - pos2.x).toDouble(), (pos1.y - pos2.y).toDouble()).toFloat()
                                 var prevCentroid = centroid
-
-                                // Track the gesture
+                                
+                                // Track the multi-touch gesture
                                 while (true) {
                                     val nextEvent = awaitPointerEvent()
-                                    val changes = nextEvent.changes
-                                    changes.forEach { it.consume() }
-                                    val active = changes.filter { it.pressed }
+                                    val active = nextEvent.changes.filter { it.pressed }
                                     if (active.size < 2) break
-
+                                    
+                                    active.forEach { it.consume() }
+                                    
                                     val newPos1 = active[0].position
-                                    val newPos2 = if (active.size >= 2) active[1].position else newPos1
+                                    val newPos2 = active[1].position
                                     val newDist = hypot((newPos1.x - newPos2.x).toDouble(), (newPos1.y - newPos2.y).toDouble()).toFloat()
                                     val newCentroid = (newPos1 + newPos2) / 2f
-
+                                    
                                     val zoom = if (prevDist > 0f) newDist / prevDist else 1f
                                     val pan = newCentroid - prevCentroid
 
-                                    // Calculate new scale
                                     val currentScale = transientScale
-                                    val currentOffsetX = transientOffsetX
-                                    val currentOffsetY = transientOffsetY
                                     val newScale = (currentScale * zoom).coerceIn(0.5f, 3f)
 
-                                    // Calculate content point under centroid
-                                    val contentX = (prevCentroid.x - currentOffsetX) / currentScale
-                                    val contentY = (prevCentroid.y - currentOffsetY) / currentScale
+                                    // If user is pinching out (zooming towards 1f) and we're very close to 1.0, snap to 1.0 immediately
+                                    if (zoom < 1f && kotlin.math.abs(newScale - 1f) < 0.05f) {
+                                        // snap to exact 100%
+                                        transientScale = 1f
+                                        transientOffsetX = 0f
+                                        transientOffsetY = 0f
 
-                                    // Calculate new offsets
-                                    var newOffsetX = newCentroid.x - contentX * newScale
-                                    var newOffsetY = newCentroid.y - contentY * newScale
+                                        // Notify parent/persistent state so scrolling is enabled immediately
+                                        onTransientScaleChange?.invoke(1f)
+                                        onScaleAndOffsetChange(1f, 0f, 0f)
 
-                                    // Apply pan
-                                    newOffsetX += pan.x * 0.5f // Dampen pan during zoom
-                                    newOffsetY += pan.y * 0.5f
+                                        // Cancel any pending commit and stop tracking this multi-touch gesture
+                                        commitGestureJob?.cancel()
+                                        commitGestureJob = null
+                                        break
+                                    }
 
-                                    // Apply bounds
+                                    // Keep the content point under the gesture centroid stable while scaling
+                                    val contentX = (prevCentroid.x - transientOffsetX) / currentScale
+                                    val contentY = (prevCentroid.y - transientOffsetY) / currentScale
+
+                                    var newOffsetX = newCentroid.x - contentX * newScale + pan.x * 0.5f
+                                    var newOffsetY = newCentroid.y - contentY * newScale + pan.y * 0.5f
+
+                                    // Apply bounds immediately for visual feedback (soft clamp)
                                     val maxOffsetX = 0f
                                     val minOffsetX = overlaySize.width * (1f - newScale)
                                     val maxOffsetY = 0f
@@ -1922,57 +1946,82 @@ private fun PdfPageWithAnnotations(
                                         newOffsetY.coerceAtMost(maxOffsetY).coerceAtLeast(minOffsetY)
                                     }
 
-                                    // Update transient state
+                                    // Update transient (visual) state immediately for smooth response
                                     transientScale = newScale
                                     transientOffsetX = newOffsetX
                                     transientOffsetY = newOffsetY
-                                    onScaleAndOffsetChange(newScale, newOffsetX, newOffsetY)
-
+                                    onTransientScaleChange?.invoke(transientScale)
+                                    
                                     prevDist = newDist
                                     prevCentroid = newCentroid
                                 }
-                            } else if (pointers.size == 1 && transientScale != 1f) {
-                                // Single-finger pan when zoomed
-                                val pointerId = pointers[0].id
-                                var prevPos = pointers[0].position
 
-                                while (true) {
-                                    val nextEvent = awaitPointerEvent()
-                                    val change = nextEvent.changes.firstOrNull { it.id == pointerId }
-                                    if (change == null || !change.pressed) break
+                                // Debounce committing the transform to parent state to avoid heavy recomposition/stutter
+                                commitGestureJob?.cancel()
+                                // Capture the transient values at the time of scheduling
+                                val snapshotScale = transientScale
+                                val snapshotOffsetX = transientOffsetX
+                                val snapshotOffsetY = transientOffsetY
+                                commitGestureJob = gestureScope.launch {
+                                    // Wait for gesture to settle
+                                    kotlinx.coroutines.delay(120L)
 
-                                    val newPos = change.position
-                                    val drag = newPos - prevPos
+                                    // Recompute clamped final offsets (ensure in-bounds) using snapshotScale
+                                    val finalMaxOffsetX = 0f
+                                    val finalMinOffsetX = overlaySize.width * (1f - snapshotScale)
+                                    val finalMaxOffsetY = 0f
+                                    val finalMinOffsetY = overlaySize.height * (1f - snapshotScale)
 
-                                    if (drag.x != 0f || drag.y != 0f) {
-                                        change.consume()
-
-                                        val currentScale = transientScale
-                                        var newOffsetX = transientOffsetX + drag.x
-                                        var newOffsetY = transientOffsetY + drag.y
-
-                                        // Apply bounds
-                                        val maxOffsetX = 0f
-                                        val minOffsetX = overlaySize.width * (1f - currentScale)
-                                        val maxOffsetY = 0f
-                                        val minOffsetY = overlaySize.height * (1f - currentScale)
-
-                                        newOffsetX = if (minOffsetX <= maxOffsetX) {
-                                            newOffsetX.coerceIn(minOffsetX, maxOffsetX)
-                                        } else {
-                                            newOffsetX.coerceAtMost(maxOffsetX).coerceAtLeast(minOffsetX)
-                                        }
-                                        newOffsetY = if (minOffsetY <= maxOffsetY) {
-                                            newOffsetY.coerceIn(minOffsetY, maxOffsetY)
-                                        } else {
-                                            newOffsetY.coerceAtMost(maxOffsetY).coerceAtLeast(minOffsetY)
-                                        }
-
-                                        transientOffsetX = newOffsetX
-                                        transientOffsetY = newOffsetY
-                                        onScaleAndOffsetChange(currentScale, newOffsetX, newOffsetY)
+                                    val targetOffsetX = if (finalMinOffsetX <= finalMaxOffsetX) {
+                                        snapshotOffsetX.coerceIn(finalMinOffsetX, finalMaxOffsetX)
+                                    } else {
+                                        snapshotOffsetX.coerceAtMost(finalMaxOffsetX).coerceAtLeast(finalMinOffsetX)
                                     }
-                                    prevPos = newPos
+                                    val targetOffsetY = if (finalMinOffsetY <= finalMaxOffsetY) {
+                                        snapshotOffsetY.coerceIn(finalMinOffsetY, finalMaxOffsetY)
+                                    } else {
+                                        snapshotOffsetY.coerceAtMost(finalMaxOffsetY).coerceAtLeast(finalMinOffsetY)
+                                    }
+
+                                    // Smoothly animate offsets to the final clamped values if needed
+                                    if (kotlin.math.abs(transientOffsetX - targetOffsetX) > 0.5f || kotlin.math.abs(transientOffsetY - targetOffsetY) > 0.5f) {
+                                        val animX = androidx.compose.animation.core.Animatable(transientOffsetX)
+                                        val animY = androidx.compose.animation.core.Animatable(transientOffsetY)
+                                        // Snap to current to avoid jumps
+                                        animX.snapTo(transientOffsetX)
+                                        animY.snapTo(transientOffsetY)
+                                        // Animate to targets using a spring for natural feel
+                                        try {
+                                            val aJob = launch {
+                                                animX.animateTo(targetOffsetX, animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 600f)) {
+                                                    transientOffsetX = value
+                                                }
+                                            }
+                                            val bJob = launch {
+                                                animY.animateTo(targetOffsetY, animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 600f)) {
+                                                    transientOffsetY = value
+                                                }
+                                            }
+                                            aJob.join(); bJob.join()
+                                        } catch (_: Exception) {
+                                            transientOffsetX = targetOffsetX
+                                            transientOffsetY = targetOffsetY
+                                        }
+                                    } else {
+                                        transientOffsetX = targetOffsetX
+                                        transientOffsetY = targetOffsetY
+                                    }
+
+                                    // If scale returned to 1f, also reset offsets to zero for a clean state
+                                    val finalScale = if (kotlin.math.abs(snapshotScale - 1f) < 0.015f) 1f else snapshotScale
+                                    if (finalScale == 1f) {
+                                        transientOffsetX = 0f
+                                        transientOffsetY = 0f
+                                    }
+
+                                    // Commit to parent (persistent) state once gesture settles
+                                    onScaleAndOffsetChange(finalScale, transientOffsetX, transientOffsetY)
+                                    commitGestureJob = null
                                 }
                             }
                         }
