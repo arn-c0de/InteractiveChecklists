@@ -15,6 +15,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.foundation.layout.offset
 import com.example.checklist_interactive.data.files.FileInfo
 import com.example.checklist_interactive.ui.checklist.MarkdownViewer
 import com.example.checklist_interactive.ui.checklist.PdfViewer
@@ -28,6 +34,7 @@ import com.example.checklist_interactive.data.prefs.PreferencesManager
 import com.example.checklist_interactive.data.checklist.MarkdownChecklistParser
 import com.example.checklist_interactive.ui.checklist.ChecklistViewModel
 import com.example.checklist_interactive.ui.checklist.ChecklistViewModelFactory
+import com.example.checklist_interactive.ui.common.DraggableFab
 import java.io.File
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
@@ -208,41 +215,53 @@ fun InternalFileViewer(
                         modifier = Modifier.height(48.dp)
                     )
                 },
-                floatingActionButton = {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                        horizontalAlignment = Alignment.End
-                    ) {
-                        // Menu FAB - always at a fixed position (placed above Quick Access)
-                        FloatingActionButton(
-                            onClick = onShowFileList,
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
-                        ) {
-                            Icon(Icons.Default.Menu, contentDescription = LocalContext.current.getString(R.string.file_list))
-                        }
-
-                        // Quick Access FAB - always anchored to bottom-right (place last so it's closest to the screen edge)
-                        FloatingActionButton(
-                            onClick = { showQuickAccess = true },
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Quick access")
-                        }
-                    }
-                }
+                floatingActionButton = { /* moved to overlay */ }
             ) { padding ->
-                MarkdownViewer(
-                    assetPath = assetPath,
-                    checklist = checklistState,
-                    onCheckboxChange = viewModel::onCheckboxChange,
-                    modifier = Modifier.padding(padding),
-                    isInternalFile = !isAsset,
-                    prefsManager = prefsManager,
-                    forceExpandAll = expandAllSections,
-                    markdownContentOverride = markdownContent,
-                    resetTrigger = resetTrigger
-                )
+                Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                    MarkdownViewer(
+                        assetPath = assetPath,
+                        checklist = checklistState,
+                        onCheckboxChange = viewModel::onCheckboxChange,
+                        modifier = Modifier.fillMaxSize(),
+                        isInternalFile = !isAsset,
+                        prefsManager = prefsManager,
+                        forceExpandAll = expandAllSections,
+                        markdownContentOverride = markdownContent,
+                        resetTrigger = resetTrigger
+                    )
+
+                    // Draggable FABs
+                    val configuration = LocalConfiguration.current
+                    val screenWidthPx = with(LocalDensity.current) { configuration.screenWidthDp.dp.roundToPx() }
+                    val screenHeightPx = with(LocalDensity.current) { configuration.screenHeightDp.dp.roundToPx() }
+                    val fabSizePx = with(LocalDensity.current) { 56.dp.roundToPx() }
+
+                    DraggableFab(
+                        name = "menu",
+                        prefsManager = prefsManager,
+                        screenWidthPx = screenWidthPx,
+                        screenHeightPx = screenHeightPx,
+                        fabSizePx = fabSizePx,
+                        defaultX = 1.0f,
+                        defaultY = 0.8f,
+                        visible = true,
+                        onClick = onShowFileList,
+                        content = { Icon(Icons.Default.Menu, contentDescription = context.getString(R.string.file_list)) }
+                    )
+
+                    DraggableFab(
+                        name = "quick_access",
+                        prefsManager = prefsManager,
+                        screenWidthPx = screenWidthPx,
+                        screenHeightPx = screenHeightPx,
+                        fabSizePx = fabSizePx,
+                        defaultX = 1.0f,
+                        defaultY = 0.9f,
+                        visible = true,
+                        onClick = { showQuickAccess = true },
+                        content = { Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Quick access") }
+                    )
+                }
             }
 
             // Quick Access Bottom Sheet

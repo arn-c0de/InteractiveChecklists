@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.automirrored.filled.NoteAdd
 import androidx.compose.material.icons.filled.ViewModule
 import androidx.compose.material.icons.automirrored.filled.ViewList
@@ -144,8 +145,33 @@ fun InternalFilesScreen(
 
     // Quick Access state
     var showQuickAccess by remember { mutableStateOf(false) }
+    // Search state
+    var showSearchDialog by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var searchResults by remember { mutableStateOf<List<FileInfo>>(emptyList()) }
+    var isSearching by remember { mutableStateOf(false) }
     // Display mode: list or grid for files (persisted)
     var isGridView by remember { mutableStateOf(prefsManager.isGridViewEnabled()) }
+
+    // Perform a simple search across displayName, path and tags (IO-bound)
+    fun performSearch(query: String) {
+        coroutineScope.launch {
+            isSearching = true
+            val q = query.trim().lowercase()
+            val results = withContext(Dispatchers.IO) {
+                if (q.isEmpty()) return@withContext emptyList<FileInfo>()
+                // Use the enriched map when available to include tags
+                val allFiles = (groupedFiles.values.flatten()).map { enrichedFileMap[it.path] ?: it }
+                allFiles.filter { file ->
+                    file.displayName.lowercase().contains(q) ||
+                    file.path.lowercase().contains(q) ||
+                    file.tags.any { tag -> tag.lowercase().contains(q) }
+                }
+            }
+            searchResults = results
+            isSearching = false
+        }
+    }
 
     // Suspended function to refresh and enrich files with tags (IO-heavy - keep suspended)
     suspend fun refreshFilesWithTags() {
@@ -294,9 +320,6 @@ fun InternalFilesScreen(
                             contentDescription = context.getString(R.string.toggle_dark_mode)
                         )
                     }
-                    IconButton(onClick = onShowSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
-                    }
                     // Toggle between list and grid view for files
                     IconButton(onClick = {
                         isGridView = !isGridView
@@ -306,6 +329,12 @@ fun InternalFilesScreen(
                             imageVector = if (isGridView) Icons.AutoMirrored.Filled.ViewList else Icons.Default.ViewModule,
                             contentDescription = if (isGridView) "List view" else "Grid view"
                         )
+                    }
+                    IconButton(onClick = { showSearchDialog = true }) {
+                        Icon(Icons.Default.Search, contentDescription = "Search files")
+                    }
+                    IconButton(onClick = onShowSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
                 }
             )
@@ -566,6 +595,30 @@ fun InternalFilesScreen(
             onDismiss = {
                 showImportDialog = false
                 selectedCategory = null
+            }
+        )
+    }
+
+    // Search Dialog
+    if (showSearchDialog) {
+        SearchDialog(
+            query = searchQuery,
+            onQueryChange = { q ->
+                searchQuery = q
+                performSearch(q)
+            },
+            isSearching = isSearching,
+            results = searchResults,
+            onSelect = { file ->
+                onFileOpen(file)
+                showSearchDialog = false
+                searchQuery = ""
+                searchResults = emptyList()
+            },
+            onDismiss = {
+                showSearchDialog = false
+                searchQuery = ""
+                searchResults = emptyList()
             }
         )
     }
@@ -1187,6 +1240,74 @@ private fun FileGridItem(
             }
         }
     }
+}
+
+@Composable
+private fun SearchDialog(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    isSearching: Boolean,
+    results: List<FileInfo>,
+    onSelect: (FileInfo) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Search files") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { onQueryChange(it); /* performSearch is called from parent */ },
+                    label = { Text("Search") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                if (isSearching) {
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                } else {
+                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp)) {
+                        items(results) { file ->
+                            ListItem(
+                                headlineContent = { Text(file.displayName) },
+                                supportingContent = {
+                                    Column {
+                                        Text(file.path, style = MaterialTheme.typography.labelSmall)
+                                        if (file.tags.isNotEmpty()) {
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            TagChips(tags = file.tags, maxVisible = 4)
+                                        }
+                                    }
+                                },
+                                leadingContent = {
+                                    Icon(
+                                        when (file.extension.lowercase()) {
+                                            "pdf" -> Icons.Default.PictureAsPdf
+                                            "md", "markdown" -> Icons.Default.Description
+                                            else -> Icons.AutoMirrored.Filled.InsertDriveFile
+                                        },
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                },
+                                modifier = Modifier.clickable {
+                                    onSelect(file)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable

@@ -201,6 +201,35 @@ fun SettingsScreen(
                 )
             }
 
+            // === Viewer Layout Reset ===
+            item {
+                Spacer(modifier = Modifier.height(12.dp))
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Viewer Layout",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Reset custom floating button (FAB) positions in all viewers (PDF, Markdown, and internal file viewer) to their default positions. Long-press any FAB to move it to a custom position.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Button(onClick = {
+                                prefsManager.resetPdfViewerLayout()
+                                Toast.makeText(context, "FAB positions reset to defaults", Toast.LENGTH_SHORT).show()
+                            }) {
+                                Text("Reset FAB positions")
+                            }
+                        }
+                    }
+                }
+            }
+
             // === Contributors ===
             item {
                 Spacer(modifier = Modifier.height(16.dp))

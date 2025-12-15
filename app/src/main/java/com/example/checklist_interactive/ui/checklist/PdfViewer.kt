@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.foundation.gestures.detectTapGestures
 
 import kotlinx.coroutines.delay
@@ -67,6 +68,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.BasicText
@@ -76,6 +78,7 @@ import com.example.checklist_interactive.data.shortcuts.PageHighlightManager
 import com.example.checklist_interactive.data.shortcuts.ShortcutManager
 import com.example.checklist_interactive.data.shortcuts.LastPageManager
 import com.example.checklist_interactive.data.prefs.InvertColorPrefManager
+import com.example.checklist_interactive.data.prefs.PreferencesManager
 import java.io.File
 import kotlin.math.hypot
 import kotlinx.coroutines.Dispatchers
@@ -99,6 +102,7 @@ import android.content.ClipData
 import android.content.Context
 import com.example.checklist_interactive.ui.quickaccess.QuickAccessSheet
 import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
+import com.example.checklist_interactive.ui.common.DraggableFab
 
 /**
  * Custom PDF viewer with no external heavy dependencies.
@@ -234,6 +238,10 @@ fun PdfViewer(
     val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
     val configuration = LocalConfiguration.current
     val screenWidthPx = with(LocalDensity.current) { configuration.screenWidthDp.dp.roundToPx() }
+    val screenHeightPx = with(LocalDensity.current) { configuration.screenHeightDp.dp.roundToPx() }
+
+    // Preferences manager for storing FAB positions
+    val prefsManager = remember { PreferencesManager(context) }
 
     // PDF laden: open once, but render pages lazily.
     var fileDescriptor by remember { mutableStateOf<ParcelFileDescriptor?>(null) }
@@ -683,46 +691,7 @@ fun PdfViewer(
                 }
             )
         },
-        floatingActionButton = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalAlignment = Alignment.End
-            ) {
-                // Zoom Reset FAB - only show when zoomed (top, so it doesn't move other items)
-                val currentScale = pageScales[currentPage] ?: 1f
-                if (currentScale != 1f) {
-                    FloatingActionButton(
-                        onClick = {
-                            pageScales[currentPage] = 1f
-                            pageOffsetsX[currentPage] = 0f
-                            pageOffsetsY[currentPage] = 0f
-                        },
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer
-                    ) {
-                        Icon(Icons.Default.CenterFocusWeak, contentDescription = "Reset zoom")
-                    }
-                }
-
-                // Menu FAB - always visible at a fixed position (only show when onShowFileList is set)
-                if (onShowFileList != null) {
-                    FloatingActionButton(
-                        onClick = onShowFileList,
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    ) {
-                        Icon(Icons.Default.Menu, contentDescription = context.getString(R.string.file_list))
-                    }
-                }
-
-                // Quick Access FAB - always anchored to bottom-right (place last so it's closest to the screen edge)
-                FloatingActionButton(
-                    onClick = { showQuickAccess = true },
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Quick access")
-                }
-            }
-        }
+        floatingActionButton = { /* moved to overlay so positions are draggable */ }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             if (isLoading) {
@@ -770,19 +739,7 @@ fun PdfViewer(
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
-                            // Table of contents / chapters (TOC) - opens a dialog with chapters
-                            HintIconButton(
-                                onClick = { showTocDialog = true },
-                                hint = "Table of contents",
-                                onHintChange = { hoveredHint = it },
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.ViewList, // visible chapter/list icon
-                                    contentDescription = "Table of contents",
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                            // (Outline button present in the top bar; removed duplicate here.)
                             HintIconButton(
                                 onClick = {
                                     brushType = if (brushType == BrushType.Marker) BrushType.Pen else BrushType.Marker
@@ -1445,6 +1402,57 @@ fun PdfViewer(
                         }
                     }
                 }
+
+                    // Draggable floating action buttons overlay
+                    val fabSizePx = with(LocalDensity.current) { 56.dp.roundToPx() }
+
+                    // Zoom FAB (conditionally visible)
+                    DraggableFab(
+                        name = "zoom_reset",
+                        prefsManager = prefsManager,
+                        screenWidthPx = screenWidthPx,
+                        screenHeightPx = screenHeightPx,
+                        fabSizePx = fabSizePx,
+                        defaultX = 1.0f,
+                        defaultY = 0.7f,
+                        visible = (pageScales[currentPage] ?: 1f) != 1f,
+                        onClick = {
+                            pageScales[currentPage] = 1f
+                            pageOffsetsX[currentPage] = 0f
+                            pageOffsetsY[currentPage] = 0f
+                        },
+                        content = { Icon(Icons.Default.CenterFocusWeak, contentDescription = "Reset zoom") }
+                    )
+
+                    // Menu FAB (only if feature available)
+                    if (onShowFileList != null) {
+                        DraggableFab(
+                            name = "menu",
+                            prefsManager = prefsManager,
+                            screenWidthPx = screenWidthPx,
+                            screenHeightPx = screenHeightPx,
+                            fabSizePx = fabSizePx,
+                            defaultX = 1.0f,
+                            defaultY = 0.8f,
+                            visible = true,
+                            onClick = onShowFileList,
+                            content = { Icon(Icons.Default.Menu, contentDescription = context.getString(R.string.file_list)) }
+                        )
+                    }
+
+                    // Quick Access FAB
+                    DraggableFab(
+                        name = "quick_access",
+                        prefsManager = prefsManager,
+                        screenWidthPx = screenWidthPx,
+                        screenHeightPx = screenHeightPx,
+                        fabSizePx = fabSizePx,
+                        defaultX = 1.0f,
+                        defaultY = 0.9f,
+                        visible = true,
+                        onClick = { showQuickAccess = true },
+                        content = { Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Quick access") }
+                    )
             }
         }
 
