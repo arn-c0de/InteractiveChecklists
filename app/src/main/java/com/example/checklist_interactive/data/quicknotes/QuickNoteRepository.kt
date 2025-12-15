@@ -41,6 +41,13 @@ class QuickNoteRepository(private val quickNoteDao: QuickNoteDao) {
     }
 
     /**
+     * Get drawing JSON (strokes) for a specific note as Flow
+     */
+    fun getNoteDrawingFlow(noteId: String): Flow<String?> {
+        return quickNoteDao.getNoteDrawing(noteId)
+    }
+
+    /**
      * Get a specific note by ID
      */
     fun getNoteById(noteId: String): Flow<QuickNote?> {
@@ -117,6 +124,19 @@ class QuickNoteRepository(private val quickNoteDao: QuickNoteDao) {
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "Error updating note content: $noteId", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Update drawing JSON for a specific note
+     */
+    suspend fun updateNoteDrawing(noteId: String, drawing: String?): Result<Unit> {
+        return try {
+            quickNoteDao.updateNoteDrawing(noteId, drawing, System.currentTimeMillis())
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating note drawing: $noteId", e)
             Result.failure(e)
         }
     }

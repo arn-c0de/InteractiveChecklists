@@ -64,11 +64,15 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.core.view.WindowCompat
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.foundation.background
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.ViewCompat
@@ -78,8 +82,13 @@ import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.first
 import java.net.URLDecoder
 import java.net.URLEncoder
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
 
 // Replace [Callsign] placeholders (case-insensitive) with provided callsign value when rendering.
 private fun expandCallsignPlaceholder(content: String, callsign: String): String {
@@ -338,6 +347,8 @@ fun QuickAccessSheet(
     var showAdvancedEditor by remember { mutableStateOf(false) }
     var newTextInput by remember { mutableStateOf(TextFieldValue("")) }
     var quickInputMode by remember { mutableStateOf("text") }
+    var wasInDrawMode by remember { mutableStateOf(false) }
+    var showDrawMode by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
 
@@ -446,12 +457,134 @@ fun QuickAccessSheet(
         }
     }
 
+    // Drawing state: strokes are lists of points
+    @Serializable
+    data class PointDto(val x: Float, val y: Float)
+
+    val json = remember { Json { ignoreUnknownKeys = true } }
+    val strokesState = remember { mutableStateListOf<List<PointDto>>() }
+    var currentStroke by remember { mutableStateOf<List<PointDto>>(emptyList()) }
+    var drawingCleared by remember { mutableStateOf(false) }
+    var drawingDirty by remember { mutableStateOf(false) }
+    var eraseMode by remember { mutableStateOf(false) }
+
+    // Load existing drawing when active note changes (one-time load, not reactive)
+    LaunchedEffect(activeNoteId) {
+        val id = activeNoteId
+        if (id != null) {
+            // Load once, then strokes persist in memory until explicitly cleared
+            val drawingJson = noteManager.getDrawingFlow(id).first()
+            android.util.Log.d("QuickAccessSheet", "Loaded drawing for $id, len=${drawingJson?.length ?: 0}")
+            if (drawingJson.isNullOrBlank()) {
+                // Try backup from SharedPreferences if DB returned nothing
+                val backup = noteManager.getDrawingBackup(id)
+                if (!backup.isNullOrBlank()) {
+                    try {
+                        val strokes: List<List<PointDto>> = json.decodeFromString(backup)
+                        strokesState.clear()
+                        strokesState.addAll(strokes)
+                        android.util.Log.d("QuickAccessSheet", "Initialized strokes from backup count=${strokesState.size} for $id")
+                        // Restore backup into DB to ensure persistence
+                        noteManager.saveDrawing(id, backup)
+                    } catch (_: Exception) {
+                        strokesState.clear()
+                    }
+                } else {
+                    strokesState.clear()
+                }
+            } else {
+                try {
+                    val strokes: List<List<PointDto>> = json.decodeFromString(drawingJson)
+                    strokesState.clear()
+                    strokesState.addAll(strokes)
+                    android.util.Log.d("QuickAccessSheet", "Initialized strokes count=${strokesState.size} for $id")
+                } catch (_: Exception) {
+                    strokesState.clear()
+                }
+            }
+        } else {
+            strokesState.clear()
+        }
+    }
+
+    // Auto-save drawing strokes when leaving draw mode
+    LaunchedEffect(quickInputMode) {
+        // Track mode transitions
+        if (quickInputMode == "draw") {
+            wasInDrawMode = true
+        } else {
+            // leaving draw mode: save current strokes persistently (include in-flight stroke)
+            if (wasInDrawMode) {
+                // include currentStroke if present
+                if (currentStroke.isNotEmpty()) {
+                    strokesState.add(currentStroke)
+                    currentStroke = emptyList()
+                    drawingDirty = true
+                }
+
+                val id = activeNoteId
+                // If the user explicitly cleared, propagate the clear; otherwise avoid saving null (to prevent accidental deletes)
+                if (drawingCleared) {
+                    if (id != null) noteManager.saveDrawing(id, null)
+                    drawingCleared = false
+                } else {
+                    if (strokesState.isNotEmpty()) {
+                        val drawingJson = json.encodeToString(strokesState.toList())
+                        if (id != null) noteManager.saveDrawing(id, drawingJson)
+                            drawingDirty = false
+                    }
+                }
+
+                wasInDrawMode = false
+            }
+        }
+    }
+
+    // Periodic autosave when drawings changed while in draw mode
+    LaunchedEffect(drawingDirty, quickInputMode) {
+        if (quickInputMode == "draw" && drawingDirty) {
+            // debounce 3s
+            kotlinx.coroutines.delay(3000L)
+            if (quickInputMode == "draw" && drawingDirty) {
+                try {
+                    if (currentStroke.isNotEmpty()) {
+                        strokesState.add(currentStroke)
+                        currentStroke = emptyList()
+                    }
+                    val id = activeNoteId
+                    if (id != null) {
+                        val drawingJson = if (strokesState.isEmpty()) null else json.encodeToString(strokesState.toList())
+                        noteManager.saveDrawing(id, drawingJson)
+                        drawingDirty = false
+                    }
+                } catch (_: Exception) {
+                }
+            }
+        }
+    }
+
     // Save on dispose
     DisposableEffect(Unit) {
         onDispose {
             if (hasChanges) {
                 noteManager.saveNote(currentNote)
             }
+            // Ensure drawing is saved when sheet disposes
+            try {
+                if (currentStroke.isNotEmpty()) {
+                    strokesState.add(currentStroke)
+                    currentStroke = emptyList()
+                }
+                val id = activeNoteId
+                if (id != null) {
+                    if (drawingCleared) {
+                        noteManager.saveDrawing(id, null)
+                    } else if (strokesState.isNotEmpty()) {
+                        val drawingJson = json.encodeToString(strokesState.toList())
+                        noteManager.saveDrawing(id, drawingJson)
+                    }
+                }
+            } catch (_: Exception) {}
         }
     }
 
@@ -1271,6 +1404,15 @@ fun QuickAccessSheet(
                             },
                             label = { Text("Time", style = MaterialTheme.typography.labelSmall) }
                         )
+                        FilterChip(
+                            selected = quickInputMode == "draw",
+                            onClick = {
+                                if (quickInputMode != "draw") {
+                                    quickInputMode = "draw"
+                                }
+                            },
+                            label = { Text("Draw", style = MaterialTheme.typography.labelSmall) }
+                        )
                     }
 
                     // Quick input field with smart keyboard
@@ -1543,6 +1685,149 @@ fun QuickAccessSheet(
                                 }
                             )
                         )
+
+                        // Drawing canvas area when draw mode is active
+                        if (quickInputMode == "draw") {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Box(
+                                    modifier = Modifier
+                                        .height(220.dp)
+                                        .fillMaxWidth()
+                                        .background(Color(0xFFFDFDFD))
+                                        .pointerInput(eraseMode) {
+                                            detectDragGestures(
+                                                onDragStart = { offset ->
+                                                    if (!eraseMode) {
+                                                        currentStroke = listOf(PointDto(offset.x, offset.y))
+                                                    } else {
+                                                        // Start erase path
+                                                        currentStroke = listOf(PointDto(offset.x, offset.y))
+                                                    }
+                                                },
+                                                onDrag = { change, _ ->
+                                                    change.consume()
+                                                    currentStroke = currentStroke + PointDto(change.position.x, change.position.y)
+                                                    
+                                                    if (eraseMode) {
+                                                        // Erase strokes that intersect with touch path
+                                                        val eraseRadius = 30f
+                                                        val touchPoint = PointDto(change.position.x, change.position.y)
+                                                        strokesState.removeAll { stroke ->
+                                                            stroke.any { point ->
+                                                                val dx = point.x - touchPoint.x
+                                                                val dy = point.y - touchPoint.y
+                                                                kotlin.math.sqrt(dx * dx + dy * dy) < eraseRadius
+                                                            }
+                                                        }
+                                                    }
+                                                },
+                                                onDragEnd = {
+                                                    if (!eraseMode && currentStroke.isNotEmpty()) {
+                                                        strokesState.add(currentStroke)
+                                                        currentStroke = emptyList()
+                                                        try {
+                                                            // Save immediately on finger lift to avoid data loss
+                                                            val id = activeNoteId
+                                                            if (id != null) {
+                                                                val drawingJson = if (strokesState.isEmpty()) null else json.encodeToString(strokesState.toList())
+                                                                noteManager.saveDrawing(id, drawingJson)
+                                                                drawingDirty = false
+                                                            } else {
+                                                                drawingDirty = true
+                                                            }
+                                                        } catch (_: Exception) {
+                                                            drawingDirty = true
+                                                        }
+                                                    } else if (eraseMode) {
+                                                        // Save after erasing
+                                                        currentStroke = emptyList()
+                                                        try {
+                                                            val id = activeNoteId
+                                                            if (id != null) {
+                                                                val drawingJson = if (strokesState.isEmpty()) null else json.encodeToString(strokesState.toList())
+                                                                noteManager.saveDrawing(id, drawingJson)
+                                                                drawingDirty = false
+                                                            }
+                                                        } catch (_: Exception) {
+                                                            drawingDirty = true
+                                                        }
+                                                    }
+                                                },
+                                                onDragCancel = {
+                                                    currentStroke = emptyList()
+                                                }
+                                            )
+                                        }
+                                ) {
+                                    Canvas(modifier = Modifier.fillMaxSize()) {
+                                        val strokeStyle = androidx.compose.ui.graphics.drawscope.Stroke(width = 3f)
+                                        // Draw persisted strokes
+                                        strokesState.forEach { stroke ->
+                                            if (stroke.isNotEmpty()) {
+                                                val path = androidx.compose.ui.graphics.Path().apply {
+                                                    moveTo(stroke[0].x, stroke[0].y)
+                                                    for (p in stroke.drop(1)) lineTo(p.x, p.y)
+                                                }
+                                                drawPath(path, color = Color.Black, style = strokeStyle)
+                                            }
+                                        }
+
+                                        // Draw current stroke (different color in erase mode for visual feedback)
+                                        if (currentStroke.isNotEmpty() && !eraseMode) {
+                                            val path = androidx.compose.ui.graphics.Path().apply {
+                                                moveTo(currentStroke[0].x, currentStroke[0].y)
+                                                for (p in currentStroke.drop(1)) lineTo(p.x, p.y)
+                                            }
+                                            drawPath(path, color = Color.Black, style = strokeStyle)
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(onClick = {
+                                        val id = activeNoteId
+                                        val drawingJson = if (strokesState.isEmpty()) null else json.encodeToString(strokesState.toList())
+                                        if (id != null) {
+                                            noteManager.saveDrawing(id, drawingJson)
+                                            drawingDirty = false
+                                            Toast.makeText(context, "Drawing saved", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "No active note to save drawing", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }) {
+                                        Icon(Icons.Default.Save, contentDescription = "Save")
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Save")
+                                    }
+
+                                    FilledTonalButton(onClick = {
+                                        eraseMode = !eraseMode
+                                    }) {
+                                        Icon(
+                                            if (eraseMode) Icons.Default.Edit else Icons.Default.Delete,
+                                            contentDescription = if (eraseMode) "Draw" else "Erase"
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(if (eraseMode) "Draw" else "Erase")
+                                    }
+
+                                    OutlinedButton(onClick = {
+                                        strokesState.clear()
+                                        currentStroke = emptyList()
+                                        drawingCleared = true
+                                        drawingDirty = false
+                                        noteManager.clearDrawing(activeNoteId)
+                                    }) {
+                                        Icon(Icons.Default.Clear, contentDescription = "Clear")
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Clear")
+                                    }
+                                }
+                            }
+                        }
 
                         FilledTonalIconButton(
                             onClick = {
