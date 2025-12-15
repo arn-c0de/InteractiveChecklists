@@ -81,8 +81,8 @@ Step-by-step instructions to get the project running locally.
 2. Clone the repository
 
 ```bash
-git clone https://github.com/<your-org>/ChecklistInteractive.git
-cd ChecklistInteractive
+git clone https://github.com/arn-c0de/InteractiveChecklists.git
+cd InteractiveChecklists
 ```
 
 3. Build with Gradle (command-line)
@@ -92,7 +92,7 @@ cd ChecklistInteractive
 ```
 
 4. Open in Android Studio
-	 - Open the `ChecklistInteractive` directory in Android Studio.
+	 - Open the `InteractiveChecklists` directory in Android Studio.
 	 - Let Gradle sync and allow Android Studio to download any missing SDK components.
 	 - Run the app on an emulator or connected device.
 
