@@ -22,6 +22,8 @@ data class QuickNote(
     val title: String = "",
     val content: String = "",
     val linkedDocuments: List<LinkedDocument> = emptyList(), // Kept for backward compatibility during migration
+    // JSON serialized strokes (nullable)
+    val drawing: String? = null,
     val timestamp: Long = System.currentTimeMillis()
 )
 
@@ -69,6 +71,17 @@ class QuickNoteManager(private val context: Context) {
     fun getNoteContentFlow(noteId: String): Flow<String?> {
         return if (::repository.isInitialized) {
             repository.getNoteContentFlow(noteId)
+        } else {
+            kotlinx.coroutines.flow.flowOf(null)
+        }
+    }
+
+    /**
+     * Get drawing JSON (strokes) for a specific note ID as Flow
+     */
+    fun getDrawingFlow(noteId: String): Flow<String?> {
+        return if (::repository.isInitialized) {
+            repository.getNoteDrawingFlow(noteId)
         } else {
             kotlinx.coroutines.flow.flowOf(null)
         }
@@ -231,6 +244,7 @@ class QuickNoteManager(private val context: Context) {
                         title = obj.optString("title", ""),
                         content = obj.optString("content", ""),
                         linkedDocuments = emptyList(), // Clear legacy linked documents
+                        drawing = if (obj.has("drawing")) obj.optString("drawing", null) else null,
                         timestamp = obj.optLong("timestamp", System.currentTimeMillis())
                     )
                 }
@@ -273,6 +287,50 @@ class QuickNoteManager(private val context: Context) {
                 Log.e(TAG, "Error saving note content", e)
             }
         }
+    }
+
+    /**
+     * Save drawing JSON (strokes) for the note identified by noteId (or the active note if null)
+     */
+    fun saveDrawing(noteId: String? = null, drawingJson: String?) {
+        scope.launch {
+            try {
+                val id = noteId ?: _activeNoteId.value
+                if (id != null) {
+                    val res = repository.updateNoteDrawing(id, drawingJson)
+                    if (res.isFailure) {
+                        Log.e(TAG, "Failed to save drawing for $id", res.exceptionOrNull())
+                    } else {
+                        Log.d(TAG, "Saved drawing for $id (len=${drawingJson?.length ?: 0})")
+                        // Read back once to verify persistence
+                        val check = repository.getNoteByIdOnce(id)
+                        Log.d(TAG, "Verified drawing for $id loaded len=${check?.let { (it.toEntity().drawing?.length ?: 0) } ?: "null"}")
+                        // Save a backup in SharedPreferences to protect against DB issues
+                        prefs.edit().putString("drawing_$id", drawingJson).apply()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error saving drawing", e)
+            }
+        }
+    }
+
+    /**
+     * Clear drawing for a note
+     */
+    fun clearDrawing(noteId: String? = null) {
+        Log.d(TAG, "clearDrawing called for ${noteId ?: _activeNoteId.value}")
+        // Remove both DB and backup
+        saveDrawing(noteId, null)
+        val id = noteId ?: _activeNoteId.value
+        if (id != null) prefs.edit().remove("drawing_$id").apply()
+    }
+
+    /**
+     * Get backup drawing (from SharedPreferences) if present
+     */
+    fun getDrawingBackup(noteId: String): String? {
+        return prefs.getString("drawing_$noteId", null)
     }
 
     // -------- CALLSIGN and COM persistence --------

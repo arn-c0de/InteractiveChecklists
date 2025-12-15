@@ -19,6 +19,8 @@ data class QuickNoteEntity(
     val title: String,
     val content: String,
     val linkedDocuments: List<LinkedDocumentEntity>,
+    // JSON serialized strokes (nullable) — stores strokes as JSON for simple persistence
+    val drawing: String? = null,
     val timestamp: Long,
     val lastModified: Long = System.currentTimeMillis()
 )
@@ -65,6 +67,7 @@ fun QuickNoteEntity.toDomain(): QuickNote {
         title = title,
         content = content,
         linkedDocuments = linkedDocuments.map { it.toDomain() },
+        drawing = drawing,
         timestamp = timestamp
     )
 }
@@ -75,6 +78,7 @@ fun QuickNote.toEntity(): QuickNoteEntity {
         title = title,
         content = content,
         linkedDocuments = linkedDocuments.map { it.toEntity() },
+        drawing = drawing,
         timestamp = timestamp
     )
 }

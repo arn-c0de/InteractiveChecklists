@@ -23,7 +23,7 @@ interface QuickNoteDao {
     /**
      * Get note summaries (id, title, lastModified only) for fast list display
      */
-    @Query("SELECT id, title, '' as content, '[]' as linkedDocuments, timestamp, lastModified FROM quick_notes ORDER BY lastModified DESC")
+    @Query("SELECT id, title, '' as content, '[]' as linkedDocuments, drawing, timestamp, lastModified FROM quick_notes ORDER BY lastModified DESC")
     fun getAllNoteSummaries(): Flow<List<QuickNoteEntity>>
 
     /**
@@ -102,6 +102,18 @@ interface QuickNoteDao {
      */
     @Query("UPDATE quick_notes SET content = :content, lastModified = :lastModified WHERE id = :noteId")
     suspend fun updateNoteContent(noteId: String, content: String, lastModified: Long)
+
+    /**
+     * Get drawing JSON for a note (strokes serialized as JSON)
+     */
+    @Query("SELECT drawing FROM quick_notes WHERE id = :noteId")
+    fun getNoteDrawing(noteId: String): Flow<String?>
+
+    /**
+     * Update drawing JSON for a note
+     */
+    @Query("UPDATE quick_notes SET drawing = :drawing, lastModified = :lastModified WHERE id = :noteId")
+    suspend fun updateNoteDrawing(noteId: String, drawing: String?, lastModified: Long)
 
     /**
      * Update note title
