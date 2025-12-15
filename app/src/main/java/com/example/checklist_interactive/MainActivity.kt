@@ -59,6 +59,10 @@ class MainActivity : ComponentActivity() {
         }
 
         val softwareVersion = SOFTWARE_VERSION
+
+    // Singletons used by Compose and lifecycle methods so we can persist state reliably
+    private val globalPrefsManager by lazy { com.example.checklist_interactive.data.prefs.PreferencesManager(this) }
+    private val globalTabManager by lazy { com.example.checklist_interactive.data.tabs.TabManager(this) }
     
     @OptIn(ExperimentalFoundationApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -76,17 +80,18 @@ class MainActivity : ComponentActivity() {
             androidx.compose.runtime.SideEffect {
                 applyFullscreenSettings()
             }
-            val prefsManager = remember { PreferencesManager(this@MainActivity) }
+            val prefsManager = remember { globalPrefsManager }
             var isDarkTheme by remember { mutableStateOf(prefsManager.isDarkModeEnabled()) }
             val toggleTheme: () -> Unit = {
                 isDarkTheme = !isDarkTheme
                 prefsManager.setDarkModeEnabled(isDarkTheme)
             }
             // State hoisted for back button handling and tab management
-            val tabManager = remember { TabManager(this@MainActivity) }
+            val tabManager = remember { globalTabManager }
             val openTabs by tabManager.openTabs.collectAsState()
             val activeTabIndex by tabManager.activeTabIndex.collectAsState()
-            var showFileList by remember { mutableStateOf(openTabs.isEmpty()) }
+            // Restore last main page preference (0=file list, 1=tabs/viewer)
+            var showFileList by remember { mutableStateOf(prefsManager.getLastMainPage() == 0) }
             var showSettings by remember { mutableStateOf(false) }
             val backHandlerEnabled = openTabs.isNotEmpty() || showSettings
 
@@ -231,9 +236,11 @@ class MainActivity : ComponentActivity() {
                             allFiles.find { it.path == path }
                         }
                         tabManager.loadHistoryFromPreferences()
-                        
-                        // If no tabs restored, try to open last file
-                        if (openTabs.isEmpty()) {
+
+                        // If tabs restored, show tabs/viewer. Otherwise try to open last opened file.
+                        if (tabManager.openTabs.value.isNotEmpty()) {
+                            showFileList = false
+                        } else {
                             val lastFilePath = repository.getLastOpenedFile()
                             if (!lastFilePath.isNullOrEmpty()) {
                                 val lastFile = allFiles.find { it.path == lastFilePath }
@@ -242,8 +249,6 @@ class MainActivity : ComponentActivity() {
                                     showFileList = false
                                 }
                             }
-                        } else {
-                            showFileList = false
                         }
                         
                         // Show import dialog only on first launch if no files
@@ -333,6 +338,8 @@ class MainActivity : ComponentActivity() {
                         } else if (!showFileList && mainPagerState.currentPage != 1) {
                             mainPagerState.animateScrollToPage(1)
                         }
+                        // Persist user's last visible main page: 0=file list, 1=tabs/viewer
+                        prefsManager.setLastMainPage(if (showFileList) 0 else 1)
                     }
 
                     when {
@@ -508,6 +515,33 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         applyFullscreenSettings()
+    }
+
+    override fun onPause() {
+        super.onPause()
+
+        // Persist tab state and history synchronously so a restart will restore the same UI.
+        try {
+            globalTabManager.persistAll()
+        } catch (e: Exception) {
+            // ignore
+        }
+
+        // Persist last opened file immediately (blocking commit) so it is available at next startup
+        val currentActive = globalTabManager.getActiveTab()?.fileInfo?.path ?: ""
+        try {
+            val sp = getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+            sp.edit().putString("last_opened_file", currentActive).commit()
+        } catch (e: Exception) {
+            // fallback: ignore
+        }
+
+        // Persist last main page: if we have open tabs we assume the user was in tab view
+        try {
+            globalPrefsManager.setLastMainPage(if (globalTabManager.openTabs.value.isNotEmpty()) 1 else 0)
+        } catch (e: Exception) {
+            // ignore
+        }
     }
 }
 

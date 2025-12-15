@@ -32,6 +32,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_TAG_FILTER_MODE = "tag_filter_mode" // "any" or "all"
         private const val KEY_GRID_VIEW = "grid_view_enabled"
         private const val KEY_LAST_IMPORTED_VERSION = "last_imported_version"
+        private const val KEY_LAST_MAIN_PAGE = "last_main_page"
         private const val KEY_DOCUMENT_SOURCES_JSON = "document_sources_json"
         private const val KEY_CONTRIBUTORS_JSON = "contributors_json"
         private const val KEY_PDF_FAB_PREFIX = "pdf_fab_"
@@ -258,6 +259,17 @@ class PreferencesManager(context: Context) {
      */
     fun setLastImportedVersion(version: String) {
         prefs.edit().putString(KEY_LAST_IMPORTED_VERSION, version).apply()
+    }
+
+    /**
+     * Stores which main page was last visible: 0 = file list, 1 = tabs/viewer
+     */
+    fun setLastMainPage(page: Int) {
+        prefs.edit().putInt(KEY_LAST_MAIN_PAGE, page.coerceIn(0, 1)).apply()
+    }
+
+    fun getLastMainPage(): Int {
+        return prefs.getInt(KEY_LAST_MAIN_PAGE, 0)
     }
 
     /**
