@@ -184,11 +184,7 @@ fun DataPadPopup(
                         .weight(1f)
                         .verticalScroll(rememberScrollState())
                 ) {
-                    if (flightData != null) {
-                        FlightDataDisplay(flightData!!)
-                    } else {
-                        NoDataCard()
-                    }
+                    FlightDataDisplay(flightData)
                 }
             }
         }
@@ -301,24 +297,27 @@ private fun NoDataCard() {
 }
 
 @Composable
-private fun FlightDataDisplay(data: FlightData) {
+private fun FlightDataDisplay(data: FlightData?) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Aircraft & Pilot
         DataSection(title = "Aircraft & Pilot") {
-            DataRow("Aircraft", data.aircraft)
-            DataRow("Pilot", data.unitName)
-            DataRow("Coalition", data.coalition)
-            DataRow("Group", data.group)
+            DataRow("Aircraft", data?.aircraft ?: "Not available")
+            DataRow("Pilot", data?.unitName ?: "Not available")
+            DataRow("Coalition", data?.coalition ?: "Not available")
+            DataRow("Group", data?.group ?: "Not available")
         }
 
-        // Environment (moved)
-        data.environment?.let { env ->
-            DataSection(title = "Environment") {
-                env.windSpeed?.let { DataRow("Wind Speed", String.format("%.1f", it) + " m/s (${String.format("%.1f", mpsToKts(it))} kt)") }
-                env.windDirection?.let { DataRow("Wind Direction", String.format("%.1f", it) + "°") }
+        // Environment
+        DataSection(title = "Environment") {
+            data?.environment?.let { env ->
+                DataRow("Wind Speed", env.windSpeed?.let { String.format("%.1f", it) + " m/s (${String.format("%.1f", mpsToKts(it))} kt)" } ?: "Not available")
+                DataRow("Wind Direction", env.windDirection?.let { String.format("%.1f", it) + "°" } ?: "Not available")
+            } ?: run {
+                DataRow("Wind Speed", "Not available")
+                DataRow("Wind Direction", "Not available")
             }
         }
 
@@ -326,18 +325,18 @@ private fun FlightDataDisplay(data: FlightData) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(modifier = Modifier.weight(1f)) {
                 DataSection(title = "Flight Parameters") {
-                    DataRow("Altitude", "${String.format("%.1f", data.altitude)} m")
-                    DataRow("Heading", "${String.format("%.1f", Math.toDegrees(data.heading))}°")
-                    DataRow("Pitch", "${String.format("%.2f", Math.toDegrees(data.pitch))}°")
-                    DataRow("Bank", "${String.format("%.2f", Math.toDegrees(data.bank))}°")
+                    DataRow("Altitude", data?.altitude?.let { "${String.format("%.1f", it)} m" } ?: "Not available")
+                    DataRow("Heading", data?.heading?.let { "${String.format("%.1f", Math.toDegrees(it))}°" } ?: "Not available")
+                    DataRow("Pitch", data?.pitch?.let { "${String.format("%.2f", Math.toDegrees(it))}°" } ?: "Not available")
+                    DataRow("Bank", data?.bank?.let { "${String.format("%.2f", Math.toDegrees(it))}°" } ?: "Not available")
                 }
             }
             Column(modifier = Modifier.weight(1f)) {
                 DataSection(title = "Performance") {
-                    data.indicatedAirspeed?.let { DataRow("Indicated Airspeed", formatSpeedWithKnots(it)) }
-                    data.trueAirspeed?.let { DataRow("True Airspeed", formatSpeedWithKnots(it)) }
-                    data.verticalSpeed?.let { DataRow("Vertical Speed", "${String.format("%.2f", it)} m/s (${String.format("%.0f", mpsToFpm(it))} ft/min)") }
-                    data.mach?.let { DataRow("Mach", String.format("%.3f", it)) }
+                    DataRow("Indicated Airspeed", data?.indicatedAirspeed?.let { formatSpeedWithKnots(it) } ?: "Not available")
+                    DataRow("True Airspeed", data?.trueAirspeed?.let { formatSpeedWithKnots(it) } ?: "Not available")
+                    DataRow("Vertical Speed", data?.verticalSpeed?.let { "${String.format("%.2f", it)} m/s (${String.format("%.0f", mpsToFpm(it))} ft/min)" } ?: "Not available")
+                    DataRow("Mach", data?.mach?.let { String.format("%.3f", it) } ?: "Not available")
                 }
             }
         }
@@ -348,27 +347,34 @@ private fun FlightDataDisplay(data: FlightData) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(modifier = Modifier.weight(1f)) {
                 DataSection(title = "Weapons & Countermeasures") {
-                    data.weapons?.let { w ->
+                    data?.weapons?.let { w ->
                         DataRow("Master Arm", if (w.masterArm) "ARMED" else "SAFE")
                         DataRow("Stations", (w.stations?.size ?: 0).toString())
                         w.stations?.forEach { s ->
                             DataRow("Station ${s.station}", "Type ${s.type} • Count ${s.count}")
                         }
                         DataRow("Total Count", (w.totalCount ?: 0).toString())
-                    } ?: DataRow("Weapons", "None")
-                    data.countermeasures?.let { c ->
+                    } ?: run {
+                        DataRow("Master Arm", "Not available")
+                        DataRow("Stations", "Not available")
+                        DataRow("Total Count", "Not available")
+                    }
+                    data?.countermeasures?.let { c ->
                         DataRow("Flares", c.flareCount.toString())
                         DataRow("Chaff", c.chaffCount.toString())
-                    } ?: DataRow("Countermeasures", "N/A")
+                    } ?: run {
+                        DataRow("Flares", "Not available")
+                        DataRow("Chaff", "Not available")
+                    }
                 }
             }
             Column(modifier = Modifier.weight(1f)) {
                 DataSection(title = "Systems Status") {
-                    StatusRow("Radar Active", data.radarActive)
-                    StatusRow("Jamming", data.jamming)
-                    StatusRow("IR Jamming", data.irJamming)
-                    StatusRow("AI On", data.aiOn)
-                    StatusRow("Human", data.isHuman)
+                    StatusRow("Radar Active", data?.radarActive ?: false)
+                    StatusRow("Jamming", data?.jamming ?: false)
+                    StatusRow("IR Jamming", data?.irJamming ?: false)
+                    StatusRow("AI On", data?.aiOn ?: false)
+                    StatusRow("Human", data?.isHuman ?: false)
                 }
             }
         }
@@ -377,21 +383,24 @@ private fun FlightDataDisplay(data: FlightData) {
 
         // Position (full width)
         DataSection(title = "Position") {
-            DataRow("Latitude", String.format("%.6f", data.latitude))
-            DataRow("Longitude", String.format("%.6f", data.longitude))
-            data.position?.let { pos ->
+            DataRow("Latitude", data?.latitude?.let { String.format("%.6f", it) } ?: "Not available")
+            DataRow("Longitude", data?.longitude?.let { String.format("%.6f", it) } ?: "Not available")
+            data?.position?.let { pos ->
                 DataRow("X", String.format("%.2f", pos.x))
                 DataRow("Y", String.format("%.2f", pos.y))
                 DataRow("Z", String.format("%.2f", pos.z))
+            } ?: run {
+                DataRow("X", "Not available")
+                DataRow("Y", "Not available")
+                DataRow("Z", "Not available")
             }
         }
 
-
         // Additional Info
         DataSection(title = "Additional Info") {
-            DataRow("Timestamp", data.timestamp)
-            DataRow("Unit ID", data.unitID)
-            DataRow("Streamer Version", data.streamerVersion)
+            DataRow("Timestamp", data?.timestamp ?: "Not available")
+            DataRow("Unit ID", data?.unitID ?: "Not available")
+            DataRow("Streamer Version", data?.streamerVersion ?: "Not available")
         }
     }
 }
