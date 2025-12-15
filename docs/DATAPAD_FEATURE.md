@@ -3,6 +3,8 @@
 ## Overview
 DataPad is a live flight data display panel that receives real-time aircraft telemetry via UDP from DCS World through the `forward_parsed_udp.py` script.
 
+**Phase 1 (experimental):** This implementation represents Phase 1 of DataPad. Future phases will expand telemetry coverage and add visual and security improvements, including live animated aircraft visualizations based on flight attitude, a dedicated DataPad UI redesign, and a planned migration to encrypted transport (TCP or UDP with AES encryption).
+
 ## Architecture
 
 ### Components
@@ -131,3 +133,6 @@ Expected JSON format (one object per UDP datagram):
 - [ ] Custom alert thresholds (altitude, speed, etc.)
 - [ ] Multiple aircraft tracking
 - [ ] Map integration with position overlay
+- [ ] Live animated aircraft visualization showing orientation (pitch/roll/heading) and movement
+- [ ] Dedicated DataPad UI/UX redesign and controls
+- [ ] Transition to encrypted transport (TCP or UDP) with AES-based encryption for secure telemetry streams
