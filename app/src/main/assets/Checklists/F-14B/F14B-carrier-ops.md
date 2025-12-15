@@ -35,8 +35,8 @@
 
 - [ ] Briefing - Recovery brief complete
 - [ ] Approach speed - Compute and verify
-  - [ ] Target approach speed - ~125-145 KIAS (approx; weight/config dependent)
-  - [ ] Final approach/touchdown target - ~120-140 KIAS (approx; arrested landing)
+- [ ] Target approach speed - ~125-145 KIAS (approx; weight/config dependent)
+- [ ] Final approach/touchdown target - ~120-140 KIAS (approx; arrested landing)
 - [ ] Hook lever - DOWN/ARM for landing; verify "HOOK DOWN" indicator and lever position
 - [ ] Flaps - Configure for landing (as required)
 - [ ] Speed Brake - CHECK RETRACTED

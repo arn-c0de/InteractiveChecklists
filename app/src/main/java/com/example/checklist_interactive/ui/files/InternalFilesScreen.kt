@@ -26,9 +26,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.LocalContentColor
+import com.example.checklist_interactive.ui.common.DraggableFab
 import com.example.checklist_interactive.data.files.FileInfo
 import com.example.checklist_interactive.data.files.InternalFileManager
 import com.example.checklist_interactive.data.prefs.PreferencesManager
@@ -339,115 +342,95 @@ fun InternalFilesScreen(
                 }
             )
         },
-        floatingActionButton = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalAlignment = Alignment.End
-            ) {
-                // Quick Access FAB - immer sichtbar an fester Position
-                FloatingActionButton(
-                    onClick = { showQuickAccess = true },
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.NoteAdd,
-                        contentDescription = "Quick access"
-                    )
-                }
-            }
-        }
+        floatingActionButton = { /* moved to overlay */ }
     ) { padding ->
-        if (isLoadingFiles) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
-        } else if (folderTree.isEmpty() && shortcuts.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        Icons.Default.FolderOff,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.outline
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        context.getString(R.string.no_files),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = { showImportDialog = true }) {
-                        Icon(Icons.Default.Add, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(context.getString(R.string.import_file))
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            // (Draggable FAB moved to render last so it stays on top)
+
+            if (isLoadingFiles) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            } else if (folderTree.isEmpty() && shortcuts.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            Icons.Default.FolderOff,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.outline
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            context.getString(R.string.no_files),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(onClick = { showImportDialog = true }) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(context.getString(R.string.import_file))
+                        }
                     }
                 }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-            ) {
-                // Tag filter bar
-                if (showTagFilter && allUsedTags.isNotEmpty()) {
-                    item {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
-                        ) {
-                            TagFilterBar(
-                                availableTags = allUsedTags,
-                                selectedTags = selectedTagFilters,
-                                filterMode = tagFilterMode,
-                                onTagToggle = { tag ->
-                                    selectedTagFilters = if (selectedTagFilters.contains(tag)) {
-                                        selectedTagFilters - tag
-                                    } else {
-                                        selectedTagFilters + tag
-                                    }
-                                    prefsManager.setActiveTagFilters(selectedTagFilters)
-                                    // Refresh and compute folder expansions off the UI thread
-                                    coroutineScope.launch {
-                                        refreshFilesWithTags()
-                                        val nodesToExpand = withContext(Dispatchers.IO) {
-                                            // Compute which folder nodes contain matching files using cached enrichedFileMap
-                                            fun nodeHasMatchingFiles(node: InternalFileManager.FolderNode): Boolean {
-                                                val enriched = node.files.map { enrichedFileMap[it.path] ?: it }
-                                                val fileMatches = enriched.any { file ->
-                                                    if (selectedTagFilters.isEmpty()) return@any false
-                                                    if (tagFilterMode == "all") {
-                                                        selectedTagFilters.all { tag -> file.tags.contains(tag) }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    // Tag filter bar
+                    if (showTagFilter && allUsedTags.isNotEmpty()) {
+                        item {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                            ) {
+                                TagFilterBar(
+                                    availableTags = allUsedTags,
+                                    selectedTags = selectedTagFilters,
+                                    filterMode = tagFilterMode,
+                                    onTagToggle = { tag ->
+                                        selectedTagFilters = if (selectedTagFilters.contains(tag)) {
+                                            selectedTagFilters - tag
+                                        } else {
+                                            selectedTagFilters + tag
+                                        }
+                                        prefsManager.setActiveTagFilters(selectedTagFilters)
+                                        // Refresh and compute folder expansions off the UI thread
+                                        coroutineScope.launch {
+                                            refreshFilesWithTags()
+                                            val nodesToExpand = withContext(Dispatchers.IO) {
+                                                // Compute which folder nodes contain matching files using cached enrichedFileMap
+                                                fun nodeHasMatchingFiles(node: InternalFileManager.FolderNode): Boolean {
+                                                    val enriched = node.files.map { enrichedFileMap[it.path] ?: it }
+                                                    val fileMatches = enriched.any { file ->
+                                                        if (selectedTagFilters.isEmpty()) return@any false
+                                                        if (tagFilterMode == "all") {
+                                                            selectedTagFilters.all { tag -> file.tags.contains(tag) }
+                                                        } else {
+                                                            file.tags.any { t -> selectedTagFilters.contains(t) }
+                                                        }
+                                                    }
+                                                    if (fileMatches) return true
+                                                    return node.children.any { child -> nodeHasMatchingFiles(child) }
+                                                }
+                                                val matching = mutableListOf<String>()
+                                                folderTree.forEach { rootNode ->
+                                                    if (rootNode.name.equals("Checklists", ignoreCase = true)) {
+                                                        rootNode.children.forEach { aircraftNode ->
+                                                            if (!prefsManager.isAircraftVisible(aircraftNode.name)) return@forEach
+                                                            if (nodeHasMatchingFiles(aircraftNode)) matching.add(aircraftNode.relativePath)
+                                                        }
                                                     } else {
-                                                        file.tags.any { t -> selectedTagFilters.contains(t) }
+                                                        if (nodeHasMatchingFiles(rootNode)) matching.add(rootNode.relativePath)
                                                     }
-                                                }
-                                                if (fileMatches) return true
-                                                return node.children.any { child -> nodeHasMatchingFiles(child) }
-                                            }
-                                            val matching = mutableListOf<String>()
-                                            folderTree.forEach { rootNode ->
-                                                if (rootNode.name.equals("Checklists", ignoreCase = true)) {
-                                                    rootNode.children.forEach { aircraftNode ->
-                                                        if (!prefsManager.isAircraftVisible(aircraftNode.name)) return@forEach
-                                                        if (nodeHasMatchingFiles(aircraftNode)) matching.add(aircraftNode.relativePath)
-                                                    }
-                                                } else {
-                                                    if (nodeHasMatchingFiles(rootNode)) matching.add(rootNode.relativePath)
-                                                }
                                             }
                                             matching
                                         }
@@ -580,7 +563,37 @@ fun InternalFilesScreen(
                     }
                 }
             }
+
+            // Draggable FAB overlay (rendered last so it stays on top)
+            // Compute screen/fab dimensions here so variables are in scope
+            val configuration = LocalConfiguration.current
+            val screenWidthPx = with(LocalDensity.current) { configuration.screenWidthDp.dp.roundToPx() }
+            val screenHeightPx = with(LocalDensity.current) { configuration.screenHeightDp.dp.roundToPx() }
+            val fabSizePx = with(LocalDensity.current) { 56.dp.roundToPx() }
+
+            DraggableFab(
+                name = "quick_access",
+                prefsManager = prefsManager,
+                screenWidthPx = screenWidthPx,
+                screenHeightPx = screenHeightPx,
+                fabSizePx = fabSizePx,
+                defaultX = 1.0f,
+                defaultY = 0.9f,
+                visible = true,
+                onClick = { showQuickAccess = true },
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                content = {
+                    Icon(
+                        Icons.AutoMirrored.Filled.NoteAdd,
+                        contentDescription = "Quick access",
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            )
+
         }
+    }
     }
 
     // Import Dialog
