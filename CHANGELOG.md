@@ -6,6 +6,11 @@ All relevant changes are summarized here by version.
 ### Added
 - Standalone PDF outline parser and improved PDF outline caching for faster navigation.
 - New PDF parser initialization and cross-reference cache for better performance.
+- Added PDF sharpening tool (manual/auto)
+- Tab and UI state now persist (pages, tabs, last position)
+- Improved PDF zoom and swipe navigation
+- New MarkdownParser implementation replaces commonmark
+- Various bugfixes: FAB, search, paint tools, tab persistence, quicknote draw mode
 
 ### Fixed
 - Fixed bug where PDF pages could get stuck while swiping.
