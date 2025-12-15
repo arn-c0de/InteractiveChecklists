@@ -9,6 +9,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.zIndex
 import com.example.checklist_interactive.data.prefs.PreferencesManager
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -39,6 +42,8 @@ fun DraggableFab(
     defaultY: Float = 0.9f,
     visible: Boolean = true,
     onClick: () -> Unit,
+    containerColor: Color? = null,
+    contentColor: Color? = null,
     content: @Composable () -> Unit
 ) {
     if (!visible) return
@@ -65,47 +70,101 @@ fun DraggableFab(
     var isDragging by remember { mutableStateOf(false) }
     var longPressTriggered by remember { mutableStateOf(false) }
     
-    FloatingActionButton(
-        onClick = {
-            if (!longPressTriggered) {
-                onClick()
-            }
-            longPressTriggered = false
-        },
-        modifier = Modifier
-            .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
-            .pointerInput(Unit) {
-                detectDragGesturesAfterLongPress(
-                    onDragStart = { _ ->
-                        isDragging = true
-                        longPressTriggered = true
-                    },
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        // Update position
-                        offsetX = (offsetX + dragAmount.x).coerceIn(0f, availableWidth.toFloat())
-                        offsetY = (offsetY + dragAmount.y).coerceIn(0f, availableHeight.toFloat())
-                    },
-                    onDragEnd = {
-                        if (isDragging) {
-                            // Save position as percentage
-                            val xPercent = offsetX / availableWidth
-                            val yPercent = offsetY / availableHeight
+    // Use provided colors when set to preserve previous look
+    val localContainerColor = containerColor
+    val localContentColor = contentColor
 
-                            coroutineScope.launch {
-                                prefsManager.setPdfViewerFabPosition(name, xPercent, yPercent)
+    if (localContainerColor == null && localContentColor == null) {
+        FloatingActionButton(
+            onClick = {
+                if (!longPressTriggered) {
+                    onClick()
+                }
+                longPressTriggered = false
+            },
+            modifier = Modifier
+                .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
+                .zIndex(10f)
+                .pointerInput(Unit) {
+                    detectDragGesturesAfterLongPress(
+                        onDragStart = { _ ->
+                            isDragging = true
+                            longPressTriggered = true
+                        },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            // Update position
+                            offsetX = (offsetX + dragAmount.x).coerceIn(0f, availableWidth.toFloat())
+                            offsetY = (offsetY + dragAmount.y).coerceIn(0f, availableHeight.toFloat())
+                        },
+                        onDragEnd = {
+                            if (isDragging) {
+                                // Save position as percentage
+                                val xPercent = offsetX / availableWidth
+                                val yPercent = offsetY / availableHeight
+
+                                coroutineScope.launch {
+                                    prefsManager.setPdfViewerFabPosition(name, xPercent, yPercent)
+                                }
                             }
+                            isDragging = false
+                            longPressTriggered = false
+                        },
+                        onDragCancel = {
+                            isDragging = false
+                            longPressTriggered = false
                         }
-                        isDragging = false
-                        longPressTriggered = false
-                    },
-                    onDragCancel = {
-                        isDragging = false
-                        longPressTriggered = false
-                    }
-                )
-            }
-    ) {
-        content()
+                    )
+                }
+        ) {
+            content()
+        }
+    } else {
+        FloatingActionButton(
+            onClick = {
+                if (!longPressTriggered) {
+                    onClick()
+                }
+                longPressTriggered = false
+            },
+            modifier = Modifier
+                .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
+                .zIndex(10f)
+                .pointerInput(Unit) {
+                    detectDragGesturesAfterLongPress(
+                        onDragStart = { _ ->
+                            isDragging = true
+                            longPressTriggered = true
+                        },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            // Update position
+                            offsetX = (offsetX + dragAmount.x).coerceIn(0f, availableWidth.toFloat())
+                            offsetY = (offsetY + dragAmount.y).coerceIn(0f, availableHeight.toFloat())
+                        },
+                        onDragEnd = {
+                            if (isDragging) {
+                                // Save position as percentage
+                                val xPercent = offsetX / availableWidth
+                                val yPercent = offsetY / availableHeight
+
+                                coroutineScope.launch {
+                                    prefsManager.setPdfViewerFabPosition(name, xPercent, yPercent)
+                                }
+                            }
+                            isDragging = false
+                            longPressTriggered = false
+                        },
+                        onDragCancel = {
+                            isDragging = false
+                            longPressTriggered = false
+                        }
+                    )
+                },
+            containerColor = localContainerColor ?: MaterialTheme.colorScheme.primary,
+            contentColor = localContentColor ?: MaterialTheme.colorScheme.onPrimary
+        ) {
+            content()
+        }
     }
 }
