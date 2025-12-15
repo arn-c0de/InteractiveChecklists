@@ -326,4 +326,13 @@ class TabManager(context: Context) {
             _navigationHistory.value = historyString.split("|").filter { it.isNotEmpty() }
         }
     }
+
+    /**
+     * Persist tabs and history synchronously. Useful to call on activity pause/stop
+     * to ensure state is saved immediately before the process may be killed.
+     */
+    fun persistAll() {
+        saveTabsToPreferences(blocking = true)
+        saveHistoryToPreferences()
+    }
 }
