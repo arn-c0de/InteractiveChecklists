@@ -153,18 +153,15 @@ fun InternalFilesScreen(
     var searchQuery by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<FileInfo>>(emptyList()) }
     var isSearching by remember { mutableStateOf(false) }
-    // Display mode: list or grid for files (persisted)
-    var isGridView by remember { mutableStateOf(prefsManager.isGridViewEnabled()) }
-
     // Perform a simple search across displayName, path and tags (IO-bound)
     fun performSearch(query: String) {
         coroutineScope.launch {
             isSearching = true
             val q = query.trim().lowercase()
             val results = withContext(Dispatchers.IO) {
-                if (q.isEmpty()) return@withContext emptyList<FileInfo>()
                 // Use the enriched map when available to include tags
                 val allFiles = (groupedFiles.values.flatten()).map { enrichedFileMap[it.path] ?: it }
+                if (q.isEmpty()) return@withContext allFiles
                 allFiles.filter { file ->
                     file.displayName.lowercase().contains(q) ||
                     file.path.lowercase().contains(q) ||
@@ -175,6 +172,15 @@ fun InternalFilesScreen(
             isSearching = false
         }
     }
+
+    // When search dialog opens, show all files initially (empty query => all files)
+    LaunchedEffect(showSearchDialog) {
+        if (showSearchDialog) performSearch("")
+    }
+    // Display mode: list or grid for files (persisted)
+    var isGridView by remember { mutableStateOf(prefsManager.isGridViewEnabled()) }
+
+    
 
     // Suspended function to refresh and enrich files with tags (IO-heavy - keep suspended)
     suspend fun refreshFilesWithTags() {
