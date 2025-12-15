@@ -183,7 +183,8 @@ fun PdfViewer(
     var outlineItems by remember { mutableStateOf<List<PdfOutlineItem>>(emptyList()) }
     val outlineExtractor = remember { PdfOutlineExtractor(context) }
     var showQuickAccess by remember { mutableStateOf(false) }
-    var showToolbar by remember { mutableStateOf(true) }
+    val prefsManager = remember { PreferencesManager(context) }
+    var showToolbar by remember { mutableStateOf(prefsManager.isPdfToolbarVisible()) }
     // Track if outline has been extracted for this document to avoid re-extracting on every page change
     var outlineExtracted by remember(pdfPath) { mutableStateOf(false) }
     // Sharpening feature
@@ -249,8 +250,7 @@ fun PdfViewer(
     val screenWidthPx = with(LocalDensity.current) { configuration.screenWidthDp.dp.roundToPx() }
     val screenHeightPx = with(LocalDensity.current) { configuration.screenHeightDp.dp.roundToPx() }
 
-    // Preferences manager for storing FAB positions
-    val prefsManager = remember { PreferencesManager(context) }
+    // Preferences manager for storing FAB positions (already initialized above)
 
     // PDF laden: open once, but render pages lazily.
     var fileDescriptor by remember { mutableStateOf<ParcelFileDescriptor?>(null) }
@@ -1010,7 +1010,10 @@ fun PdfViewer(
                             .height(24.dp)
                     ) {
                         IconButton(
-                            onClick = { showToolbar = !showToolbar },
+                            onClick = {
+                                showToolbar = !showToolbar
+                                prefsManager.setPdfToolbarVisible(showToolbar)
+                            },
                             modifier = Modifier
                                 .align(Alignment.Center)
                                 .size(32.dp)

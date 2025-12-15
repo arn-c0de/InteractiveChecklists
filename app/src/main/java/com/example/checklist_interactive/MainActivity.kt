@@ -368,7 +368,8 @@ class MainActivity : ComponentActivity() {
                                         InternalFilesScreen(
                                             fileManager = fileManager,
                                             onFileOpen = { fileInfo ->
-                                                tabManager.openTab(fileInfo)
+                                                val idx = tabManager.openTab(fileInfo)
+                                                tabManager.switchToTab(idx)
                                                 showFileList = false
                                                 scope.launch {
                                                     repository.saveLastOpenedFile(fileInfo.path)
@@ -378,7 +379,8 @@ class MainActivity : ComponentActivity() {
                                                 val allFiles = fileManager.getAllFilesGrouped().values.flatten()
                                                 val targetFile = allFiles.find { it.path == shortcut.filePath }
                                                 if (targetFile != null) {
-                                                    tabManager.openTab(targetFile, shortcut.pageNumber)
+                                                    val idx = tabManager.openTab(targetFile, shortcut.pageNumber)
+                                                    tabManager.switchToTab(idx)
                                                     showFileList = false
                                                     scope.launch {
                                                         repository.saveLastOpenedFile(targetFile.path)

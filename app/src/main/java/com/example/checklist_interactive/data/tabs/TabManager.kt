@@ -51,12 +51,12 @@ class TabManager(private val context: Context) {
     /**
      * Open a new tab or switch to existing tab
      */
-    fun openTab(fileInfo: FileInfo, pageNumber: Int = -1) {
+    fun openTab(fileInfo: FileInfo, pageNumber: Int = -1): Int {
         val currentTabs = _openTabs.value.toMutableList()
-        
+
         // Check if tab already exists
         val existingIndex = currentTabs.indexOfFirst { it.fileInfo.path == fileInfo.path }
-        
+
         if (existingIndex >= 0) {
             // Switch to existing tab
             _activeTabIndex.value = existingIndex
@@ -65,6 +65,16 @@ class TabManager(private val context: Context) {
                 currentTabs[existingIndex] = currentTabs[existingIndex].copy(pageNumber = pageNumber)
                 _openTabs.value = currentTabs
             }
+            // Add to history & persist
+            addToHistory(fileInfo.path)
+            saveTabsToPreferences(blocking = true)
+            try {
+                val appPrefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+                appPrefs.edit().putString("last_opened_file", fileInfo.path).commit()
+            } catch (e: Exception) {
+                // ignore
+            }
+            return existingIndex
         } else {
             // Add new tab
             if (currentTabs.size >= MAX_TABS) {
@@ -75,25 +85,22 @@ class TabManager(private val context: Context) {
                     _activeTabIndex.value -= 1
                 }
             }
-            
+
             currentTabs.add(TabInfo(fileInfo, pageNumber))
             _openTabs.value = currentTabs
             _activeTabIndex.value = currentTabs.size - 1
-        }
-        
-        // Add to navigation history
-        addToHistory(fileInfo.path)
-        
-        // Persist
-        // Use blocking save to ensure the closed tab state is persisted immediately
-        // (prevents the closed tab from being restored after an app restart).
-        saveTabsToPreferences(blocking = true)
-        // Also persist last opened file immediately so app restart can open the same document
-        try {
-            val appPrefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
-            appPrefs.edit().putString("last_opened_file", fileInfo.path).commit()
-        } catch (e: Exception) {
-            // ignore
+
+            // Add to navigation history & persist
+            addToHistory(fileInfo.path)
+            saveTabsToPreferences(blocking = true)
+            try {
+                val appPrefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+                appPrefs.edit().putString("last_opened_file", fileInfo.path).commit()
+            } catch (e: Exception) {
+                // ignore
+            }
+
+            return _activeTabIndex.value
         }
     }
     
