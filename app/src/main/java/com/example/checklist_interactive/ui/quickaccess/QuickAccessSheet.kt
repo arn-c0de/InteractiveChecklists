@@ -468,9 +468,32 @@ fun QuickAccessSheet(
     var drawingDirty by remember { mutableStateOf(false) }
     var eraseMode by remember { mutableStateOf(false) }
 
+    // Track previous active note ID to save before switching
+    var previousActiveNoteId by remember { mutableStateOf<String?>(null) }
+
     // Load existing drawing when active note changes (one-time load, not reactive)
     LaunchedEffect(activeNoteId) {
         val id = activeNoteId
+
+        // Save previous note's drawing before switching to new note
+        if (previousActiveNoteId != null && previousActiveNoteId != id && strokesState.isNotEmpty()) {
+            try {
+                // Include current stroke if present
+                if (currentStroke.isNotEmpty()) {
+                    strokesState.add(currentStroke)
+                    currentStroke = emptyList()
+                }
+                val drawingJson = json.encodeToString(strokesState.toList())
+                noteManager.saveDrawing(previousActiveNoteId, drawingJson)
+                android.util.Log.d("QuickAccessSheet", "Saved previous note drawing before tab switch: $previousActiveNoteId (len=${drawingJson.length})")
+            } catch (e: Exception) {
+                android.util.Log.e("QuickAccessSheet", "Error saving previous note drawing", e)
+            }
+        }
+
+        // Update previous ID tracker
+        previousActiveNoteId = id
+
         if (id != null) {
             // Load once, then strokes persist in memory until explicitly cleared
             val drawingJson = noteManager.getDrawingFlow(id).first()

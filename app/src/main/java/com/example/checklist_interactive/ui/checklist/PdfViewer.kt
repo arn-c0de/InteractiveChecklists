@@ -186,6 +186,9 @@ fun PdfViewer(
     var showToolbar by remember { mutableStateOf(true) }
     // Track if outline has been extracted for this document to avoid re-extracting on every page change
     var outlineExtracted by remember(pdfPath) { mutableStateOf(false) }
+    // Sharpening feature
+    var sharpenEnabled by remember { mutableStateOf(false) }
+    var sharpenIntensity by remember { mutableStateOf(1.5f) }
 
     // Text extraction
     val textExtractor = remember { PdfTextExtractor(context) }
@@ -679,6 +682,20 @@ fun PdfViewer(
                             modifier = Modifier.size(18.dp)
                         )
                     }
+                    // Sharpen toggle moved to top bar
+                    HintIconButton(
+                        onClick = { sharpenEnabled = !sharpenEnabled },
+                        hint = "Sharpen PDF",
+                        onHintChange = { hoveredHint = it },
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CenterFocusWeak,
+                            contentDescription = "Sharpen",
+                            tint = if (sharpenEnabled) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                     HintIconButton(
                         onClick = {
                             invertColors = !invertColors
@@ -967,6 +984,7 @@ fun PdfViewer(
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
+                            Spacer(modifier = Modifier.width(8.dp))
                             Spacer(modifier = Modifier.weight(1f))
                             Text(
                                 text = if (eraseMode) "Eraser"
@@ -1012,6 +1030,36 @@ fun PdfViewer(
                             style = MaterialTheme.typography.labelSmall,
                             modifier = Modifier.padding(start = 8.dp, top = 4.dp)
                         )
+                    }
+
+                    // Sharpening slider: only show when sharpen mode is active
+                    if (sharpenEnabled) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Sharpness:",
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.width(70.dp)
+                            )
+                            Slider(
+                                value = sharpenIntensity,
+                                onValueChange = { sharpenIntensity = it },
+                                valueRange = 0.5f..4.0f,
+                                steps = 6,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                "${String.format("%.1f", sharpenIntensity)}x",
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.width(40.dp),
+                                textAlign = TextAlign.End
+                            )
+                        }
                     }
 
                     // Color and stroke width controls: only show when draw mode is active
@@ -1185,6 +1233,8 @@ fun PdfViewer(
                                     offsetY = pageOffsetsY[pageIndex] ?: 0f,
                                         isPageHighlighted = pageHighlights.contains(pageIndex),
                                         invertColors = invertColors,
+                                    sharpenEnabled = sharpenEnabled,
+                                    sharpenIntensity = sharpenIntensity,
                                     onStrokeAdd = { stroke -> strokes.add(stroke) },
                                     onStrokeUpdate = { oldStroke, newStroke ->
                                         val idx = strokes.indexOf(oldStroke)
@@ -1327,6 +1377,8 @@ fun PdfViewer(
                                             offsetY = pageOffsetY,
                                             isPageHighlighted = isHighlighted,
                                             invertColors = invertColors,
+                                            sharpenEnabled = sharpenEnabled,
+                                            sharpenIntensity = sharpenIntensity,
                                             onStrokeAdd = { strokes.add(it) },
                                             onStrokeUpdate = { old, new ->
                                                 val idx = strokes.indexOf(old)
@@ -1653,6 +1705,173 @@ fun PdfViewer(
     }
 }
 
+// Memory-friendly CPU unsharp mask that preserves hue by operating on luminance
+private fun sharpenBitmap(src: Bitmap, amount: Float): Bitmap {
+    // Memory-friendly, tile-based separable unsharp mask.
+    // Strategy:
+    // 1) Downscale if the image is extremely large (quick safety).
+    // 2) For moderate/large images, operate in horizontal tiles to limit peak memory.
+    // 3) Use a separable kernel (3x3 or 5x5) for efficient Gaussian-like blur.
+    // 4) On any OOM or unexpected error, return the original bitmap and log a warning.
+    val amt = amount.coerceIn(0.5f, 4.0f)
+    val w = src.width
+    val h = src.height
+
+    // Safety threshold for full-image processing in-memory. Tweakable.
+    val maxPixels = 2_000_000
+    if (w.toLong() * h.toLong() > maxPixels) {
+        try {
+            val scale = kotlin.math.sqrt(maxPixels.toDouble() / (w.toDouble() * h.toDouble()))
+            val sw = (w * scale).coerceAtLeast(1.0).toInt()
+            val sh = (h * scale).coerceAtLeast(1.0).toInt()
+            val scaled = Bitmap.createScaledBitmap(src, sw, sh, true)
+            try {
+                val sharpenedSmall = sharpenBitmap(scaled, amount)
+                val result = Bitmap.createScaledBitmap(sharpenedSmall, w, h, true)
+                if (sharpenedSmall !== scaled) sharpenedSmall.recycle()
+                scaled.recycle()
+                return result
+            } catch (e: OutOfMemoryError) {
+                android.util.Log.w("PdfViewer", "OOM while sharpening downscaled bitmap, skipping sharpen: ${e.message}")
+                scaled.recycle()
+                return src
+            }
+        } catch (e: Throwable) {
+            android.util.Log.w("PdfViewer", "Skipping sharpen due to error: ${e.message}")
+            return src
+        }
+    }
+
+    try {
+        // Choose kernel size based on requested strength for slightly more aggressive sharpening when amount is high.
+        val useLargeKernel = amt > 2.0f
+        val kernel: IntArray
+        val pad: Int
+        if (useLargeKernel) {
+            kernel = intArrayOf(1, 4, 6, 4, 1) // 5x5 separable
+            pad = 2
+        } else {
+            kernel = intArrayOf(1, 2, 1) // 3x3 separable
+            pad = 1
+        }
+
+        // Target tile size in pixels (tweakable). Keeps per-tile memory modest.
+        val tileMaxPixels = 600_000
+        val result = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+
+        // Helper to process a tile defined by [y0, y1) (exclusive y1).
+        fun processTile(y0: Int, y1: Int) {
+            val innerHeight = y1 - y0
+            val readTop = (y0 - pad).coerceAtLeast(0)
+            val readBottom = (y1 + pad).coerceAtMost(h)
+            val readHeight = readBottom - readTop
+
+            // Read the tightly-bounded pixel block (including padding rows for blur kernel)
+            val readPixels = IntArray(w * readHeight)
+            src.getPixels(readPixels, 0, w, 0, readTop, w, readHeight)
+
+            // Convert to luminance (float) for the working block
+            val lum = FloatArray(w * readHeight)
+            for (row in 0 until readHeight) {
+                val base = row * w
+                for (x in 0 until w) {
+                    val c = readPixels[base + x]
+                    val r = (c shr 16 and 0xff).toFloat()
+                    val g = (c shr 8 and 0xff).toFloat()
+                    val b = (c and 0xff).toFloat()
+                    lum[base + x] = 0.2126f * r + 0.7152f * g + 0.0722f * b
+                }
+            }
+
+            // Separable blur: horizontal pass -> temp, then vertical pass -> blurred
+            val temp = FloatArray(w * readHeight)
+
+            // Horizontal
+            for (row in 0 until readHeight) {
+                val base = row * w
+                for (x in 0 until w) {
+                    var s = 0f
+                    var wsum = 0
+                    for (kx in -pad..pad) {
+                        val xx = (x + kx).coerceIn(0, w - 1)
+                        val kval = kernel[kx + pad]
+                        s += kval * lum[base + xx]
+                        wsum += kval
+                    }
+                    temp[base + x] = s / wsum
+                }
+            }
+
+            // Vertical
+            val blurred = FloatArray(w * readHeight)
+            for (x in 0 until w) {
+                for (row in 0 until readHeight) {
+                    var s = 0f
+                    var wsum = 0
+                    for (ky in -pad..pad) {
+                        val yy = (row + ky).coerceIn(0, readHeight - 1)
+                        val kval = kernel[ky + pad]
+                        s += kval * temp[yy * w + x]
+                        wsum += kval
+                    }
+                    blurred[row * w + x] = s / wsum
+                }
+            }
+
+            // Compose output pixels for the inner rows (excluding padding). Write them into the result bitmap.
+            val outRows = innerHeight
+            val outPixels = IntArray(w * outRows)
+            for (row in 0 until outRows) {
+                val readRow = row + (readTop - y0 + pad).coerceAtLeast(0) // map to readPixels index
+                val readBase = (readRow) * w
+                val outBase = row * w
+                for (x in 0 until w) {
+                    val c = readPixels[readBase + x]
+                    val a = (c ushr 24) and 0xff
+                    val r = (c shr 16 and 0xff).toFloat()
+                    val g = (c shr 8 and 0xff).toFloat()
+                    val b = (c and 0xff).toFloat()
+                    val oLum = lum[readBase + x]
+                    val bLum = blurred[readBase + x]
+                    val newLum = (oLum + amt * (oLum - bLum)).coerceIn(0f, 255f)
+                    val ratio = if (oLum > 0.001f) (newLum / oLum) else 1f
+                    val nr = (r * ratio).coerceIn(0f, 255f).toInt()
+                    val ng = (g * ratio).coerceIn(0f, 255f).toInt()
+                    val nb = (b * ratio).coerceIn(0f, 255f).toInt()
+                    outPixels[outBase + x] = (a shl 24) or (nr shl 16) or (ng shl 8) or nb
+                }
+            }
+
+            // Write the processed stripe back into the result bitmap
+            result.setPixels(outPixels, 0, w, 0, y0, w, outRows)
+        }
+
+        // Decide tiling layout
+        if (w * h <= tileMaxPixels) {
+            // Small enough to do in a single tile
+            processTile(0, h)
+        } else {
+            val tileHeight = (tileMaxPixels / w).coerceAtLeast(64)
+            var y = 0
+            while (y < h) {
+                val y1 = (y + tileHeight).coerceAtMost(h)
+                try {
+                    processTile(y, y1)
+                } catch (e: OutOfMemoryError) {
+                    android.util.Log.w("PdfViewer", "OOM while sharpening tile [$y,$y1), skipping sharpen: ${e.message}")
+                    return src
+                }
+                y = y1
+            }
+        }
+
+        return result
+    } catch (e: OutOfMemoryError) {
+        android.util.Log.w("PdfViewer", "OOM while sharpening bitmap, skipping sharpen: ${e.message}")
+        return src
+    }
+}
+
 @Composable
 private fun HintIconButton(
     onClick: () -> Unit,
@@ -1739,6 +1958,8 @@ private fun PdfPageWithAnnotations(
     offsetY: Float,
     isPageHighlighted: Boolean,
     invertColors: Boolean,
+    sharpenEnabled: Boolean,
+    sharpenIntensity: Float,
     onStrokeAdd: (AnnotationStroke) -> Unit,
     onStrokeUpdate: (AnnotationStroke, AnnotationStroke) -> Unit,
     onStrokesErase: (List<AnnotationStroke>) -> Unit,
@@ -1807,12 +2028,16 @@ private fun PdfPageWithAnnotations(
 
     val (bitmapDisplaySize, bitmapDisplayOffset) = bitmapDisplayBounds
 
+    // Sharpened bitmap cache per page
+    val sharpenedBitmapStates = remember { mutableStateMapOf<Int, Bitmap?>() }
+
     Box(
         modifier = modifier
             .padding(8.dp)
             .background(if (invertColors) Color.Black else Color.White)
             .clip(RectangleShape)
     ) {
+        // Only handle color inversion here; sharpening is done by processing the bitmap
         val colorFilter = remember(invertColors) {
             if (invertColors) ColorFilter.colorMatrix(
                 ColorMatrix(
@@ -1826,8 +2051,35 @@ private fun PdfPageWithAnnotations(
             ) else null
         }
         // PDF page as bitmap
+        // Choose sharpened bitmap when enabled and available, otherwise use base bitmap
+        val displayedBitmap = remember(bitmap, sharpenEnabled, sharpenIntensity) {
+            bitmap
+        }
+
+        val effectiveBitmapState = remember(pageIndex) { mutableStateOf<Bitmap?>(null) }
+        // Kick off sharpening job when needed; LaunchedEffect will be cancelled/restarted automatically
+        LaunchedEffect(bitmap, sharpenEnabled, sharpenIntensity) {
+            sharpenedBitmapStates.remove(pageIndex)
+            effectiveBitmapState.value = bitmap
+
+            if (sharpenEnabled && bitmap != null) {
+                try {
+                    val sb = withContext(Dispatchers.Default) { sharpenBitmap(bitmap, sharpenIntensity) }
+                    sharpenedBitmapStates[pageIndex] = sb
+                    effectiveBitmapState.value = sb
+                } catch (e: Exception) {
+                    // Let cancellations propagate, only log other exceptions
+                    if (e !is kotlinx.coroutines.CancellationException) e.printStackTrace()
+                }
+            } else {
+                effectiveBitmapState.value = bitmap
+            }
+        }
+
+        val toDisplayBitmap by remember(pageIndex) { derivedStateOf { sharpenedBitmapStates[pageIndex] ?: effectiveBitmapState.value } }
+
         Image(
-            bitmap = remember(bitmap) { bitmap.asImageBitmap() },
+            bitmap = remember(toDisplayBitmap ?: bitmap) { (toDisplayBitmap ?: bitmap).asImageBitmap() },
             contentDescription = "PDF page ${pageIndex + 1}",
             modifier = Modifier
                 .fillMaxSize()
@@ -1903,7 +2155,8 @@ private fun PdfPageWithAnnotations(
                                     val pan = newCentroid - prevCentroid
 
                                     val currentScale = transientScale
-                                    val newScale = (currentScale * zoom).coerceIn(0.5f, 3f)
+                                    // Only allow zoom out to 1.0 (100%), never below, but allow zoom-in up to 8x
+                                    val newScale = (currentScale * zoom).coerceAtLeast(1.0f).coerceAtMost(8f)
 
                                     // If user is pinching out (zooming towards 1f) and we're very close to 1.0, snap to 1.0 immediately
                                     if (zoom < 1f && kotlin.math.abs(newScale - 1f) < 0.05f) {
