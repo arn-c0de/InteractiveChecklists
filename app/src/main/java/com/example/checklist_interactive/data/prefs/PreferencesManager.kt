@@ -36,6 +36,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_DOCUMENT_SOURCES_JSON = "document_sources_json"
         private const val KEY_CONTRIBUTORS_JSON = "contributors_json"
         private const val KEY_PDF_FAB_PREFIX = "pdf_fab_"
+        private const val KEY_PDF_TOOLBAR_VISIBLE = "pdf_toolbar_visible"
 
         // Shared Json instance to avoid redundant creation
         private val json = Json { prettyPrint = true }
@@ -357,6 +358,17 @@ class PreferencesManager(context: Context) {
             remove("${KEY_PDF_FAB_PREFIX}ifv_quick_access_x")
             remove("${KEY_PDF_FAB_PREFIX}ifv_quick_access_y")
         }.apply()
+    }
+
+    /**
+     * PDF toolbar visibility (global for all PDFs)
+     */
+    fun setPdfToolbarVisible(visible: Boolean) {
+        prefs.edit().putBoolean(KEY_PDF_TOOLBAR_VISIBLE, visible).apply()
+    }
+
+    fun isPdfToolbarVisible(): Boolean {
+        return prefs.getBoolean(KEY_PDF_TOOLBAR_VISIBLE, false)
     }
 
     // Migration: move legacy per-view FAB prefs (md_*, ifv_*) to unified names (menu, quick_access)
