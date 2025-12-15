@@ -42,22 +42,67 @@ Organized in collapsible sections:
    - Heading (degrees)
    - Pitch (degrees)
    - Bank (degrees)
+   - Ground Speed / Indicated Airspeed / True Airspeed
+   - Vertical Speed (VSI)
+   - Mach number
 
 3. **Position**
    - Latitude/Longitude
    - DCS world coordinates (X, Y, Z)
 
-4. **Systems Status**
-   - Radar Active
-   - Jamming
-   - IR Jamming
-   - AI On
-   - Human control
+4. **Navigation & Waypoints**
+   - Current waypoint name
+   - Distance to waypoint
+   - Bearing to waypoint
+   - ETA (time/seconds)
+   - Flight plan: current WP index / total waypoints
+   - Route name
 
-5. **Additional Info**
-   - Timestamp
-   - Unit ID
-   - Streamer version
+5. **Fuel**
+   - Total fuel capacity
+   - Remaining fuel (internal/external)
+   - Fuel flow rate
+   - Endurance (minutes remaining)
+
+6. **Weapons & Stores**
+   - Master Arm status (SAFE/ARM)
+   - Selected weapon
+   - Weapon stations (station #, type, count)
+   - Total munitions count
+
+7. **Threats & EW**
+   - RWR contacts (ID, type, bearing, priority, locked)
+   - Total threats detected
+   - Radar mode, range, lock status, track count
+   - Countermeasures: Chaff/Flare counts, dispenser mode
+
+8. **Avionics & Systems**
+   - Autopilot enabled/mode/Flight Director
+   - Transponder code & mode
+   - Radio frequencies (COM1/COM2/Guard/Active)
+   - Master Caution/Warning
+   - System faults & alerts
+
+9. **Environment**
+   - Wind direction & speed
+   - Temperature
+   - Pressure
+   - Visibility
+   - Cloud layers
+
+10. **Systems Status**
+    - Radar Active
+    - Jamming
+    - IR Jamming
+    - AI On
+    - Human control
+
+11. **Additional Info**
+    - Timestamp
+    - Unit ID
+    - Streamer version
+    - Data age (latency)
+    - Update rate (Hz)
 
 ## Usage
 
@@ -93,6 +138,8 @@ New-NetFirewallRule -DisplayName "DCS DataPad" -Direction Inbound -Protocol UDP 
 
 ## Data Format
 Expected JSON format (one object per UDP datagram):
+
+### Basic Example (Minimal)
 ```json
 {
   "aircraft": "FA-18C_hornet",
@@ -108,6 +155,118 @@ Expected JSON format (one object per UDP datagram):
   "radarActive": true,
   "isHuman": true,
   "timestamp": "2025-12-15T19:52:22Z"
+}
+```
+
+### Extended Example (Full Tactical Kneepad Data)
+```json
+{
+  "aircraft": "FA-18C_hornet",
+  "unitName": "[RGS] FATBEE | FTBE",
+  "coalition": "Blue",
+  "country": 2,
+  "group": "Hornet Flight",
+  "alt": 5486.3,
+  "heading": 245.8,
+  "pitch": 2.1,
+  "bank": -5.3,
+  "lat": 42.17,
+  "long": 42.46,
+  "pos": {"x": -285764.44, "y": 5486.3, "z": 682926.49},
+  "groundSpeed": 420.5,
+  "indicatedAirspeed": 385.2,
+  "trueAirspeed": 425.8,
+  "verticalSpeed": 12.3,
+  "mach": 0.64,
+  "fuel": {
+    "total": 4800,
+    "remaining": 3250,
+    "internal": 2100,
+    "external": 1150,
+    "endurance": 45.2,
+    "fuelFlow": 1.2
+  },
+  "waypoint": {
+    "current": "WP03-TARGET",
+    "distance": 38500,
+    "bearing": 248.5,
+    "eta": "2025-12-15T20:15:30Z",
+    "etaSeconds": 342
+  },
+  "flightPlan": {
+    "currentIndex": 2,
+    "totalWaypoints": 5,
+    "route": "BASE-IP-TGT-EGRESS-RTB"
+  },
+  "weapons": {
+    "masterArm": true,
+    "selected": "AIM-120C",
+    "stations": [
+      {"station": 2, "type": "AIM-120C", "count": 2},
+      {"station": 8, "type": "AIM-120C", "count": 2},
+      {"station": 3, "type": "AIM-9X", "count": 1},
+      {"station": 7, "type": "AIM-9X", "count": 1}
+    ],
+    "totalCount": 6
+  },
+  "rwr": {
+    "contacts": [
+      {"id": "SA-6", "type": "SAM", "bearing": 315.0, "priority": 3, "locked": true},
+      {"id": "MIG-29", "type": "AI", "bearing": 180.5, "priority": 2, "locked": false}
+    ],
+    "threatsDetected": 2
+  },
+  "radar": {
+    "mode": "RWS",
+    "range": 80.0,
+    "locked": false,
+    "trackCount": 3
+  },
+  "countermeasures": {
+    "chaffCount": 60,
+    "flareCount": 30,
+    "dispenserMode": "AUTO"
+  },
+  "autopilot": {
+    "enabled": true,
+    "mode": "ALT HOLD",
+    "flightDirector": true
+  },
+  "transponder": {
+    "code": "2341",
+    "mode": "ALT",
+    "ident": false
+  },
+  "radios": {
+    "com1": 251.5,
+    "com2": 127.5,
+    "guard": true,
+    "activeFreq": 251.5
+  },
+  "warnings": {
+    "masterCaution": false,
+    "masterWarning": false,
+    "faults": [],
+    "alerts": ["LOW FUEL"]
+  },
+  "environment": {
+    "windDirection": 270.0,
+    "windSpeed": 15.5,
+    "temperature": -12.3,
+    "pressure": 1013.25,
+    "visibility": 10000.0,
+    "clouds": "SCT040"
+  },
+  "radarActive": true,
+  "jamming": false,
+  "irJamming": false,
+  "isHuman": true,
+  "timestamp": "2025-12-15T19:52:22Z",
+  "unitID": "16777472",
+  "lua_version": "1.2",
+  "streamer_version": "2.0",
+  "dataAge": 0.05,
+  "updateRate": 20.0
 }
 ```
 
