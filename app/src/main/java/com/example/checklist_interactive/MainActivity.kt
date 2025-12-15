@@ -57,7 +57,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 
 class MainActivity : ComponentActivity() {
         companion object {
-            const val SOFTWARE_VERSION = "1.0.10"
+            const val SOFTWARE_VERSION = "1.0.11"
         }
 
         val softwareVersion = SOFTWARE_VERSION
