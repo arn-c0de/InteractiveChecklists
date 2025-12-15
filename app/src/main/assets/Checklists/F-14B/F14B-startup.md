@@ -48,12 +48,13 @@
 - [ ] Cockpit lighting - Set for startup
 - [ ] Instrument panel lights - Check
 
-## External Power / APU
+## External Power / Ground Start (no APU)
 
-- [ ] External Power - Connect/Avail - ON (if required)
-- [ ] APU - START (if external power not available)
-- [ ] APU GEN - Check online
-- [ ] APU RPM/Oil pressure - Monitor
+- [ ] External Power (GPU) - Connect/Avail - ON (if required)
+- [ ] Air/Start Cart - Connect/Avail - ON (if external air start required)
+- [ ] Check GPU/Cart indications - Ensure stable power/air pressure
+
+> Note: The F-14B does not have an APU; use a ground power unit or air/start cart for starts.
 
 ## Avionics Power Up
 
@@ -105,7 +106,8 @@
 
 ## After Engine Start
 
-- [ ] APU - OFF (if APU was used for start and not required)
+- [ ] External Power/GPU - Disconnect (if used)
+- [ ] Air/Start Cart - Stow/Disconnect (if used)
 - [ ] Pack/Environmental control - AUTO
 - [ ] Probe heat/Engine anti-ice - As required
 - [ ] Cabin press - Check normal

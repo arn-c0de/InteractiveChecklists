@@ -55,7 +55,7 @@
 - [ ] Chocks/Deck crew - Follow ship signals
 - [ ] Speedbrake - As required
 - [ ] Flaps - As required
-- [ ] Engine bleed/APU - As required for shutdown
+- [ ] Engine bleed / External power (ship/GPU) - As required for shutdown (no APU on F-14B)
 - [ ] Secure - Hand signals to deck crew confirmed
 
 ---
