@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * - Tab history for quick navigation
  * - Support for both MD and PDF files
  */
-class TabManager(context: Context) {
+class TabManager(private val context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("tab_manager", Context.MODE_PRIVATE)
     
     companion object {
@@ -88,6 +88,13 @@ class TabManager(context: Context) {
         // Use blocking save to ensure the closed tab state is persisted immediately
         // (prevents the closed tab from being restored after an app restart).
         saveTabsToPreferences(blocking = true)
+        // Also persist last opened file immediately so app restart can open the same document
+        try {
+            val appPrefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+            appPrefs.edit().putString("last_opened_file", fileInfo.path).commit()
+        } catch (e: Exception) {
+            // ignore
+        }
     }
     
     /**
@@ -113,6 +120,14 @@ class TabManager(context: Context) {
 
         // Persist synchronously so all tabs are removed immediately.
         saveTabsToPreferences(blocking = true)
+        // Update last opened file
+        try {
+            val appPrefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+            val currentActive = getActiveTab()?.fileInfo?.path ?: ""
+            appPrefs.edit().putString("last_opened_file", currentActive).commit()
+        } catch (e: Exception) {
+            // ignore
+        }
         Log.d(TAG, "closeTab: remaining=${_openTabs.value.map { it.fileInfo.path }} activeIndex=${_activeTabIndex.value}")
         return removed
     }
@@ -128,6 +143,13 @@ class TabManager(context: Context) {
         addToHistory(tab.fileInfo.path)
         
         saveTabsToPreferences()
+        // Persist last opened file immediately
+        try {
+            val appPrefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+            appPrefs.edit().putString("last_opened_file", tab.fileInfo.path).commit()
+        } catch (e: Exception) {
+            // ignore
+        }
     }
     
     /**

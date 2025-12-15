@@ -1,5 +1,7 @@
 package com.example.checklist_interactive
 
+import android.content.Context
+
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -75,6 +77,24 @@ class MainActivity : ComponentActivity() {
         // rememberLauncherForActivityResult and the in-composition logic.
         enableEdgeToEdge()
 
+        // Pre-restore tab state synchronously before Compose to avoid pager initial-page flicker
+        val preFileManager = InternalFileManager(this)
+        val allFilesPre = preFileManager.getAllFilesGrouped().values.flatten()
+        globalTabManager.restoreTabsFromPaths { path ->
+            allFilesPre.find { it.path == path }
+        }
+        globalTabManager.loadHistoryFromPreferences()
+
+        // If no tabs restored, try to open last opened file (read synchronously)
+        val sp = getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+        val lastFilePathSync = sp.getString("last_opened_file", null)
+        if (globalTabManager.openTabs.value.isEmpty() && !lastFilePathSync.isNullOrEmpty()) {
+            val lastFile = allFilesPre.find { it.path == lastFilePathSync }
+            if (lastFile != null) {
+                globalTabManager.openTab(lastFile)
+            }
+        }
+
         setContent {
             // Maintain fullscreen during composition
             androidx.compose.runtime.SideEffect {
@@ -122,7 +142,8 @@ class MainActivity : ComponentActivity() {
                 Scaffold(modifier = Modifier.fillMaxSize(), topBar = { FlightMiniStatusBar(noteManager = quickNoteManager) }) { innerPadding ->
                     Box(modifier = Modifier.padding(innerPadding)) {
                     var refreshTrigger by remember { mutableStateOf(0) }
-                    val fileManager = remember { InternalFileManager(this@MainActivity) }
+                    // reuse pre-created instances so state is consistent and restoration happened already
+                    val fileManager = remember { preFileManager }
                     val repository = remember { ChecklistRepository(this@MainActivity) }
                     val scope = rememberCoroutineScope()
                     val context = this@MainActivity
@@ -230,26 +251,7 @@ class MainActivity : ComponentActivity() {
                         // Always trigger refresh after startup to show latest data
                         refreshTrigger++
                         
-                        // 3. Restore tabs from previous session
-                        val allFiles = fileManager.getAllFilesGrouped().values.flatten()
-                        tabManager.restoreTabsFromPaths { path ->
-                            allFiles.find { it.path == path }
-                        }
-                        tabManager.loadHistoryFromPreferences()
-
-                        // If tabs restored, show tabs/viewer. Otherwise try to open last opened file.
-                        if (tabManager.openTabs.value.isNotEmpty()) {
-                            showFileList = false
-                        } else {
-                            val lastFilePath = repository.getLastOpenedFile()
-                            if (!lastFilePath.isNullOrEmpty()) {
-                                val lastFile = allFiles.find { it.path == lastFilePath }
-                                if (lastFile != null) {
-                                    tabManager.openTab(lastFile)
-                                    showFileList = false
-                                }
-                            }
-                        }
+                        // 3. Tab restoration is handled before composition to avoid UI flicker.
                         
                         // Show import dialog only on first launch if no files
                         if (!prefsManager.hasShownImportDialog() && prefsManager.isFirstLaunch() && importedFromExternal == 0 && fileManager.getAllFilesGrouped().values.flatten().isEmpty()) {
