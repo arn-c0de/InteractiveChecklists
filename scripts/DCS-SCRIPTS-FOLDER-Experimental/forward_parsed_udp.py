@@ -70,10 +70,6 @@ def tail_and_send(path: str, host: str, port: int, send_existing=False, once=Fal
 
     def open_for_tail(read_existing: bool = False):
         f = open(path, 'r', encoding='utf-8', errors='ignore')
-        # By default, seek to EOF so we don't send existing lines.
-        # When recovering from rotation/truncation we may want to
-        # read existing lines from the replacement file immediately
-        # (pass read_existing=True to keep the file at its start).
         if not read_existing:
             f.seek(0, os.SEEK_END)
         return f
@@ -83,17 +79,14 @@ def tail_and_send(path: str, host: str, port: int, send_existing=False, once=Fal
         while True:
             line = f.readline()
             if not line:
-                # detect truncation/rotation: current position greater than file size
                 try:
                     cur_pos = f.tell()
                     size = os.path.getsize(path)
                 except OSError:
-                    # file removed or inaccessible; try to reopen
                     try:
                         f.close()
                     except Exception:
                         pass
-                    # when recovering from a temporary error, read existing lines
                     f = open_for_tail(True)
                     if once:
                         break
@@ -101,27 +94,21 @@ def tail_and_send(path: str, host: str, port: int, send_existing=False, once=Fal
                     continue
 
                 if cur_pos > size:
-                    # truncated or replaced: reopen
                     try:
                         f.close()
                     except Exception:
                         pass
-                    # when the file was truncated/replaced, read existing lines
-                    # from the new file immediately (don't seek to EOF)
                     f = open_for_tail(True)
                     if once:
                         break
                     time.sleep(interval)
                     continue
 
-                # detect replaced file (e.g. atomic replace / rename)
                 if not _is_same_file(f, path):
-                    # file was replaced: reopen
                     try:
                         f.close()
                     except Exception:
                         pass
-                    # read existing lines from the replacement file
                     f = open_for_tail(True)
                     if once:
                         break
@@ -143,7 +130,6 @@ def tail_and_send(path: str, host: str, port: int, send_existing=False, once=Fal
                     print(f"{ts} GESENDET {host}:{port} {jsonpart}")
                 else:
                     print(f"{ts} FEHLER {host}:{port} {jsonpart}")
-            # if once and we read at least one line, we can exit only after EOF (handled above)
     finally:
         try:
             f.close()
@@ -152,35 +138,71 @@ def tail_and_send(path: str, host: str, port: int, send_existing=False, once=Fal
         sock.close()
 
 
+# Neue Funktion: Wiederholt alle X Sekunden die letzte Zeile senden
+def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=False):
+    """Sendet alle <interval> Sekunden die letzte Zeile der Datei als UDP."""
+    if not os.path.exists(path):
+        raise FileNotFoundError(path)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        last_sent = None
+        while True:
+            try:
+                with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                    lines = f.readlines()
+                if not lines:
+                    time.sleep(interval)
+                    continue
+                last_line = lines[-1]
+                jsonpart = extract_json_from_line(last_line)
+                if not jsonpart:
+                    time.sleep(interval)
+                    continue
+                sent = send_udp(jsonpart.encode('utf-8'), host, port, sock)
+                if verbose:
+                    ts = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+                    if sent:
+                        print(f"{ts} REPEAT {host}:{port} {jsonpart}")
+                    else:
+                        print(f"{ts} FEHLER {host}:{port} {jsonpart}")
+            except Exception as e:
+                print(f"Fehler beim Lesen/Senden: {e}", file=sys.stderr)
+            time.sleep(interval)
+    finally:
+        sock.close()
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description='Forward parsed JSONL as UDP datagrams')
     p.add_argument('--file', '-f', default=DEFAULT_FILE, help='Path to JSONL file')
     p.add_argument('--host', default=DEFAULT_HOST, help='Destination host')
     p.add_argument('--port', '-p', type=int, default=DEFAULT_PORT, help='Destination port')
-    # --send-existing entfernt
     p.add_argument('--interval', type=float, default=0.2, help='Polling interval in seconds')
     p.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
+    p.add_argument('--repeat-last', action='store_true', help='Alle <interval> Sekunden immer die letzte Zeile erneut senden')
     args = p.parse_args(argv)
 
     try:
-        print(f"Forwarding {args.file} to {args.host}:{args.port} (immer nur neue Zeilen)")
-
-        # Nur neue Zeilen senden, nie bestehende
-        while True:
-            try:
-                tail_and_send(args.file, args.host, args.port, send_existing=False, once=False, interval=args.interval, verbose=args.verbose)
-            except KeyboardInterrupt:
-                raise
-            except FileNotFoundError:
-                print(f"File not found: {args.file}")
-                time.sleep(5)
-                continue
-            except Exception:
-                import traceback
-                print("Unhandled error in tail_and_send, restarting in 5s:", file=sys.stderr)
-                traceback.print_exc()
-                time.sleep(5)
-                continue
+        if args.repeat_last:
+            print(f"Wiederhole alle {args.interval} Sekunden letzten Eintrag von {args.file} an {args.host}:{args.port}")
+            repeat_last_line(args.file, args.host, args.port, interval=args.interval, verbose=args.verbose)
+        else:
+            print(f"Forwarding {args.file} to {args.host}:{args.port} (immer nur neue Zeilen)")
+            while True:
+                try:
+                    tail_and_send(args.file, args.host, args.port, send_existing=False, once=False, interval=args.interval, verbose=args.verbose)
+                except KeyboardInterrupt:
+                    raise
+                except FileNotFoundError:
+                    print(f"File not found: {args.file}")
+                    time.sleep(5)
+                    continue
+                except Exception:
+                    import traceback
+                    print("Unhandled error in tail_and_send, restarting in 5s:", file=sys.stderr)
+                    traceback.print_exc()
+                    time.sleep(5)
+                    continue
     except FileNotFoundError:
         print(f"File not found: {args.file}")
         return 2

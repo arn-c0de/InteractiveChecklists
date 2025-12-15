@@ -12,7 +12,7 @@ set SCRIPT_DIR=%~dp0
 rem Remove trailing backslash if present (except for root like C:\)
 if "%SCRIPT_DIR:~-1%"=="\" set SCRIPT_DIR=%SCRIPT_DIR:~0,-1%
 set HOST=%1
-if "%HOST%"=="" set HOST=192.168.178.69
+if "%HOST%"=="" set HOST=192.168.178.131
 set PORT=%2
 if "%PORT%"=="" set PORT=5010
 

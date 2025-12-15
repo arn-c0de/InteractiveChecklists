@@ -4,27 +4,12 @@ pcall(function()
 
 	local LOG_PATH = writeDir .. [[Scripts\player_aircraft.log]]
 	local DEBUG_LOG_PATH = writeDir .. [[Scripts\player_aircraft_debug.log]]
-	-- Configuration
+	local JSON_PATH = writeDir .. [[Scripts\player_aircraft_parsed.jsonl]]
 	local DEBUG_DUMP_TABLES = true -- set to false to disable table debug dumps
-	local DEBUG_IS_MAIN = true -- when true, detailed debug dumps become the primary output
-	local WRITE_PARSED = true -- write concise, parseable JSON lines to PARSED_LOG_PATH
-    -- Version info: change `STREAMER_VERSION` when you update this script
-    local STREAMER_VERSION = '1.0.0'
-    local LUA_VERSION = _VERSION or 'unknown'
-	local PARSED_LOG_PATH = writeDir .. [[Scripts\player_aircraft_parsed.jsonl]] -- JSON-lines file for easy parsing
-	-- Trimming options: keep the parsed JSONL file from growing indefinitely
-	local TRIM_PARSED = true -- when true, automatically remove old lines when file grows too large
-	local PARSED_MAX_LINES = 10000 -- maximum number of lines to keep in the parsed file
-	local PARSED_TMP_SUFFIX = '.tmp'
-	local CLEAR_ON_START = true -- when true, truncate/clear log and parsed files on start
-	local WRITE_LOG = false -- when false, do not create/write `player_aircraft.log`
-
-	-- UDP streaming removed: Export.lua now only writes JSON and debug logs
-	local UPDATE_INTERVAL = 5 -- seconds
-	-- The parsed JSON tries to discover common fields (COM1/COM2/DME/NearestAirfield/etc.) by searching
-	-- through the tables DCS provides. If you need additional fields, edit `build_summary()` and the
-	-- candidate key lists used by `find_in_table()`.
+	local dumped_tables = {}
+	local UPDATE_INTERVAL = 0.2 -- seconds (5 Hz update rate)
 	local lastWrite = 0
+	local STREAMER_VERSION = "1.0.1"
 
 	local function format_pos(p)
 		if not p then return 'N/A' end
@@ -44,87 +29,305 @@ pcall(function()
 		return nil
 	end
 
-	local function detect_all()
-		local aircraft = nil
-		local unitID = nil
-		local pos = nil
+	-- JSON encoding helpers
+	local function json_escape(str)
+		if type(str) ~= 'string' then return tostring(str) end
+		str = string.gsub(str, '\\', '\\\\')
+		str = string.gsub(str, '"', '\\"')
+		str = string.gsub(str, '\n', '\\n')
+		str = string.gsub(str, '\r', '\\r')
+		str = string.gsub(str, '\t', '\\t')
+		return str
+	end
 
-		-- Try LoGetSelfData
-		local ok, sd = pcall(function()
-			if LoGetSelfData then return LoGetSelfData() end
-		end)
-		if ok and sd then
-			-- sd may be a table or other; extract common fields
-			if type(sd) == 'table' then
-				aircraft = try_field(sd, {'Name', 'type', 'Type', 'typeName', 'name'})
-				unitID = try_field(sd, {'unitId', 'unitID', 'unit_id', 'id', 'ID'}) or unitID
-				pos = try_field(sd, {'Position', 'pos', 'position', 'pos3d', 'p'})
-				-- Sometimes position is split into x,y,z on the root
-				if not pos and sd.x and sd.y then pos = { x = sd.x, y = sd.y, z = sd.z } end
+	local function json_encode_value(val)
+		local t = type(val)
+		if t == 'string' then
+			return '"' .. json_escape(val) .. '"'
+		elseif t == 'number' then
+			if val ~= val then return 'null' end -- NaN
+			if val == math.huge or val == -math.huge then return 'null' end -- Inf
+			return tostring(val)
+		elseif t == 'boolean' then
+			return val and 'true' or 'false'
+		elseif t == 'table' then
+			return json_encode_table(val)
+		else
+			return 'null'
+		end
+	end
+
+	function json_encode_table(tbl)
+		if not tbl then return 'null' end
+		local isArray = false
+		local maxIndex = 0
+		for k, v in pairs(tbl) do
+			if type(k) == 'number' and k > 0 and k == math.floor(k) then
+				isArray = true
+				if k > maxIndex then maxIndex = k end
 			else
-				-- sd is a string or number
-				aircraft = tostring(sd)
+				isArray = false
+				break
 			end
 		end
+		
+		if isArray then
+			local parts = {}
+			for i = 1, maxIndex do
+				parts[i] = json_encode_value(tbl[i])
+			end
+			return '[' .. table.concat(parts, ',') .. ']'
+		else
+			local parts = {}
+			for k, v in pairs(tbl) do
+				local key = tostring(k)
+				table.insert(parts, '"' .. json_escape(key) .. '":' .. json_encode_value(v))
+			end
+			return '{' .. table.concat(parts, ',') .. '}'
+		end
+	end
 
-		-- Try GetSelfID (fallback) or other ID getters
-		local idv
-		ok, idv = pcall(function()
-			if GetSelfID then return GetSelfID() end
-			if LoGetSelfID then return LoGetSelfID() end
-		end)
-		if ok and idv and type(idv) == 'number' then
-			unitID = unitID or idv
-			local ok2, u = pcall(function()
-				if Unit and Unit.getById then return Unit.getById(idv) end
-				if Unit and Unit.getByName then return Unit.getByName(idv) end
-			end)
-			if ok2 and u then
-				if not aircraft then
-					local ok3, t = pcall(function() return u.getTypeName and u:getTypeName() end)
-					if ok3 and t then aircraft = t end
+	local function safe_get(func, default)
+		local ok, result = pcall(func)
+		if ok and result ~= nil then return result end
+		return default
+	end
+
+	-- Collect comprehensive telemetry data
+	local function collect_telemetry()
+		local data = {
+			timestamp = os.date('!%Y-%m-%dT%H:%M:%SZ'),
+			streamer_version = STREAMER_VERSION,
+			dataAge = 0.0,
+			updateRate = 1.0 / UPDATE_INTERVAL
+		}
+
+		-- Basic aircraft info from LoGetSelfData
+		local selfData = safe_get(function() return LoGetSelfData() end, nil)
+		if selfData and type(selfData) == 'table' then
+			data.aircraft = selfData.Name or selfData.Type or selfData.type or 'UNKNOWN'
+			data.unitName = selfData.UnitName or selfData.unitName or selfData.Name or ''
+			data.lat = selfData.LatLongAlt and selfData.LatLongAlt.Lat or 0
+			data.long = selfData.LatLongAlt and selfData.LatLongAlt.Long or 0
+			data.alt = selfData.LatLongAlt and selfData.LatLongAlt.Alt or 0
+			data.heading = selfData.Heading or selfData.heading or 0
+			data.pitch = selfData.Pitch or selfData.pitch or 0
+			data.bank = selfData.Bank or selfData.bank or 0
+			data.coalition = selfData.Coalition or ''
+			data.country = selfData.Country or 0
+			data.group = selfData.GroupName or ''
+			data.unitID = tostring(selfData.ID or selfData.UnitId or 'N/A')
+		end
+
+		-- Position (DCS coordinates)
+		local pos = safe_get(function() return LoGetWorldObjects() end, nil)
+		if selfData and selfData.Position then
+			data.pos = {
+				x = selfData.Position.x or 0,
+				y = selfData.Position.y or 0,
+				z = selfData.Position.z or 0
+			}
+		end
+
+		-- Speed & Vertical
+		local ias = safe_get(function() return LoGetIndicatedAirSpeed() end, nil)
+		local tas = safe_get(function() return LoGetTrueAirSpeed() end, nil)
+		local gs = safe_get(function() return LoGetGroundSpeed() end, nil)
+		local vs = safe_get(function() return LoGetVerticalVelocity() end, nil)
+		local mach = safe_get(function() return LoGetMachNumber() end, nil)
+		
+		if ias then data.indicatedAirspeed = ias end
+		if tas then data.trueAirspeed = tas end
+		if gs then data.groundSpeed = gs end
+		if vs then data.verticalSpeed = vs end
+		if mach then data.mach = mach end
+
+		-- Fuel
+		local fuelInternal = safe_get(function() return LoGetFuelWeight() end, 0)
+		local fuelExternal = safe_get(function() return LoGetFuelWeight() end, 0) -- DCS doesn't separate easily
+		if fuelInternal and fuelInternal > 0 then
+			data.fuel = {
+				total = fuelInternal,
+				remaining = fuelInternal,
+				internal = fuelInternal,
+				external = 0,
+				endurance = nil, -- calculated externally if flow known
+				fuelFlow = nil
+			}
+		end
+
+		-- Navigation & Waypoints
+		local route = safe_get(function() return LoGetRoute() end, nil)
+		if route and route.CurrentWaypoint then
+			local wp = route.CurrentWaypoint
+			data.waypoint = {
+				current = wp.Name or ('WP' .. (wp.number or '?')),
+				distance = wp.distance or nil,
+				bearing = wp.heading or nil,
+				eta = nil,
+				etaSeconds = wp.eta or nil
+			}
+			data.flightPlan = {
+				currentIndex = wp.number or 0,
+				totalWaypoints = route.GoToWaypointCount or 0,
+				route = route.Name or nil
+			}
+		end
+
+		-- Weapons & Stores
+		local payload = safe_get(function() return LoGetPayloadInfo() end, nil)
+		if payload then
+			local stations = {}
+			local totalCount = 0
+			if payload.Stations then
+				for i, station in pairs(payload.Stations) do
+					if station.weapon then
+						table.insert(stations, {
+							station = i,
+							type = station.weapon.displayName or station.weapon.level1 or 'UNKNOWN',
+							count = station.count or 1
+						})
+						totalCount = totalCount + (station.count or 1)
+					end
 				end
-				local ok4, p = pcall(function()
-					if u.getPosition then return u:getPosition() end
-				end)
-				if ok4 and p then pos = pos or p end
 			end
+			data.weapons = {
+				masterArm = safe_get(function() return LoGetMasterArmState() end, false),
+				selected = payload.CurrentWeapon or nil,
+				stations = #stations > 0 and stations or nil,
+				totalCount = totalCount > 0 and totalCount or nil
+			}
 		end
 
-		-- Normalize aircraft to a readable string
-		if type(aircraft) == 'table' then
-			-- try to stringify with known fields
-			local s = try_field(aircraft, {'type', 'Type', 'typeName', 'name', 'Name'})
-			if s then aircraft = s else aircraft = 'TABLE' end
+		-- RWR / Threats (limited API, placeholder)
+		local threats = safe_get(function() return LoGetTWSInfo() end, nil)
+		if threats then
+			local contacts = {}
+			-- DCS doesn't expose RWR directly; this is a placeholder
+			data.rwr = {
+				contacts = nil,
+				threatsDetected = 0
+			}
 		end
 
-		aircraft = aircraft or 'UNKNOWN'
-		return aircraft, unitID or 'N/A', pos, sd
+		-- Radar
+		local radarInfo = safe_get(function() return LoGetRadarInfo() end, nil)
+		if radarInfo then
+			data.radar = {
+				mode = radarInfo.mode or nil,
+				range = radarInfo.range or nil,
+				locked = radarInfo.lock or false,
+				trackCount = radarInfo.trackCount or 0
+			}
+		end
+		data.radarActive = safe_get(function() return LoGetSelfData() end, {}).RadarOn or false
+
+		-- Countermeasures
+		local cmds = safe_get(function() return LoGetSnares() end, nil)
+		if cmds then
+			data.countermeasures = {
+				chaffCount = cmds.chaff or 0,
+				flareCount = cmds.flare or 0,
+				dispenserMode = cmds.mode or nil
+			}
+		end
+
+		-- Autopilot
+		local apState = safe_get(function() return LoGetControlPanel_Autopilot() end, nil)
+		if apState then
+			data.autopilot = {
+				enabled = apState.on or false,
+				mode = apState.mode or nil,
+				flightDirector = apState.fd or false
+			}
+		end
+
+		-- Transponder
+		local xpdr = safe_get(function() return LoGetTransponderInfo() end, nil)
+		if xpdr then
+			data.transponder = {
+				code = xpdr.code or nil,
+				mode = xpdr.mode or nil,
+				ident = xpdr.ident or false
+			}
+		end
+
+		-- Radios
+		local radio = safe_get(function() return LoGetRadioFrequencies() end, nil)
+		if radio then
+			data.radios = {
+				com1 = radio.COM1 or nil,
+				com2 = radio.COM2 or nil,
+				guard = radio.Guard or false,
+				activeFreq = radio.active or nil
+			}
+		end
+
+		-- Warnings
+		local mcp = safe_get(function() return LoGetMCPState() end, nil)
+		if mcp then
+			data.warnings = {
+				masterCaution = mcp.MasterCaution or false,
+				masterWarning = mcp.MasterWarning or false,
+				faults = mcp.faults or nil,
+				alerts = mcp.alerts or nil
+			}
+		end
+
+		-- Environment (limited)
+		local wind = safe_get(function() return LoGetVectorWindVelocity() end, nil)
+		if wind then
+			local windSpeed = math.sqrt((wind.x or 0)^2 + (wind.z or 0)^2)
+			local windDir = math.deg(math.atan2(wind.z or 0, wind.x or 0))
+			data.environment = {
+				windDirection = windDir,
+				windSpeed = windSpeed,
+				temperature = safe_get(function() return LoGetTemperature() end, nil),
+				pressure = safe_get(function() return LoGetPressure() end, nil),
+				visibility = nil,
+				clouds = nil
+			}
+		end
+
+		-- Status flags
+		data.isHuman = safe_get(function() return LoGetSelfData() end, {}).Player or false
+		data.jamming = false
+		data.irJamming = false
+		data.invisible = false
+		data.aiOn = false
+		data.born = true
+
+		return data
 	end
 
 	local function write_log(aircraft, unitID, pos)
-		if not WRITE_LOG then return end
 		pcall(function()
 			local f = io.open(LOG_PATH, 'a')
 			if not f then return end
-			f:write(string.format('%s - Aircraft: %s - UnitID: %s - Pos: %s - Streamer: %s - Lua: %s\n', os.date('%Y-%m-%d %H:%M:%S'), tostring(aircraft), tostring(unitID), format_pos(pos), STREAMER_VERSION, LUA_VERSION))
+			f:write(string.format('%s - Aircraft: %s - UnitID: %s - Pos: %s\n', os.date('%Y-%m-%d %H:%M:%S'), tostring(aircraft), tostring(unitID), format_pos(pos)))
+			f:close()
+		end)
+	end
+
+	local function write_json(data)
+		pcall(function()
+			local json = json_encode_table(data)
+			local f = io.open(JSON_PATH, 'a')
+			if not f then return end
+			f:write(json .. '\n')
 			f:close()
 		end)
 	end
 
 	local function serialize_table(obj, depth, maxDepth, seen)
 		depth = depth or 0
-		maxDepth = maxDepth or 4
+		maxDepth = maxDepth or 3
 		seen = seen or {}
 		if depth > maxDepth then return string.rep('  ', depth) .. '...\n' end
 		if seen[obj] then return string.rep('  ', depth) .. '*cycle*\n' end
 		seen[obj] = true
 		local s = ''
-		local keys = {}
-		for k in pairs(obj) do table.insert(keys, k) end
-		table.sort(keys, function(a,b) return tostring(a) < tostring(b) end)
-		for _,k in ipairs(keys) do
-			local v = obj[k]
+		for k, v in pairs(obj) do
 			local key = tostring(k)
 			if type(v) == 'table' then
 				s = s .. string.rep('  ', depth) .. key .. ':\n' .. serialize_table(v, depth+1, maxDepth, seen)
@@ -135,291 +338,42 @@ pcall(function()
 		return s
 	end
 
-	-- Recursively search a table for any of the candidate keys and return the first match.
-	local function find_in_table(obj, candidates, maxDepth, seen, depth)
-		if type(obj) ~= 'table' or not candidates then return nil end
-		depth = depth or 0
-		maxDepth = maxDepth or 3
-		seen = seen or {}
-		if depth > maxDepth then return nil end
-		if seen[obj] then return nil end
-		seen[obj] = true
-		for _,k in ipairs(candidates) do
-			if obj[k] ~= nil then return obj[k] end
-		end
-		for _,v in pairs(obj) do
-			if type(v) == 'table' then
-				local r = find_in_table(v, candidates, maxDepth, seen, depth+1)
-				if r ~= nil then return r end
-			end
-		end
-		return nil
-	end
-
-	-- Simple JSON serializer for basic types and tables (avoids cycles)
-	local function to_json(value, seen)
-		seen = seen or {}
-		local t = type(value)
-		if t == 'nil' then return 'null' end
-		if t == 'boolean' then return tostring(value) end
-		if t == 'number' then return tostring(value) end
-		if t == 'string' then return string.format('%q', value) end
-		if t == 'table' then
-			if seen[value] then return 'null' end
-			seen[value] = true
-			-- detect array-like
-			local i = 0
-			for _ in pairs(value) do i = i + 1 end
-			local isArray = true
-			for n=1,i do if value[n] == nil then isArray = false break end end
-			if isArray then
-				local parts = {}
-				for n=1,i do table.insert(parts, to_json(value[n], seen)) end
-				return '[' .. table.concat(parts, ',') .. ']'
-			else
-				local keys = {}
-				for k in pairs(value) do table.insert(keys, k) end
-				table.sort(keys, function(a,b) return tostring(a) < tostring(b) end)
-				local parts = {}
-				for _,k in ipairs(keys) do
-					local v = value[k]
-					table.insert(parts, string.format('%q:%s', tostring(k), to_json(v, seen)))
-				end
-				return '{' .. table.concat(parts, ',') .. '}'
-			end
-		end
-		return string.format('%q', tostring(value))
-	end
-
-	local function write_parsed(summary)
-		if not WRITE_PARSED then return end
-		pcall(function()
-			local f = io.open(PARSED_LOG_PATH, 'a')
-			if not f then return end
-			local json = to_json(summary)
-			f:write(os.date('%Y-%m-%d %H:%M:%S') .. ' ' .. json .. '\n')
-			f:close()
-			-- UDP streaming removed: only write parsed JSON to disk
-		end)
-		-- keep parsed file bounded so it doesn't grow indefinitely
-		trim_parsed_file()
-	end
-
-	-- Trim parsed JSONL file to keep only the last PARSED_MAX_LINES entries.
-	-- Uses a simple ring buffer while reading to avoid allocating more than necessary.
-	local function trim_parsed_file()
-		if not WRITE_PARSED or not TRIM_PARSED then return end
-		pcall(function()
-			local max_lines = PARSED_MAX_LINES or 10000
-			local f = io.open(PARSED_LOG_PATH, 'r')
-			if not f then return end
-			local buf = {}
-			local count = 0
-			for line in f:lines() do
-				count = count + 1
-				buf[#buf+1] = line
-				if #buf > max_lines then table.remove(buf, 1) end
-			end
-			f:close()
-			if count <= max_lines then return end -- nothing to do
-			-- write out only the kept lines to a temporary file then atomically replace
-			local tmp = PARSED_LOG_PATH .. PARSED_TMP_SUFFIX
-			local w = io.open(tmp, 'w')
-			if not w then return end
-			for _,l in ipairs(buf) do w:write(l, '\n') end
-			w:close()
-			-- replace original file
-			pcall(function()
-				os.remove(PARSED_LOG_PATH)
-				os.rename(tmp, PARSED_LOG_PATH)
-			end)
-		end)
-	end
-
-	local function build_summary(aircraft, unitID, pos, raw)
-		local summary = {}
-		-- include version info so we always know which script + Lua version produced the JSON
-		summary.streamer_version = STREAMER_VERSION
-		summary.lua_version = LUA_VERSION
-		summary.timestamp = os.date('!%Y-%m-%dT%H:%M:%SZ') -- UTC ISO-like
-		summary.aircraft = tostring(aircraft or 'UNKNOWN')
-		summary.unitID = unitID or 'N/A'
-		-- position: prefer provided `pos`, but fall back to nested PositionAsMatrix if available
-		if type(pos) == 'table' then
-			summary.pos = { x = pos.x or (pos.p and pos.p.x) or nil, y = pos.y or (pos.p and pos.p.y) or nil, z = pos.z or (pos.p and pos.p.z) or nil }
-		else
-			local pam = find_in_table(raw, {'PositionAsMatrix','positionAsMatrix'})
-			if type(pam) == 'table' and pam.p then
-				summary.pos = { x = pam.p.x, y = pam.p.y, z = pam.p.z }
-			end
-		end
-		-- common fields to try to extract
-		summary.heading = find_in_table(raw, {'Heading','heading'}) or (summary.pos and summary.pos.heading)
-		summary.alt = find_in_table(raw, {'Alt','alt','Altitude','AltMsl'}) or (summary.pos and summary.pos.y)
-
-		-- Lat/Long/Alt that sometimes exist as a nested table
-		local lla = find_in_table(raw, {'LatLongAlt','latlongalt','LatLong','latlong'})
-		if type(lla) == 'table' then
-			summary.lat = lla.Lat or lla.lat
-			summary.long = lla.Long or lla.long
-			summary.alt_from_lla = lla.Alt or lla.alt
-		end
-
-		-- additional useful fields
-		summary.unitName = find_in_table(raw, {'UnitName','unitName','Unit','name'})
-		summary.group = find_in_table(raw, {'GroupName','groupName','Group','group'})
-		summary.country = find_in_table(raw, {'Country','country','CountryID','countryID'})
-		summary.coalition = find_in_table(raw, {'Coalition','coalition','CoalitionID','coalitionID'})
-		summary.pitch = find_in_table(raw, {'Pitch','pitch'})
-		summary.bank = find_in_table(raw, {'Bank','bank'})
-		-- Extract only selected status flags (do not include the whole flags object)
-		local flags_tbl = find_in_table(raw, {'Flags','flags'})
-		if type(flags_tbl) == 'table' then
-			summary.isHuman = flags_tbl.Human
-			summary.radarActive = flags_tbl.RadarActive
-			summary.aiOn = flags_tbl.AI_ON
-			summary.born = flags_tbl.Born
-			summary.invisible = flags_tbl.Invisible
-			summary.jamming = flags_tbl.Jamming
-			summary.irJamming = flags_tbl.IRJamming
-		end
-
-		-- small helpers to be defensive: don't let one bad field break everything
-		local function to_number(v)
-			if type(v) == 'number' then return v end
-			if type(v) == 'string' then return tonumber(v) end
-			return nil
-		end
-
-		-- fuel: may be a number or a table with details; keep errors localized
-		pcall(function()
-			local fuel = find_in_table(raw, {'Fuel','fuel','FuelTotal','fuel_total','FuelLeft','fuelLeft','FuelIndicator'})
-			if type(fuel) == 'number' then
-				summary.fuel = fuel
-			elseif type(fuel) == 'table' then
-				summary.fuel = {}
-				local ft = to_number(fuel.Total) or to_number(fuel.total) or to_number(fuel.totalFuel) or to_number(fuel.TotalFuel)
-				if ft then summary.fuel.total = ft end
-				local fi = to_number(fuel.Internal) or to_number(fuel.internal) or to_number(fuel.Inboard) or to_number(fuel.inboard)
-				if fi then summary.fuel.internal = fi end
-				for k,v in pairs(fuel) do
-					local n = to_number(v)
-					if n then summary.fuel[k] = n end
-				end
-			end
-		end)
-
-		-- speed: could be a scalar or vector; compute magnitude only from numeric components
-		pcall(function()
-			local sp = find_in_table(raw, {'Speed','speed','IAS','ias','Velocity','velocity','speedKMH','speedKTS','GroundSpeed','groundSpeed'})
-			if type(sp) == 'number' then
-				summary.speed = sp
-			elseif type(sp) == 'table' then
-				local sx = to_number(sp.x) or to_number(sp[1])
-				local sy = to_number(sp.y) or to_number(sp[2])
-				local sz = to_number(sp.z) or to_number(sp[3])
-				if sx or sy or sz then
-					summary.speed = {}
-					summary.speed.x = sx
-					summary.speed.y = sy
-					summary.speed.z = sz
-					local sum = 0 local count = 0
-					if sx then sum = sum + sx*sx; count = count + 1 end
-					if sy then sum = sum + sy*sy; count = count + 1 end
-					if sz then sum = sum + sz*sz; count = count + 1 end
-					if count > 0 then summary.speed_m_s = math.sqrt(sum) end
-				end
-			end
-		end)
-		-- radios
-		summary.com1 = find_in_table(raw, {'COM1','com1','com1Freq','COM1_Freq','com1f'})
-		summary.com2 = find_in_table(raw, {'COM2','com2','com2Freq','COM2_Freq','com2f'})
-		summary.nav1 = find_in_table(raw, {'NAV1','nav1','nav1Freq'})
-		-- DME / navaid / nearest airfield attempts
-		summary.dme = find_in_table(raw, {'DME','dme','dme_station','DME_station','Dme'})
-		summary.nearest_airfield = find_in_table(raw, {'NearestAirfield','NearestAirport','nearestAirport','airportName','Airfield','airfield'})
-		return summary
-	end
-
-	local function debug_dump(tbl, aircraft, unitID, pos, maxDepth)
-		if not DEBUG_DUMP_TABLES then return end
+	local function debug_dump_once(tbl)
+		if not DEBUG_DUMP_TABLES or type(tbl) ~= 'table' then return end
+		local id = tostring(tbl)
+		if dumped_tables[id] then return end
+		dumped_tables[id] = true
 		pcall(function()
 			local f = io.open(DEBUG_LOG_PATH, 'a')
 			if not f then return end
-			local id = tostring(tbl)
 			f:write('--- ' .. os.date('%Y-%m-%d %H:%M:%S') .. ' DUMP ' .. id .. '\n')
-			if type(tbl) == 'table' then
-				f:write(serialize_table(tbl, 0, maxDepth or 6, {}))
-			else
-				f:write('Value: ' .. tostring(tbl) .. '\n')
-			end
-			local summary = build_summary(aircraft, unitID, pos, tbl)
-			f:write(string.format('Summary: Aircraft: %s - UnitID: %s - Pos: %s - Streamer: %s - Lua: %s\n\n', tostring(summary.aircraft or 'N/A'), tostring(summary.unitID or 'N/A'), format_pos(pos), tostring(summary.streamer_version or STREAMER_VERSION), tostring(summary.lua_version or LUA_VERSION)))
+			f:write(serialize_table(tbl, 0, 4, {}))
+			f:write('\n')
 			f:close()
-			-- write concise parseable JSON line
-			write_parsed(summary)
 		end)
 	end
 
 	function LuaExportStart()
 		lastWrite = 0
-		-- Optionally clear old data files on start
-		if CLEAR_ON_START then
-			pcall(function()
-				if WRITE_PARSED then
-					local f = io.open(PARSED_LOG_PATH, 'w')
-					if f then f:close() end
-				end
-				if WRITE_LOG then
-					local lf = io.open(LOG_PATH, 'w')
-					if lf then lf:close() end
-				else
-					-- if logs disabled, remove any existing file to avoid lingering files
-					pcall(function() os.remove(LOG_PATH) end)
-				end
-				if DEBUG_DUMP_TABLES or DEBUG_IS_MAIN then
-					local df = io.open(DEBUG_LOG_PATH, 'w')
-					if df then df:close() end
-				end
-				-- UDP streaming removed; no network initialization
-			end)
-		end
-		-- write a startup marker including streamer + Lua versions so the first JSON shows what code ran
-		if WRITE_PARSED then
-			pcall(function()
-				write_parsed({ timestamp = os.date('!%Y-%m-%dT%H:%M:%SZ'), streamer_version = STREAMER_VERSION, lua_version = LUA_VERSION, event = 'start' })
-			end)
-		end
-		local a, id, p, raw = detect_all()
-		if DEBUG_IS_MAIN then
-			debug_dump(raw, a, id, p)
-		else
-			write_log(a, id, p)
-			if type(raw) == 'table' then debug_dump(raw, a, id, p, 4) end
+		local telemetry = collect_telemetry()
+		write_json(telemetry)
+		if DEBUG_DUMP_TABLES then
+			debug_dump_once(telemetry)
 		end
 	end
 
 	function LuaExportAfterNextFrame()
-		local now = os.time()
+		local now = LoGetModelTime()
+		if not now then now = os.clock() end
 		if now - lastWrite >= UPDATE_INTERVAL then
-			local a, id, p, raw = detect_all()
-			if DEBUG_IS_MAIN then
-				debug_dump(raw, a, id, p)
-			else
-				write_log(a, id, p)
-				if type(raw) == 'table' then debug_dump(raw, a, id, p, 4) end
-			end
+			local telemetry = collect_telemetry()
+			write_json(telemetry)
 			lastWrite = now
 		end
 	end
 
 	function LuaExportStop()
-		local a, id, p, raw = detect_all()
-		if DEBUG_IS_MAIN then
-			debug_dump(raw, a, id, p)
-		else
-			write_log(a, id, p)
-			if type(raw) == 'table' then debug_dump(raw, a, id, p, 4) end
-		end
+		local telemetry = collect_telemetry()
+		write_json(telemetry)
 	end
 end, nil)

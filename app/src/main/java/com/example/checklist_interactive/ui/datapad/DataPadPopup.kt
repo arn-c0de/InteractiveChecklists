@@ -3,11 +3,21 @@ package com.example.checklist_interactive.ui.datapad
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -16,6 +26,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import android.content.Context
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.WindowInsetsCompat
@@ -60,14 +72,32 @@ fun DataPadPopup(
         }
     }
 
+    val context = LocalContext.current
+
+    // Persistable sheet fraction and pinned state (like QuickAccessSheet)
+    val prefs = context.getSharedPreferences("datapad_prefs", Context.MODE_PRIVATE)
+    val KEY_SHEET_FRACTION = "datapad_sheet_fraction"
+    val savedFraction = prefs.getFloat(KEY_SHEET_FRACTION, 0.6f)
+    val sheetMin = 0.2f
+    val sheetMax = 0.95f
+    var sheetFraction by rememberSaveable { mutableStateOf(savedFraction.coerceIn(sheetMin, sheetMax)) }
+
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val configuration = LocalConfiguration.current
-    val sheetFraction = 0.6f
     val sheetHeightDp = (configuration.screenHeightDp.toFloat() * sheetFraction).dp
     val dialogView = LocalView.current
 
+    // Attempt to hide system UI immediately before first draw to avoid a visible flash
+    DisposableEffect(dialogView) {
+        val window = (dialogView.context as? android.app.Activity)?.window
+        val controller = window?.let { WindowCompat.getInsetsController(it, dialogView) }
+        controller?.hide(WindowInsetsCompat.Type.systemBars())
+        try { controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE } catch (_: Throwable) {}
+        onDispose { /* keep hidden while sheet logic manages visibility */ }
+    }
+
     // Keep immersive fullscreen while sheet is visible
-    LaunchedEffect(sheetState.isVisible) {
+    LaunchedEffect(sheetState.currentValue) {
         if (sheetState.isVisible) {
             val window = (dialogView.context as? android.app.Activity)?.window
             val controller = window?.let { WindowCompat.getInsetsController(it, dialogView) }
@@ -84,11 +114,40 @@ fun DataPadPopup(
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface
     ) {
+        // Box with draggable top handle to resize sheet height
+        val density = LocalDensity.current
+
         Box(modifier = Modifier
             .fillMaxWidth()
             .height(sheetHeightDp)
             .padding(horizontal = 16.dp)
         ) {
+            // Drag handle at top (drag vertically to resize)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(28.dp)
+                    .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDrag = { change: PointerInputChange, dragAmount: Offset ->
+                                val screenPx = with(density) { configuration.screenHeightDp.dp.toPx() }
+                                val fracDelta = dragAmount.y / screenPx
+                                sheetFraction = (sheetFraction - fracDelta).coerceIn(sheetMin, sheetMax)
+                            },
+                            onDragEnd = {
+                                prefs.edit().putFloat(KEY_SHEET_FRACTION, sheetFraction).apply()
+                            }
+                        )
+                    }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(top = 6.dp)
+                        .size(width = 64.dp, height = 6.dp)
+                        .background(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f), shape = MaterialTheme.shapes.small)
+                )
+            }
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -105,9 +164,6 @@ fun DataPadPopup(
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold
                     )
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
-                    }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -157,7 +213,7 @@ private fun ConnectionStatusCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
+                .padding(8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -167,30 +223,31 @@ private fun ConnectionStatusCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(12.dp)
+                            .size(8.dp)
                             .background(
                                 color = if (isConnected) Color.Green else Color.Gray,
                                 shape = MaterialTheme.shapes.small
                             )
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = if (isConnected) "Connected" else "Waiting for data",
                         color = Color.White,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp
                     )
                 }
                 Text(
                     text = timeSinceUpdate,
                     color = Color.White.copy(alpha = 0.8f),
-                    fontSize = 12.sp
+                    fontSize = 11.sp
                 )
             }
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = "Listening on: $deviceIpAddress:5010",
                 color = Color.White.copy(alpha = 0.9f),
-                fontSize = 11.sp,
+                fontSize = 10.sp,
                 fontWeight = FontWeight.Medium
             )
         }
@@ -257,15 +314,68 @@ private fun FlightDataDisplay(data: FlightData) {
             DataRow("Group", data.group)
         }
 
-        // Flight Parameters
-        DataSection(title = "Flight Parameters") {
-            DataRow("Altitude", "${String.format("%.1f", data.altitude)} m")
-            DataRow("Heading", "${String.format("%.1f", Math.toDegrees(data.heading))}°")
-            DataRow("Pitch", "${String.format("%.2f", Math.toDegrees(data.pitch))}°")
-            DataRow("Bank", "${String.format("%.2f", Math.toDegrees(data.bank))}°")
+        // Environment (moved)
+        data.environment?.let { env ->
+            DataSection(title = "Environment") {
+                env.windSpeed?.let { DataRow("Wind Speed", String.format("%.1f", it) + " m/s (${String.format("%.1f", mpsToKts(it))} kt)") }
+                env.windDirection?.let { DataRow("Wind Direction", String.format("%.1f", it) + "°") }
+            }
         }
 
-        // Position
+        // Flight Parameters & Performance (side-by-side)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(modifier = Modifier.weight(1f)) {
+                DataSection(title = "Flight Parameters") {
+                    DataRow("Altitude", "${String.format("%.1f", data.altitude)} m")
+                    DataRow("Heading", "${String.format("%.1f", Math.toDegrees(data.heading))}°")
+                    DataRow("Pitch", "${String.format("%.2f", Math.toDegrees(data.pitch))}°")
+                    DataRow("Bank", "${String.format("%.2f", Math.toDegrees(data.bank))}°")
+                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                DataSection(title = "Performance") {
+                    data.indicatedAirspeed?.let { DataRow("Indicated Airspeed", formatSpeedWithKnots(it)) }
+                    data.trueAirspeed?.let { DataRow("True Airspeed", formatSpeedWithKnots(it)) }
+                    data.verticalSpeed?.let { DataRow("Vertical Speed", "${String.format("%.2f", it)} m/s (${String.format("%.0f", mpsToFpm(it))} ft/min)") }
+                    data.mach?.let { DataRow("Mach", String.format("%.3f", it)) }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Weapons & Countermeasures & Systems Status (side-by-side)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(modifier = Modifier.weight(1f)) {
+                DataSection(title = "Weapons & Countermeasures") {
+                    data.weapons?.let { w ->
+                        DataRow("Master Arm", if (w.masterArm) "ARMED" else "SAFE")
+                        DataRow("Stations", (w.stations?.size ?: 0).toString())
+                        w.stations?.forEach { s ->
+                            DataRow("Station ${s.station}", "Type ${s.type} • Count ${s.count}")
+                        }
+                        DataRow("Total Count", (w.totalCount ?: 0).toString())
+                    } ?: DataRow("Weapons", "None")
+                    data.countermeasures?.let { c ->
+                        DataRow("Flares", c.flareCount.toString())
+                        DataRow("Chaff", c.chaffCount.toString())
+                    } ?: DataRow("Countermeasures", "N/A")
+                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                DataSection(title = "Systems Status") {
+                    StatusRow("Radar Active", data.radarActive)
+                    StatusRow("Jamming", data.jamming)
+                    StatusRow("IR Jamming", data.irJamming)
+                    StatusRow("AI On", data.aiOn)
+                    StatusRow("Human", data.isHuman)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Position (full width)
         DataSection(title = "Position") {
             DataRow("Latitude", String.format("%.6f", data.latitude))
             DataRow("Longitude", String.format("%.6f", data.longitude))
@@ -276,14 +386,6 @@ private fun FlightDataDisplay(data: FlightData) {
             }
         }
 
-        // Systems Status
-        DataSection(title = "Systems Status") {
-            StatusRow("Radar Active", data.radarActive)
-            StatusRow("Jamming", data.jamming)
-            StatusRow("IR Jamming", data.irJamming)
-            StatusRow("AI On", data.aiOn)
-            StatusRow("Human", data.isHuman)
-        }
 
         // Additional Info
         DataSection(title = "Additional Info") {
@@ -297,8 +399,15 @@ private fun FlightDataDisplay(data: FlightData) {
 @Composable
 private fun DataSection(
     title: String,
+    initialExpanded: Boolean = true,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val context = LocalContext.current
+    val prefs = context.getSharedPreferences("datapad_prefs", Context.MODE_PRIVATE)
+    val key = "section_expanded_${title.replace(" ", "_").lowercase()}"
+
+    var expanded by rememberSaveable { mutableStateOf(prefs.getBoolean(key, initialExpanded)) }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -310,14 +419,36 @@ private fun DataSection(
                 .fillMaxWidth()
                 .padding(12.dp)
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-            content()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                IconButton(onClick = {
+                    expanded = !expanded
+                    prefs.edit().putBoolean(key, expanded).apply()
+                }) {
+                    Icon(
+                        imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                        contentDescription = if (expanded) "Collapse" else "Expand",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            AnimatedVisibility(visible = expanded, enter = fadeIn(), exit = fadeOut()) {
+                Column {
+                    content()
+                }
+            }
         }
     }
 }
@@ -377,3 +508,11 @@ private fun StatusRow(label: String, active: Boolean) {
         }
     }
 }
+
+// --- Unit conversion helpers ---
+private fun mpsToKts(mps: Double): Double = mps * 1.9438444924406
+
+private fun mpsToFpm(mps: Double): Double = mps * 196.850393701
+
+private fun formatSpeedWithKnots(value: Double): String =
+    "${String.format("%.1f", value)} m/s (${String.format("%.1f", mpsToKts(value))} kt)"
