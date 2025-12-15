@@ -84,7 +84,19 @@ fun SettingsScreen(
     
     var showSourcesJsonDialog by remember { mutableStateOf(false) }
     var sourcesJsonContent by remember { mutableStateOf("") }
-    val sources = remember { androidx.compose.runtime.mutableStateListOf<SourceEntry>().apply { addAll(prefsManager.getDocumentSources()) } }
+    var sources by remember { mutableStateOf(listOf<SourceEntry>()) }
+    LaunchedEffect(Unit) {
+        try {
+            val assetManager = context.assets
+            val jsonStr = assetManager.open("document_sources.json").bufferedReader().use { it.readText() }
+            sources = Json.decodeFromString(
+                kotlinx.serialization.builtins.ListSerializer(SourceEntry.serializer()),
+                jsonStr
+            )
+        } catch (e: Exception) {
+            sources = emptyList()
+        }
+    }
 
     // Contributors
     var showContributorsJsonDialog by remember { mutableStateOf(false) }
@@ -356,22 +368,6 @@ fun SettingsScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Spacer(modifier = Modifier.height(12.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    Button(onClick = {
-                                        try {
-                                            val jsonString = json.encodeToString(
-                                                kotlinx.serialization.builtins.ListSerializer(SourceEntry.serializer()),
-                                                sources
-                                            )
-                                            sourcesJsonContent = jsonString
-                                        } catch (e: Exception) {
-                                            sourcesJsonContent = "Error encoding sources: ${'$'}{e.message}"
-                                        }
-                                        showSourcesJsonDialog = true
-                                    }) {
-                                        Text("View sources JSON")
-                                    }
-                                }
                                 Spacer(modifier = Modifier.height(12.dp))
                                 Column {
                                     sources.forEachIndexed { idx, entry ->
