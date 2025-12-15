@@ -91,7 +91,8 @@ class MainActivity : ComponentActivity() {
         if (globalTabManager.openTabs.value.isEmpty() && !lastFilePathSync.isNullOrEmpty()) {
             val lastFile = allFilesPre.find { it.path == lastFilePathSync }
             if (lastFile != null) {
-                globalTabManager.openTab(lastFile)
+                val idx = globalTabManager.openTab(lastFile)
+                globalTabManager.switchToTab(idx)
             }
         }
 
@@ -371,7 +372,10 @@ class MainActivity : ComponentActivity() {
                                                 val idx = tabManager.openTab(fileInfo)
                                                 tabManager.switchToTab(idx)
                                                 showFileList = false
+                                                // Ensure focus after pager transition (workaround for compose race)
                                                 scope.launch {
+                                                    kotlinx.coroutines.delay(100L)
+                                                    tabManager.switchToTab(idx)
                                                     repository.saveLastOpenedFile(fileInfo.path)
                                                 }
                                             },
@@ -383,6 +387,8 @@ class MainActivity : ComponentActivity() {
                                                     tabManager.switchToTab(idx)
                                                     showFileList = false
                                                     scope.launch {
+                                                        kotlinx.coroutines.delay(100L)
+                                                        tabManager.switchToTab(idx)
                                                         repository.saveLastOpenedFile(targetFile.path)
                                                     }
                                                 }
@@ -399,9 +405,12 @@ class MainActivity : ComponentActivity() {
                                                 val allFiles = fileManager.getAllFilesGrouped().values.flatten()
                                                 val targetFile = allFiles.find { it.path == filePath || it.path.endsWith(filePath) }
                                                 if (targetFile != null) {
-                                                    tabManager.openTab(targetFile, pageNumber ?: 0)
+                                                    val idx = tabManager.openTab(targetFile, pageNumber ?: 0)
+                                                    tabManager.switchToTab(idx)
                                                     showFileList = false
                                                     scope.launch {
+                                                        kotlinx.coroutines.delay(100L)
+                                                        tabManager.switchToTab(idx)
                                                         repository.saveLastOpenedFile(targetFile.path)
                                                     }
                                                 }
@@ -478,9 +487,12 @@ class MainActivity : ComponentActivity() {
                                             filePath.replace("asset://", "") == file.path.replace("asset://", "")
                                         }
                                         if (targetFile != null) {
-                                            tabManager.openTab(targetFile, pageNumber ?: -1)
+                                            val idx = tabManager.openTab(targetFile, pageNumber ?: -1)
+                                            tabManager.switchToTab(idx)
                                             showFileList = false
                                             scope.launch {
+                                                kotlinx.coroutines.delay(100L)
+                                                tabManager.switchToTab(idx)
                                                 repository.saveLastOpenedFile(targetFile.path)
                                             }
                                         } else {

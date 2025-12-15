@@ -100,6 +100,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import android.content.ClipboardManager
 import android.content.ClipData
 import android.content.Context
+import android.content.SharedPreferences
 import com.example.checklist_interactive.ui.quickaccess.QuickAccessSheet
 import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
 import com.example.checklist_interactive.ui.common.DraggableFab
@@ -185,6 +186,20 @@ fun PdfViewer(
     var showQuickAccess by remember { mutableStateOf(false) }
     val prefsManager = remember { PreferencesManager(context) }
     var showToolbar by remember { mutableStateOf(prefsManager.isPdfToolbarVisible()) }
+
+    // Listen to preference changes so toolbar state stays in sync across multiple open PDFs
+    DisposableEffect(prefsManager) {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == "pdf_toolbar_visible") {
+                showToolbar = prefsManager.isPdfToolbarVisible()
+            }
+        }
+        prefsManager.registerOnChangeListener(listener)
+        onDispose {
+            prefsManager.unregisterOnChangeListener(listener)
+        }
+    }
+
     // Track if outline has been extracted for this document to avoid re-extracting on every page change
     var outlineExtracted by remember(pdfPath) { mutableStateOf(false) }
     // Sharpening feature
