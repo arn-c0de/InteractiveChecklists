@@ -2,7 +2,22 @@
 
 All relevant changes are summarized here by version.
 ## [1.0.10] - 2025-12-15
+### Added
+- **DataPad (experimental):** Live UDP telemetry viewer (DataPadManager + DataPadPopup) to stream aircraft telemetry from DCS World (requires `forward_parsed_udp.py`) — Phase 1 implementation and docs. (commit: `0530b5e`, `ffc3ebd`)
+- F-14B and AH-64 base checklists added
+- Full folder import support
+- PDF sharpening tools and auto-apply improvements
+- Persist UI and tab state (pages, tabs, last position)
 
+### Changed
+- README and documentation updates (DataPad notes and roadmap)
+- Performance and parser improvements (PDF parser, caching)
+- UI/UX tweaks: improved swipe navigation, FAB behaviors, and search fixes
+
+### Fixed
+- Various bug fixes, including tab race condition, PDF page swipe issues, quicknote delete selection, and multiple small stability fixes
+
+*See commit history on branch `1.0.10` for full details.*
 
 ## [1.0.9] - 2025-12-14
 ### Added
