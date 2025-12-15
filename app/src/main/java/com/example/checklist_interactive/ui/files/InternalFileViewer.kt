@@ -25,9 +25,11 @@ import com.example.checklist_interactive.data.files.FileInfo
 import com.example.checklist_interactive.ui.checklist.MarkdownViewer
 import com.example.checklist_interactive.ui.checklist.PdfViewer
 import com.example.checklist_interactive.ui.quickaccess.QuickAccessSheet
+import com.example.checklist_interactive.ui.datapad.DataPadPopup
 import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
 
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Flight
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.checklist_interactive.data.checklist.ChecklistRepository
 import com.example.checklist_interactive.data.prefs.PreferencesManager
@@ -165,6 +167,7 @@ fun InternalFileViewer(
             // State for Expand/Collapse All
             var expandAllSections by remember { mutableStateOf(prefsManager.areMarkdownSectionsExpandedByDefault()) }
             var showQuickAccess by remember { mutableStateOf(false) }
+            var showDataPad by remember { mutableStateOf(false) }
             var resetTrigger by remember { mutableStateOf(0) }
 
             Scaffold(
@@ -234,13 +237,16 @@ fun InternalFileViewer(
                     val configuration = LocalConfiguration.current
                     val screenWidthPx = with(LocalDensity.current) { configuration.screenWidthDp.dp.roundToPx() }
                     val screenHeightPx = with(LocalDensity.current) { configuration.screenHeightDp.dp.roundToPx() }
+                    val topPadPx = with(LocalDensity.current) { padding.calculateTopPadding().roundToPx() }
+                    val bottomPadPx = with(LocalDensity.current) { padding.calculateBottomPadding().roundToPx() }
+                    val effectiveScreenHeightPx = (screenHeightPx - topPadPx - bottomPadPx).coerceAtLeast(1)
                     val fabSizePx = with(LocalDensity.current) { 56.dp.roundToPx() }
 
                     DraggableFab(
                         name = "menu",
                         prefsManager = prefsManager,
                         screenWidthPx = screenWidthPx,
-                        screenHeightPx = screenHeightPx,
+                        screenHeightPx = effectiveScreenHeightPx,
                         fabSizePx = fabSizePx,
                         defaultX = 1.0f,
                         defaultY = 0.8f,
@@ -253,14 +259,37 @@ fun InternalFileViewer(
                         name = "quick_access",
                         prefsManager = prefsManager,
                         screenWidthPx = screenWidthPx,
-                        screenHeightPx = screenHeightPx,
+                        screenHeightPx = effectiveScreenHeightPx,
                         fabSizePx = fabSizePx,
-                        defaultX = 1.0f,
+                        defaultX = 0.9f,
                         defaultY = 0.9f,
                         visible = true,
                         onClick = { showQuickAccess = true },
                         content = { Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Quick access") }
                     )
+
+                    // DataPad FAB for internal markdown viewer
+                    val datapadPos = prefsManager.getPdfViewerFabPosition("datapad", 0.75f, 0.9f)
+                    android.util.Log.d("InternalFileViewer", "datapad saved pos: x=${datapadPos.first}, y=${datapadPos.second}")
+                    DraggableFab(
+                        name = "datapad",
+                        prefsManager = prefsManager,
+                        screenWidthPx = screenWidthPx,
+                        screenHeightPx = effectiveScreenHeightPx,
+                        fabSizePx = fabSizePx,
+                        defaultX = 0.75f,
+                        defaultY = 0.9f,
+                        visible = true,
+                        onClick = {
+                            android.util.Log.d("InternalFileViewer", "DataPad FAB clicked")
+                            showDataPad = true
+                        },
+                        content = { Icon(Icons.Default.Flight, contentDescription = "DataPad") }
+                    )
+                }
+
+                if (showDataPad) {
+                    DataPadPopup(onDismiss = { showDataPad = false })
                 }
             }
 

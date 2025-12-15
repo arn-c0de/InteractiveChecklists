@@ -6,8 +6,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Intent
 import androidx.documentfile.provider.DocumentFile
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
@@ -47,7 +49,10 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.automirrored.filled.NoteAdd
 import androidx.compose.material.icons.filled.ViewModule
 import androidx.compose.material.icons.automirrored.filled.ViewList
+import androidx.compose.material.icons.filled.Flight
 import kotlinx.coroutines.Dispatchers
+import com.example.checklist_interactive.ui.datapad.LocalDataPadManager
+import com.example.checklist_interactive.ui.datapad.DataPadPopup
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -152,6 +157,7 @@ fun InternalFilesScreen(
 
     // Quick Access state
     var showQuickAccess by remember { mutableStateOf(false) }
+    var showDataPad by remember { mutableStateOf(false) }
     // Search state
     var showSearchDialog by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -634,6 +640,28 @@ fun InternalFilesScreen(
             val fabSizePx = with(LocalDensity.current) { 56.dp.roundToPx() }
 
             DraggableFab(
+                name = "datapad",
+                prefsManager = prefsManager,
+                screenWidthPx = screenWidthPx,
+                screenHeightPx = screenHeightPx,
+                fabSizePx = fabSizePx,
+                // Slightly left of quick_access and aligned vertically
+                defaultX = 0.92f,
+                defaultY = 0.9f,
+                visible = true,
+                onClick = { showDataPad = true },
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                content = {
+                    Icon(
+                        Icons.Default.Flight,
+                        contentDescription = "DataPad",
+                        tint = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                }
+            )
+
+            DraggableFab(
                 name = "quick_access",
                 prefsManager = prefsManager,
                 screenWidthPx = screenWidthPx,
@@ -653,6 +681,20 @@ fun InternalFilesScreen(
                     )
                 }
             )
+
+            // Allow long-press (on the quick access area) to reset FAB positions
+            Box(modifier = Modifier
+                .offset { androidx.compose.ui.unit.IntOffset((screenWidthPx * 0.92).toInt(), (screenHeightPx * 0.88).toInt()) }
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onLongPress = {
+                            prefsManager.resetPdfViewerLayout()
+                            android.widget.Toast.makeText(context, "FAB positions restored", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                }
+            ) {}
+
 
         }
     }
@@ -879,6 +921,11 @@ fun InternalFilesScreen(
             },
             onDismiss = { showMoveDialog = false }
         )
+    }
+
+    // DataPad Popup
+    if (showDataPad) {
+        DataPadPopup(onDismiss = { showDataPad = false })
     }
 
     // Quick Access Bottom Sheet - central notes without document context

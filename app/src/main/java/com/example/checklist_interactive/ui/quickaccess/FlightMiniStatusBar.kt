@@ -31,6 +31,8 @@ fun FlightMiniStatusBar(noteManager: QuickNoteManager, onClick: (() -> Unit)? = 
     val com2 by noteManager.com2.collectAsState()
     val com2Mode by noteManager.com2Mode.collectAsState()
 
+
+
     val bgColor = if (useBackground) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.surfaceVariant
     val contentColor = if (useBackground) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant
 
@@ -40,8 +42,18 @@ fun FlightMiniStatusBar(noteManager: QuickNoteManager, onClick: (() -> Unit)? = 
             .fillMaxWidth()
             .height(28.dp)
             .background(bgColor)
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+
+        
+    Row(
+        modifier = Modifier
+            .weight(1f)
+            .height(28.dp)
             .then(if (onClick != null) Modifier.clickable { onClick.invoke() } else Modifier)
-            .padding(horizontal = 8.dp),
+            .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -71,4 +83,7 @@ fun FlightMiniStatusBar(noteManager: QuickNoteManager, onClick: (() -> Unit)? = 
         Text(text = timeText, style = MaterialTheme.typography.labelSmall)
     }
     }
+    }
+    
+
 }
