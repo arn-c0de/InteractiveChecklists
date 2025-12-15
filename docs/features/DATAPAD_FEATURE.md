@@ -270,6 +270,95 @@ Expected JSON format (one object per UDP datagram):
 }
 ```
 
+## Complete Field Reference
+A comprehensive list of fields the DataPad will receive from the UDP JSON stream (name · type · notes). Fields mirror the `FlightData.kt` data model.
+
+### Basic Identity
+- `aircraft` · string — aircraft type identifier
+- `unitName` · string — pilot / unit display name
+- `coalition` · string — coalition name (Blue/Enemies/etc.)
+- `country` · int — country code
+- `group` · string — group name
+
+### Flight Parameters
+- `alt` · number — altitude (meters)
+- `heading` · number — heading (radians in-stream; converted to degrees in UI)
+- `pitch` · number — pitch (radians)
+- `bank` · number — bank/roll (radians)
+- `lat` · number — latitude (decimal degrees)
+- `long` · number — longitude (decimal degrees)
+- `pos` · object { `x`, `y`, `z` } — DCS world coordinates
+
+### Speed & Vertical
+- `groundSpeed` · number? — ground speed (units variable)
+- `indicatedAirspeed` · number? — IAS
+- `trueAirspeed` · number? — TAS
+- `verticalSpeed` · number? — vertical speed (m/s)
+- `mach` · number? — Mach number
+
+### Fuel
+- `fuel` · object? — fuel details
+  - `total` · number — total capacity
+  - `remaining` · number — remaining fuel
+  - `internal` · number? — internal fuel
+  - `external` · number? — external fuel
+  - `endurance` · number? — minutes remaining
+  - `fuelFlow` · number? — consumption rate
+
+### Navigation & Waypoints
+- `waypoint` · object? — current waypoint info
+  - `current` · string? — waypoint name
+  - `distance` · number? — distance to WP
+  - `bearing` · number? — bearing to WP (degrees)
+  - `eta` · string? — ISO timestamp or textual ETA
+  - `etaSeconds` · number? — ETA in seconds
+- `flightPlan` · object? — flight plan info
+  - `currentIndex` · int? — current WP index
+  - `totalWaypoints` · int? — total WPs
+  - `route` · string? — route name
+
+### Weapons & Stores
+- `weapons` · object? — weapons summary
+  - `masterArm` · bool — master arm state
+  - `selected` · string? — selected weapon
+  - `stations` · list? — station entries { `station`, `type`, `count` }
+  - `totalCount` · int? — total munitions
+
+### EW / RWR / Threats
+- `rwr` · object? — RWR/contacts
+  - `contacts` · list? — each contact: { `id`, `type`, `bearing`, `priority`, `locked` }
+  - `threatsDetected` · int — total detected threats
+- `radar` · object? — radar mode/status { `mode`, `range`, `locked`, `trackCount` }
+- `countermeasures` · object? — { `chaffCount`, `flareCount`, `dispenserMode` }
+
+### Avionics & Systems
+- `autopilot` · object? — { `enabled`, `mode`, `flightDirector` }
+- `transponder` · object? — { `code`, `mode`, `ident` }
+- `radios` · object? — { `com1`, `com2`, `guard`, `activeFreq` }
+- `warnings` · object? — { `masterCaution`, `masterWarning`, `faults`, `alerts` }
+
+### Environment
+- `environment` · object? — { `windDirection`, `windSpeed`, `temperature`, `pressure`, `visibility`, `clouds` }
+
+### Existing Status Flags
+- `isHuman` · bool — player-controlled
+- `born` · bool — unit born/active flag
+- `aiOn` · bool — AI control
+- `radarActive` · bool — radar active
+- `jamming` · bool — EW jamming
+- `irJamming` · bool — IR jamming
+- `invisible` · bool — map/world visibility flag
+
+### Metadata
+- `timestamp` · string — ISO timestamp for the sample
+- `unitID` · string — unique unit identifier
+- `lua_version` · string — exporter Lua version
+- `streamer_version` · string — streamer/exporter version
+- `dataAge` · number? — latency / age (seconds)
+- `updateRate` · number? — reported update rate (Hz)
+
+> Notes: Optional fields are suffixed with `?` above and may be absent depending on the exporter script or aircraft. Units can vary depending on DCS/exporter settings (e.g., wind speed m/s vs knots); the UI applies reasonable formatting/conversions.
+
 ## Technical Details
 
 ### Threading

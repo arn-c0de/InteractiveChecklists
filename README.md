@@ -13,7 +13,7 @@
 <div align="center">
 	<a href="CHANGELOG.md">Changelog</a> |
 	<a href="docs/docnavigation.md">Documentation</a> |
-	<a href="docs/roadmap.md">Roadmap</a> |
+	<a href="docs/planning/roadmap.md">Roadmap</a> |
 	<a href="SECURITY.md">Security Policy</a> |
 	<a href="LICENSE">License</a> |
 	<a href="COLLABORATORS.md">Collaborators</a>
@@ -57,7 +57,7 @@ InteractiveChecklists is an Android application for viewing and interacting with
 - **Tagging System:** Assign tags to files for filtering and organization.
 - **QuickNotes:** Persistent notes powered by Room, with search, autosave, and markdown support.
 - **Data Persistence:** Stores user preferences, annotations, shortcuts, tags, and open tabs locally.
-- **DataPad (experimental):** Live flight telemetry display (UDP) for DCS World. Streams aircraft telemetry to the app for realtime status and popup details — see `docs/DATAPAD_FEATURE.md` for full details and setup instructions.
+- **DataPad (experimental):** Live flight telemetry display (UDP) for DCS World. Streams aircraft telemetry to the app for realtime status and popup details — see `docs/features/DATAPAD_FEATURE.md` for full details and setup instructions.
 
 ## Experimental: DataPad (Live Flight Telemetry)
 
@@ -66,10 +66,10 @@ DataPad is an experimental feature that receives real-time aircraft telemetry fr
 Key points:
 
 - Default UDP port: **5010** (configurable in the app)
-- Run the forwarder script and point it to your device IP and port (see `docs/DATAPAD_FEATURE.md`)
+- Run the forwarder script and point it to your device IP and port (see `docs/features/DATAPAD_FEATURE.md`)
 - Ensure your firewall allows UDP traffic on the chosen port
 
-See `docs/DATAPAD_FEATURE.md` for full usage, configuration, and troubleshooting.
+See `docs/features/DATAPAD_FEATURE.md` for full usage, configuration, and troubleshooting.
 
 **Phase 1 (experimental)**: This release represents Phase 1 of DataPad. Future phases will expand telemetry coverage and add visual and security improvements, including live animated aircraft visualizations based on flight attitude, a dedicated DataPad UI redesign, and a planned migration to encrypted transport (TCP or UDP with AES encryption).
 
@@ -80,7 +80,7 @@ Planned enhancements:
 - Dedicated DataPad UI/UX design and controls
 - Transition to encrypted transport (TCP or UDP) with AES-based encryption for secure telemetry streams
 
-See `docs/DATAPAD_FEATURE.md` for full usage, configuration, and troubleshooting.
+See `docs/features/DATAPAD_FEATURE.md` for full usage, configuration, and troubleshooting.
 
 ## Screenshots
 
