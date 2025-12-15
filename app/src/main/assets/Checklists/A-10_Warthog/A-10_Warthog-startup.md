@@ -54,3 +54,59 @@
 - [ ] **Right engine instruments & Hyd Pressure** - Check
 - [ ] **AC generators** - Check
 - [ ] **Instrument inverter** - Check
+
+## After Engine Start
+
+- [ ] **APU generator switch** - OFF
+- [ ] **APU switch** - OFF
+- [ ] **Fuel quantity** - Recheck
+- [ ] **Hydraulic pressure** - Check (both systems, 2,800-3,350 psi)
+- [ ] **Engine instruments** - Check normal operating parameters
+- [ ] **Caution/Advisory panels** - Check clear
+
+## Avionics Setup
+
+- [ ] **MFCD (L/R)** - ON
+- [ ] **IFFCC switch** - ON
+- [ ] **Master Mode** - Set as required (NAV/AG/AA)
+- [ ] **AAP: CDU alignment** - Monitor/verify completion
+- [ ] **Navigation system** - Check aligned
+- [ ] **ESIS** - Check operational
+- [ ] **NMSP** - Set as required
+- [ ] **Altimeter** - Set (baro pressure)
+- [ ] **Standby attitude indicator** - Uncage and check
+
+## Communication Setup
+
+- [ ] **UHF radio** - Set frequencies, check operation
+- [ ] **VHF/AM radio** - Set frequencies, check operation
+- [ ] **VHF/FM radio** - Set frequencies, check operation
+- [ ] **IFF Mode 4** - Set as required
+- [ ] **IFF Mode 3/C** - Set code
+- [ ] **JTRS** - ON (if applicable)
+- [ ] **KY-58** - Set as required
+
+## Weapon Systems
+
+- [ ] **TGP** - Set as required
+- [ ] **DSMS** - Check stations, load data
+- [ ] **Maverick alignment** - Check (if loaded)
+- [ ] **Gun rounds** - Check quantity
+- [ ] **Master ARM switch** - Remain SAFE until takeoff
+- [ ] **Laser ARM switch** - SAFE
+- [ ] **Gun/PAC switch** - SAFE
+
+## Final Checks Before Taxi
+
+- [ ] **Flight controls** - Full and free movement, check
+- [ ] **Trim** - Check centered or set as required
+- [ ] **Flaps** - Set as required (typically MVR for taxi)
+- [ ] **Speed brake** - Check retracted
+- [ ] **Emergency brake handle** - Stowed
+- [ ] **Canopy** - Closed and locked
+- [ ] **Ejection seat** - Armed (when ready)
+- [ ] **Harness** - Locked
+- [ ] **Oxygen** - Flowing, check mask
+- [ ] **Circuit breakers** - Final check, all in
+- [ ] **Exterior lights** - Set as required for taxi
+- [ ] **Parking brake** - Release when ready to taxi
