@@ -13,6 +13,19 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToUp
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.geometry.Offset
+import kotlin.math.abs
+import androidx.compose.foundation.layout.offset
 import com.example.checklist_interactive.data.checklist.Checklist
 import com.example.checklist_interactive.data.checklist.ChecklistRepository
 import com.example.checklist_interactive.data.checklist.MarkdownChecklistParser
@@ -26,6 +39,7 @@ import com.example.checklist_interactive.data.prefs.PreferencesManager
 import androidx.compose.ui.platform.LocalContext
 import com.example.checklist_interactive.ui.quickaccess.QuickAccessSheet
 import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
+import com.example.checklist_interactive.ui.common.DraggableFab
 import androidx.compose.material.icons.filled.Link
 
 /**
@@ -156,48 +170,60 @@ fun MarkdownViewerScreen(
                 modifier = Modifier.height(48.dp)
             )
         },
-        floatingActionButton = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalAlignment = androidx.compose.ui.Alignment.End
-            ) {
-                // Menu FAB - only if onShowFileList is set (placed above Quick Access so Quick Access is bottom-most)
-                if (onShowFileList != null) {
-                    FloatingActionButton(
-                        onClick = onShowFileList,
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    ) {
-                        Icon(Icons.Default.Menu, contentDescription = "File list")
-                    }
-                }
-
-                // Quick Access FAB - always anchored to bottom-right (place last so it's closest to the screen edge)
-                FloatingActionButton(
-                    onClick = { showQuickAccess = true },
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Quick access")
-                }
-            }
-        }
+        floatingActionButton = { /* moved to overlay */ }
     ) { paddingValues ->
-        // Use previously prepared context/prefs/viewmodel
-        val checkedStateForViewer = checklistState
-        val handler: ((itemId: String, checked: Boolean) -> Unit)? = viewModel?.let { vm ->
-            { itemId: String, checked: Boolean -> vm.onCheckboxChange(itemId, checked) }
-        } ?: onCheckboxChange
+        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+            // Use previously prepared context/prefs/viewmodel
+            val checkedStateForViewer = checklistState
+            val handler: ((itemId: String, checked: Boolean) -> Unit)? = viewModel?.let { vm ->
+                { itemId: String, checked: Boolean -> vm.onCheckboxChange(itemId, checked) }
+            } ?: onCheckboxChange
 
-        MarkdownViewer(
-            assetPath = assetPath,
-            checklist = checkedStateForViewer,
-            onCheckboxChange = handler,
-            modifier = Modifier.padding(paddingValues),
-            prefsManager = prefsManager,
-            forceExpandAll = expandAllSections,
-            markdownContentOverride = markdownContent,
-            resetTrigger = resetTrigger
-        )
+            MarkdownViewer(
+                assetPath = assetPath,
+                checklist = checkedStateForViewer,
+                onCheckboxChange = handler,
+                modifier = Modifier.fillMaxSize(),
+                prefsManager = prefsManager,
+                forceExpandAll = expandAllSections,
+                markdownContentOverride = markdownContent,
+                resetTrigger = resetTrigger
+            )
+
+            // Draggable FABs
+            val configuration = LocalConfiguration.current
+            val screenWidthPx = with(LocalDensity.current) { configuration.screenWidthDp.dp.roundToPx() }
+            val screenHeightPx = with(LocalDensity.current) { configuration.screenHeightDp.dp.roundToPx() }
+            val fabSizePx = with(LocalDensity.current) { 56.dp.roundToPx() }
+
+            if (onShowFileList != null) {
+                DraggableFab(
+                    name = "menu",
+                    prefsManager = prefsManager,
+                    screenWidthPx = screenWidthPx,
+                    screenHeightPx = screenHeightPx,
+                    fabSizePx = fabSizePx,
+                    defaultX = 1.0f,
+                    defaultY = 0.8f,
+                    visible = true,
+                    onClick = onShowFileList,
+                    content = { Icon(Icons.Default.Menu, contentDescription = "File list") }
+                )
+            }
+
+            DraggableFab(
+                name = "quick_access",
+                prefsManager = prefsManager,
+                screenWidthPx = screenWidthPx,
+                screenHeightPx = screenHeightPx,
+                fabSizePx = fabSizePx,
+                defaultX = 1.0f,
+                defaultY = 0.9f,
+                visible = true,
+                onClick = { showQuickAccess = true },
+                content = { Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Quick access") }
+            )
+        }
     }
 
     // Quick Access Bottom Sheet

@@ -12,6 +12,11 @@ import com.example.checklist_interactive.data.prefs.ContributorEntry
  */
 class PreferencesManager(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+
+    init {
+        // Migrate legacy FAB preference keys (md_*, ifv_*) to unified keys (menu, quick_access)
+        migrateFabPrefNamesIfNeeded()
+    }
     
     companion object {
         private const val PREFIX_CATEGORY_EXPANDED = "category_expanded_"
@@ -29,6 +34,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_LAST_IMPORTED_VERSION = "last_imported_version"
         private const val KEY_DOCUMENT_SOURCES_JSON = "document_sources_json"
         private const val KEY_CONTRIBUTORS_JSON = "contributors_json"
+        private const val KEY_PDF_FAB_PREFIX = "pdf_fab_"
 
         // Shared Json instance to avoid redundant creation
         private val json = Json { prettyPrint = true }
@@ -304,5 +310,80 @@ class PreferencesManager(context: Context) {
 
     fun resetContributorsToDefaults() {
         setContributors(emptyList())
+    }
+
+    // PDF viewer FAB positions: stored as percentage (0..1) of available area
+    fun setPdfViewerFabPosition(name: String, xPercent: Float, yPercent: Float) {
+        prefs.edit()
+            .putFloat("${KEY_PDF_FAB_PREFIX}${name}_x", xPercent.coerceIn(0f, 1f))
+            .putFloat("${KEY_PDF_FAB_PREFIX}${name}_y", yPercent.coerceIn(0f, 1f))
+            .apply()
+    }
+
+    fun getPdfViewerFabPosition(name: String, defaultX: Float, defaultY: Float): Pair<Float, Float> {
+        val x = prefs.getFloat("${KEY_PDF_FAB_PREFIX}${name}_x", defaultX).coerceIn(0f, 1f)
+        val y = prefs.getFloat("${KEY_PDF_FAB_PREFIX}${name}_y", defaultY).coerceIn(0f, 1f)
+        return Pair(x, y)
+    }
+
+    fun resetPdfViewerLayout() {
+        prefs.edit().apply {
+            // remove all FAB keys (pdf viewer, markdown viewer, internal file viewer)
+            remove("${KEY_PDF_FAB_PREFIX}menu_x")
+            remove("${KEY_PDF_FAB_PREFIX}menu_y")
+            remove("${KEY_PDF_FAB_PREFIX}quick_access_x")
+            remove("${KEY_PDF_FAB_PREFIX}quick_access_y")
+            remove("${KEY_PDF_FAB_PREFIX}zoom_reset_x")
+            remove("${KEY_PDF_FAB_PREFIX}zoom_reset_y")
+            // legacy keys - kept for backward compatibility
+            remove("${KEY_PDF_FAB_PREFIX}md_menu_x")
+            remove("${KEY_PDF_FAB_PREFIX}md_menu_y")
+            remove("${KEY_PDF_FAB_PREFIX}md_quick_access_x")
+            remove("${KEY_PDF_FAB_PREFIX}md_quick_access_y")
+            remove("${KEY_PDF_FAB_PREFIX}ifv_menu_x")
+            remove("${KEY_PDF_FAB_PREFIX}ifv_menu_y")
+            remove("${KEY_PDF_FAB_PREFIX}ifv_quick_access_x")
+            remove("${KEY_PDF_FAB_PREFIX}ifv_quick_access_y")
+        }.apply()
+    }
+
+    // Migration: move legacy per-view FAB prefs (md_*, ifv_*) to unified names (menu, quick_access)
+    private fun migrateFabPrefNamesIfNeeded() {
+        val mapping = mapOf(
+            "md_menu" to "menu",
+            "md_quick_access" to "quick_access",
+            "ifv_menu" to "menu",
+            "ifv_quick_access" to "quick_access"
+        )
+
+        val editor = prefs.edit()
+        var changed = false
+
+        for ((legacy, target) in mapping) {
+            val legacyXKey = "${KEY_PDF_FAB_PREFIX}${legacy}_x"
+            val legacyYKey = "${KEY_PDF_FAB_PREFIX}${legacy}_y"
+            val targetXKey = "${KEY_PDF_FAB_PREFIX}${target}_x"
+            val targetYKey = "${KEY_PDF_FAB_PREFIX}${target}_y"
+
+            // If target already has values, prefer them (no overwrite). Otherwise, migrate if legacy exists.
+            val targetHas = prefs.contains(targetXKey) || prefs.contains(targetYKey)
+            val legacyHas = prefs.contains(legacyXKey) || prefs.contains(legacyYKey)
+
+            if (!targetHas && legacyHas) {
+                val lx = prefs.getFloat(legacyXKey, -1f)
+                val ly = prefs.getFloat(legacyYKey, -1f)
+                if (lx >= 0f) {
+                    editor.putFloat(targetXKey, lx.coerceIn(0f, 1f))
+                }
+                if (ly >= 0f) {
+                    editor.putFloat(targetYKey, ly.coerceIn(0f, 1f))
+                }
+                editor.remove(legacyXKey)
+                editor.remove(legacyYKey)
+                changed = true
+            }
+        }
+
+        if (changed) editor.apply()
     }
 }
