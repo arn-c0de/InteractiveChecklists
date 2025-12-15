@@ -3,6 +3,8 @@ package com.example.checklist_interactive.ui.files
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import android.content.Intent
+import androidx.documentfile.provider.DocumentFile
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -126,6 +128,7 @@ fun InternalFilesScreen(
     var enrichedFileMap by remember { mutableStateOf<Map<String, FileInfo>>(emptyMap()) }
     var shortcuts by remember { mutableStateOf<List<PageShortcut>>(emptyList()) }
     var showImportDialog by remember { mutableStateOf(false) }
+    var showImportChoiceDialog by remember { mutableStateOf(false) }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
     var fileToDelete by remember { mutableStateOf<FileInfo?>(null) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
@@ -270,7 +273,7 @@ fun InternalFilesScreen(
         }
     }
 
-    // Import Launcher
+    // Import Launcher (single file)
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -287,6 +290,58 @@ fun InternalFilesScreen(
                     }
                 }.onFailure { error ->
                     // TODO: Show error to user
+                }
+            }
+        }
+        showImportDialog = false
+        selectedCategory = null
+    }
+
+    // Folder import launcher (pick a directory and import all PDF/MD files recursively)
+    val importFolderLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        uri?.let { folderUri ->
+            selectedCategory?.let { category ->
+                coroutineScope.launch {
+                    isLoadingFiles = true
+                    try {
+                        context.contentResolver.takePersistableUriPermission(folderUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    } catch (_: Exception) { }
+
+                    val doc = DocumentFile.fromTreeUri(context, folderUri)
+                    val filesToImport = mutableListOf<Uri>()
+                    fun collect(d: DocumentFile?) {
+                        if (d == null) return
+                        if (d.isDirectory) {
+                            d.listFiles().forEach { collect(it) }
+                        } else {
+                            val name = d.name?.lowercase() ?: ""
+                            if (name.endsWith(".pdf") || name.endsWith(".md") || name.endsWith(".markdown")) {
+                                filesToImport.add(d.uri)
+                            }
+                        }
+                    }
+                    collect(doc)
+
+                    if (filesToImport.isEmpty()) {
+                        // Inform user no matching files found
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            android.widget.Toast.makeText(context, "No matching files found", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        withContext(Dispatchers.IO) {
+                            filesToImport.forEach { fileUri ->
+                                try {
+                                    fileManager.importFile(fileUri, category)
+                                } catch (_: Exception) { }
+                            }
+                        }
+                    }
+
+                    refreshFilesWithTags()
+                    onRefresh()
+                    isLoadingFiles = false
                 }
             }
         }
@@ -609,11 +664,37 @@ fun InternalFilesScreen(
             selectedCategory = selectedCategory,
             onCategorySelected = { category ->
                 selectedCategory = category
-                importLauncher.launch("*/*")
+                showImportDialog = false
+                showImportChoiceDialog = true
             },
             onDismiss = {
                 showImportDialog = false
                 selectedCategory = null
+            }
+        )
+    }
+
+    if (showImportChoiceDialog && selectedCategory != null) {
+        AlertDialog(
+            onDismissRequest = { showImportChoiceDialog = false; selectedCategory = null },
+            title = { Text("Import") },
+            text = { Text("Import a file or the whole folder (all .pdf/.md files)?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    // Import single file
+                    importLauncher.launch("*/*")
+                    showImportChoiceDialog = false
+                }) { Text("File") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = {
+                        // Import folder
+                        importFolderLauncher.launch(null)
+                        showImportChoiceDialog = false
+                    }) { Text("Folder") }
+                    TextButton(onClick = { showImportChoiceDialog = false; selectedCategory = null }) { Text("Cancel") }
+                }
             }
         )
     }
@@ -691,7 +772,7 @@ fun InternalFilesScreen(
                 showRenameDialog = false
                 shortcutToRename = null
             },
-            title = { Text("Shortcut umbenennen") },
+            title = { Text("Rename Shortcut") },
             text = {
                 OutlinedTextField(
                     value = renameText,
@@ -1075,7 +1156,7 @@ private fun ShortcutsHeader(
             IconButton(onClick = onToggleExpanded) {
                 Icon(
                     if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = if (isExpanded) "Zuklappen" else "Aufklappen"
+                    contentDescription = if (isExpanded) "Collapse" else "Expand"
                 )
             }
         }
