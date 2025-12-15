@@ -26,7 +26,9 @@ fun FileTagEditorDialog(
     currentTags: Set<String>,
     allUsedTags: Set<String>,
     onDismiss: () -> Unit,
-    onSave: (Set<String>) -> Unit
+    onSave: (Set<String>) -> Unit,
+    onMove: () -> Unit,
+    canMove: Boolean = true
 ) {
     var selectedTags by remember { mutableStateOf(currentTags.toMutableSet()) }
     var showAddCustomTag by remember { mutableStateOf(false) }
@@ -39,12 +41,19 @@ fun FileTagEditorDialog(
         onDismissRequest = onDismiss,
         title = { 
             Column {
-                Text("Edit tags")
-                Text(
-                    text = fileName,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Column {
+                        Text("Edit tags")
+                        Text(
+                            text = fileName,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    TextButton(onClick = onMove, enabled = canMove) {
+                        Text("Move")
+                    }
+                }
             }
         },
         text = {
@@ -169,6 +178,8 @@ fun FileTagEditorDialog(
                         Text("Add custom tag")
                     }
                 }
+
+
             }
         },
         confirmButton = {

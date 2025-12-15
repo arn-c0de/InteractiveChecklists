@@ -140,6 +140,7 @@ fun InternalFilesScreen(
     val tagManager = remember { fileManager.tagManager }
     var fileToEditTags by remember { mutableStateOf<FileInfo?>(null) }
     var showTagEditor by remember { mutableStateOf(false) }
+    var showMoveDialog by remember { mutableStateOf(false) }
     var showTagFilter by remember { mutableStateOf(false) }
     var selectedTagFilters by remember { mutableStateOf(prefsManager.getActiveTagFilters()) }
     var tagFilterMode by remember { mutableStateOf(prefsManager.getTagFilterMode()) }
@@ -832,6 +833,51 @@ fun InternalFilesScreen(
                 showTagEditor = false
                 fileToEditTags = null
             }
+            , onMove = {
+                // Show category selection dialog to pick destination
+                showMoveDialog = true
+            },
+            canMove = !(fileToEditTags?.isAsset ?: true)
+        )
+    }
+
+    // Move dialog shown from tag editor
+    if (showMoveDialog && fileToEditTags != null) {
+        CategorySelectionDialog(
+            categories = fileManager.getAllCategoryPaths(),
+            selectedCategory = null,
+            onCategorySelected = { category ->
+                // Perform move
+                val file = fileToEditTags ?: return@CategorySelectionDialog
+                if (category == file.category) {
+                    android.widget.Toast.makeText(context, "File is already in this category", android.widget.Toast.LENGTH_SHORT).show()
+                    showMoveDialog = false
+                    return@CategorySelectionDialog
+                }
+                coroutineScope.launch {
+                    isLoadingFiles = true
+                    val result = withContext(Dispatchers.IO) {
+                        try {
+                            fileManager.moveFile(file.path, category)
+                        } catch (e: Exception) {
+                            Result.failure<FileInfo>(e)
+                        }
+                    }
+                    result.onSuccess {
+                        android.widget.Toast.makeText(context, "Moved to $category", android.widget.Toast.LENGTH_SHORT).show()
+                        // Refresh UI and close dialogs
+                        refreshFilesWithTags()
+                        onRefresh()
+                        showTagEditor = false
+                        fileToEditTags = null
+                    }.onFailure { err ->
+                        android.widget.Toast.makeText(context, "Could not move: ${err.message}", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                    isLoadingFiles = false
+                    showMoveDialog = false
+                }
+            },
+            onDismiss = { showMoveDialog = false }
         )
     }
 
