@@ -42,9 +42,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.RectangleShape
@@ -97,7 +99,10 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Flight
 import android.content.ClipboardManager
+import com.example.checklist_interactive.ui.datapad.LocalDataPadManager
+import com.example.checklist_interactive.ui.datapad.DataPadPopup
 import android.content.ClipData
 import android.content.Context
 import android.content.SharedPreferences
@@ -184,6 +189,7 @@ fun PdfViewer(
     var outlineItems by remember { mutableStateOf<List<PdfOutlineItem>>(emptyList()) }
     val outlineExtractor = remember { PdfOutlineExtractor(context) }
     var showQuickAccess by remember { mutableStateOf(false) }
+    var showDataPad by remember { mutableStateOf(false) }
     val prefsManager = remember { PreferencesManager(context) }
     var showToolbar by remember { mutableStateOf(prefsManager.isPdfToolbarVisible()) }
 
@@ -1538,6 +1544,21 @@ fun PdfViewer(
                         )
                     }
 
+                    // DataPad FAB (left of Quick Access)
+                    DraggableFab(
+                        name = "datapad",
+                        prefsManager = prefsManager,
+                        screenWidthPx = screenWidthPx,
+                        screenHeightPx = screenHeightPx,
+                        fabSizePx = fabSizePx,
+                        // Place slightly left of quick_access and aligned vertically
+                        defaultX = 0.92f,
+                        defaultY = 0.9f,
+                        visible = true,
+                        onClick = { showDataPad = true },
+                        content = { Icon(Icons.Default.Flight, contentDescription = "DataPad") }
+                    )
+
                     // Quick Access FAB
                     DraggableFab(
                         name = "quick_access",
@@ -1545,7 +1566,7 @@ fun PdfViewer(
                         screenWidthPx = screenWidthPx,
                         screenHeightPx = screenHeightPx,
                         fabSizePx = fabSizePx,
-                        defaultX = 1.0f,
+                        defaultX = 0.9f,
                         defaultY = 0.9f,
                         visible = true,
                         onClick = { showQuickAccess = true },
@@ -1730,6 +1751,11 @@ fun PdfViewer(
                 }
             )
         }
+    }
+
+    // DataPad Popup
+    if (showDataPad) {
+        DataPadPopup(onDismiss = { showDataPad = false })
     }
 
     // Quick Access Bottom Sheet

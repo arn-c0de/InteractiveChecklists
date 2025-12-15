@@ -9,7 +9,11 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material.icons.filled.UnfoldLess
 import androidx.compose.material.icons.automirrored.filled.NoteAdd
+import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material3.*
+import androidx.compose.foundation.gestures.detectTapGestures
+import com.example.checklist_interactive.ui.datapad.LocalDataPadManager
+import com.example.checklist_interactive.ui.datapad.DataPadPopup
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -106,6 +110,7 @@ fun MarkdownViewerScreen(
     // State for Expand/Collapse All
     var expandAllSections by remember { mutableStateOf(prefsManager.areMarkdownSectionsExpandedByDefault()) }
     var showQuickAccess by remember { mutableStateOf(false) }
+    var showDataPad by remember { mutableStateOf(false) }
     var resetTrigger by remember { mutableStateOf(0) }
 
     Scaffold(
@@ -144,8 +149,19 @@ fun MarkdownViewerScreen(
                     }, modifier = Modifier.size(40.dp)) {
                         Icon(Icons.Default.Link, contentDescription = "Link to quick note", modifier = Modifier.size(20.dp))
                     }
-                    IconButton(onClick = { showQuickAccess = true }, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Quick access", modifier = Modifier.size(20.dp))
+                    // Quick access: tap opens sheet, long-press resets persisted FAB positions
+                    Box(modifier = Modifier.pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = { showQuickAccess = true },
+                            onLongPress = {
+                                prefsManager.resetPdfViewerLayout()
+                                android.widget.Toast.makeText(context, "FAB positions restored", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    }) {
+                        IconButton(onClick = { showQuickAccess = true }, modifier = Modifier.size(40.dp)) {
+                            Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Quick access", modifier = Modifier.size(20.dp))
+                        }
                     }
                     IconButton(onClick = {
                         expandAllSections = !expandAllSections
@@ -194,6 +210,10 @@ fun MarkdownViewerScreen(
             val configuration = LocalConfiguration.current
             val screenWidthPx = with(LocalDensity.current) { configuration.screenWidthDp.dp.roundToPx() }
             val screenHeightPx = with(LocalDensity.current) { configuration.screenHeightDp.dp.roundToPx() }
+            // Adjust height to account for Scaffold padding so FAB offsets are computed relative to the content area
+            val topPadPx = with(LocalDensity.current) { paddingValues.calculateTopPadding().roundToPx() }
+            val bottomPadPx = with(LocalDensity.current) { paddingValues.calculateBottomPadding().roundToPx() }
+            val effectiveScreenHeightPx = (screenHeightPx - topPadPx - bottomPadPx).coerceAtLeast(1)
             val fabSizePx = with(LocalDensity.current) { 56.dp.roundToPx() }
 
             if (onShowFileList != null) {
@@ -201,7 +221,7 @@ fun MarkdownViewerScreen(
                     name = "menu",
                     prefsManager = prefsManager,
                     screenWidthPx = screenWidthPx,
-                    screenHeightPx = screenHeightPx,
+                    screenHeightPx = effectiveScreenHeightPx,
                     fabSizePx = fabSizePx,
                     defaultX = 1.0f,
                     defaultY = 0.8f,
@@ -211,19 +231,45 @@ fun MarkdownViewerScreen(
                 )
             }
 
+            // DataPad FAB - placed first to be rendered
+            val datapadPos = prefsManager.getPdfViewerFabPosition("datapad", 0.75f, 0.9f)
+            android.util.Log.d("MarkdownViewer", "datapad saved pos: x=${datapadPos.first}, y=${datapadPos.second}")
+            Box(modifier = Modifier.fillMaxSize()) {
+                DraggableFab(
+                    name = "datapad",
+                    prefsManager = prefsManager,
+                    screenWidthPx = screenWidthPx,
+                    screenHeightPx = effectiveScreenHeightPx,
+                    fabSizePx = fabSizePx,
+                    defaultX = 0.75f,
+                    defaultY = 0.9f,
+                    visible = true,
+                    onClick = { 
+                        android.util.Log.d("MarkdownViewer", "DataPad FAB clicked!")
+                        showDataPad = true 
+                    },
+                    content = { Icon(Icons.Default.Flight, contentDescription = "DataPad") }
+                )
+            }
+
             DraggableFab(
                 name = "quick_access",
                 prefsManager = prefsManager,
                 screenWidthPx = screenWidthPx,
-                screenHeightPx = screenHeightPx,
+                screenHeightPx = effectiveScreenHeightPx,
                 fabSizePx = fabSizePx,
-                defaultX = 1.0f,
+                defaultX = 0.9f,
                 defaultY = 0.9f,
                 visible = true,
                 onClick = { showQuickAccess = true },
                 content = { Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Quick access") }
             )
         }
+    }
+
+    // DataPad Popup
+    if (showDataPad) {
+        DataPadPopup(onDismiss = { showDataPad = false })
     }
 
     // Quick Access Bottom Sheet

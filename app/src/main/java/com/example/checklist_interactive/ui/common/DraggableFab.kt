@@ -66,6 +66,27 @@ fun DraggableFab(
     var offsetY by remember(savedYPercent, availableHeight) {
         mutableFloatStateOf((savedYPercent * availableHeight).coerceIn(0f, availableHeight.toFloat()))
     }
+
+    // Clamp any positions that might be outside the available area (e.g., due to layout/padding changes)
+    // and persist corrected values so old off-screen positions are fixed automatically.
+    LaunchedEffect(name, availableWidth, availableHeight) {
+        val clampedX = offsetX.coerceIn(0f, availableWidth.toFloat())
+        val clampedY = offsetY.coerceIn(0f, availableHeight.toFloat())
+        if (clampedX != offsetX || clampedY != offsetY) {
+            offsetX = clampedX
+            offsetY = clampedY
+            // Save corrected normalized values
+            val xPercent = if (availableWidth > 0) (offsetX / availableWidth) else 0f
+            val yPercent = if (availableHeight > 0) (offsetY / availableHeight) else 0f
+            coroutineScope.launch {
+                try {
+                    prefsManager.setPdfViewerFabPosition(name, xPercent, yPercent)
+                } catch (e: Exception) {
+                    android.util.Log.w("DraggableFab", "Failed to persist clamped FAB position: ${e.message}")
+                }
+            }
+        }
+    }
     
     var isDragging by remember { mutableStateOf(false) }
     var longPressTriggered by remember { mutableStateOf(false) }

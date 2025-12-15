@@ -135,8 +135,22 @@ class MainActivity : ComponentActivity() {
                     it.warmUp()
                 }
             }
+            val dataPadManager = remember {
+                com.example.checklist_interactive.data.datapad.DataPadManager(this@MainActivity).also {
+                    it.start()
+                }
+            }
+            
+            // Clean up DataPadManager on disposal
+            androidx.compose.runtime.DisposableEffect(Unit) {
+                onDispose {
+                    dataPadManager.cleanup()
+                }
+            }
+            
             androidx.compose.runtime.CompositionLocalProvider(
-                com.example.checklist_interactive.ui.quickaccess.LocalQuickNoteManager provides quickNoteManager
+                com.example.checklist_interactive.ui.quickaccess.LocalQuickNoteManager provides quickNoteManager,
+                com.example.checklist_interactive.ui.datapad.LocalDataPadManager provides dataPadManager
             ) {
                 ChecklistInteractiveTheme(darkTheme = isDarkTheme) {
 
