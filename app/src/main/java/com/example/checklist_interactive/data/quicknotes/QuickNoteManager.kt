@@ -304,7 +304,7 @@ class QuickNoteManager(private val context: Context) {
                         Log.d(TAG, "Saved drawing for $id (len=${drawingJson?.length ?: 0})")
                         // Read back once to verify persistence
                         val check = repository.getNoteByIdOnce(id)
-                        Log.d(TAG, "Verified drawing for $id loaded len=${check?.let { (it.toEntity().drawing?.length ?: 0) } ?: "null"}")
+                        Log.d(TAG, "Verified drawing for $id loaded len=${check?.drawing?.length ?: "null"}")
                         // Save a backup in SharedPreferences to protect against DB issues
                         prefs.edit().putString("drawing_$id", drawingJson).apply()
                     }
