@@ -27,7 +27,7 @@
 - [ ] Leg restraints - Connect
 - [ ] Helmet + oxygen mask - Don
 
-## Before Battery Power
+## Before Battery Power sgsssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss
 
 - [ ] Circuit breakers - Check IN
 - [ ] Emergency Mode switches - Check OFF/Normal
