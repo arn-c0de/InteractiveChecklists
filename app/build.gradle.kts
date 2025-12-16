@@ -58,6 +58,9 @@ dependencies {
     implementation("androidx.documentfile:documentfile:1.0.1")
     // PDFBox removed - using native PDF parser (PdfStructureParser.kt)
 
+    // OpenStreetMap for aviation map display
+    implementation("org.osmdroid:osmdroid-android:6.1.20")
+
     // SplashScreen API for Android 12+
     implementation("androidx.core:core-splashscreen:1.0.1")
 

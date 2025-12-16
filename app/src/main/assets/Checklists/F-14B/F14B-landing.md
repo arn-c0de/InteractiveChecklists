@@ -62,7 +62,7 @@
 - [ ] Canopy - Open when safe or follow ship procedures
 - [ ] Ejection seat - SAFE (if needed)
 - [ ] Ground/Deck signals - Follow instructions
-- [ ] External power/GPU - Configure or connect as required (F-14B has no APU)
+- [ ] External power/GPU - Configure or connect as required
 - [ ] SALUTE/Secure aircraft - Perform post-flight checks
 
 ---

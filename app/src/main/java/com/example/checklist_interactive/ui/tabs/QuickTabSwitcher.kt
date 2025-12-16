@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -132,9 +133,10 @@ private fun TabHistoryItem(
     isActive: Boolean,
     onClick: () -> Unit
 ) {
-    val icon = when (tabInfo.fileInfo.extension.lowercase()) {
-        "pdf" -> Icons.Default.PictureAsPdf
-        "md", "markdown" -> Icons.Default.Description
+    val icon = when {
+        tabInfo.content is TabManager.TabContent.MapTab -> Icons.Default.Map
+        tabInfo.fileInfo.extension.lowercase() == "pdf" -> Icons.Default.PictureAsPdf
+        tabInfo.fileInfo.extension.lowercase() in listOf("md", "markdown") -> Icons.Default.Description
         else -> Icons.Default.Description
     }
     

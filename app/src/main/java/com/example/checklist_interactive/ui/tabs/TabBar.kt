@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -203,9 +204,10 @@ private fun TabItem(
         tabInfo.fileInfo.extension.lowercase()
     }
     
-    val icon = when (fileExtension) {
-        "pdf" -> Icons.Default.PictureAsPdf
-        "md", "markdown" -> Icons.Default.Description
+    val icon = when {
+        tabInfo.content is TabManager.TabContent.MapTab -> Icons.Default.Map
+        fileExtension == "pdf" -> Icons.Default.PictureAsPdf
+        fileExtension == "md" || fileExtension == "markdown" -> Icons.Default.Description
         else -> Icons.Default.Description
     }
     
@@ -300,6 +302,7 @@ fun TabbedDocumentViewer(
     onTabClosed: (Int) -> Unit,
     onNewTab: () -> Unit,
     onTabsReordered: (fromIndex: Int, toIndex: Int) -> Unit = { _, _ -> },
+    isScreenLocked: Boolean = false,
     modifier: Modifier = Modifier,
     content: @Composable (TabManager.TabInfo) -> Unit
 ) {
@@ -322,22 +325,12 @@ fun TabbedDocumentViewer(
         }
     }
     
-    Column(modifier = modifier.fillMaxSize()) {
-        // Tab bar at top (always visible, even when empty)
-        TabBar(
-            tabs = tabs,
-            activeTabIndex = activeTabIndex,
-            onTabSelected = onTabChanged,
-            onTabClosed = onTabClosed,
-            onNewTab = onNewTab,
-            onTabsReordered = onTabsReordered
-        )
-        
-        // Content area
+    Box(modifier = modifier.fillMaxSize()) {
+        // Content area (pager or empty state) - apply top padding so content does not overlap the TabBar
         if (tabs.isEmpty()) {
             // Show empty state
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().padding(top = 40.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
@@ -366,7 +359,10 @@ fun TabbedDocumentViewer(
             // Horizontal pager for content
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 40.dp),
+                userScrollEnabled = !isScreenLocked,
                 key = { index -> tabs.getOrNull(index)?.fileInfo?.path ?: index }
             ) { pageIndex ->
                 val tab = tabs.getOrNull(pageIndex)
@@ -375,6 +371,20 @@ fun TabbedDocumentViewer(
                 }
             }
         }
+
+        // Overlayed Tab bar at top so it stays visible above native MapView (AndroidView)
+        TabBar(
+            tabs = tabs,
+            activeTabIndex = activeTabIndex,
+            onTabSelected = onTabChanged,
+            onTabClosed = onTabClosed,
+            onNewTab = onNewTab,
+            onTabsReordered = onTabsReordered,
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
+                .zIndex(1f)
+        )
     }
 }
 
