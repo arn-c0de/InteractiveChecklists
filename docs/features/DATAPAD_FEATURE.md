@@ -139,8 +139,7 @@ New-NetFirewallRule -DisplayName "DCS DataPad" -Direction Inbound -Protocol UDP 
 ## Security
 - AES-GCM encryption for UDP telemetry is **enabled by default** in the Python forwarder (`forward_parsed_udp.py`).
 - To temporarily disable encryption for debugging use `--no-encrypt` (not recommended in production).
-- The Pre-Shared Key (32 bytes) **must match** on both Python and Android sides. See `docs/technical/AES_GCM_ENCRYPTION.md` for generation and configuration instructions.
-
+- The Pre-Shared Key (32 bytes) **must match** on both Python and Android sides. See `docs/technical/AES_GCM_ENCRYPTION.md` for generation and configuration instructions.- The DataPad UI exposes a **Settings** dialog (⚙️) where you can change the UDP port, bind IP, and Pre-Shared Key. The dialog includes a **Reset Key** action which restores the default key — **you should change the key after resetting (do not use default in production)**.
 ## Data Format
 Expected JSON format (one object per UDP datagram):
 

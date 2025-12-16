@@ -20,19 +20,23 @@ import javax.crypto.spec.SecretKeySpec
 class DataPadManager(private val context: Context) {
     companion object {
         private const val TAG = "DataPadManager"
-        private const val UDP_PORT = 5010
+        private const val DEFAULT_UDP_PORT = 5010
         private const val BUFFER_SIZE = 4096
         private const val SOCKET_TIMEOUT_MS = 1000
         
-        // Pre-Shared Key (32 bytes for AES-256) - MUST match Python script!
-        // Change this to your own random key in production!
-        private val PRE_SHARED_KEY = "DCS_DataPad_Secret_Key_32BYTES!!".toByteArray(Charsets.UTF_8)
+        private const val PREFS_NAME = "datapad_settings"
+        private const val KEY_UDP_PORT = "udp_port"
+        private const val KEY_BIND_IP = "bind_ip"
+        private const val KEY_PRE_SHARED_KEY = "pre_shared_key"
+        
+        // Default Pre-Shared Key (32 bytes for AES-256)
+        private const val DEFAULT_PRE_SHARED_KEY = "DCS_DataPad_Secret_Key_32BYTES!!"
         
         /**
          * Decrypt AES-GCM encrypted data
          * Format: nonce (12 bytes) + ciphertext + tag (16 bytes)
          */
-        private fun decryptPayload(encryptedData: ByteArray): ByteArray? {
+        private fun decryptPayload(encryptedData: ByteArray, key: ByteArray): ByteArray? {
             return try {
                 if (encryptedData.size < 28) { // 12 (nonce) + 16 (tag) minimum
                     Log.e(TAG, "Encrypted data too short: ${encryptedData.size} bytes")
@@ -46,7 +50,7 @@ class DataPadManager(private val context: Context) {
                 
                 // Initialize AES-GCM cipher
                 val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-                val keySpec = SecretKeySpec(PRE_SHARED_KEY, "AES")
+                val keySpec = SecretKeySpec(key, "AES")
                 val gcmSpec = GCMParameterSpec(128, nonce) // 128-bit authentication tag
                 
                 cipher.init(Cipher.DECRYPT_MODE, keySpec, gcmSpec)
@@ -57,6 +61,8 @@ class DataPadManager(private val context: Context) {
             }
         }
     }
+    
+    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     private val json = Json { 
         ignoreUnknownKeys = true
@@ -76,6 +82,15 @@ class DataPadManager(private val context: Context) {
     
     private val _deviceIpAddress = MutableStateFlow<String>("Unknown")
     val deviceIpAddress: StateFlow<String> = _deviceIpAddress.asStateFlow()
+    
+    private val _udpPort = MutableStateFlow(prefs.getInt(KEY_UDP_PORT, DEFAULT_UDP_PORT))
+    val udpPort: StateFlow<Int> = _udpPort.asStateFlow()
+    
+    private val _bindIp = MutableStateFlow(prefs.getString(KEY_BIND_IP, "") ?: "")
+    val bindIp: StateFlow<String> = _bindIp.asStateFlow()
+    
+    private val _preSharedKey = MutableStateFlow(prefs.getString(KEY_PRE_SHARED_KEY, DEFAULT_PRE_SHARED_KEY) ?: DEFAULT_PRE_SHARED_KEY)
+    val preSharedKey: StateFlow<String> = _preSharedKey.asStateFlow()
     
     private var udpSocket: DatagramSocket? = null
     private var receiveJob: Job? = null
@@ -122,15 +137,22 @@ class DataPadManager(private val context: Context) {
                 val activeNetwork = cm.activeNetworkInfo
                 Log.d(TAG, "Active network: ${activeNetwork?.typeName}, connected: ${activeNetwork?.isConnected}")
                 
-                udpSocket = DatagramSocket(UDP_PORT).apply {
+                val port = _udpPort.value
+                val bindAddress = _bindIp.value
+                
+                udpSocket = if (bindAddress.isNotEmpty()) {
+                    DatagramSocket(port, java.net.InetAddress.getByName(bindAddress))
+                } else {
+                    DatagramSocket(port)
+                }.apply {
                     soTimeout = SOCKET_TIMEOUT_MS
                     reuseAddress = true
                     broadcast = true
                 }
-                Log.d(TAG, "UDP socket opened on port $UDP_PORT")
+                Log.d(TAG, "UDP socket opened on ${if (bindAddress.isNotEmpty()) bindAddress else "0.0.0.0"}:$port")
                 Log.d(TAG, "Socket local address: ${udpSocket?.localAddress?.hostAddress}")
                 Log.d(TAG, "Socket local port: ${udpSocket?.localPort}")
-                Log.d(TAG, "Waiting for UDP packets on $deviceIp:$UDP_PORT...")
+                Log.d(TAG, "Waiting for UDP packets on ${if (bindAddress.isNotEmpty()) bindAddress else deviceIp}:${_udpPort.value}...")
                 
                 val buffer = ByteArray(BUFFER_SIZE)
                 val packet = DatagramPacket(buffer, buffer.size)
@@ -142,7 +164,8 @@ class DataPadManager(private val context: Context) {
                         Log.d(TAG, "UDP packet received (${packet.length} bytes)")
                         
                         // Try to decrypt the data
-                        val decryptedData = decryptPayload(receivedData)
+                        val keyBytes = _preSharedKey.value.toByteArray(Charsets.UTF_8)
+                        val decryptedData = decryptPayload(receivedData, keyBytes)
                         
                         if (decryptedData != null) {
                             val message = String(decryptedData, Charsets.UTF_8)
@@ -203,5 +226,48 @@ class DataPadManager(private val context: Context) {
     fun cleanup() {
         stop()
         scope.cancel()
+    }
+    
+    /**
+     * Update UDP port and restart socket if running
+     */
+    fun updatePort(newPort: Int) {
+        if (newPort in 1024..65535) {
+            prefs.edit().putInt(KEY_UDP_PORT, newPort).apply()
+            _udpPort.value = newPort
+            if (isStarted) {
+                restart()
+            }
+        }
+    }
+    
+    /**
+     * Update bind IP address (empty = all interfaces)
+     */
+    fun updateBindIp(newIp: String) {
+        prefs.edit().putString(KEY_BIND_IP, newIp).apply()
+        _bindIp.value = newIp
+        if (isStarted) {
+            restart()
+        }
+    }
+    
+    /**
+     * Update Pre-Shared Key for AES-GCM decryption
+     */
+    fun updatePreSharedKey(newKey: String) {
+        if (newKey.length == 32 || newKey.isEmpty()) {
+            val finalKey = newKey.ifEmpty { DEFAULT_PRE_SHARED_KEY }
+            prefs.edit().putString(KEY_PRE_SHARED_KEY, finalKey).apply()
+            _preSharedKey.value = finalKey
+        }
+    }
+    
+    /**
+     * Restart the UDP socket with new settings
+     */
+    private fun restart() {
+        stop()
+        start()
     }
 }

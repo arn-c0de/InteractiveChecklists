@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -52,6 +53,9 @@ fun DataPadPopup(
     val isConnected by manager.isConnected.collectAsState()
     val lastUpdateTime by manager.lastUpdateTime.collectAsState()
     val deviceIpAddress by manager.deviceIpAddress.collectAsState()
+    val udpPort by manager.udpPort.collectAsState()
+    
+    var showSettingsDialog by remember { mutableStateOf(false) }
     
     // Calculate time since last update
     var timeSinceUpdate by remember { mutableStateOf("--") }
@@ -164,6 +168,13 @@ fun DataPadPopup(
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold
                     )
+                    IconButton(onClick = { showSettingsDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Settings",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -172,7 +183,8 @@ fun DataPadPopup(
                 ConnectionStatusCard(
                     isConnected = isConnected,
                     timeSinceUpdate = timeSinceUpdate,
-                    deviceIpAddress = deviceIpAddress
+                    deviceIpAddress = deviceIpAddress,
+                    udpPort = udpPort
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -189,13 +201,21 @@ fun DataPadPopup(
             }
         }
     }
+    
+    // Settings Dialog
+    if (showSettingsDialog) {
+        DataPadSettingsDialog(
+            onDismiss = { showSettingsDialog = false }
+        )
+    }
 }
 
 @Composable
 private fun ConnectionStatusCard(
     isConnected: Boolean,
     timeSinceUpdate: String,
-    deviceIpAddress: String
+    deviceIpAddress: String,
+    udpPort: Int
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -241,7 +261,7 @@ private fun ConnectionStatusCard(
             }
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = "🔒 AES-GCM encrypted • $deviceIpAddress:5010",
+                text = "🔒 AES-GCM encrypted • $deviceIpAddress:$udpPort",
                 color = Color.White.copy(alpha = 0.9f),
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Medium
@@ -254,6 +274,7 @@ private fun ConnectionStatusCard(
 private fun NoDataCard() {
     val manager = LocalDataPadManager.current
     val deviceIpAddress by manager.deviceIpAddress.collectAsState()
+    val udpPort by manager.udpPort.collectAsState()
     
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -287,7 +308,7 @@ private fun NoDataCard() {
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "python forward_parsed_udp.py --host $deviceIpAddress --port 5010",
+                text = "python forward_parsed_udp.py --host $deviceIpAddress --port $udpPort",
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.primary
