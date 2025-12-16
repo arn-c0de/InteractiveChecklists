@@ -74,6 +74,8 @@ See `docs/features/DATAPAD_FEATURE.md` for full usage, configuration, and troubl
 
 **Phase 1 (experimental)**: This release represents Phase 1 of DataPad. Future phases will expand telemetry coverage and add visual and security improvements, including live animated aircraft visualizations based on flight attitude, a dedicated DataPad UI redesign, and a planned migration to encrypted transport (TCP or UDP with AES encryption).
 
+**Next up: 2way (experimental)** – enabling data flow from the App to DCS.
+
 Planned enhancements:
 
 - Additional telemetry (e.g., speed, vertical speed, fuel levels, systems statuses)
