@@ -79,7 +79,6 @@ Planned enhancements:
 - Additional telemetry (e.g., speed, vertical speed, fuel levels, systems statuses)
 - Live animated aircraft visualization showing orientation (pitch/roll/heading) and movement
 - Dedicated DataPad UI/UX design and controls
-- Transition to encrypted transport (TCP or UDP) with AES-based encryption for secure telemetry streams
 
 See `docs/features/DATAPAD_FEATURE.md` for full usage, configuration, and troubleshooting.
 
