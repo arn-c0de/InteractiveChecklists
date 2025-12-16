@@ -123,28 +123,6 @@ pcall(function()
 			data.unitID = tostring(selfData.ID or selfData.UnitId or 'N/A')
 		end
 
-		-- AoA & G-Load (try common draw arguments and API)
-		local aoa = safe_get(function() return LoGetAngleOfAttack() end, nil)
-		if type(aoa) == 'number' then data.angleOfAttack = aoa end
-		local gload = safe_get(function() return LoGetAccelerationUnits() end, nil)
-		if gload and type(gload) == 'table' and gload.x and gload.y and gload.z then
-			data.gLoad = {
-				x = gload.x or 0,
-				y = gload.y or 0,
-				z = gload.z or 0
-			}
-		end
-
-		-- Aircraft Mass (if available)
-		local mass = safe_get(function() return LoGetAircraftMass() end, nil)
-		if type(mass) == 'number' then
-			data.aircraftMass = {
-				total = mass,
-				empty = nil,
-				payload = nil
-			}
-		end
-
 		-- Position (DCS coordinates)
 		local pos = safe_get(function() return LoGetWorldObjects() end, nil)
 		if selfData and selfData.Position then
@@ -168,42 +146,18 @@ pcall(function()
 		if vs then data.verticalSpeed = vs end
 		if mach then data.mach = mach end
 
-		-- Fuel & Fuel Flow
+		-- Fuel
 		local fuelInternal = safe_get(function() return LoGetFuelWeight() end, 0)
 		local fuelExternal = safe_get(function() return LoGetFuelWeight() end, 0) -- DCS doesn't separate easily
-		local engineInfo = safe_get(function() return LoGetEngineInfo() end, nil)
-		local fuelFlow = nil
-		if engineInfo and type(engineInfo) == 'table' and engineInfo.FuelConsumption and type(engineInfo.FuelConsumption) == 'number' then
-			fuelFlow = engineInfo.FuelConsumption
-		end
-		if type(fuelInternal) == 'number' and fuelInternal > 0 then
+		if fuelInternal and fuelInternal > 0 then
 			data.fuel = {
 				total = fuelInternal,
 				remaining = fuelInternal,
 				internal = fuelInternal,
 				external = 0,
-				endurance = (fuelFlow and fuelFlow > 0) and (fuelInternal / fuelFlow) or nil,
-				fuelFlow = fuelFlow
+				endurance = nil, -- calculated externally if flow known
+				fuelFlow = nil
 			}
-		end
-
-		-- Engine Data (N1, RPM, EGT, Oil Pressure - varies by aircraft)
-		if engineInfo and type(engineInfo) == 'table' then
-			data.engines = {}
-			if engineInfo.RPM and type(engineInfo.RPM) == 'table' then
-				data.engines.rpm = {
-					left = engineInfo.RPM.left or nil,
-					right = engineInfo.RPM.right or nil
-				}
-			end
-			if engineInfo.Temperature and type(engineInfo.Temperature) == 'table' then
-				data.engines.egt = {
-					left = engineInfo.Temperature.left or nil,
-					right = engineInfo.Temperature.right or nil
-				}
-			end
-			data.engines.throttle = engineInfo.throttle or nil
-			data.engines.afterburner = engineInfo.afterburner or false
 		end
 
 		-- Navigation & Waypoints
@@ -249,93 +203,28 @@ pcall(function()
 			}
 		end
 
-		-- Systems Status (Electrical, Hydraulic, APU, Generator)
-		local electrical = safe_get(function() return LoGetElectricalSystemInfo() end, nil)
-		local hydraulic = safe_get(function() return LoGetHydraulicSystemInfo() end, nil)
-		local apuOn = safe_get(function() return LoGetAPUInfo() end, nil)
-		local generatorOn = safe_get(function() return LoGetGeneratorInfo() end, nil)
-		data.systems = {
-			electrical = (type(electrical) == 'string' or type(electrical) == 'number') and electrical or nil,
-			hydraulic = (type(hydraulic) == 'string' or type(hydraulic) == 'number') and hydraulic or nil,
-			apuOn = (type(apuOn) == 'boolean') and apuOn or nil,
-			generatorOn = (type(generatorOn) == 'boolean') and generatorOn or nil
-		}
+		-- RWR / Threats (limited API, placeholder)
+		local threats = safe_get(function() return LoGetTWSInfo() end, nil)
+		if threats then
+			local contacts = {}
+			-- DCS doesn't expose RWR directly; this is a placeholder
+			data.rwr = {
+				contacts = nil,
+				threatsDetected = 0
+			}
+		end
 
-		-- Radar (detailed)
+		-- Radar
 		local radarInfo = safe_get(function() return LoGetRadarInfo() end, nil)
-		if radarInfo and type(radarInfo) == 'table' then
+		if radarInfo then
 			data.radar = {
 				mode = radarInfo.mode or nil,
 				range = radarInfo.range or nil,
 				locked = radarInfo.lock or false,
-				trackCount = radarInfo.trackCount or 0,
-				azimuth = radarInfo.azimuth or nil,
-				elevation = radarInfo.elevation or nil,
-				scan = radarInfo.scan or nil
+				trackCount = radarInfo.trackCount or 0
 			}
-			-- Track details if available
-			if radarInfo.tracks and type(radarInfo.tracks) == 'table' then
-				data.radar.tracks = {}
-				for i, track in pairs(radarInfo.tracks) do
-					if type(track) == 'table' then
-						table.insert(data.radar.tracks, {
-							id = i,
-							range = track.range or nil,
-							azimuth = track.azimuth or nil,
-							elevation = track.elevation or nil,
-							locked = track.locked or false
-						})
-					end
-				end
-			end
 		end
-		local selfRadar = safe_get(function() return LoGetSelfData() end, {})
-		data.radarActive = (type(selfRadar) == 'table' and selfRadar.RadarOn) or false
-
-		-- RWR / Threat Warning (limited exposure, placeholder for TWS)
-		local twsInfo = safe_get(function() return LoGetTWSInfo() end, nil)
-		if twsInfo and type(twsInfo) == 'table' then
-			data.rwr = {
-				contacts = {},
-				threatsDetected = 0
-			}
-			for id, contact in pairs(twsInfo) do
-				if type(contact) == 'table' then
-					table.insert(data.rwr.contacts, {
-						id = id,
-						type = contact.type or 'UNKNOWN',
-						azimuth = contact.azimuth or nil,
-						priority = contact.priority or 0
-					})
-					data.rwr.threatsDetected = data.rwr.threatsDetected + 1
-				end
-			end
-		end
-
-		-- Nearby Units / Ground Objects (World Objects)
-		local worldObjects = safe_get(function() return LoGetWorldObjects() end, nil)
-		if worldObjects and type(worldObjects) == 'table' then
-			data.nearbyUnits = {}
-			local count = 0
-			for id, obj in pairs(worldObjects) do
-				if type(obj) == 'table' and count < 20 then -- limit to 20 nearest
-					local distance = nil
-					if obj.Position and selfData and selfData.Position then
-						local dx = (obj.Position.x or 0) - (selfData.Position.x or 0)
-						local dz = (obj.Position.z or 0) - (selfData.Position.z or 0)
-						distance = math.sqrt(dx*dx + dz*dz)
-					end
-					table.insert(data.nearbyUnits, {
-						id = tostring(id),
-						name = obj.Name or obj.UnitName or 'UNKNOWN',
-						type = obj.Type or 'UNKNOWN',
-						coalition = obj.Coalition or '',
-						distance = distance
-					})
-					count = count + 1
-				end
-			end
-		end
+		data.radarActive = safe_get(function() return LoGetSelfData() end, {}).RadarOn or false
 
 		-- Countermeasures
 		local cmds = safe_get(function() return LoGetSnares() end, nil)
@@ -388,55 +277,6 @@ pcall(function()
 				alerts = mcp.alerts or nil
 			}
 		end
-
-		-- Flight Controls & Trim (try common draw arguments)
-		local controls = safe_get(function() return LoGetControlsState() end, nil)
-		if controls then
-			data.flightControls = {
-				pitch = controls.pitch or nil,
-				roll = controls.roll or nil,
-				yaw = controls.yaw or nil,
-				trimPitch = controls.trimPitch or nil,
-				trimRoll = controls.trimRoll or nil,
-				trimYaw = controls.trimYaw or nil
-			}
-		end
-
-		-- Gear, Flaps, Speedbrake, Canopy, Hook
-		local mechInfo = safe_get(function() return LoGetMechInfo() end, nil)
-		if mechInfo and type(mechInfo) == 'table' then
-			data.mechanical = {
-				gear = (mechInfo.gear and type(mechInfo.gear) == 'table') and {
-					nose = mechInfo.gear.nose or nil,
-					left = mechInfo.gear.left or nil,
-					right = mechInfo.gear.right or nil
-				} or nil,
-				flaps = mechInfo.flaps or nil,
-				speedbrake = mechInfo.speedbrake or nil,
-				canopy = mechInfo.canopy or nil,
-				hook = mechInfo.hook or nil,
-				wheelBrake = mechInfo.wheelbrake or nil,
-				noseGearSteeringEnabled = mechInfo.noseGearSteeringEnabled or nil
-			}
-			-- Weight on wheels (squat switch)
-			data.weightOnWheels = (mechInfo.gear and type(mechInfo.gear) == 'table' and (mechInfo.gear.nose or 0) > 0.9) or false
-		end
-
-		-- Lights (various states)
-		local function safe_draw_arg(idx)
-			local v = safe_get(function() return LoGetAircraftDrawArgumentValue(idx) end, nil)
-			return (type(v) == 'number') and v or nil
-		end
-		data.lights = {
-			landing = safe_draw_arg(208),
-			taxi = safe_draw_arg(209),
-			navigation = safe_draw_arg(190),
-			strobe = safe_draw_arg(192),
-			formation = safe_draw_arg(88)
-		}
-
-		-- Mission Time
-		data.missionTime = safe_get(function() return LoGetModelTime() end, 0)
 
 		-- Environment (limited)
 		local wind = safe_get(function() return LoGetVectorWindVelocity() end, nil)
