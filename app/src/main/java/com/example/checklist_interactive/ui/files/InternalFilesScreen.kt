@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
@@ -336,7 +337,7 @@ fun InternalFilesScreen(
                     if (filesToImport.isEmpty()) {
                         // Inform user no matching files found
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                            android.widget.Toast.makeText(context, "No matching files found", android.widget.Toast.LENGTH_SHORT).show()
+                            android.widget.Toast.makeText(context, context.getString(R.string.msg_no_matching_files), android.widget.Toast.LENGTH_SHORT).show()
                         }
                     } else {
                         withContext(Dispatchers.IO) {
@@ -367,7 +368,7 @@ fun InternalFilesScreen(
                     IconButton(onClick = { showTagFilter = !showTagFilter }) {
                         Icon(
                             imageVector = Icons.Default.FilterList,
-                            contentDescription = "Filter by tags",
+                            contentDescription = stringResource(R.string.tag_filter_by),
                             tint = if (selectedTagFilters.isNotEmpty())
                                 MaterialTheme.colorScheme.primary
                             else
@@ -400,20 +401,20 @@ fun InternalFilesScreen(
                     }) {
                         Icon(
                             imageVector = if (isGridView) Icons.AutoMirrored.Filled.ViewList else Icons.Default.ViewModule,
-                            contentDescription = if (isGridView) "List view" else "Grid view"
+                            contentDescription = if (isGridView) stringResource(R.string.cd_list_view) else stringResource(R.string.cd_grid_view)
                         )
                     }
                     IconButton(onClick = { showSearchDialog = true }) {
-                        Icon(Icons.Default.Search, contentDescription = "Search files")
+                        Icon(Icons.Default.Search, contentDescription = stringResource(R.string.action_search))
                     }
                     // Aviation Map button
                     if (onOpenMap != null) {
                         IconButton(onClick = onOpenMap) {
-                            Icon(Icons.Default.Map, contentDescription = "Open Aviation Map")
+                            Icon(Icons.Default.Map, contentDescription = stringResource(R.string.map_aviation_map))
                         }
                     }
                     IconButton(onClick = onShowSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.nav_settings))
                     }
                 }
             )
@@ -663,7 +664,7 @@ fun InternalFilesScreen(
                 content = {
                     Icon(
                         Icons.Default.Flight,
-                        contentDescription = "DataPad",
+                        contentDescription = stringResource(R.string.datapad_title),
                         tint = MaterialTheme.colorScheme.onTertiaryContainer
                     )
                 }
@@ -684,7 +685,7 @@ fun InternalFilesScreen(
                 content = {
                     Icon(
                         Icons.AutoMirrored.Filled.NoteAdd,
-                        contentDescription = "Quick access",
+                        contentDescription = stringResource(R.string.quick_access_title),
                         tint = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
@@ -697,7 +698,7 @@ fun InternalFilesScreen(
                     detectTapGestures(
                         onLongPress = {
                             prefsManager.resetPdfViewerLayout()
-                            android.widget.Toast.makeText(context, "FAB positions restored", android.widget.Toast.LENGTH_SHORT).show()
+                            android.widget.Toast.makeText(context, context.getString(R.string.msg_fab_positions_restored), android.widget.Toast.LENGTH_SHORT).show()
                         }
                     )
                 }
@@ -728,14 +729,14 @@ fun InternalFilesScreen(
     if (showImportChoiceDialog && selectedCategory != null) {
         AlertDialog(
             onDismissRequest = { showImportChoiceDialog = false; selectedCategory = null },
-            title = { Text("Import") },
-            text = { Text("Import a file or the whole folder (all .pdf/.md files)?") },
+            title = { Text(stringResource(R.string.dialog_import_files)) },
+            text = { Text(stringResource(R.string.dialog_import_files_message)) },
             confirmButton = {
                 TextButton(onClick = {
                     // Import single file
                     importLauncher.launch("*/*")
                     showImportChoiceDialog = false
-                }) { Text("File") }
+                }) { Text(stringResource(R.string.file_single)) }
             },
             dismissButton = {
                 Row {
@@ -743,8 +744,8 @@ fun InternalFilesScreen(
                         // Import folder
                         importFolderLauncher.launch(null)
                         showImportChoiceDialog = false
-                    }) { Text("Folder") }
-                    TextButton(onClick = { showImportChoiceDialog = false; selectedCategory = null }) { Text("Cancel") }
+                    }) { Text(stringResource(R.string.cd_folder)) }
+                    TextButton(onClick = { showImportChoiceDialog = false; selectedCategory = null }) { Text(stringResource(R.string.action_cancel)) }
                 }
             }
         )
@@ -823,12 +824,12 @@ fun InternalFilesScreen(
                 showRenameDialog = false
                 shortcutToRename = null
             },
-            title = { Text("Rename Shortcut") },
+            title = { Text(stringResource(R.string.dialog_rename_shortcut)) },
             text = {
                 OutlinedTextField(
                     value = renameText,
                     onValueChange = { renameText = it },
-                    label = { Text("Name") },
+                    label = { Text(stringResource(R.string.dialog_name)) },
                     modifier = Modifier.fillMaxWidth()
                 )
             },
@@ -845,7 +846,7 @@ fun InternalFilesScreen(
                         shortcutToRename = null
                     }
                 ) {
-                    Text("Save")
+                    Text(stringResource(R.string.action_save))
                 }
             },
             dismissButton = {
@@ -853,7 +854,7 @@ fun InternalFilesScreen(
                     showRenameDialog = false
                     shortcutToRename = null
                 }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -900,7 +901,7 @@ fun InternalFilesScreen(
                 // Perform move
                 val file = fileToEditTags ?: return@CategorySelectionDialog
                 if (category == file.category) {
-                    android.widget.Toast.makeText(context, "File is already in this category", android.widget.Toast.LENGTH_SHORT).show()
+                    android.widget.Toast.makeText(context, context.getString(R.string.msg_file_already_in_category), android.widget.Toast.LENGTH_SHORT).show()
                     showMoveDialog = false
                     return@CategorySelectionDialog
                 }
@@ -914,14 +915,14 @@ fun InternalFilesScreen(
                         }
                     }
                     result.onSuccess {
-                        android.widget.Toast.makeText(context, "Moved to $category", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(context, context.getString(R.string.moved_to_category, category), android.widget.Toast.LENGTH_SHORT).show()
                         // Refresh UI and close dialogs
                         refreshFilesWithTags()
                         onRefresh()
                         showTagEditor = false
                         fileToEditTags = null
                     }.onFailure { err ->
-                        android.widget.Toast.makeText(context, "Could not move: ${err.message}", android.widget.Toast.LENGTH_LONG).show()
+                        android.widget.Toast.makeText(context, context.getString(R.string.msg_could_not_move, err.message ?: err.toString()), android.widget.Toast.LENGTH_LONG).show()
                     }
                     isLoadingFiles = false
                     showMoveDialog = false
@@ -1243,7 +1244,7 @@ private fun ShortcutsHeader(
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
-                text = "Shortcuts",
+                text = stringResource(R.string.shortcuts_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f)
@@ -1257,7 +1258,7 @@ private fun ShortcutsHeader(
             IconButton(onClick = onToggleExpanded) {
                 Icon(
                     if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = if (isExpanded) "Collapse" else "Expand"
+                    contentDescription = if (isExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand)
                 )
             }
         }
@@ -1275,7 +1276,7 @@ private fun ShortcutListItem(
         headlineContent = { Text(shortcut.name) },
             supportingContent = {
             Text(
-                "${shortcut.fileName} • Page ${shortcut.pageNumber + 1}",
+                "${shortcut.fileName} • ${stringResource(R.string.tab_page_number, shortcut.pageNumber + 1)}",
                 style = MaterialTheme.typography.labelSmall
             )
         },
@@ -1291,14 +1292,14 @@ private fun ShortcutListItem(
                 IconButton(onClick = onRename) {
                     Icon(
                         Icons.Default.Edit,
-                        contentDescription = "Rename",
+                        contentDescription = stringResource(R.string.cd_rename),
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
                 IconButton(onClick = onDelete) {
                     Icon(
                         Icons.Default.Delete,
-                        contentDescription = "Delete",
+                        contentDescription = stringResource(R.string.action_delete),
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
@@ -1359,7 +1360,7 @@ private fun FileListItem(
                     IconButton(onClick = onEditTags) {
                         Icon(
                             Icons.Default.Edit,
-                            contentDescription = "Edit tags",
+                            contentDescription = stringResource(R.string.tag_edit),
                             tint = if (file.tags.isNotEmpty()) 
                                 MaterialTheme.colorScheme.primary 
                             else 
@@ -1431,7 +1432,7 @@ private fun FileGridItem(
             Spacer(modifier = Modifier.height(6.dp))
             Row {
                 IconButton(onClick = onEditTags) {
-                    Icon(Icons.Default.Edit, contentDescription = "Edit tags", tint = MaterialTheme.colorScheme.primary)
+                    Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.tag_edit), tint = MaterialTheme.colorScheme.primary)
                 }
                 if (!file.isAsset) {
                     IconButton(onClick = onDelete) {
@@ -1454,13 +1455,13 @@ private fun SearchDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Search files") },
+        title = { Text(stringResource(R.string.dialog_search_files)) },
         text = {
             Column {
                 OutlinedTextField(
                     value = query,
                     onValueChange = { onQueryChange(it); /* performSearch is called from parent */ },
-                    label = { Text("Search") },
+                    label = { Text(stringResource(R.string.action_search)) },
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -1505,7 +1506,7 @@ private fun SearchDialog(
         confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.action_cancel))
             }
         }
     )
@@ -1520,7 +1521,7 @@ private fun CategorySelectionDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Select category") },
+        title = { Text(stringResource(R.string.dialog_select_category)) },
             text = {
             LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
                 items(categories) { category ->
@@ -1543,9 +1544,9 @@ private fun CategorySelectionDialog(
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.action_cancel))
+                }
             }
-        }
     )
 }

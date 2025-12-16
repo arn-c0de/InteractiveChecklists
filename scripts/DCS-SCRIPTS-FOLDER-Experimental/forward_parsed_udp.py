@@ -94,7 +94,7 @@ def _is_same_file(f, path: str) -> bool:
 
 
 def tail_and_send(path: str, host: str, port: int, send_existing=False, once=False, interval=0.2, verbose=False, show_env=False, encrypt=True):
-    """Tail a file and send only new JSON lines as UDP datagrams (nie bestehende senden)."""
+    """Tail a file and send only new JSON lines as UDP datagrams (do not send existing lines)."""
     if not os.path.exists(path):
         raise FileNotFoundError(path)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -167,13 +167,13 @@ def tail_and_send(path: str, host: str, port: int, send_existing=False, once=Fal
                             wind = env.get('wind') or {'speed': env.get('windSpeed'), 'direction': env.get('windDirection')}
                             wspeed = wind.get('speed')
                             wdir = wind.get('direction')
-                            print(f"{ts} GESENDET {host}:{port} temp={temp}C pres={pres} wind={wspeed}@{wdir}")
+                            print(f"{ts} SENT {host}:{port} temp={temp}C pres={pres} wind={wspeed}@{wdir}")
                         except Exception:
-                            print(f"{ts} GESENDET {host}:{port} {jsonpart}")
+                            print(f"{ts} SENT {host}:{port} {jsonpart}")
                     else:
-                        print(f"{ts} GESENDET {host}:{port} {jsonpart}")
+                        print(f"{ts} SENT {host}:{port} {jsonpart}")
                 else:
-                    print(f"{ts} FEHLER {host}:{port} {jsonpart}")
+                    print(f"{ts} ERROR {host}:{port} {jsonpart}")
     finally:
         try:
             f.close()
@@ -182,9 +182,9 @@ def tail_and_send(path: str, host: str, port: int, send_existing=False, once=Fal
         sock.close()
 
 
-# Neue Funktion: Wiederholt alle X Sekunden die letzte Zeile senden
+# New feature: repeat the last line every X seconds
 def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=False, show_env=False, encrypt=True):
-    """Sendet alle <interval> Sekunden die letzte Zeile der Datei als UDP."""
+    """Send the last line of the file as a UDP datagram every <interval> seconds."""
     if not os.path.exists(path):
         raise FileNotFoundError(path)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -221,9 +221,9 @@ def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=Fals
                         else:
                             print(f"{ts} REPEAT {host}:{port} {jsonpart}")
                     else:
-                        print(f"{ts} FEHLER {host}:{port} {jsonpart}")
+                        print(f"{ts} ERROR {host}:{port} {jsonpart}")
             except Exception as e:
-                print(f"Fehler beim Lesen/Senden: {e}", file=sys.stderr)
+                print(f"Error reading/sending: {e}", file=sys.stderr)
             time.sleep(interval)
     finally:
         sock.close()
@@ -236,7 +236,7 @@ def main(argv=None):
     p.add_argument('--port', '-p', type=int, default=DEFAULT_PORT, help='Destination port')
     p.add_argument('--interval', type=float, default=0.2, help='Polling interval in seconds')
     p.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
-    p.add_argument('--repeat-last', action='store_true', help='Alle <interval> Sekunden immer die letzte Zeile erneut senden')
+    p.add_argument('--repeat-last', action='store_true', help='Repeat the last line every <interval> seconds')
     p.add_argument('--show-env', action='store_true', help='Print temperature/pressure/wind when sending')
     p.add_argument('--no-encrypt', action='store_true', help='Disable AES-GCM encryption (not recommended)')
     args = p.parse_args(argv)
@@ -246,10 +246,10 @@ def main(argv=None):
     
     try:
         if args.repeat_last:
-            print(f"Wiederhole alle {args.interval} Sekunden letzten Eintrag von {args.file} an {args.host}:{args.port} ({enc_status})")
+            print(f"Repeating last line every {args.interval} seconds from {args.file} to {args.host}:{args.port} ({enc_status})")
             repeat_last_line(args.file, args.host, args.port, interval=args.interval, verbose=args.verbose, show_env=args.show_env, encrypt=encrypt)
         else:
-            print(f"Forwarding {args.file} to {args.host}:{args.port} (immer nur neue Zeilen) ({enc_status})")
+            print(f"Forwarding {args.file} to {args.host}:{args.port} (forward only new lines) ({enc_status})")
             while True:
                 try:
                     tail_and_send(args.file, args.host, args.port, send_existing=False, once=False, interval=args.interval, verbose=args.verbose, show_env=args.show_env, encrypt=encrypt)

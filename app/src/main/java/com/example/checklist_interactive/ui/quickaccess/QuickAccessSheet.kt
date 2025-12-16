@@ -28,6 +28,8 @@ import android.widget.Toast
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
+import com.example.checklist_interactive.R
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -751,7 +753,7 @@ fun QuickAccessSheet(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "Quick Notes",
+                        text = stringResource(R.string.quick_notes_title),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold
                     )
@@ -775,7 +777,7 @@ fun QuickAccessSheet(
                         IconButton(onClick = { showSearchBar = !showSearchBar }) {
                             Icon(
                                 if (showSearchBar) Icons.Default.Close else Icons.Default.Search,
-                                contentDescription = "Search"
+                                contentDescription = stringResource(R.string.action_search)
                             )
                         }
                     }
@@ -787,14 +789,14 @@ fun QuickAccessSheet(
                                 val uri = "internal://open?file=${URLEncoder.encode(currentDocumentPath, "UTF-8")}${
                                     if (currentPageNumber != null) "&page=${currentPageNumber + 1}" else ""
                                 }"
-                                val label = if (currentPageNumber != null) "${currentDocumentName} (Page ${currentPageNumber + 1})" else currentDocumentName
+                                val label = if (currentPageNumber != null) "$currentDocumentName (${context.getString(R.string.tab_page_number, currentPageNumber + 1)})" else currentDocumentName
                                 val linkText = "\n📌 [$label]($uri)\n"
                                 val newContent = currentNote + linkText
                                 currentNote = newContent
                                 hasChanges = true
                             }
                         ) {
-                            Icon(Icons.Default.PushPin, contentDescription = "Pin document")
+                            Icon(Icons.Default.PushPin, contentDescription = stringResource(R.string.quick_notes_pin_document))
                         }
                     }
                 }
@@ -808,7 +810,7 @@ fun QuickAccessSheet(
                         .padding(bottom = 12.dp)
                 ) {
                     Text(
-                        text = "Opacity: ${(sheetOpacity * 100).toInt()}% (min 25%)",
+                        text = stringResource(R.string.quick_notes_opacity_label, (sheetOpacity * 100).toInt()),
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.padding(bottom = 4.dp)
                     )
@@ -829,14 +831,14 @@ fun QuickAccessSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 12.dp),
-                    placeholder = { Text("Search notes...") },
+                    placeholder = { Text(stringResource(R.string.quick_notes_search_placeholder)) },
                     leadingIcon = {
                         Icon(Icons.Default.Search, contentDescription = null)
                     },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
                             IconButton(onClick = { searchQuery = "" }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Clear")
+                                Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.action_clear))
                             }
                         }
                     },
@@ -853,14 +855,14 @@ fun QuickAccessSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = "Flight Info", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(text = stringResource(R.string.quick_notes_section_flight_info), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 IconButton(onClick = {
                     flightExpanded = !flightExpanded
                     noteManager.saveFlightInfoExpanded(flightExpanded)
                 }) {
                     Icon(
                         imageVector = if (flightExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = if (flightExpanded) "Collapse" else "Expand"
+                        contentDescription = if (flightExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand)
                     )
                 }
             }
@@ -874,7 +876,7 @@ fun QuickAccessSheet(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = "${callsign.ifBlank { "-" }}  | Status: ${flightStatus.ifBlank { "Idle" }}  | COM1: ${com1.ifBlank { "-" }} ${com1Mode}  | COM2: ${com2.ifBlank { "-" }} ${com2Mode}", style = MaterialTheme.typography.bodyMedium)
+                    Text(text = "${callsign.ifBlank { "-" }}  | ${stringResource(R.string.quick_notes_status_label)}: ${flightStatus.ifBlank { stringResource(R.string.flight_status_idle) }}  | ${stringResource(R.string.quick_notes_com1_label)}: ${com1.ifBlank { "-" }} ${com1Mode}  | ${stringResource(R.string.quick_notes_com2_label)}: ${com2.ifBlank { "-" }} ${com2Mode}", style = MaterialTheme.typography.bodyMedium)
                 }
             }
 
@@ -892,7 +894,7 @@ fun QuickAccessSheet(
                                 OutlinedTextField(
                                     value = callsign,
                                     onValueChange = { callsign = it },
-                                    label = { Text("CALLSIGN") },
+                                    label = { Text(stringResource(R.string.quick_notes_callsign_label)) },
                                     singleLine = true,
                                     modifier = Modifier.weight(1f)
                                 )
@@ -921,15 +923,15 @@ fun QuickAccessSheet(
                             OutlinedTextField(
                                 value = com1,
                                 onValueChange = { com1 = formatComInputToDot(it) },
-                                label = { Text("COM1") },
+                                label = { Text(stringResource(R.string.quick_notes_com1_label)) },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Decimal),
                                 modifier = Modifier.width(140.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            FilterChip(selected = com1Mode == "FM", onClick = { com1Mode = "FM" }, label = { Text("FM") })
+                            FilterChip(selected = com1Mode == "FM", onClick = { com1Mode = "FM" }, label = { Text(stringResource(R.string.quick_notes_fm)) })
                             Spacer(modifier = Modifier.width(4.dp))
-                            FilterChip(selected = com1Mode == "AM", onClick = { com1Mode = "AM" }, label = { Text("AM") })
+                            FilterChip(selected = com1Mode == "AM", onClick = { com1Mode = "AM" }, label = { Text(stringResource(R.string.quick_notes_am)) })
                         }
 
                         // COM2 column
@@ -937,15 +939,15 @@ fun QuickAccessSheet(
                             OutlinedTextField(
                                 value = com2,
                                 onValueChange = { com2 = formatComInputToDot(it) },
-                                label = { Text("COM2") },
+                                label = { Text(stringResource(R.string.quick_notes_com2_label)) },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Decimal),
                                 modifier = Modifier.width(140.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            FilterChip(selected = com2Mode == "FM", onClick = { com2Mode = "FM" }, label = { Text("FM") })
+                            FilterChip(selected = com2Mode == "FM", onClick = { com2Mode = "FM" }, label = { Text(stringResource(R.string.quick_notes_fm)) })
                             Spacer(modifier = Modifier.width(4.dp))
-                            FilterChip(selected = com2Mode == "AM", onClick = { com2Mode = "AM" }, label = { Text("AM") })
+                            FilterChip(selected = com2Mode == "AM", onClick = { com2Mode = "AM" }, label = { Text(stringResource(R.string.quick_notes_am)) })
                         }
 
                         // no manual save/load buttons (auto-save/auto-load enabled)
@@ -960,12 +962,12 @@ fun QuickAccessSheet(
                     icon = {
                         Icon(Icons.Default.Edit, contentDescription = null)
                     },
-                    title = { Text("Rename Note") },
+                    title = { Text(stringResource(R.string.quick_notes_rename_title)) },
                     text = {
                         OutlinedTextField(
                             value = renameText,
                             onValueChange = { renameText = it },
-                            label = { Text("Title") },
+                            label = { Text(stringResource(R.string.quick_notes_title_label)) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -979,12 +981,12 @@ fun QuickAccessSheet(
                                 showRenameDialog = false
                             }
                         ) {
-                            Text("Save")
+                            Text(stringResource(R.string.action_save))
                         }
                     },
                     dismissButton = {
                         TextButton(onClick = { showRenameDialog = false }) {
-                            Text("Cancel")
+                            Text(stringResource(R.string.action_cancel))
                         }
                     }
                 )
@@ -999,7 +1001,7 @@ fun QuickAccessSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (showAdvancedEditor) "Markdown Editor" else "Note",
+                    text = if (showAdvancedEditor) stringResource(R.string.quick_notes_editor_markdown) else stringResource(R.string.quick_notes_editor_note),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -1008,12 +1010,12 @@ fun QuickAccessSheet(
                     FilterChip(
                         selected = !showAdvancedEditor,
                         onClick = { showAdvancedEditor = false },
-                        label = { Text("Normal", style = MaterialTheme.typography.labelSmall) }
+                        label = { Text(stringResource(R.string.quick_notes_mode_normal_chip), style = MaterialTheme.typography.labelSmall) }
                     )
                     FilterChip(
                         selected = showAdvancedEditor,
                         onClick = { showAdvancedEditor = true },
-                        label = { Text("Markdown", style = MaterialTheme.typography.labelSmall) }
+                        label = { Text(stringResource(R.string.quick_notes_mode_markdown_chip), style = MaterialTheme.typography.labelSmall) }
                     )
                 }
             }
@@ -1042,9 +1044,7 @@ fun QuickAccessSheet(
                             .heightIn(min = 300.dp, max = editorMax),
                         placeholder = {
                             Text(
-                                "Markdown Editor\n\n" +
-                                "Links: [Text](internal://open?file=...)\n" +
-                                "**Bold**, *Italic*",
+                                stringResource(R.string.quick_notes_markdown_placeholder),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1075,7 +1075,7 @@ fun QuickAccessSheet(
                                     .heightIn(min = 200.dp),
                                 placeholder = {
                                     Text(
-                                        "Write your notes here...",
+                                        stringResource(R.string.quick_notes_placeholder),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -1195,12 +1195,12 @@ fun QuickAccessSheet(
                                     tint = MaterialTheme.colorScheme.outline
                                 )
                                 Text(
-                                    text = "Note is empty",
+                                    text = stringResource(R.string.quick_notes_empty_state),
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
-                                    text = "Use quick input below",
+                                    text = stringResource(R.string.quick_notes_empty_hint),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.outline
                                 )
@@ -1257,7 +1257,7 @@ fun QuickAccessSheet(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 Text(
-                                    text = if (note.title.isNotBlank()) note.title else "Untitled",
+                                    text = if (note.title.isNotBlank()) note.title else stringResource(R.string.quick_notes_untitled),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     style = MaterialTheme.typography.labelMedium,
@@ -1280,7 +1280,7 @@ fun QuickAccessSheet(
                                     // Two-step delete: first click arms, second click confirms
                                     Icon(
                                         Icons.Default.Delete,
-                                        contentDescription = if (pendingDeleteNoteId == note.id) "Click again to confirm" else "Delete",
+                                        contentDescription = if (pendingDeleteNoteId == note.id) stringResource(R.string.quick_notes_delete_confirm) else stringResource(R.string.action_delete),
                                         modifier = Modifier
                                             .size(12.dp)
                                                 .clickable {
@@ -1289,7 +1289,7 @@ fun QuickAccessSheet(
                                                         pendingDeleteNoteId = null
                                                     } else {
                                                         pendingDeleteNoteId = note.id
-                                                        Toast.makeText(context, "Press again to delete", Toast.LENGTH_SHORT).show()
+                                                        Toast.makeText(context, context.getString(R.string.quick_notes_delete_confirm), Toast.LENGTH_SHORT).show()
                                                     }
                                                 },
                                         tint = if (pendingDeleteNoteId == note.id) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.error.copy(alpha = 0.9f)
@@ -1303,7 +1303,7 @@ fun QuickAccessSheet(
                     item {
                         Surface(
                             onClick = {
-                                val id = noteManager.addNote(title = "New Note")
+                                val id = noteManager.addNote(title = context.getString(R.string.quick_notes_new_note))
                                 noteManager.setActiveNote(id)
                             },
                             modifier = Modifier
@@ -1323,11 +1323,11 @@ fun QuickAccessSheet(
                             ) {
                                 Icon(
                                     Icons.Default.Add,
-                                    contentDescription = "New note",
+                                    contentDescription = stringResource(R.string.quick_notes_new_note),
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Text(
-                                    "New",
+                                    stringResource(R.string.quick_notes_new_button),
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -1366,7 +1366,7 @@ fun QuickAccessSheet(
                                     newTextInput = TextFieldValue("")
                                 }
                             },
-                            label = { Text("Text", style = MaterialTheme.typography.labelSmall) }
+                            label = { Text(stringResource(R.string.quick_notes_field_text), style = MaterialTheme.typography.labelSmall) }
                         )
                         FilterChip(
                             selected = quickInputMode == "number",
@@ -1376,43 +1376,43 @@ fun QuickAccessSheet(
                                     newTextInput = TextFieldValue("")
                                 }
                             },
-                            label = { Text("Numbers", style = MaterialTheme.typography.labelSmall) }
+                            label = { Text(stringResource(R.string.quick_notes_field_numbers), style = MaterialTheme.typography.labelSmall) }
                         )
                         FilterChip(
                             selected = quickInputMode == "freq",
                             onClick = {
                                 if (quickInputMode != "freq") {
                                     quickInputMode = "freq"
-                                    val tmpl = "COM: "
+                                    val tmpl = context.getString(R.string.quick_notes_com_prefix)
                                     newTextInput = TextFieldValue(tmpl, selection = TextRange(tmpl.length))
                                     focusRequester.requestFocus()
                                 }
                             },
-                            label = { Text("Frequency", style = MaterialTheme.typography.labelSmall) }
+                            label = { Text(stringResource(R.string.quick_notes_field_frequency), style = MaterialTheme.typography.labelSmall) }
                         )
                         FilterChip(
                             selected = quickInputMode == "coord",
                             onClick = {
                                 if (quickInputMode != "coord") {
                                     quickInputMode = "coord"
-                                    val tmpl = "N       E      "
+                                    val tmpl = context.getString(R.string.quick_notes_coord_template)
                                     newTextInput = TextFieldValue(tmpl, selection = TextRange(2))
                                     focusRequester.requestFocus()
                                 }
                             },
-                            label = { Text("Coordinates", style = MaterialTheme.typography.labelSmall) }
+                            label = { Text(stringResource(R.string.quick_notes_field_coordinates), style = MaterialTheme.typography.labelSmall) }
                         )
                         FilterChip(
                             selected = quickInputMode == "fluglage",
                             onClick = {
                                 if (quickInputMode != "fluglage") {
                                     quickInputMode = "fluglage"
-                                    val tmpl = "Alt: FL    / Speed:     / HDG:    "
+                                    val tmpl = context.getString(R.string.quick_notes_flight_template)
                                     newTextInput = TextFieldValue(tmpl, selection = TextRange(9))
                                     focusRequester.requestFocus()
                                 }
                             },
-                            label = { Text("Flight State", style = MaterialTheme.typography.labelSmall) }
+                            label = { Text(stringResource(R.string.quick_notes_field_flight_state), style = MaterialTheme.typography.labelSmall) }
                         )
                         FilterChip(
                             selected = quickInputMode == "time",
@@ -1425,7 +1425,7 @@ fun QuickAccessSheet(
                                     focusRequester.requestFocus()
                                 }
                             },
-                            label = { Text("Time", style = MaterialTheme.typography.labelSmall) }
+                            label = { Text(stringResource(R.string.quick_notes_field_time), style = MaterialTheme.typography.labelSmall) }
                         )
                         FilterChip(
                             selected = quickInputMode == "draw",
@@ -1434,7 +1434,7 @@ fun QuickAccessSheet(
                                     quickInputMode = "draw"
                                 }
                             },
-                            label = { Text("Draw", style = MaterialTheme.typography.labelSmall) }
+                            label = { Text(stringResource(R.string.quick_notes_field_draw), style = MaterialTheme.typography.labelSmall) }
                         )
                     }
 
@@ -1516,7 +1516,7 @@ fun QuickAccessSheet(
 
                                     val northFmt = formatCoordPart(northDigits)
                                     val eastFmt = formatCoordPart(eastDigits)
-                                    val formatted = "N $northFmt E $eastFmt"
+                                    val formatted = context.getString(R.string.quick_notes_coord_format, northFmt, eastFmt)
 
                                     // Determine cursor: after last entered digit; if symbol follows it, place after symbol
                                     val numDigits = digits.length
@@ -1576,11 +1576,11 @@ fun QuickAccessSheet(
 
                                     // Format: "Alt: FL DDDDD / Speed: DDD / HDG: DDD"
                                     val formatted = buildString {
-                                        append("Alt: FL ")
+                                        append(context.getString(R.string.quick_notes_alt_prefix))
                                         append(flDigits)
-                                        append(" / Speed: ")
+                                        append(context.getString(R.string.quick_notes_speed_separator))
                                         append(speedDigits)
-                                        append(" / HDG: ")
+                                        append(context.getString(R.string.quick_notes_hdg_separator))
                                         append(hdgDigits)
                                     }
 
@@ -1601,7 +1601,8 @@ fun QuickAccessSheet(
                                         idx
                                     } else -1
 
-                                    val cursorPos = if (lastDigitIndex >= 0) lastDigitIndex + 1 else formatted.indexOf("Alt: FL ") + "Alt: FL ".length
+                                    val altPrefix = context.getString(R.string.quick_notes_alt_prefix)
+                                    val cursorPos = if (lastDigitIndex >= 0) lastDigitIndex + 1 else formatted.indexOf(altPrefix) + altPrefix.length
 
                                     newTextInput = TextFieldValue(
                                         text = formatted,
@@ -1668,7 +1669,8 @@ fun QuickAccessSheet(
                                                     idx
                                                 } else -1
 
-                                                val pos = if (lastDigitIndex >= 0) lastDigitIndex + 1 else txt.indexOf("Alt: FL ") + "Alt: FL ".length
+                                                val altPrefix2 = context.getString(R.string.quick_notes_alt_prefix)
+                                                val pos = if (lastDigitIndex >= 0) lastDigitIndex + 1 else txt.indexOf(altPrefix2) + altPrefix2.length
 
                                                 newTextInput = newTextInput.copy(
                                                     selection = TextRange(pos.coerceIn(0, txt.length))
@@ -1679,12 +1681,12 @@ fun QuickAccessSheet(
                                 },
                             placeholder = {
                                 Text(when (quickInputMode) {
-                                    "coord" -> "Enter numbers (e.g., 481234 for N48°12'34\")"
-                                    "freq" -> "e.g., 122.500"
-                                    "time" -> "e.g., 14:30"
-                                    "number" -> "Enter numbers..."
-                                    "fluglage" -> "Enter numbers (e.g., 020000250090 for FL20000/250kt/HDG090)"
-                                    else -> "Add text..."
+                                    "coord" -> stringResource(R.string.quick_notes_coord_placeholder)
+                                    "freq" -> stringResource(R.string.quick_notes_freq_placeholder)
+                                    "time" -> stringResource(R.string.quick_notes_time_placeholder)
+                                    "number" -> stringResource(R.string.quick_notes_numbers_placeholder)
+                                    "fluglage" -> stringResource(R.string.quick_notes_flight_placeholder)
+                                    else -> stringResource(R.string.quick_notes_text_placeholder)
                                 })
                             },
                             maxLines = 2,
@@ -1816,14 +1818,14 @@ fun QuickAccessSheet(
                                         if (id != null) {
                                             noteManager.saveDrawing(id, drawingJson)
                                             drawingDirty = false
-                                            Toast.makeText(context, "Drawing saved", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, context.getString(R.string.quick_notes_drawing_saved), Toast.LENGTH_SHORT).show()
                                         } else {
-                                            Toast.makeText(context, "No active note to save drawing", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, context.getString(R.string.quick_notes_no_active_note), Toast.LENGTH_SHORT).show()
                                         }
                                     }) {
-                                        Icon(Icons.Default.Save, contentDescription = "Save")
+                                        Icon(Icons.Default.Save, contentDescription = stringResource(R.string.action_save))
                                         Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Save")
+                                        Text(stringResource(R.string.action_save))
                                     }
 
                                     FilledTonalButton(onClick = {
@@ -1831,10 +1833,10 @@ fun QuickAccessSheet(
                                     }) {
                                         Icon(
                                             if (eraseMode) Icons.Default.Edit else Icons.Default.Delete,
-                                            contentDescription = if (eraseMode) "Draw" else "Erase"
+                                            contentDescription = if (eraseMode) stringResource(R.string.quick_notes_draw_button) else stringResource(R.string.quick_notes_erase_button)
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
-                                        Text(if (eraseMode) "Draw" else "Erase")
+                                        Text(if (eraseMode) stringResource(R.string.quick_notes_draw_button) else stringResource(R.string.quick_notes_erase_button))
                                     }
 
                                     OutlinedButton(onClick = {
@@ -1844,9 +1846,9 @@ fun QuickAccessSheet(
                                         drawingDirty = false
                                         noteManager.clearDrawing(activeNoteId)
                                     }) {
-                                        Icon(Icons.Default.Clear, contentDescription = "Clear")
+                                        Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.action_clear))
                                         Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Clear")
+                                        Text(stringResource(R.string.action_clear))
                                     }
                                 }
                             }
@@ -1866,7 +1868,7 @@ fun QuickAccessSheet(
                             },
                             enabled = newTextInput.text.isNotEmpty()
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = "Add")
+                            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.action_add))
                         }
                     }
                 }
@@ -1890,7 +1892,7 @@ fun QuickAccessSheet(
                                 pendingDeleteCurrentNoteConfirm = false
                             } else {
                                 pendingDeleteCurrentNoteConfirm = true
-                                Toast.makeText(context, "Press again to delete", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.quick_notes_delete_confirm), Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier
@@ -1900,12 +1902,12 @@ fun QuickAccessSheet(
                     ) {
                         Icon(
                             Icons.Default.Delete,
-                            contentDescription = if (pendingDeleteCurrentNoteConfirm) "Click again to confirm" else "Delete",
+                            contentDescription = if (pendingDeleteCurrentNoteConfirm) stringResource(R.string.quick_notes_delete_confirm) else stringResource(R.string.action_delete),
                             modifier = Modifier.size(14.dp),
                             tint = if (pendingDeleteCurrentNoteConfirm) MaterialTheme.colorScheme.error else LocalContentColor.current
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Delete", style = MaterialTheme.typography.labelSmall)
+                        Text(stringResource(R.string.action_delete), style = MaterialTheme.typography.labelSmall)
                     }
 
                     // Smaller save button
@@ -1925,7 +1927,7 @@ fun QuickAccessSheet(
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Save", style = MaterialTheme.typography.labelSmall)
+                        Text(stringResource(R.string.action_save), style = MaterialTheme.typography.labelSmall)
                     }
                 }
 
@@ -1948,7 +1950,7 @@ fun QuickAccessSheet(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "Not saved",
+                                    text = stringResource(R.string.quick_notes_not_saved),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.primary
                                 )
@@ -1964,7 +1966,7 @@ fun QuickAccessSheet(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "Saved",
+                                    text = stringResource(R.string.quick_notes_saved),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.tertiary
                                 )
@@ -1975,7 +1977,7 @@ fun QuickAccessSheet(
                     // Note count
                     if (notes.isNotEmpty()) {
                         Text(
-                            text = "${notes.size} ${if (notes.size == 1) "note" else "notes"}",
+                            text = "${notes.size} ${if (notes.size == 1) stringResource(R.string.quick_notes_count_singular) else stringResource(R.string.quick_notes_count_plural)}",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

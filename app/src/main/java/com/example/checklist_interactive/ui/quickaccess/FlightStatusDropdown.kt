@@ -8,6 +8,8 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.example.checklist_interactive.R
 import androidx.compose.ui.unit.dp
 
 /**
@@ -22,18 +24,18 @@ fun FlightStatusDropdown(
     compact: Boolean = false
 ) {
     val statusOptions = listOf(
-        "Idle",
-        "Startup",
-        "Taxi",
-        "Holding",
-        "Start Navigation",
-        "Navigation",
-        "Landing",
-        "Shutdown"
+        stringResource(R.string.flight_status_idle),
+        stringResource(R.string.flight_status_startup),
+        stringResource(R.string.flight_status_taxi),
+        stringResource(R.string.flight_status_holding),
+        stringResource(R.string.flight_status_start_navigation),
+        stringResource(R.string.flight_status_navigation),
+        stringResource(R.string.flight_status_landing),
+        stringResource(R.string.flight_status_shutdown)
     )
     
     var expanded by remember { mutableStateOf(false) }
-    val displayStatus = currentStatus.ifBlank { "Idle" }
+    val displayStatus = currentStatus.ifBlank { stringResource(R.string.flight_status_idle) }
     
     if (compact) {
         // Compact mode: clickable text with dropdown
@@ -64,13 +66,13 @@ fun FlightStatusDropdown(
             OutlinedTextField(
                 value = displayStatus,
                 onValueChange = {},
-                label = { Text("Status") },
+                label = { Text(stringResource(R.string.quick_notes_status_label)) },
                 readOnly = true,
                 trailingIcon = {
                     IconButton(onClick = { expanded = !expanded }) {
                         Icon(
                             imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            contentDescription = if (expanded) "Collapse" else "Expand"
+                            contentDescription = stringResource(if (expanded) R.string.action_collapse else R.string.action_expand)
                         )
                     }
                 },

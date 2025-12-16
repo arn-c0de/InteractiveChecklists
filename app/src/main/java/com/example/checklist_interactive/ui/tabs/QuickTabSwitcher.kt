@@ -13,8 +13,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.checklist_interactive.R
 import com.example.checklist_interactive.data.tabs.TabManager
 
 /**
@@ -51,12 +53,12 @@ fun QuickTabSwitcherSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Open tabs",
+                    text = stringResource(R.string.tab_open_tabs),
                     style = MaterialTheme.typography.titleLarge
                 )
                 
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = "Close")
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_close))
                 }
             }
             
@@ -65,7 +67,7 @@ fun QuickTabSwitcherSheet(
             // Recently used section
             if (navigationHistory.isNotEmpty()) {
                 Text(
-                    text = "Recently used",
+                    text = stringResource(R.string.tab_recently_used),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -97,7 +99,7 @@ fun QuickTabSwitcherSheet(
             
             // All tabs section
             Text(
-                text = "All tabs (${tabs.size})",
+                text = stringResource(R.string.tab_all_tabs, tabs.size),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp)
@@ -183,7 +185,7 @@ private fun TabHistoryItem(
                 
                 if (tabInfo.pageNumber >= 0) {
                     Text(
-                        text = "Page ${tabInfo.pageNumber + 1}",
+                        text = stringResource(R.string.tab_page_number, tabInfo.pageNumber + 1),
                         style = MaterialTheme.typography.bodySmall,
                         color = if (isActive) {
                             MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
@@ -200,7 +202,7 @@ private fun TabHistoryItem(
                     color = MaterialTheme.colorScheme.primary
                 ) {
                     Text(
-                        text = "Active",
+                        text = stringResource(R.string.tab_active),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
@@ -227,7 +229,7 @@ fun QuickTabSwitchFAB(
     ) {
         Icon(
             imageVector = Icons.Default.History,
-            contentDescription = "Switch tabs"
+            contentDescription = stringResource(R.string.tab_switch)
         )
     }
 }

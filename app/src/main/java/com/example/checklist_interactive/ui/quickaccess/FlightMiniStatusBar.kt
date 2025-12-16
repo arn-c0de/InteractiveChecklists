@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.CompositionLocalProvider
 import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
+import androidx.compose.ui.res.stringResource
+import com.example.checklist_interactive.R
 
 @Composable
 fun FlightMiniStatusBar(noteManager: QuickNoteManager, onClick: (() -> Unit)? = null, useBackground: Boolean = true) {
@@ -59,15 +61,15 @@ fun FlightMiniStatusBar(noteManager: QuickNoteManager, onClick: (() -> Unit)? = 
     ) {
         Text(text = (callsign.ifBlank { "-" }), style = MaterialTheme.typography.labelSmall)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(text = "Status:", style = MaterialTheme.typography.labelSmall)
+            Text(text = stringResource(R.string.quick_notes_status_label) + ":", style = MaterialTheme.typography.labelSmall)
             FlightStatusDropdown(
                 currentStatus = status,
                 onStatusChange = { noteManager.saveFlightStatus(it) },
                 compact = true
             )
         }
-        Text(text = "COM1: ${com1.ifBlank { "-" }.replace(',', '.')} ${com1Mode}", style = MaterialTheme.typography.labelSmall)
-        Text(text = "COM2: ${com2.ifBlank { "-" }.replace(',', '.')} ${com2Mode}", style = MaterialTheme.typography.labelSmall)
+        Text(text = stringResource(R.string.quick_notes_com1_label) + ": ${com1.ifBlank { "-" }.replace(',', '.')} ${com1Mode}", style = MaterialTheme.typography.labelSmall)
+        Text(text = stringResource(R.string.quick_notes_com2_label) + ": ${com2.ifBlank { "-" }.replace(',', '.')} ${com2Mode}", style = MaterialTheme.typography.labelSmall)
         Spacer(modifier = Modifier.weight(1f))
 
         // Live clock (HH:mm:ss)

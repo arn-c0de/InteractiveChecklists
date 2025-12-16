@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -38,6 +39,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.ui.platform.LocalDensity
 import com.example.checklist_interactive.data.datapad.FlightData
+import com.example.checklist_interactive.R
 import kotlinx.coroutines.isActive
 import kotlin.math.abs
 
@@ -259,14 +261,14 @@ fun DataPadPopup(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "DataPad",
+                        text = stringResource(R.string.datapad_title),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold
                     )
                     IconButton(onClick = { showSettingsDialog = true }) {
                         Icon(
                             imageVector = Icons.Default.Settings,
-                            contentDescription = "Settings",
+                            contentDescription = stringResource(R.string.cd_settings),
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -337,7 +339,7 @@ private fun ConnectionStatusCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     // Enabled indicator
                     Text(
-                        text = if (isEnabled) "Empfang: AN" else "Empfang: AUS",
+                        text = stringResource(if (isEnabled) R.string.datapad_reception_on else R.string.datapad_reception_off),
                         color = if (isEnabled) Color(0xFFB9F6CA) else Color(0xFFB0BEC5),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold
@@ -353,7 +355,7 @@ private fun ConnectionStatusCard(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (isConnected) "Connected" else "Waiting for data",
+                        text = stringResource(if (isConnected) R.string.datapad_connected else R.string.datapad_waiting_for_data),
                         color = Color.White,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 14.sp
@@ -366,7 +368,7 @@ private fun ConnectionStatusCard(
                     ) {
                         Icon(
                             imageVector = Icons.Default.PowerSettingsNew,
-                            contentDescription = if (isEnabled) "Empfang deaktivieren" else "Empfang aktivieren",
+                            contentDescription = stringResource(if (isEnabled) R.string.datapad_toggle_reception_on else R.string.datapad_toggle_reception_off),
                             tint = if (isEnabled) Color.White else Color.Gray
                         )
                     }
@@ -380,7 +382,7 @@ private fun ConnectionStatusCard(
             }
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = "🔒 AES-GCM encrypted • $deviceIpAddress:$udpPort",
+                text = stringResource(R.string.datapad_encrypted_connection, deviceIpAddress, udpPort),
                 color = Color.White.copy(alpha = 0.9f),
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Medium
@@ -408,33 +410,33 @@ private fun NoDataCard() {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "No flight data received yet",
+                text = stringResource(R.string.datapad_no_data),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Make sure forward_parsed_udp.py is running",
+                text = stringResource(R.string.datapad_setup_instructions),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "Expected command:",
+                text = stringResource(R.string.datapad_expected_command),
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "python forward_parsed_udp.py --host $deviceIpAddress --port $udpPort",
+                text = stringResource(R.string.datapad_command_example, deviceIpAddress, udpPort),
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "🔒 Data is encrypted with AES-GCM",
+                text = stringResource(R.string.datapad_encryption_info),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.secondary
             )
@@ -449,134 +451,134 @@ private fun FlightDataDisplay(data: FlightData?) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Aircraft & Pilot
-        DataSection(title = "Aircraft & Pilot") {
-            DataRow("Aircraft", data?.aircraft ?: "Not available")
-            DataRow("Pilot", data?.unitName ?: "Not available")
-            DataRow("Coalition", data?.coalition ?: "Not available")
-            DataRow("Group", data?.group ?: "Not available")
+        DataSection(title = stringResource(R.string.datapad_section_aircraft_pilot)) {
+            DataRow(stringResource(R.string.datapad_aircraft), data?.aircraft ?: stringResource(R.string.datapad_not_available))
+            DataRow(stringResource(R.string.datapad_pilot), data?.unitName ?: stringResource(R.string.datapad_not_available))
+            DataRow(stringResource(R.string.datapad_coalition), data?.coalition ?: stringResource(R.string.datapad_not_available))
+            DataRow(stringResource(R.string.datapad_group), data?.group ?: stringResource(R.string.datapad_not_available))
         }
 
         // Environment
-        DataSection(title = "Environment") {
+        DataSection(title = stringResource(R.string.datapad_environment)) {
             data?.environment?.let { env ->
-                DataRow("Temperature", env.temperature?.let { String.format("%.1f", it) + "°C (${String.format("%.1f", celsiusToFahrenheit(it))}°F)" } ?: "Not available")
-                DataRow("Pressure", env.pressure?.let { String.format("%.1f", it) + " hPa (${String.format("%.2f", hpaToInHg(it))} inHg)" } ?: "Not available")
-                DataRow("Wind Speed", env.windSpeed?.let { String.format("%.1f", it) + " m/s (${String.format("%.1f", mpsToKts(it))} kt)" } ?: "Not available")
-                DataRow("Wind Direction", env.windDirection?.let { String.format("%.1f", it) + "°" } ?: "Not available")
+                DataRow(stringResource(R.string.datapad_temperature), env.temperature?.let { String.format("%.1f", it) + "°C (${String.format("%.1f", celsiusToFahrenheit(it))}°F)" } ?: stringResource(R.string.datapad_not_available))
+                DataRow(stringResource(R.string.datapad_pressure), env.pressure?.let { String.format("%.1f", it) + " hPa (${String.format("%.2f", hpaToInHg(it))} inHg)" } ?: stringResource(R.string.datapad_not_available))
+                DataRow(stringResource(R.string.datapad_wind_speed), env.windSpeed?.let { String.format("%.1f", it) + " m/s (${String.format("%.1f", mpsToKts(it))} kt)" } ?: stringResource(R.string.datapad_not_available))
+                DataRow(stringResource(R.string.datapad_wind_direction), env.windDirection?.let { String.format("%.1f", it) + "°" } ?: stringResource(R.string.datapad_not_available))
                 env.visibility?.let { vis ->
-                    DataRow("Visibility", String.format("%.0f", vis) + " m (${String.format("%.1f", metersToNm(vis))} nm)")
+                    DataRow(stringResource(R.string.datapad_visibility), String.format("%.0f", vis) + " m (${String.format("%.1f", metersToNm(vis))} nm)")
                 }
                 env.clouds?.let { clouds ->
-                    DataRow("Clouds", clouds)
+                    DataRow(stringResource(R.string.datapad_clouds), clouds)
                 }
             } ?: run {
-                DataRow("Temperature", "Not available")
-                DataRow("Pressure", "Not available")
-                DataRow("Wind Speed", "Not available")
-                DataRow("Wind Direction", "Not available")
+                DataRow(stringResource(R.string.datapad_temperature), stringResource(R.string.datapad_not_available))
+                DataRow(stringResource(R.string.datapad_pressure), stringResource(R.string.datapad_not_available))
+                DataRow(stringResource(R.string.datapad_wind_speed), stringResource(R.string.datapad_not_available))
+                DataRow(stringResource(R.string.datapad_wind_direction), stringResource(R.string.datapad_not_available))
             }
         }
 
         // AoA & G-Load
         data?.angleOfAttack?.let { aoa ->
-            DataSection(title = "Flight Performance") {
-                DataRow("Angle of Attack", String.format("%.2f°", aoa))
+            DataSection(title = stringResource(R.string.datapad_section_flight_performance)) {
+                DataRow(stringResource(R.string.datapad_field_angle_of_attack), String.format("%.2f°", aoa))
                 data.gLoad?.let { g ->
-                    DataRow("G-Load X", String.format("%.2f G", g.x))
-                    DataRow("G-Load Y", String.format("%.2f G", g.y))
-                    DataRow("G-Load Z", String.format("%.2f G", g.z))
+                    DataRow(stringResource(R.string.datapad_field_g_load_x), String.format("%.2f G", g.x))
+                    DataRow(stringResource(R.string.datapad_field_g_load_y), String.format("%.2f G", g.y))
+                    DataRow(stringResource(R.string.datapad_field_g_load_z), String.format("%.2f G", g.z))
                 }
             }
         }
 
         // Engine Data
         data?.engines?.let { eng ->
-            DataSection(title = "Engine") {
+            DataSection(title = stringResource(R.string.datapad_section_engine)) {
                 eng.rpm?.let { rpm ->
-                    rpm.left?.let { DataRow("RPM Left", String.format("%.1f%%", it)) }
-                    rpm.right?.let { DataRow("RPM Right", String.format("%.1f%%", it)) }
+                    rpm.left?.let { DataRow(stringResource(R.string.datapad_field_rpm_left), String.format("%.1f%%", it)) }
+                    rpm.right?.let { DataRow(stringResource(R.string.datapad_field_rpm_right), String.format("%.1f%%", it)) }
                 }
                 eng.egt?.let { egt ->
-                    egt.left?.let { DataRow("EGT Left", String.format("%.0f°C", it)) }
-                    egt.right?.let { DataRow("EGT Right", String.format("%.0f°C", it)) }
+                    egt.left?.let { DataRow(stringResource(R.string.datapad_field_egt_left), String.format("%.0f°C", it)) }
+                    egt.right?.let { DataRow(stringResource(R.string.datapad_field_egt_right), String.format("%.0f°C", it)) }
                 }
-                eng.throttle?.let { DataRow("Throttle", String.format("%.1f%%", it * 100)) }
-                StatusRow("Afterburner", eng.afterburner)
+                eng.throttle?.let { DataRow(stringResource(R.string.datapad_field_throttle), String.format("%.1f%%", it * 100)) }
+                StatusRow(stringResource(R.string.datapad_field_afterburner), eng.afterburner)
             }
         }
 
         // Aircraft Mass
         data?.aircraftMass?.let { mass ->
-            DataSection(title = "Aircraft Mass") {
-                mass.total?.let { DataRow("Total Mass", String.format("%.0f kg", it)) }
-                mass.empty?.let { DataRow("Empty Mass", String.format("%.0f kg", it)) }
-                mass.payload?.let { DataRow("Payload", String.format("%.0f kg", it)) }
+            DataSection(title = stringResource(R.string.datapad_section_aircraft_mass)) {
+                mass.total?.let { DataRow(stringResource(R.string.datapad_field_total_mass), String.format("%.0f kg", it)) }
+                mass.empty?.let { DataRow(stringResource(R.string.datapad_field_empty_mass), String.format("%.0f kg", it)) }
+                mass.payload?.let { DataRow(stringResource(R.string.datapad_field_payload), String.format("%.0f kg", it)) }
             }
         }
 
         // Flight Controls & Trim
         data?.flightControls?.let { ctrl ->
-            DataSection(title = "Flight Controls & Trim", initialExpanded = false) {
-                ctrl.pitch?.let { DataRow("Pitch", String.format("%.2f", it)) }
-                ctrl.roll?.let { DataRow("Roll", String.format("%.2f", it)) }
-                ctrl.yaw?.let { DataRow("Yaw", String.format("%.2f", it)) }
-                ctrl.trimPitch?.let { DataRow("Trim Pitch", String.format("%.2f", it)) }
-                ctrl.trimRoll?.let { DataRow("Trim Roll", String.format("%.2f", it)) }
-                ctrl.trimYaw?.let { DataRow("Trim Yaw", String.format("%.2f", it)) }
+            DataSection(title = stringResource(R.string.datapad_section_flight_controls), initialExpanded = false) {
+                ctrl.pitch?.let { DataRow(stringResource(R.string.datapad_field_pitch), String.format("%.2f", it)) }
+                ctrl.roll?.let { DataRow(stringResource(R.string.datapad_field_roll), String.format("%.2f", it)) }
+                ctrl.yaw?.let { DataRow(stringResource(R.string.datapad_field_yaw), String.format("%.2f", it)) }
+                ctrl.trimPitch?.let { DataRow(stringResource(R.string.datapad_field_trim_pitch), String.format("%.2f", it)) }
+                ctrl.trimRoll?.let { DataRow(stringResource(R.string.datapad_field_trim_roll), String.format("%.2f", it)) }
+                ctrl.trimYaw?.let { DataRow(stringResource(R.string.datapad_field_trim_yaw), String.format("%.2f", it)) }
             }
         }
 
         // Mechanical (Gear, Flaps, etc.)
         data?.mechanical?.let { mech ->
-            DataSection(title = "Gear & Configuration") {
+            DataSection(title = stringResource(R.string.datapad_section_gear_config)) {
                 mech.gear?.let { gear ->
-                    gear.nose?.let { DataRow("Nose Gear", if (it > 0.9) "DOWN" else if (it < 0.1) "UP" else "TRANSIT") }
-                    gear.left?.let { DataRow("Left Gear", if (it > 0.9) "DOWN" else if (it < 0.1) "UP" else "TRANSIT") }
-                    gear.right?.let { DataRow("Right Gear", if (it > 0.9) "DOWN" else if (it < 0.1) "UP" else "TRANSIT") }
+                    gear.nose?.let { DataRow(stringResource(R.string.datapad_field_nose_gear), if (it > 0.9) stringResource(R.string.datapad_gear_down) else if (it < 0.1) stringResource(R.string.datapad_gear_up) else stringResource(R.string.datapad_gear_transit)) }
+                    gear.left?.let { DataRow(stringResource(R.string.datapad_field_left_gear), if (it > 0.9) stringResource(R.string.datapad_gear_down) else if (it < 0.1) stringResource(R.string.datapad_gear_up) else stringResource(R.string.datapad_gear_transit)) }
+                    gear.right?.let { DataRow(stringResource(R.string.datapad_field_right_gear), if (it > 0.9) stringResource(R.string.datapad_gear_down) else if (it < 0.1) stringResource(R.string.datapad_gear_up) else stringResource(R.string.datapad_gear_transit)) }
                 }
-                StatusRow("Weight on Wheels", data.weightOnWheels)
-                mech.flaps?.let { DataRow("Flaps", String.format("%.0f%%", it * 100)) }
-                mech.speedbrake?.let { DataRow("Speedbrake", String.format("%.0f%%", it * 100)) }
-                mech.canopy?.let { DataRow("Canopy", if (it > 0.9) "OPEN" else if (it < 0.1) "CLOSED" else "MOVING") }
-                mech.hook?.let { DataRow("Hook", if (it > 0.5) "DOWN" else "UP") }
+                StatusRow(stringResource(R.string.datapad_field_weight_on_wheels), data.weightOnWheels)
+                mech.flaps?.let { DataRow(stringResource(R.string.datapad_field_flaps), String.format("%.0f%%", it * 100)) }
+                mech.speedbrake?.let { DataRow(stringResource(R.string.datapad_field_speedbrake), String.format("%.0f%%", it * 100)) }
+                mech.canopy?.let { DataRow(stringResource(R.string.datapad_field_canopy), if (it > 0.9) stringResource(R.string.datapad_canopy_open) else if (it < 0.1) stringResource(R.string.datapad_canopy_closed) else stringResource(R.string.datapad_canopy_moving)) }
+                mech.hook?.let { DataRow(stringResource(R.string.datapad_field_hook), if (it > 0.5) stringResource(R.string.datapad_hook_down) else stringResource(R.string.datapad_hook_up)) }
             }
         }
 
         // Lights
         data?.lights?.let { lights ->
-            DataSection(title = "Lights", initialExpanded = false) {
-                lights.landing?.let { StatusRow("Landing", it > 0.5) }
-                lights.taxi?.let { StatusRow("Taxi", it > 0.5) }
-                lights.navigation?.let { StatusRow("Navigation", it > 0.5) }
-                lights.strobe?.let { StatusRow("Strobe", it > 0.5) }
-                lights.formation?.let { StatusRow("Formation", it > 0.5) }
+            DataSection(title = stringResource(R.string.datapad_section_lights), initialExpanded = false) {
+                lights.landing?.let { StatusRow(stringResource(R.string.datapad_field_landing_light), it > 0.5) }
+                lights.taxi?.let { StatusRow(stringResource(R.string.datapad_field_taxi_light), it > 0.5) }
+                lights.navigation?.let { StatusRow(stringResource(R.string.datapad_field_nav_light), it > 0.5) }
+                lights.strobe?.let { StatusRow(stringResource(R.string.datapad_field_strobe_light), it > 0.5) }
+                lights.formation?.let { StatusRow(stringResource(R.string.datapad_field_formation_light), it > 0.5) }
             }
         }
 
         // Systems Status
         data?.systems?.let { sys ->
-            DataSection(title = "Systems Status", initialExpanded = false) {
-                sys.electrical?.let { DataRow("Electrical", it) }
-                sys.hydraulic?.let { DataRow("Hydraulic", it) }
-                sys.apuOn?.let { StatusRow("APU", it) }
-                sys.generatorOn?.let { StatusRow("Generator", it) }
+            DataSection(title = stringResource(R.string.datapad_section_systems_status), initialExpanded = false) {
+                sys.electrical?.let { DataRow(stringResource(R.string.datapad_field_electrical), it) }
+                sys.hydraulic?.let { DataRow(stringResource(R.string.datapad_field_hydraulic), it) }
+                sys.apuOn?.let { StatusRow(stringResource(R.string.datapad_field_apu), it) }
+                sys.generatorOn?.let { StatusRow(stringResource(R.string.datapad_field_generator), it) }
             }
         }
 
         // Mission Time
         data?.missionTime?.let { mt ->
-            DataSection(title = "Mission Time", initialExpanded = false) {
+            DataSection(title = stringResource(R.string.datapad_section_mission_time), initialExpanded = false) {
                 val hours = (mt / 3600).toInt()
                 val minutes = ((mt % 3600) / 60).toInt()
                 val seconds = (mt % 60).toInt()
-                DataRow("Time", String.format("%02d:%02d:%02d", hours, minutes, seconds))
+                DataRow(stringResource(R.string.datapad_field_time), String.format("%02d:%02d:%02d", hours, minutes, seconds))
             }
         }
 
         // Nearby Units
         data?.nearbyUnits?.let { units ->
             if (units.isNotEmpty()) {
-                DataSection(title = "Nearby Units (${units.size})", initialExpanded = false) {
+                DataSection(title = stringResource(R.string.datapad_section_nearby_units, units.size), initialExpanded = false) {
                     units.take(10).forEach { unit ->
                         DataRow(
                             unit.name,
@@ -590,19 +592,19 @@ private fun FlightDataDisplay(data: FlightData?) {
         // Flight Parameters & Performance (side-by-side)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(modifier = Modifier.weight(1f)) {
-                DataSection(title = "Flight Parameters") {
-                    DataRow("Altitude", data?.altitude?.let { "${String.format("%.1f", it)} m" } ?: "Not available")
-                    DataRow("Heading", data?.heading?.let { "${String.format("%.1f", Math.toDegrees(it))}°" } ?: "Not available")
-                    DataRow("Pitch", data?.pitch?.let { "${String.format("%.2f", Math.toDegrees(it))}°" } ?: "Not available")
-                    DataRow("Bank", data?.bank?.let { "${String.format("%.2f", Math.toDegrees(it))}°" } ?: "Not available")
+                DataSection(title = stringResource(R.string.datapad_section_flight_params)) {
+                    DataRow(stringResource(R.string.datapad_field_altitude), data?.altitude?.let { "${String.format("%.1f", it)} m" } ?: stringResource(R.string.datapad_not_available))
+                    DataRow(stringResource(R.string.datapad_field_heading), data?.heading?.let { "${String.format("%.1f", Math.toDegrees(it))}°" } ?: stringResource(R.string.datapad_not_available))
+                    DataRow(stringResource(R.string.datapad_field_pitch), data?.pitch?.let { "${String.format("%.2f", Math.toDegrees(it))}°" } ?: stringResource(R.string.datapad_not_available))
+                    DataRow(stringResource(R.string.datapad_field_bank), data?.bank?.let { "${String.format("%.2f", Math.toDegrees(it))}°" } ?: stringResource(R.string.datapad_not_available))
                 }
             }
             Column(modifier = Modifier.weight(1f)) {
-                DataSection(title = "Performance") {
-                    DataRow("Indicated Airspeed", data?.indicatedAirspeed?.let { formatSpeedWithKnots(it) } ?: "Not available")
-                    DataRow("True Airspeed", data?.trueAirspeed?.let { formatSpeedWithKnots(it) } ?: "Not available")
-                    DataRow("Vertical Speed", data?.verticalSpeed?.let { "${String.format("%.2f", it)} m/s (${String.format("%.0f", mpsToFpm(it))} ft/min)" } ?: "Not available")
-                    DataRow("Mach", data?.mach?.let { String.format("%.3f", it) } ?: "Not available")
+                DataSection(title = stringResource(R.string.datapad_section_performance)) {
+                    DataRow(stringResource(R.string.datapad_field_indicated_airspeed), data?.indicatedAirspeed?.let { formatSpeedWithKnots(it) } ?: stringResource(R.string.datapad_not_available))
+                    DataRow(stringResource(R.string.datapad_field_true_airspeed), data?.trueAirspeed?.let { formatSpeedWithKnots(it) } ?: stringResource(R.string.datapad_not_available))
+                    DataRow(stringResource(R.string.datapad_field_vertical_speed), data?.verticalSpeed?.let { "${String.format("%.2f", it)} m/s (${String.format("%.0f", mpsToFpm(it))} ft/min)" } ?: stringResource(R.string.datapad_not_available))
+                    DataRow(stringResource(R.string.datapad_field_mach), data?.mach?.let { String.format("%.3f", it) } ?: stringResource(R.string.datapad_not_available))
                 }
             }
         }
@@ -612,61 +614,64 @@ private fun FlightDataDisplay(data: FlightData?) {
         // Weapons & Countermeasures & Systems Status (side-by-side)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(modifier = Modifier.weight(1f)) {
-                DataSection(title = "Weapons & Countermeasures") {
+                DataSection(title = stringResource(R.string.datapad_section_weapons)) {
                     data?.weapons?.let { w ->
-                        DataRow("Master Arm", if (w.masterArm) "ARMED" else "SAFE")
-                        DataRow("Stations", (w.stations?.size ?: 0).toString())
+                        DataRow(stringResource(R.string.datapad_field_master_arm), if (w.masterArm) stringResource(R.string.datapad_master_arm_armed) else stringResource(R.string.datapad_master_arm_safe))
+                        DataRow(stringResource(R.string.datapad_field_stations), (w.stations?.size ?: 0).toString())
                         w.stations?.forEach { s ->
-                            DataRow("Station ${s.station}", "Type ${s.type} • Count ${s.count}")
+                            DataRow(stringResource(R.string.datapad_station_label, s.station), stringResource(R.string.datapad_type_count, s.type, s.count))
                         }
-                        DataRow("Total Count", (w.totalCount ?: 0).toString())
+                        DataRow(stringResource(R.string.datapad_field_total_count), (w.totalCount ?: 0).toString())
                     } ?: run {
-                        DataRow("Master Arm", "Not available")
-                        DataRow("Stations", "Not available")
-                        DataRow("Total Count", "Not available")
+                        DataRow(stringResource(R.string.datapad_field_master_arm), stringResource(R.string.datapad_not_available))
+                        DataRow(stringResource(R.string.datapad_field_stations), stringResource(R.string.datapad_not_available))
+                        DataRow(stringResource(R.string.datapad_field_total_count), stringResource(R.string.datapad_not_available))
                     }
                     data?.countermeasures?.let { c ->
-                        DataRow("Flares", c.flareCount.toString())
-                        DataRow("Chaff", c.chaffCount.toString())
+                        DataRow(stringResource(R.string.datapad_field_flares), c.flareCount.toString())
+                        DataRow(stringResource(R.string.datapad_field_chaff), c.chaffCount.toString())
                     } ?: run {
-                        DataRow("Flares", "Not available")
-                        DataRow("Chaff", "Not available")
+                        DataRow(stringResource(R.string.datapad_field_flares), stringResource(R.string.datapad_not_available))
+                        DataRow(stringResource(R.string.datapad_field_chaff), stringResource(R.string.datapad_not_available))
                     }
                 }
             }
             Column(modifier = Modifier.weight(1f)) {
-                DataSection(title = "Systems Status") {
-                    StatusRow("Radar Active", data?.radarActive ?: false)
-                    StatusRow("Jamming", data?.jamming ?: false)
-                    StatusRow("IR Jamming", data?.irJamming ?: false)
-                    StatusRow("AI On", data?.aiOn ?: false)
-                    StatusRow("Human", data?.isHuman ?: false)
+                DataSection(title = stringResource(R.string.datapad_section_systems_status)) {
+                    StatusRow(stringResource(R.string.datapad_field_radar_active), data?.radarActive ?: false)
+                    StatusRow(stringResource(R.string.datapad_field_jamming), data?.jamming ?: false)
+                    StatusRow(stringResource(R.string.datapad_field_ir_jamming), data?.irJamming ?: false)
+                    StatusRow(stringResource(R.string.datapad_field_ai_on), data?.aiOn ?: false)
+                    StatusRow(stringResource(R.string.datapad_field_human), data?.isHuman ?: false)
                 }
             }
         }
 
         // Radar Details
         data?.radar?.let { radar ->
-            DataSection(title = "Radar", initialExpanded = false) {
-                radar.mode?.let { DataRow("Mode", it) }
-                radar.range?.let { DataRow("Range", String.format("%.0f m", it)) }
-                StatusRow("Locked", radar.locked)
-                DataRow("Track Count", radar.trackCount.toString())
-                radar.azimuth?.let { DataRow("Azimuth", String.format("%.1f°", it)) }
-                radar.elevation?.let { DataRow("Elevation", String.format("%.1f°", it)) }
-                radar.scan?.let { DataRow("Scan", it) }
+            DataSection(title = stringResource(R.string.datapad_section_radar), initialExpanded = false) {
+                radar.mode?.let { DataRow(stringResource(R.string.datapad_field_mode), it) }
+                radar.range?.let { DataRow(stringResource(R.string.datapad_field_range), String.format("%.0f m", it)) }
+                StatusRow(stringResource(R.string.datapad_field_locked), radar.locked)
+                DataRow(stringResource(R.string.datapad_field_track_count), radar.trackCount.toString())
+                radar.azimuth?.let { DataRow(stringResource(R.string.datapad_field_azimuth), String.format("%.1f°", it)) }
+                radar.elevation?.let { DataRow(stringResource(R.string.datapad_field_elevation), String.format("%.1f°", it)) }
+                radar.scan?.let { DataRow(stringResource(R.string.datapad_field_scan), it) }
                 radar.tracks?.let { tracks ->
                     if (tracks.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Tracks:",
+                            text = stringResource(R.string.datapad_radar_tracks),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold
                         )
                         tracks.forEach { track ->
                             DataRow(
-                                "Track ${track.id}",
-                                "${track.range?.let { String.format("%.0f m", it) } ?: "?"} • ${track.azimuth?.let { String.format("%.0f°", it) } ?: "?"}"
+                                stringResource(R.string.datapad_track_label, track.id),
+                                stringResource(R.string.datapad_track_detail,
+                                    track.range?.let { String.format("%.0f m", it) } ?: "?",
+                                    track.azimuth?.let { String.format("%.0f°", it) } ?: "?"
+                                )
                             )
                         }
                     }
@@ -677,11 +682,11 @@ private fun FlightDataDisplay(data: FlightData?) {
         // RWR / Threats
         data?.rwr?.let { rwr ->
             if (rwr.threatsDetected > 0) {
-                DataSection(title = "RWR Threats (${rwr.threatsDetected})", initialExpanded = true) {
+                DataSection(title = stringResource(R.string.datapad_section_rwr_threats, rwr.threatsDetected), initialExpanded = true) {
                     rwr.contacts?.forEach { contact ->
                         DataRow(
                             contact.type,
-                            "Azimuth: ${contact.azimuth?.let { String.format("%.0f°", it) } ?: "?"} • Priority: ${contact.priority}"
+                            "${stringResource(R.string.datapad_rwr_azimuth_prefix)} ${contact.azimuth?.let { String.format("%.0f°", it) } ?: "?"} • ${stringResource(R.string.datapad_rwr_priority_prefix)} ${contact.priority}"
                         )
                     }
                 }
@@ -691,25 +696,25 @@ private fun FlightDataDisplay(data: FlightData?) {
         Spacer(modifier = Modifier.height(12.dp))
 
         // Position (full width)
-        DataSection(title = "Position") {
-            DataRow("Latitude", data?.latitude?.let { String.format("%.6f", it) } ?: "Not available")
-            DataRow("Longitude", data?.longitude?.let { String.format("%.6f", it) } ?: "Not available")
+        DataSection(title = stringResource(R.string.datapad_section_position)) {
+            DataRow(stringResource(R.string.datapad_field_latitude), data?.latitude?.let { String.format("%.6f", it) } ?: stringResource(R.string.datapad_not_available))
+            DataRow(stringResource(R.string.datapad_field_longitude), data?.longitude?.let { String.format("%.6f", it) } ?: stringResource(R.string.datapad_not_available))
             data?.position?.let { pos ->
-                DataRow("X", String.format("%.2f", pos.x))
-                DataRow("Y", String.format("%.2f", pos.y))
-                DataRow("Z", String.format("%.2f", pos.z))
+                DataRow(stringResource(R.string.datapad_field_x), String.format("%.2f", pos.x))
+                DataRow(stringResource(R.string.datapad_field_y), String.format("%.2f", pos.y))
+                DataRow(stringResource(R.string.datapad_field_z), String.format("%.2f", pos.z))
             } ?: run {
-                DataRow("X", "Not available")
-                DataRow("Y", "Not available")
-                DataRow("Z", "Not available")
+                DataRow(stringResource(R.string.datapad_field_x), stringResource(R.string.datapad_not_available))
+                DataRow(stringResource(R.string.datapad_field_y), stringResource(R.string.datapad_not_available))
+                DataRow(stringResource(R.string.datapad_field_z), stringResource(R.string.datapad_not_available))
             }
         }
 
         // Additional Info
-        DataSection(title = "Additional Info") {
-            DataRow("Timestamp", data?.timestamp ?: "Not available")
-            DataRow("Unit ID", data?.unitID ?: "Not available")
-            DataRow("Streamer Version", data?.streamerVersion ?: "Not available")
+        DataSection(title = stringResource(R.string.datapad_section_additional_info)) {
+            DataRow(stringResource(R.string.datapad_field_timestamp), data?.timestamp ?: stringResource(R.string.datapad_not_available))
+            DataRow(stringResource(R.string.datapad_field_unit_id), data?.unitID ?: stringResource(R.string.datapad_not_available))
+            DataRow(stringResource(R.string.datapad_field_streamer_version), data?.streamerVersion ?: stringResource(R.string.datapad_not_available))
         }
     }
 }
@@ -756,7 +761,7 @@ private fun DataSection(
                 }) {
                     Icon(
                         imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                        contentDescription = if (expanded) "Collapse" else "Expand",
+                        contentDescription = if (expanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -818,7 +823,7 @@ private fun StatusRow(label: String, active: Boolean) {
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-                text = if (active) "ON" else "OFF",
+                text = if (active) stringResource(R.string.state_on) else stringResource(R.string.state_off),
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Bold,
                 color = if (active) Color.Green else Color.Gray

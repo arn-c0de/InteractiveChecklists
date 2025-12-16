@@ -46,6 +46,10 @@ class PreferencesManager(context: Context) {
         // Persisted map tile source id (e.g. "MAPNIK", "OpenTopo", "USGS_SAT", "CartoDB.DarkMatter")
         private const val KEY_MAP_TILE_SOURCE = "map_tile_source"
 
+        // Application language preference (ISO code, e.g., "en", "de")
+        private const val KEY_APP_LANGUAGE = "app_language"
+        private const val DEFAULT_APP_LANGUAGE = "en"
+
         // Shared Json instance to avoid redundant creation
         private val json = Json { prettyPrint = true }
     }
@@ -421,6 +425,17 @@ class PreferencesManager(context: Context) {
 
     fun isPdfToolbarVisible(): Boolean {
         return prefs.getBoolean(KEY_PDF_TOOLBAR_VISIBLE, false)
+    }
+
+    /**
+     * Application language preference
+     */
+    fun setAppLanguage(code: String) {
+        prefs.edit().putString(KEY_APP_LANGUAGE, code).apply()
+    }
+
+    fun getAppLanguage(): String {
+        return prefs.getString(KEY_APP_LANGUAGE, DEFAULT_APP_LANGUAGE) ?: DEFAULT_APP_LANGUAGE
     }
 
     // Migration: move legacy per-view FAB prefs (md_*, ifv_*) to unified names (menu, quick_access)

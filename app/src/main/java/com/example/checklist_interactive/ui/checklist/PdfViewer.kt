@@ -38,6 +38,8 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.automirrored.filled.NoteAdd
 import androidx.compose.runtime.*
+import androidx.compose.ui.res.stringResource
+import com.example.checklist_interactive.R
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,7 +77,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.ui.text.TextStyle
-import com.example.checklist_interactive.R
 import com.example.checklist_interactive.data.shortcuts.PageHighlightManager
 import com.example.checklist_interactive.data.shortcuts.ShortcutManager
 import com.example.checklist_interactive.data.shortcuts.LastPageManager
@@ -451,7 +452,7 @@ fun PdfViewer(
             chapters = if (outlineItems.isNotEmpty()) {
                 outlineItems.map { it.title to it.pageNumber }
             } else {
-                (0 until pageCount).map { idx -> "Page ${idx + 1}" to idx }
+                (0 until pageCount).map { idx -> context.getString(R.string.tab_page_number, idx + 1) to idx }
             }
         } catch (e: Exception) {
             errorMessage = context.getString(R.string.error_loading_pdf, e.message ?: "")
@@ -673,9 +674,9 @@ fun PdfViewer(
                         chapters.lastOrNull { it.second <= currentPage }?.first ?: ""
                     }
                     val titleText = if (currentChapterTitle.isNotBlank()) {
-                        "$title — $currentChapterTitle (Page ${currentPage + 1}/$pageCount)"
+                        "$title — $currentChapterTitle (${stringResource(R.string.pdf_page_progress, currentPage + 1, pageCount)})"
                     } else {
-                        "$title (Page ${currentPage + 1}/$pageCount)"
+                        "$title (${stringResource(R.string.pdf_page_progress, currentPage + 1, pageCount)})"
                     }
                     Text(titleText, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 },
@@ -697,26 +698,26 @@ fun PdfViewer(
                     // Outline button next to the page number
                     HintIconButton(
                         onClick = { showTocDialog = true },
-                        hint = if (outlineItems.isNotEmpty()) "Show outline" else "Show page list",
+                        hint = if (outlineItems.isNotEmpty()) stringResource(R.string.pdf_outline) else stringResource(R.string.pdf_no_chapters),
                         onHintChange = { hoveredHint = it },
                         modifier = Modifier.size(40.dp)
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ViewList,
-                            contentDescription = "Outline",
+                            contentDescription = stringResource(R.string.pdf_outline),
                             modifier = Modifier.size(18.dp)
                         )
                     }
                     // Sharpen toggle moved to top bar
                     HintIconButton(
                         onClick = { sharpenEnabled = !sharpenEnabled },
-                        hint = "Sharpen PDF",
+                        hint = stringResource(R.string.pdf_sharpen),
                         onHintChange = { hoveredHint = it },
                         modifier = Modifier.size(40.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.CenterFocusWeak,
-                            contentDescription = "Sharpen",
+                            contentDescription = stringResource(R.string.pdf_sharpen),
                             tint = if (sharpenEnabled) MaterialTheme.colorScheme.primary else LocalContentColor.current,
                             modifier = Modifier.size(18.dp)
                         )
@@ -726,11 +727,11 @@ fun PdfViewer(
                             invertColors = !invertColors
                             invertColorPrefManager.setInverted(pdfPath, invertColors)
                         },
-                        hint = "Invert colors",
+                        hint = stringResource(R.string.pdf_invert_colors),
                         onHintChange = { hoveredHint = it },
                         modifier = Modifier.size(40.dp)
                     ) {
-                        Icon(Icons.Default.InvertColors, contentDescription = "Invert Colors", modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.InvertColors, contentDescription = stringResource(R.string.pdf_invert_colors), modifier = Modifier.size(18.dp))
                     }
                 }
             )
@@ -778,7 +779,7 @@ fun PdfViewer(
                             ) {
                                 Icon(
                                     Icons.Default.Create,
-                                    contentDescription = "Draw",
+                                    contentDescription = stringResource(R.string.pdf_draw),
                                     tint = if (annotateMode) MaterialTheme.colorScheme.primary else LocalContentColor.current,
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -798,7 +799,7 @@ fun PdfViewer(
                             ) {
                                 Icon(
                                     Icons.Default.Highlight,
-                                    contentDescription = "Markieren",
+                                    contentDescription = stringResource(R.string.pdf_marker),
                                     tint = if (highlightMode) MaterialTheme.colorScheme.primary else LocalContentColor.current,
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -808,29 +809,29 @@ fun PdfViewer(
                                     val isHighlighted = highlightManager.togglePageHighlight(pdfPath, currentPage)
                                     pageHighlights = highlightManager.getHighlightsForFile(pdfPath).map { it.pageNumber }
                                 },
-                                hint = "Highlight page",
+                                hint = stringResource(R.string.pdf_highlight_page),
                                 onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
                                     Icons.Default.Star,
-                                    contentDescription = "Highlight page",
+                                    contentDescription = stringResource(R.string.pdf_highlight_page),
                                     tint = if (pageHighlights.contains(currentPage)) Color.Yellow else LocalContentColor.current,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
                             HintIconButton(
                                 onClick = {
-                                    shortcutName = "$title - Page ${currentPage + 1}"
+                                    shortcutName = context.getString(R.string.pdf_shortcut_name_format, title, currentPage + 1)
                                     showShortcutDialog = true
                                 },
-                                hint = "Shortcut erstellen",
+                                hint = stringResource(R.string.pdf_shortcut_create),
                                 onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
                                     Icons.Default.BookmarkAdd,
-                                    contentDescription = "Shortcut",
+                                    contentDescription = stringResource(R.string.pdf_shortcut),
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -843,13 +844,13 @@ fun PdfViewer(
                                         pageNumber = currentPage
                                     )
                                 },
-                                hint = "Link to quick note",
+                                hint = stringResource(R.string.pdf_link),
                                 onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
                                     Icons.Default.Link,
-                                    contentDescription = "Link",
+                                    contentDescription = stringResource(R.string.pdf_link),
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -866,13 +867,13 @@ fun PdfViewer(
                                         }
                                     }
                                 },
-                                hint = "Text anzeigen",
+                                hint = stringResource(R.string.pdf_show_text),
                                 onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
                                     Icons.Default.ContentCopy,
-                                    contentDescription = "Text anzeigen",
+                                    contentDescription = stringResource(R.string.pdf_show_text),
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -887,19 +888,19 @@ fun PdfViewer(
                             ) {
                                 Icon(
                                     Icons.AutoMirrored.Filled.Undo,
-                                    contentDescription = "Undo",
+                                    contentDescription = stringResource(R.string.cd_undo),
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
                             HintIconButton(
                                 onClick = { showDeleteAllDialog = true },
-                                hint = "Delete all annotations",
+                                hint = stringResource(R.string.pdf_delete_all_message),
                                 onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
                                     Icons.Default.Delete,
-                                    contentDescription = "Clear",
+                                    contentDescription = stringResource(R.string.cd_clear),
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -913,7 +914,7 @@ fun PdfViewer(
                             ) {
                                 Icon(
                                     Icons.Default.Save,
-                                    contentDescription = "Save",
+                                    contentDescription = stringResource(R.string.action_save),
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -923,19 +924,19 @@ fun PdfViewer(
                         if (showDeleteAllDialog) {
                             AlertDialog(
                                 onDismissRequest = { showDeleteAllDialog = false },
-                                title = { Text("Delete all drawings?") },
-                                text = { Text("Do you really want to permanently delete all drawings/annotations on this page?") },
+                                title = { Text(stringResource(R.string.pdf_delete_all_title)) },
+                                text = { Text(stringResource(R.string.pdf_delete_all_message)) },
                                 confirmButton = {
                                     TextButton(onClick = {
                                         strokes.removeAll { it.page == currentPage }
                                         showDeleteAllDialog = false
                                     }) {
-                                        Text("Delete")
+                                        Text(stringResource(R.string.action_delete))
                                     }
                                 },
                                 dismissButton = {
                                     TextButton(onClick = { showDeleteAllDialog = false }) {
-                                        Text("Cancel")
+                                        Text(stringResource(R.string.action_cancel))
                                     }
                                 }
                             )
@@ -956,13 +957,13 @@ fun PdfViewer(
                                         pageOffsetsY[currentPage] = 0f
                                     }
                                 },
-                                hint = "Zoom out",
+                                hint = stringResource(R.string.pdf_zoom_out),
                                 onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
                                     Icons.Default.ZoomOut,
-                                    contentDescription = "Zoom Out",
+                                    contentDescription = stringResource(R.string.pdf_zoom_out),
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -980,13 +981,13 @@ fun PdfViewer(
                                         pageScales[currentPage] = (cur + 0.5f).coerceAtMost(3f)
                                     }
                                 },
-                                hint = "Zoom in",
+                                hint = stringResource(R.string.pdf_zoom_in),
                                 onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
                                     Icons.Default.ZoomIn,
-                                    contentDescription = "Zoom In",
+                                    contentDescription = stringResource(R.string.pdf_zoom_in),
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -1004,7 +1005,7 @@ fun PdfViewer(
                             ) {
                                 Icon(
                                     Icons.Default.Delete,
-                                    contentDescription = "Eraser",
+                                    contentDescription = stringResource(R.string.pdf_eraser),
                                     tint = if (eraseMode) MaterialTheme.colorScheme.primary else LocalContentColor.current,
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -1045,7 +1046,7 @@ fun PdfViewer(
                         ) {
                             Icon(
                                 imageVector = if (showToolbar) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                contentDescription = if (showToolbar) "Werkzeugleiste ausblenden" else "Werkzeugleiste einblenden",
+                                contentDescription = if (showToolbar) stringResource(R.string.pdf_hide_toolbar) else stringResource(R.string.pdf_show_toolbar),
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
@@ -1149,7 +1150,7 @@ fun PdfViewer(
                         ) {
                             Icon(
                                 Icons.Default.Create,
-                                contentDescription = "Pen",
+                                contentDescription = stringResource(R.string.pdf_pen),
                                 tint = if (brushType == BrushType.Pen) MaterialTheme.colorScheme.primary else LocalContentColor.current,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -1167,7 +1168,7 @@ fun PdfViewer(
                         ) {
                             Icon(
                                 Icons.Default.Highlight,
-                                contentDescription = "Marker",
+                                contentDescription = stringResource(R.string.pdf_marker),
                                 tint = if (brushType == BrushType.Marker) MaterialTheme.colorScheme.primary else LocalContentColor.current,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -1185,7 +1186,7 @@ fun PdfViewer(
                         ) {
                             Icon(
                                 Icons.Default.Star,
-                                contentDescription = "Special brush",
+                                contentDescription = stringResource(R.string.pdf_special_brush),
                                 tint = if (brushType == BrushType.Special) MaterialTheme.colorScheme.primary else LocalContentColor.current,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -1207,14 +1208,14 @@ fun PdfViewer(
                         ) {
                             Icon(
                                 Icons.Default.Delete,
-                                contentDescription = "Eraser",
+                                contentDescription = stringResource(R.string.pdf_eraser),
                                 tint = if (eraseMode) MaterialTheme.colorScheme.primary else LocalContentColor.current,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         if (eraseMode) {
-                            Text("Eraser:", style = MaterialTheme.typography.labelSmall)
+                            Text(stringResource(R.string.pdf_eraser_label), style = MaterialTheme.typography.labelSmall)
                             Slider(
                                 value = eraseRadius,
                                 onValueChange = { eraseRadius = it },
@@ -1222,7 +1223,7 @@ fun PdfViewer(
                                 modifier = Modifier.width(120.dp).padding(start = 8.dp)
                             )
                         } else {
-                            Text("Breite:", style = MaterialTheme.typography.labelSmall)
+                            Text(stringResource(R.string.pdf_width), style = MaterialTheme.typography.labelSmall)
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 8.dp)) {
                                 Slider(
                                     value = strokeWidth,
@@ -1525,7 +1526,7 @@ fun PdfViewer(
                             pageOffsetsY[currentPage] = 0f
                             transientScaleMap[currentPage] = 1f
                         },
-                        content = { Icon(Icons.Default.CenterFocusWeak, contentDescription = "Reset zoom") }
+                        content = { Icon(Icons.Default.CenterFocusWeak, contentDescription = stringResource(R.string.pdf_reset_zoom)) }
                     )
 
                     // Menu FAB (only if feature available)
@@ -1556,7 +1557,7 @@ fun PdfViewer(
                         defaultY = 0.9f,
                         visible = true,
                         onClick = { showDataPad = true },
-                        content = { Icon(Icons.Default.Flight, contentDescription = "DataPad") }
+                        content = { Icon(Icons.Default.Flight, contentDescription = stringResource(R.string.datapad_title)) }
                     )
 
                     // Quick Access FAB
@@ -1570,7 +1571,7 @@ fun PdfViewer(
                         defaultY = 0.9f,
                         visible = true,
                         onClick = { showQuickAccess = true },
-                        content = { Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Quick access") }
+                        content = { Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = stringResource(R.string.quick_access_title)) }
                     )
             }
         }
@@ -1579,15 +1580,15 @@ fun PdfViewer(
         if (showShortcutDialog) {
             AlertDialog(
                 onDismissRequest = { showShortcutDialog = false },
-                title = { Text("Shortcut erstellen") },
+                title = { Text(stringResource(R.string.pdf_shortcut_dialog_title)) },
                 text = {
                     Column {
-                        Text("Create a shortcut to page ${currentPage + 1}")
+                        Text(stringResource(R.string.pdf_shortcut_dialog_message, currentPage + 1))
                         Spacer(modifier = Modifier.height(8.dp))
                         OutlinedTextField(
                             value = shortcutName,
                             onValueChange = { shortcutName = it },
-                            label = { Text("Shortcut-Name") },
+                            label = { Text(stringResource(R.string.pdf_shortcut_name_label)) },
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -1604,12 +1605,12 @@ fun PdfViewer(
                             showShortcutDialog = false
                         }
                     }) {
-                        Text("Erstellen")
+                        Text(stringResource(R.string.action_create))
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showShortcutDialog = false }) {
-                        Text("Cancel")
+                        Text(stringResource(R.string.action_cancel))
                     }
                 }
             )
@@ -1654,13 +1655,13 @@ fun PdfViewer(
                 text = {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         if (chapters.isEmpty()) {
-                            Text("No chapters found. Showing page list as fallback.")
+                            Text(stringResource(R.string.pdf_no_chapters))
                         }
                         // Search field
                         OutlinedTextField(
                             value = tocSearchQuery,
                             onValueChange = { tocSearchQuery = it },
-                            label = { Text("Kapitel suchen") },
+                            label = { Text(stringResource(R.string.pdf_search_chapters)) },
                             singleLine = true,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1702,7 +1703,7 @@ fun PdfViewer(
                                             )
                                         )
                                         Text(
-                                            text = "Page ${pageIndex + 1}",
+                                            text = stringResource(R.string.tab_page_number, pageIndex + 1),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -1713,7 +1714,7 @@ fun PdfViewer(
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = { showTocDialog = false }) { Text("Close") }
+                    TextButton(onClick = { showTocDialog = false }) { Text(stringResource(R.string.action_close)) }
                 }
             )
         }
@@ -1722,13 +1723,13 @@ fun PdfViewer(
         if (showTextDialog) {
             AlertDialog(
                 onDismissRequest = { showTextDialog = false },
-                title = { Text("Page text (Page ${currentPage + 1})") },
+                title = { Text(stringResource(R.string.pdf_text) + " (" + stringResource(R.string.tab_page_number, currentPage + 1) + ")") },
                 text = {
                     SelectionContainer {
                         LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
                             item {
                                 Text(
-                                    text = dialogPageText.ifEmpty { "No text found on this page." },
+                                    text = dialogPageText.ifEmpty { stringResource(R.string.pdf_no_text_on_page) },
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                             }
@@ -1738,15 +1739,15 @@ fun PdfViewer(
                 confirmButton = {
                     TextButton(onClick = {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val clip = ClipData.newPlainText("PDF Text", dialogPageText)
+                        val clip = ClipData.newPlainText(context.getString(R.string.pdf_clipboard_label), dialogPageText)
                         clipboard.setPrimaryClip(clip)
                     }) {
-                        Text("Kopieren")
+                        Text(stringResource(R.string.action_copy))
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showTextDialog = false }) {
-                        Text("Close")
+                        Text(stringResource(R.string.action_close))
                     }
                 }
             )
@@ -2145,7 +2146,7 @@ private fun PdfPageWithAnnotations(
 
         Image(
             bitmap = remember(toDisplayBitmap ?: bitmap) { (toDisplayBitmap ?: bitmap).asImageBitmap() },
-            contentDescription = "PDF page ${pageIndex + 1}",
+            contentDescription = stringResource(R.string.pdf_page_number, pageIndex + 1),
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer(

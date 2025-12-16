@@ -45,6 +45,8 @@ import com.example.checklist_interactive.ui.quickaccess.QuickAccessSheet
 import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
 import com.example.checklist_interactive.ui.common.DraggableFab
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.ui.res.stringResource
+import com.example.checklist_interactive.R
 
 /**
  * MarkdownViewerScreen - component for displaying Markdown files
@@ -128,7 +130,7 @@ fun MarkdownViewerScreen(
                     IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
+                            contentDescription = stringResource(R.string.action_back),
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -138,7 +140,7 @@ fun MarkdownViewerScreen(
                         viewModel?.resetChecklist()
                         resetTrigger += 1
                     }, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Reset Checklist", modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.cd_reset_checklist), modifier = Modifier.size(20.dp))
                     }
                     IconButton(onClick = {
                         quickNoteManager.addMarkdownLink(
@@ -147,7 +149,7 @@ fun MarkdownViewerScreen(
                             pageNumber = null
                         )
                     }, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Default.Link, contentDescription = "Link to quick note", modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Link, contentDescription = stringResource(R.string.cd_link_to_quick_note), modifier = Modifier.size(20.dp))
                     }
                     // Quick access: tap opens sheet, long-press resets persisted FAB positions
                     Box(modifier = Modifier.pointerInput(Unit) {
@@ -155,12 +157,12 @@ fun MarkdownViewerScreen(
                             onTap = { showQuickAccess = true },
                             onLongPress = {
                                 prefsManager.resetPdfViewerLayout()
-                                android.widget.Toast.makeText(context, "FAB positions restored", android.widget.Toast.LENGTH_SHORT).show()
+                                android.widget.Toast.makeText(context, context.getString(R.string.msg_fab_positions_restored), android.widget.Toast.LENGTH_SHORT).show()
                             }
                         )
                     }) {
                         IconButton(onClick = { showQuickAccess = true }, modifier = Modifier.size(40.dp)) {
-                            Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Quick access", modifier = Modifier.size(20.dp))
+                            Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = stringResource(R.string.cd_quick_access), modifier = Modifier.size(20.dp))
                         }
                     }
                     IconButton(onClick = {
@@ -169,7 +171,7 @@ fun MarkdownViewerScreen(
                     }, modifier = Modifier.size(40.dp)) {
                         Icon(
                             imageVector = if (expandAllSections) Icons.Default.UnfoldLess else Icons.Default.UnfoldMore,
-                            contentDescription = if (expandAllSections) "Collapse all" else "Expand all",
+                            contentDescription = stringResource(if (expandAllSections) R.string.cd_collapse_all else R.string.cd_expand_all),
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -177,7 +179,7 @@ fun MarkdownViewerScreen(
                         IconButton(onClick = onSettings, modifier = Modifier.size(40.dp)) {
                             Icon(
                                 imageVector = Icons.Default.Settings,
-                                contentDescription = "Settings",
+                                contentDescription = stringResource(R.string.cd_settings),
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -227,7 +229,7 @@ fun MarkdownViewerScreen(
                     defaultY = 0.8f,
                     visible = true,
                     onClick = onShowFileList,
-                    content = { Icon(Icons.Default.Menu, contentDescription = "File list") }
+                    content = { Icon(Icons.Default.Menu, contentDescription = stringResource(R.string.cd_menu)) }
                 )
             }
 
@@ -246,9 +248,9 @@ fun MarkdownViewerScreen(
                     visible = true,
                     onClick = { 
                         android.util.Log.d("MarkdownViewer", "DataPad FAB clicked!")
-                        showDataPad = true 
+                        showDataPad = true
                     },
-                    content = { Icon(Icons.Default.Flight, contentDescription = "DataPad") }
+                    content = { Icon(Icons.Default.Flight, contentDescription = stringResource(R.string.cd_datapad)) }
                 )
             }
 
@@ -262,7 +264,7 @@ fun MarkdownViewerScreen(
                 defaultY = 0.9f,
                 visible = true,
                 onClick = { showQuickAccess = true },
-                content = { Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Quick access") }
+                content = { Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = stringResource(R.string.cd_quick_access)) }
             )
         }
     }

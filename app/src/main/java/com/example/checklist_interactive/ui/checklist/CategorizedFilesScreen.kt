@@ -21,6 +21,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.checklist_interactive.data.checklist.AssetBrowser
 import com.example.checklist_interactive.data.checklist.AssetNode
+import androidx.compose.ui.res.stringResource
+import com.example.checklist_interactive.R
 
 /**
  * Categorized file view - shows all files grouped by folders
@@ -41,15 +43,15 @@ fun CategorizedFilesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Files in: $rootFolder") },
+                title = { Text(stringResource(R.string.files_in_folder, rootFolder)) },
                 navigationIcon = {
                     IconButton(onClick = onClose) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cd_close))
                     }
                 },
                 actions = {
                     IconButton(onClick = onChangeRootFolder) {
-                        Icon(Icons.Default.FolderOpen, contentDescription = "Change folder")
+                        Icon(Icons.Default.FolderOpen, contentDescription = stringResource(R.string.cd_change_folder))
                     }
                 }
             )
@@ -71,13 +73,13 @@ fun CategorizedFilesScreen(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        "No files found",
+                        stringResource(R.string.no_files_found),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.outline
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     TextButton(onClick = onChangeRootFolder) {
-                        Text("Select another folder")
+                        Text(stringResource(R.string.select_another_folder))
                     }
                 }
             }
@@ -113,7 +115,7 @@ fun CategorizedFilesScreen(
                                 )
                                 Spacer(modifier = Modifier.weight(1f))
                                 Text(
-                                    text = "${files.size} ${if (files.size == 1) "file" else "files"}",
+                                    text = "${files.size} ${stringResource(if (files.size == 1) R.string.file_single else R.string.file_plural)}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

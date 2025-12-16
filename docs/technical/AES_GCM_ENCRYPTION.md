@@ -1,54 +1,54 @@
-# AES-GCM Verschlüsselung für DataPad
+# AES-GCM Encryption for DataPad
 
-## Übersicht
-Die Kommunikation zwischen dem Python-Skript und der Android-App ist jetzt mit **AES-GCM** (Authenticated Encryption with Associated Data) verschlüsselt.
+## Overview
+Communication between the Python script and the Android app is protected using **AES-GCM** (Authenticated Encryption with Associated Data).
 
-## Implementierte Änderungen
+## Implemented changes
 
-### 1. Python-Skript (`forward_parsed_udp.py`)
-- ✅ AES-GCM Verschlüsselung mit 256-bit Pre-Shared Key
-- ✅ Zufällige 12-Byte Nonce für jedes Paket
-- ✅ Automatische Authentifizierung (AEAD)
-- ✅ Optional deaktivierbar mit `--no-encrypt` Flag
+### 1. Python script (`forward_parsed_udp.py`)
+- ✅ AES-GCM encryption with a 256-bit pre-shared key
+- ✅ Random 12-byte nonce per packet
+- ✅ AEAD (authenticated encryption) provides integrity and authenticity
+- ✅ Optional disable with the `--no-encrypt` flag
 
-### 2. Android App (`DataPadManager.kt`)
-- ✅ AES-GCM Entschlüsselung mit javax.crypto
-- ✅ Automatische Validierung der Authentizität
-- ✅ Fehlerbehandlung bei ungültigen Paketen
+### 2. Android app (`DataPadManager.kt`)
+- ✅ AES-GCM decryption using `javax.crypto`
+- ✅ Automatic validation of packet authenticity
+- ✅ Error handling for invalid packets
 
-### 3. UI Updates (`DataPadPopup.kt`)
-- ✅ "🔒 AES-GCM encrypted" Status-Anzeige
-- ✅ Aktualisierte Kommandozeilen-Hinweise
+### 3. UI updates (`DataPadPopup.kt`)
+- ✅ "🔒 AES-GCM encrypted" status indicator
+- ✅ Updated command-line messages
 
 ## Installation
 
-### Python-Seite
+### Python side
 ```bash
 pip install cryptography
 ```
 
-### Android-Seite
-Keine zusätzlichen Dependencies erforderlich - verwendet javax.crypto (Standard Android API).
+### Android side
+No additional dependencies required — uses `javax.crypto` (standard Android API).
 
-> Hinweise: Verwenden Sie die Anleitung in diesem Dokument, um den Pre-Shared Key sicher zu generieren und in beiden Seiten zu konfigurieren.
+> Notes: Follow the instructions in this document to generate and configure the pre-shared key securely on both sides.
 
-## Verwendung
+## Usage
 
-### Normal (verschlüsselt)
+### Encrypted (recommended)
 ```bash
 python forward_parsed_udp.py --host 192.168.178.100 --port 5010
 ```
 
-### Unverschlüsselt (nicht empfohlen)
+### Unencrypted (not recommended)
 ```bash
 python forward_parsed_udp.py --host 192.168.178.100 --port 5010 --no-encrypt
 ```
 
 ## Pre-Shared Key
 
-**Wichtig:** Der Pre-Shared Key **muss** auf beiden Seiten identisch sein. Verwenden Sie am besten einen zufälligen 32‑Byte (256‑bit) Schlüssel und geben Sie ihn als Hex-String an, damit er nicht unabsichtlich als Klartext eingecheckt wird.
+**Important:** The pre-shared key **must** be identical on both sides. Prefer generating a random 32‑byte (256‑bit) key and use a hex string to avoid accidentally checking secrets into the repository.
 
-Beispiel: Generieren eines 32-Byte Schlüssels (Hex):
+Example: Generate a 32-byte key (hex):
 
 ```bash
 python - <<'PY'
@@ -57,14 +57,14 @@ print(os.urandom(32).hex())
 PY
 ```
 
-Konfiguration in Python (sicherer: Hex-to-bytes):
+Configure in Python (safer: hex-to-bytes):
 
 ```python
 # forward_parsed_udp.py
 PRE_SHARED_KEY = bytes.fromhex('your_64_char_hex_key_here')
 ```
 
-Konfiguration in Android/Kotlin:
+Configure in Android/Kotlin:
 
 ```kotlin
 // Helper to convert hex string to byte array
@@ -83,37 +83,37 @@ private fun hexStringToByteArray(hex: String): ByteArray {
 private val PRE_SHARED_KEY = hexStringToByteArray("your_64_char_hex_key_here")
 ```
 
-### In Produktion
-- Verteilen und speichern Sie Schlüssel sicher (Out-of-band), rotieren Sie bei Bedarf und vermeiden Sie das Einchecken von Geheimnissen ins Repository.
+### In production
+- Distribute and store keys securely (out-of-band), rotate them as needed, and avoid checking secrets into the repository.
 
-## Sicherheitsmerkmale
+## Security properties
 
-✅ **Vertraulichkeit**: Daten sind verschlüsselt mit AES-256
-✅ **Integrität**: GCM-Tag verhindert Manipulation
-✅ **Authentizität**: Nur Clients mit dem richtigen Key können entschlüsseln
-✅ **Replay-Schutz**: Jedes Paket hat eine einzigartige Nonce
+✅ **Confidentiality**: Data is encrypted using AES-256
+✅ **Integrity**: GCM authentication tag prevents tampering
+✅ **Authenticity**: Only clients with the correct key can decrypt
+✅ **Replay protection**: Each packet uses a unique nonce
 
-## Paketformat
+## Packet format
 
 ```
-[12 Bytes Nonce][Verschlüsselter JSON][16 Bytes GCM Tag]
+[12 Bytes Nonce][Encrypted JSON][16 Bytes GCM Tag]
 ```
 
-Minimale Paketgröße: 28 Bytes (Nonce + Tag)
+Minimum packet size: 28 bytes (nonce + tag)
 
-## Fehlerbehebung
+## Troubleshooting
 
 ### "Failed to decrypt packet - check Pre-Shared Key!"
-- Ensure the Pre-Shared Key is identical in both files
-- Ensure the Python script uses the `cryptography` library
+- Ensure the pre-shared key is identical in both configurations
+- Ensure the Python script has the `cryptography` package installed
 
-### Import-Fehler in Python
+### Python import errors
 ```bash
 pip install --upgrade cryptography
 ```
 
-## Hinweise
+## Notes
 
-- Die Pylance-Warnung über unaufgelöste Imports in VSCode ist normal, wenn `cryptography` nicht in der aktuellen Python-Umgebung installiert ist
-- Verschlüsselung ist standardmäßig aktiviert - verwenden Sie `--no-encrypt` nur zu Debug-Zwecken
-- Die App zeigt "🔒 AES-GCM encrypted" in der Verbindungsanzeige
+- Pylance may show unresolved-import warnings in VSCode if `cryptography` is not installed in the active Python environment
+- Encryption is enabled by default — use `--no-encrypt` only for debugging
+- The app shows "🔒 AES-GCM encrypted" in the connection status

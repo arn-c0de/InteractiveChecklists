@@ -457,7 +457,7 @@ class QuickNoteManager(private val context: Context) {
                         // Create markdown link pointing to internal URI handled by the app
                         val encodedPath = java.net.URLEncoder.encode(filePath, "UTF-8")
                         val pageParam = if (pageNumber != null) "&page=${pageNumber + 1}" else ""
-                        val label = if (pageNumber != null) "$fileName (Page ${pageNumber + 1})" else fileName
+                        val label = if (pageNumber != null) "$fileName (${context.getString(com.example.checklist_interactive.R.string.tab_page_number, pageNumber + 1)})" else fileName
                         val markdownLink = "\n📎 [$label](internal://open?file=$encodedPath$pageParam)\n"
 
                         val newContent = note.content + markdownLink
