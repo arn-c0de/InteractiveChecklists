@@ -1,0 +1,30 @@
+# Fehlende Datenpunkte für Export.lua (Stand: 16.12.2025)
+
+## Kritisch fehlend (Kern-Telemetrie)
+
+- [x] Angle of Attack (AoA) — implemented in Export.lua
+- [x] G-Load (x, y, z) — implemented in Export.lua
+- [x] Engine Data (RPM, EGT, Throttle, Afterburner) — implemented in Export.lua
+
+- [ ] Weight on Wheels
+
+
+## Erweiterte Features (optional)
+
+- [ ] Systems Status (Electrical, Hydraulic, APU, Generator)
+- [ ] Nearby Units (id, name, type, coalition, distance)
+
+- [ ] RWR Contacts (id, type, bearing, azimuth, priority, locked)
+
+## Hinweise
+- Siehe FlightData.kt für alle Felder, die die App erwartet.
+- Siehe Export.lua für aktuelle Implementierung und API-Referenzen.
+- Haken setzen, sobald ein Datenpunkt im Lua-Skript korrekt exportiert wird.
+
+
+not supported by api
+- [-] Aircraft Mass (total, empty, payload) — not supported by DCS Export API (reverted)
+- [-] Flight Controls & Trim (Pitch, Roll, Yaw, Trim) — not supported by DCS Export API (reverted)
+- [-] Mechanical (Gear, Flaps, Speedbrake, Canopy, Hook, Wheel Brake, Nose Gear Steering)
+- [-] Lights Status (Landing, Taxi, Navigation, Strobe, Formation)
+- [-] Radar Details (azimuth, elevation, scan, tracks[])

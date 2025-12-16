@@ -97,6 +97,24 @@ pcall(function()
 		return default
 	end
 
+	-- Utility: round numbers to given decimals
+	local function round(v, decimals)
+		local m = 10^(decimals or 2)
+		if type(v) ~= 'number' then return v end
+		if v >= 0 then return math.floor(v*m + 0.5)/m else return math.ceil(v*m - 0.5)/m end
+	end
+
+	-- Utility: write short debug lines to the debug log when enabled
+	local function debug_log(msg)
+		if not DEBUG_DUMP_TABLES then return end
+		pcall(function()
+			local f = io.open(DEBUG_LOG_PATH, 'a')
+			if not f then return end
+			f:write(os.date('%Y-%m-%d %H:%M:%S') .. ' ' .. tostring(msg) .. '\n')
+			f:close()
+		end)
+	end
+
 	-- Collect comprehensive telemetry data
 	local function collect_telemetry()
 		local data = {
@@ -146,6 +164,55 @@ pcall(function()
 		if vs then data.verticalSpeed = vs end
 		if mach then data.mach = mach end
 
+		-- Angle of Attack (AoA)
+		local aoa = safe_get(function() return LoGetAngleOfAttack() end, nil)
+		if aoa then
+			-- Some aircraft/modules return AoA in radians; convert to degrees if value looks like radians
+			if math.abs(aoa) < 6.283185307179586 then
+				aoa = math.deg(aoa)
+			end
+			-- Normalize angle to [-180, 180)
+			while aoa > 180 do aoa = aoa - 360 end
+			while aoa <= -180 do aoa = aoa + 360 end
+			-- Round to 2 decimals for compactness
+			aoa = round(aoa, 2)
+			data.angleOfAttack = aoa
+			-- Flag unusually large AoA values to debug log
+			if math.abs(aoa) > 90 then
+				debug_log('AOA unusual: ' .. tostring(aoa))
+			end
+		end
+
+		-- G-Load (x, y, z)
+		local g = safe_get(function() return LoGetAccelerationUnits() end, nil)
+		if g then
+			local gx = (type(g) == 'table') and (g.x or g[1]) or g
+			local gy = (type(g) == 'table') and (g.y or g[2]) or nil
+			local gz = (type(g) == 'table') and (g.z or g[3]) or nil
+			-- Heuristic: if values look like m/s^2 (abs>20), convert to G by dividing by g0
+			local function conv(v)
+				if not v then return nil end
+				if type(v) ~= 'number' then return tonumber(v) end
+				if math.abs(v) > 20 then -- likely m/s^2
+					return v / 9.80665
+				end
+				return v
+			end
+			local gxv = conv(gx)
+			local gyv = conv(gy)
+			local gzv = conv(gz)
+			-- Round g values to 3 decimals
+			data.gLoad = {
+				x = gxv and round(gxv, 3) or nil,
+				y = gyv and round(gyv, 3) or nil,
+				z = gzv and round(gzv, 3) or nil
+			}
+			-- Log if conversion from m/s^2 was likely
+			if (type(gx) == 'number' and math.abs(gx) > 20) or (type(gy) == 'number' and math.abs(gy) > 20) or (type(gz) == 'number' and math.abs(gz) > 20) then
+				debug_log('gLoad converted from m/s^2 to Gs: ' .. tostring(data.gLoad.x) .. ',' .. tostring(data.gLoad.y) .. ',' .. tostring(data.gLoad.z))
+			end
+		end
+
 		-- Fuel
 		local fuelInternal = safe_get(function() return LoGetFuelWeight() end, 0)
 		local fuelExternal = safe_get(function() return LoGetFuelWeight() end, 0) -- DCS doesn't separate easily
@@ -159,6 +226,73 @@ pcall(function()
 				fuelFlow = nil
 			}
 		end
+
+		-- Engine Data (RPM, EGT, Throttle, Afterburner)
+		local engineInfo = safe_get(function() return LoGetEngineInfo() end, nil)
+		if engineInfo then
+			local rpmLeft, rpmRight, egtLeft, egtRight
+			local throttleVal, afterburnerVal
+
+			-- Helper to extract rpm/egt from engine entries
+			local function extract_from_entry(e, idx)
+				local r = try_field(e, {'RPM','rpm','N1','n1','rpmPercent','rpm_percent'})
+				if r then
+					if type(r) == 'table' then r = (r.left or r.right or r[1] or r[2]) end
+					if type(r) == 'number' and r <= 1.5 then r = r * 100 end -- fraction -> percent
+					if idx == 1 then rpmLeft = r else rpmRight = r end
+				end
+				local egt = try_field(e, {'EGT','egt','egtC','EGT_C','EGT_CELSIUS'})
+				if egt then
+					if type(egt) == 'table' then egt = (egt.left or egt.right or egt[1] or egt[2]) end
+					if idx == 1 then egtLeft = egt else egtRight = egt end
+				end
+			end
+
+			-- If engine list present, iterate
+			local enginesList = engineInfo.Engines or engineInfo.engines
+			if enginesList and type(enginesList) == 'table' then
+				for i, ent in ipairs(enginesList) do
+					extract_from_entry(ent, i)
+					-- try per-engine throttle if provided
+					local t = try_field(ent, {'throttle','Throttle','throttlePos','throttle_position'})
+					if t and throttleVal == nil then
+						if type(t) == 'number' and t > 1 and t <= 100 then t = t/100 end
+						throttleVal = tonumber(t)
+					end
+					-- per-engine afterburner
+					local ab = try_field(ent, {'afterburner','afterburn','AB','afterburnerState'})
+					if ab ~= nil and afterburnerVal == nil then afterburnerVal = (ab == true or ab == 1) end
+				end
+			else
+				-- Top-level fields
+				extract_from_entry(engineInfo, 1)
+				local t = try_field(engineInfo, {'Throttle','throttle','throttlePos','throttle_position'})
+				if t then if type(t) == 'number' and t > 1 and t <= 100 then t = t/100 end; throttleVal = tonumber(t) end
+				local ab = try_field(engineInfo, {'afterburner','afterburn','AB','afterburnerState'})
+				if ab ~= nil then afterburnerVal = (ab == true or ab == 1) end
+			end
+
+			-- Populate data.engines according to FlightData.kt schema
+			data.engines = data.engines or {}
+			if rpmLeft or rpmRight then
+				data.engines.rpm = {
+					left = rpmLeft and round(rpmLeft, 1) or nil,
+					right = rpmRight and round(rpmRight, 1) or nil
+				}
+			end
+			if egtLeft or egtRight then
+				data.engines.egt = {
+					left = egtLeft and round(egtLeft, 0) or nil,
+					right = egtRight and round(egtRight, 0) or nil
+				}
+			end
+			if throttleVal ~= nil then data.engines.throttle = round(throttleVal, 3) end
+			if afterburnerVal ~= nil then data.engines.afterburner = afterburnerVal end
+
+			debug_log('Engines: rpm=' .. tostring(data.engines.rpm and (data.engines.rpm.left or '?')) .. ',' .. tostring(data.engines.rpm and (data.engines.rpm.right or '?')) .. ' egt=' .. tostring(data.engines.egt and (data.engines.egt.left or '?')) .. ',' .. tostring(data.engines.egt and (data.engines.egt.right or '?')) .. ' throttle=' .. tostring(data.engines.throttle) .. ' ab=' .. tostring(data.engines.afterburner))
+		end
+
+		-- Flight Controls & Trim not exported: DCS Export API does not reliably expose stick/trim across modules
 
 		-- Navigation & Waypoints
 		local route = safe_get(function() return LoGetRoute() end, nil)
@@ -183,15 +317,27 @@ pcall(function()
 		if payload then
 			local stations = {}
 			local totalCount = 0
+			local payloadMassSum = 0
+			local payloadMassFound = false
 			if payload.Stations then
 				for i, station in pairs(payload.Stations) do
 					if station.weapon then
+						-- Try to detect per-station mass (some modules expose this)
+						local stmass = nil
+						if station.mass then stmass = station.mass end
+						if not stmass and station.weapon.mass then stmass = station.weapon.mass end
+						if not stmass and station.weight then stmass = station.weight end
+						local count = station.count or 1
+						if stmass then
+							payloadMassSum = payloadMassSum + (stmass * count)
+							payloadMassFound = true
+						end
 						table.insert(stations, {
 							station = i,
 							type = station.weapon.displayName or station.weapon.level1 or 'UNKNOWN',
-							count = station.count or 1
+							count = count
 						})
-						totalCount = totalCount + (station.count or 1)
+						totalCount = totalCount + count
 					end
 				end
 			end
@@ -201,6 +347,7 @@ pcall(function()
 				stations = #stations > 0 and stations or nil,
 				totalCount = totalCount > 0 and totalCount or nil
 			}
+			-- payload mass not exported (not reliably available via DCS Export API)
 		end
 
 		-- RWR / Threats (limited API, placeholder)
