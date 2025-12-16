@@ -477,6 +477,116 @@ private fun FlightDataDisplay(data: FlightData?) {
             }
         }
 
+        // AoA & G-Load
+        data?.angleOfAttack?.let { aoa ->
+            DataSection(title = "Flight Performance") {
+                DataRow("Angle of Attack", String.format("%.2f°", aoa))
+                data.gLoad?.let { g ->
+                    DataRow("G-Load X", String.format("%.2f G", g.x))
+                    DataRow("G-Load Y", String.format("%.2f G", g.y))
+                    DataRow("G-Load Z", String.format("%.2f G", g.z))
+                }
+            }
+        }
+
+        // Engine Data
+        data?.engines?.let { eng ->
+            DataSection(title = "Engine") {
+                eng.rpm?.let { rpm ->
+                    rpm.left?.let { DataRow("RPM Left", String.format("%.1f%%", it)) }
+                    rpm.right?.let { DataRow("RPM Right", String.format("%.1f%%", it)) }
+                }
+                eng.egt?.let { egt ->
+                    egt.left?.let { DataRow("EGT Left", String.format("%.0f°C", it)) }
+                    egt.right?.let { DataRow("EGT Right", String.format("%.0f°C", it)) }
+                }
+                eng.throttle?.let { DataRow("Throttle", String.format("%.1f%%", it * 100)) }
+                StatusRow("Afterburner", eng.afterburner)
+            }
+        }
+
+        // Aircraft Mass
+        data?.aircraftMass?.let { mass ->
+            DataSection(title = "Aircraft Mass") {
+                mass.total?.let { DataRow("Total Mass", String.format("%.0f kg", it)) }
+                mass.empty?.let { DataRow("Empty Mass", String.format("%.0f kg", it)) }
+                mass.payload?.let { DataRow("Payload", String.format("%.0f kg", it)) }
+            }
+        }
+
+        // Flight Controls & Trim
+        data?.flightControls?.let { ctrl ->
+            DataSection(title = "Flight Controls & Trim", initialExpanded = false) {
+                ctrl.pitch?.let { DataRow("Pitch", String.format("%.2f", it)) }
+                ctrl.roll?.let { DataRow("Roll", String.format("%.2f", it)) }
+                ctrl.yaw?.let { DataRow("Yaw", String.format("%.2f", it)) }
+                ctrl.trimPitch?.let { DataRow("Trim Pitch", String.format("%.2f", it)) }
+                ctrl.trimRoll?.let { DataRow("Trim Roll", String.format("%.2f", it)) }
+                ctrl.trimYaw?.let { DataRow("Trim Yaw", String.format("%.2f", it)) }
+            }
+        }
+
+        // Mechanical (Gear, Flaps, etc.)
+        data?.mechanical?.let { mech ->
+            DataSection(title = "Gear & Configuration") {
+                mech.gear?.let { gear ->
+                    gear.nose?.let { DataRow("Nose Gear", if (it > 0.9) "DOWN" else if (it < 0.1) "UP" else "TRANSIT") }
+                    gear.left?.let { DataRow("Left Gear", if (it > 0.9) "DOWN" else if (it < 0.1) "UP" else "TRANSIT") }
+                    gear.right?.let { DataRow("Right Gear", if (it > 0.9) "DOWN" else if (it < 0.1) "UP" else "TRANSIT") }
+                }
+                StatusRow("Weight on Wheels", data.weightOnWheels)
+                mech.flaps?.let { DataRow("Flaps", String.format("%.0f%%", it * 100)) }
+                mech.speedbrake?.let { DataRow("Speedbrake", String.format("%.0f%%", it * 100)) }
+                mech.canopy?.let { DataRow("Canopy", if (it > 0.9) "OPEN" else if (it < 0.1) "CLOSED" else "MOVING") }
+                mech.hook?.let { DataRow("Hook", if (it > 0.5) "DOWN" else "UP") }
+            }
+        }
+
+        // Lights
+        data?.lights?.let { lights ->
+            DataSection(title = "Lights", initialExpanded = false) {
+                lights.landing?.let { StatusRow("Landing", it > 0.5) }
+                lights.taxi?.let { StatusRow("Taxi", it > 0.5) }
+                lights.navigation?.let { StatusRow("Navigation", it > 0.5) }
+                lights.strobe?.let { StatusRow("Strobe", it > 0.5) }
+                lights.formation?.let { StatusRow("Formation", it > 0.5) }
+            }
+        }
+
+        // Systems Status
+        data?.systems?.let { sys ->
+            DataSection(title = "Systems Status", initialExpanded = false) {
+                sys.electrical?.let { DataRow("Electrical", it) }
+                sys.hydraulic?.let { DataRow("Hydraulic", it) }
+                sys.apuOn?.let { StatusRow("APU", it) }
+                sys.generatorOn?.let { StatusRow("Generator", it) }
+            }
+        }
+
+        // Mission Time
+        data?.missionTime?.let { mt ->
+            DataSection(title = "Mission Time", initialExpanded = false) {
+                val hours = (mt / 3600).toInt()
+                val minutes = ((mt % 3600) / 60).toInt()
+                val seconds = (mt % 60).toInt()
+                DataRow("Time", String.format("%02d:%02d:%02d", hours, minutes, seconds))
+            }
+        }
+
+        // Nearby Units
+        data?.nearbyUnits?.let { units ->
+            if (units.isNotEmpty()) {
+                DataSection(title = "Nearby Units (${units.size})", initialExpanded = false) {
+                    units.take(10).forEach { unit ->
+                        DataRow(
+                            unit.name,
+                            "${unit.type} • ${unit.distance?.let { String.format("%.0f m", it) } ?: "?"}"
+                        )
+                    }
+                }
+            }
+        }
+
         // Flight Parameters & Performance (side-by-side)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(modifier = Modifier.weight(1f)) {
@@ -531,6 +641,49 @@ private fun FlightDataDisplay(data: FlightData?) {
                     StatusRow("IR Jamming", data?.irJamming ?: false)
                     StatusRow("AI On", data?.aiOn ?: false)
                     StatusRow("Human", data?.isHuman ?: false)
+                }
+            }
+        }
+
+        // Radar Details
+        data?.radar?.let { radar ->
+            DataSection(title = "Radar", initialExpanded = false) {
+                radar.mode?.let { DataRow("Mode", it) }
+                radar.range?.let { DataRow("Range", String.format("%.0f m", it)) }
+                StatusRow("Locked", radar.locked)
+                DataRow("Track Count", radar.trackCount.toString())
+                radar.azimuth?.let { DataRow("Azimuth", String.format("%.1f°", it)) }
+                radar.elevation?.let { DataRow("Elevation", String.format("%.1f°", it)) }
+                radar.scan?.let { DataRow("Scan", it) }
+                radar.tracks?.let { tracks ->
+                    if (tracks.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Tracks:",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        tracks.forEach { track ->
+                            DataRow(
+                                "Track ${track.id}",
+                                "${track.range?.let { String.format("%.0f m", it) } ?: "?"} • ${track.azimuth?.let { String.format("%.0f°", it) } ?: "?"}"
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // RWR / Threats
+        data?.rwr?.let { rwr ->
+            if (rwr.threatsDetected > 0) {
+                DataSection(title = "RWR Threats (${rwr.threatsDetected})", initialExpanded = true) {
+                    rwr.contacts?.forEach { contact ->
+                        DataRow(
+                            contact.type,
+                            "Azimuth: ${contact.azimuth?.let { String.format("%.0f°", it) } ?: "?"} • Priority: ${contact.priority}"
+                        )
+                    }
                 }
             }
         }
