@@ -3,7 +3,7 @@
 
 # 🛡️ Security Policy
 
-ChecklistInteractive takes security seriously. We appreciate responsible disclosure and your help in keeping our users safe.
+InteractiveChecklists takes security seriously. We appreciate responsible disclosure and your help in keeping our users safe.
 
 ---
 
