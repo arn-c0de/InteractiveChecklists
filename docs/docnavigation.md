@@ -10,6 +10,7 @@
 
 - [Checklist Feature](features/CHECKLIST_FEATURE.md)
 - [DataPad Feature (Live Flight Data)](features/DATAPAD_FEATURE.md)
+- [Aviation Map (Live Map)](features/AVIATION_MAP_FEATURE.md)
 - [Tag System](features/TAG_SYSTEM.md)
 - [Tab System (Multi-Document Navigation)](features/TAB_SYSTEM.md)
 - [QuickNotes Architecture](features/QUICKNOTES_ARCHITECTURE.md)
