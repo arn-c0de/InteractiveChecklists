@@ -73,17 +73,11 @@ Key points:
 
 See `docs/features/DATAPAD_FEATURE.md` for full usage, configuration, and troubleshooting.
 
-**Phase 1 (experimental)**: This release represents Phase 1 of DataPad. Future phases will expand telemetry coverage and add visual and security improvements, including live animated aircraft visualizations based on flight attitude,and an dedicated DataPad UI redesign.
+**Phase 1 (experimental)**: This release represents Phase 1 of DataPad. Future phases will expand telemetry coverage and add visual and security improvements, including live animated aircraft visualizations and a dedicated UI redesign.
 
-**Next up: 2way (experimental)** – enabling data flow from the App to DCS.
+**Next up:** 2-way (experimental) — enabling data flow from the app back to DCS.
 
-Planned enhancements:
-
-- Additional telemetry (e.g., speed, vertical speed, fuel levels, systems statuses)
-- Live animated aircraft visualization showing orientation (pitch/roll/heading) and movement
-- Dedicated DataPad UI/UX design and controls
-
-See `docs/features/DATAPAD_FEATURE.md` for full usage, configuration, and troubleshooting.
+Planned enhancements include additional telemetry (speed, vertical speed, fuel, systems), live animated aircraft visualizations, and UI/UX improvements.
 
 ## Screenshots
 
