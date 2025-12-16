@@ -187,8 +187,7 @@ fun DataPadPopup(
                     deviceIpAddress = deviceIpAddress,
                     udpPort = udpPort,
                     isEnabled = isEnabled,
-                    onToggleEnabled = { manager.toggleEnabled() },
-                    onOpenSettings = { showSettingsDialog = true }
+                    onToggleEnabled = { manager.toggleEnabled() }
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -221,8 +220,7 @@ private fun ConnectionStatusCard(
     deviceIpAddress: String,
     udpPort: Int,
     isEnabled: Boolean,
-    onToggleEnabled: () -> Unit,
-    onOpenSettings: () -> Unit
+    onToggleEnabled: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -256,7 +254,7 @@ private fun ConnectionStatusCard(
                         modifier = Modifier
                             .size(8.dp)
                             .background(
-                                color = if (isConnected) Color.Green else Color.Gray,
+                                color = if (isConnected) Color(0xFFB9F6CA) else Color.Gray,
                                 shape = MaterialTheme.shapes.small
                             )
                     )
@@ -276,18 +274,7 @@ private fun ConnectionStatusCard(
                         Icon(
                             imageVector = Icons.Default.PowerSettingsNew,
                             contentDescription = if (isEnabled) "Empfang deaktivieren" else "Empfang aktivieren",
-                            tint = if (isEnabled) Color(0xFF1B5E20) else Color.Gray
-                        )
-                    }
-
-                    IconButton(
-                        onClick = onOpenSettings,
-                        modifier = Modifier.size(34.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Einstellungen",
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = if (isEnabled) Color.White else Color.Gray
                         )
                     }
 
