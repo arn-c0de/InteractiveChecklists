@@ -42,9 +42,13 @@ Organized in collapsible sections:
    - Heading (degrees)
    - Pitch (degrees)
    - Bank (degrees)
+   - **Angle of Attack (AoA)** — degrees (if available from draw arguments or aircraft module)
+   - **G-Load** — X/Y/Z axes (G)
    - Ground Speed / Indicated Airspeed / True Airspeed
    - Vertical Speed (VSI)
    - Mach number
+   - Flight Controls & Trim — elevator, aileron, rudder positions and trim values (if exposed)
+
 
 3. **Position**
    - Latitude/Longitude
@@ -57,6 +61,28 @@ Organized in collapsible sections:
    - ETA (time/seconds)
    - Flight plan: current WP index / total waypoints
    - Route name
+
+5. **Engine & Performance**
+   - Engine RPM / N1, EGT, Throttle position, Afterburner state (where available)
+   - Fuel flow (if exposed) and derived endurance
+
+6. **Aircraft Mass**
+   - Total mass, empty weight and payload mass (if exposed by module)
+
+7. **Flight Controls / Trim**
+   - Elevator/Aileron/Rudder positions and trims
+
+8. **Gear & Configuration**
+   - Gear positions (nose/left/right), Weight-on-Wheels (WoW), Flaps %, Speedbrake %, Hook state
+
+9. **Lights & Canopy**
+   - Landing/Taxi/Navigation/Strobe/Formation lights and canopy status
+
+10. **Mission Time**
+   - Mission clock / model time (seconds)
+
+11. **Nearby Units / Ground Objects**
+   - Nearby unit list (type, name, coalition, position, distance) for situational awareness
 
 5. **Fuel**
    - Total fuel capacity
@@ -220,12 +246,28 @@ Expected JSON format (one object per UDP datagram):
     ],
     "threatsDetected": 2
   },
+  "angleOfAttack": 3.5,
+  "gLoad": { "x": 1.0, "y": 0.0, "z": 1.0 },
+  "engines": {
+    "rpm": { "left": 98.5, "right": 98.5 },
+    "egt": { "left": 560.0, "right": 558.0 },
+    "throttle": 0.75,
+    "afterburner": false
+  },
+  "aircraftMass": { "total": 17200, "empty": 12000, "payload": 4200 },
+  "flightControls": { "pitch": 0.01, "roll": -0.02, "yaw": 0.0, "trimPitch": 0.0, "trimRoll": 0.0, "trimYaw": 0.0 },
+  "mechanical": { "gear": { "nose": 1.0, "left": 1.0, "right": 1.0 }, "flaps": 0.25, "speedbrake": 0.0, "canopy": 0.0, "hook": 0.0 },
+  "lights": { "landing": 0.0, "taxi": 0.0, "navigation": 1.0, "strobe": 0.0, "formation": 0.0 },
+  "systems": { "electrical": "OK", "hydraulic": "OK", "apuOn": false, "generatorOn": true },
+  "missionTime": 4523,
   "radar": {
     "mode": "RWS",
     "range": 80.0,
     "locked": false,
-    "trackCount": 3
+    "trackCount": 3,
+    "tracks": [ { "id": 1, "range": 12000, "azimuth": 45.0, "elevation": 1.5, "locked": false } ]
   },
+  "nearbyUnits": [ { "id": "U123", "name": "Tanker", "type": "KC-135", "coalition": "Blue", "distance": 3200 } ],
   "countermeasures": {
     "chaffCount": 60,
     "flareCount": 30,
@@ -289,9 +331,45 @@ A comprehensive list of fields the DataPad will receive from the UDP JSON stream
 - `heading` · number — heading (radians in-stream; converted to degrees in UI)
 - `pitch` · number — pitch (radians)
 - `bank` · number — bank/roll (radians)
+- `angleOfAttack` · number? — AoA (degrees), when available from draw arguments or module
+- `gLoad` · object? { `x`, `y`, `z` } — G-force in Gs on X/Y/Z axes
 - `lat` · number — latitude (decimal degrees)
 - `long` · number — longitude (decimal degrees)
 - `pos` · object { `x`, `y`, `z` } — DCS world coordinates
+
+### Engine Data
+- `engines` · object? — engine telemetry
+  - `rpm` · object? { `left`, `right` } — percent or RPM
+  - `egt` · object? { `left`, `right` } — exhaust gas temperature (°C)
+  - `throttle` · number? — throttle position (0.0–1.0)
+  - `afterburner` · bool? — afterburner engaged
+
+### Aircraft Mass
+- `aircraftMass` · object? — { `total`, `empty`, `payload` } (kg)
+
+### Flight Controls
+- `flightControls` · object? — { `pitch`, `roll`, `yaw`, `trimPitch`, `trimRoll`, `trimYaw` }
+
+### Mechanical / Configuration
+- `mechanical` · object? — { `gear`, `flaps`, `speedbrake`, `canopy`, `hook`, `wheelBrake`, `noseGearSteeringEnabled` }
+  - `gear` · object? { `nose`, `left`, `right` } — 0.0=up, 1.0=down
+  - `weightOnWheels` · bool? — true if on ground
+
+### Lights & Canopy
+- `lights` · object? — { `landing`, `taxi`, `navigation`, `strobe`, `formation` }
+
+### Systems
+- `systems` · object? — { `electrical`, `hydraulic`, `apuOn`, `generatorOn` }
+
+### Radar Tracks
+- `radar.tracks` · list? — each track { `id`, `range`, `azimuth`, `elevation`, `locked` }
+
+### Nearby Units
+- `nearbyUnits` · list? — nearby objects with `{ id, name, type, coalition, distance }`
+
+### Mission Time
+- `missionTime` · number? — mission model time in seconds
+
 
 ### Speed & Vertical
 - `groundSpeed` · number? — ground speed (units variable)
