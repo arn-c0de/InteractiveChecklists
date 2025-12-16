@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataPad Map</title>
+    <!-- Use CDN directly (most reliable in QWebEngineView) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" 
+          crossorigin=""/>
+    <style>
+        html, body, #map { height: 100%; margin: 0; padding: 0; }
+        #status { position: absolute; top: 10px; left: 10px; z-index: 1000; 
+                  background: rgba(255,255,255,0.9); padding: 5px 10px; 
+                  border-radius: 3px; font-size: 12px; display: none; }
+    </style>
+</head>
+<body>
+    <div id="status">Loading map...</div>
+    <div id="map"></div>
+
+    <!-- Load Leaflet from CDN -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+    <!-- Rotated marker plugin -->
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.min.js"></script>
+
+    <script>
+        // Wait for everything to load
+        window.addEventListener('load', function() {
+            var statusEl = document.getElementById('status');
+            
+            try {
+                if (typeof L === 'undefined') {
+                    statusEl.textContent = 'ERROR: Leaflet failed to load';
+                    statusEl.style.display = 'block';
+                    statusEl.style.background = 'rgba(255,0,0,0.9)';
+                    statusEl.style.color = 'white';
+                    return;
+                }
+                
+                var map = L.map('map', { zoomControl: true }).setView([48.0, 11.0], 6);
+
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(map);
+
+                statusEl.textContent = 'Map loaded successfully';
+                statusEl.style.display = 'block';
+                statusEl.style.background = 'rgba(0,255,0,0.7)';
+                setTimeout(function() { statusEl.style.display = 'none'; }, 2000);
+
+                var aircraftMarker = null;
+
+                window.setMarker = function(lat, lon, heading, center) {
+                    try {
+                        var latnum = Number(lat);
+                        var lonnum = Number(lon);
+                        var head = Number(heading) || 0;
+                        var doCenter = (center === true || center === 'true');
+
+                        if (!aircraftMarker) {
+                            // Use default blue marker but rotated
+                            aircraftMarker = L.marker([latnum, lonnum], { 
+                                rotationAngle: head, 
+                                rotationOrigin: 'center center' 
+                            }).addTo(map);
+                            aircraftMarker.bindPopup('Aircraft position');
+                        } else {
+                            aircraftMarker.setLatLng([latnum, lonnum]);
+                            if (typeof aircraftMarker.setRotationAngle === 'function') {
+                                aircraftMarker.setRotationAngle(head);
+                            }
+                        }
+
+                        // Update popup content
+                        try { aircraftMarker.setPopupContent('Heading: ' + Math.round(head) + '°'); } catch (e) {}
+
+                        if (doCenter) {
+                            map.setView([latnum, lonnum]);
+                        }
+                    } catch (e) {
+                        console.error('setMarker error', e);
+                    }
+                };
+            } catch (e) {
+                statusEl.textContent = 'ERROR: ' + e.message;
+                statusEl.style.display = 'block';
+                statusEl.style.background = 'rgba(255,0,0,0.9)';
+                statusEl.style.color = 'white';
+                console.error('Map init error', e);
+            }
+        });
+    </script>
+</body>
+</html>
