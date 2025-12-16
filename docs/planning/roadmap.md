@@ -11,9 +11,6 @@ This roadmap outlines planned features, priorities, and future directions for Ch
 ### DCS (Digital Combat Simulator) Integration
 - **Export Checklists to DCS (Lua):**
 	- Enable exporting checklists as Lua scripts for use in DCS.
-- **Live Data Import from DCS:**
-	- Support real-time synchronization of app state with DCS (e.g., player position, aircraft type, system status, fuel, weapons, flight phase).
-	- Investigate telemetry, network APIs, scripting hooks, or community interfaces.
 - **Two-way Data Injection (Future):**
 	- Explore sending data from mobile to DCS for two-way workflows.
 
