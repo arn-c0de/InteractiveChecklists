@@ -28,6 +28,7 @@ class DataPadManager(private val context: Context) {
         private const val KEY_UDP_PORT = "udp_port"
         private const val KEY_BIND_IP = "bind_ip"
         private const val KEY_PRE_SHARED_KEY = "pre_shared_key"
+        private const val KEY_ENABLED = "enabled"
         
         // Default Pre-Shared Key (32 bytes for AES-256)
         private const val DEFAULT_PRE_SHARED_KEY = "DCS_DataPad_Secret_Key_32BYTES!!"
@@ -76,6 +77,10 @@ class DataPadManager(private val context: Context) {
     
     private val _isConnected = MutableStateFlow(false)
     val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
+
+    // Whether the UDP receiver is enabled (persisted)
+    private val _isEnabled = MutableStateFlow(prefs.getBoolean(KEY_ENABLED, false))
+    val isEnabled: StateFlow<Boolean> = _isEnabled.asStateFlow()
     
     private val _lastUpdateTime = MutableStateFlow<Long?>(null)
     val lastUpdateTime: StateFlow<Long?> = _lastUpdateTime.asStateFlow()
@@ -95,6 +100,17 @@ class DataPadManager(private val context: Context) {
     private var udpSocket: DatagramSocket? = null
     private var receiveJob: Job? = null
     private var isStarted = false
+
+    // Helper functions to gate UDP-related logs when disabled
+    private fun udpLogD(message: String) {
+        if (_isEnabled.value) Log.d(TAG, message)
+    }
+
+    private fun udpLogE(message: String, throwable: Throwable? = null) {
+        if (_isEnabled.value) {
+            if (throwable != null) Log.e(TAG, message, throwable) else Log.e(TAG, message)
+        }
+    }
     
     /**
      * Get the device's local IP address
@@ -123,6 +139,11 @@ class DataPadManager(private val context: Context) {
      */
     fun start() {
         if (isStarted) return
+        if (!_isEnabled.value) {
+            // Receiver is disabled by user - do not start
+            udpLogD("Start requested but receiver is disabled")
+            return
+        }
         isStarted = true
         
         receiveJob = scope.launch {
@@ -130,12 +151,12 @@ class DataPadManager(private val context: Context) {
                 // Get and log device IP
                 val deviceIp = getLocalIpAddress()
                 _deviceIpAddress.value = deviceIp
-                Log.d(TAG, "Device IP address: $deviceIp")
+                udpLogD("Device IP address: $deviceIp")
                 
                 // Log network info
                 val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
                 val activeNetwork = cm.activeNetworkInfo
-                Log.d(TAG, "Active network: ${activeNetwork?.typeName}, connected: ${activeNetwork?.isConnected}")
+                udpLogD("Active network: ${activeNetwork?.typeName}, connected: ${activeNetwork?.isConnected}")
                 
                 val port = _udpPort.value
                 val bindAddress = _bindIp.value
@@ -149,10 +170,10 @@ class DataPadManager(private val context: Context) {
                     reuseAddress = true
                     broadcast = true
                 }
-                Log.d(TAG, "UDP socket opened on ${if (bindAddress.isNotEmpty()) bindAddress else "0.0.0.0"}:$port")
-                Log.d(TAG, "Socket local address: ${udpSocket?.localAddress?.hostAddress}")
-                Log.d(TAG, "Socket local port: ${udpSocket?.localPort}")
-                Log.d(TAG, "Waiting for UDP packets on ${if (bindAddress.isNotEmpty()) bindAddress else deviceIp}:${_udpPort.value}...")
+                udpLogD("UDP socket opened on ${if (bindAddress.isNotEmpty()) bindAddress else "0.0.0.0"}:$port")
+                udpLogD("Socket local address: ${udpSocket?.localAddress?.hostAddress}")
+                udpLogD("Socket local port: ${udpSocket?.localPort}")
+                udpLogD("Waiting for UDP packets on ${if (bindAddress.isNotEmpty()) bindAddress else deviceIp}:${_udpPort.value}...")
                 
                 val buffer = ByteArray(BUFFER_SIZE)
                 val packet = DatagramPacket(buffer, buffer.size)
@@ -161,7 +182,7 @@ class DataPadManager(private val context: Context) {
                     try {
                         udpSocket?.receive(packet)
                         val receivedData = packet.data.copyOfRange(0, packet.length)
-                        Log.d(TAG, "UDP packet received (${packet.length} bytes)")
+                        udpLogD("UDP packet received (${packet.length} bytes)")
                         
                         // Try to decrypt the data
                         val keyBytes = _preSharedKey.value.toByteArray(Charsets.UTF_8)
@@ -169,20 +190,20 @@ class DataPadManager(private val context: Context) {
                         
                         if (decryptedData != null) {
                             val message = String(decryptedData, Charsets.UTF_8)
-                            Log.d(TAG, "Decrypted message: ${message.take(200)}")
+                            udpLogD("Decrypted message: ${message.take(200)}")
                             
                             try {
                                 val data = json.decodeFromString<FlightData>(message)
                                 _flightData.value = data
                                 _lastUpdateTime.value = System.currentTimeMillis()
                                 _isConnected.value = true
-                                Log.d(TAG, "✅ Received encrypted flight data: ${data.aircraft} at ${data.altitude}m")
+                                udpLogD("✅ Received encrypted flight data: ${data.aircraft} at ${data.altitude}m")
                             } catch (e: Exception) {
-                                Log.e(TAG, "Failed to parse flight data: ${e.message}", e)
-                                Log.e(TAG, "Raw message: $message")
+                                udpLogE("Failed to parse flight data: ${e.message}", e)
+                                udpLogE("Raw message: $message")
                             }
                         } else {
-                            Log.e(TAG, "❌ Failed to decrypt packet - check Pre-Shared Key!")
+                            udpLogE("❌ Failed to decrypt packet - check Pre-Shared Key!")
                         }
                         
                     } catch (e: SocketTimeoutException) {
@@ -193,12 +214,12 @@ class DataPadManager(private val context: Context) {
                         }
                     } catch (e: Exception) {
                         if (isActive) {
-                            Log.e(TAG, "Error receiving UDP packet: ${e.message}")
+                            udpLogE("Error receiving UDP packet: ${e.message}")
                         }
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to open UDP socket: ${e.message}")
+                udpLogE("Failed to open UDP socket: ${e.message}")
                 _isConnected.value = false
             } finally {
                 udpSocket?.close()
@@ -217,7 +238,7 @@ class DataPadManager(private val context: Context) {
         udpSocket?.close()
         udpSocket = null
         _isConnected.value = false
-        Log.d(TAG, "UDP socket closed")
+        udpLogD("UDP socket closed")
     }
 
     /**
@@ -261,6 +282,19 @@ class DataPadManager(private val context: Context) {
             prefs.edit().putString(KEY_PRE_SHARED_KEY, finalKey).apply()
             _preSharedKey.value = finalKey
         }
+    }
+
+    /**
+     * Enable or disable the UDP receiver. When disabled, the socket is closed and no UDP logs will be emitted.
+     */
+    fun setEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_ENABLED, enabled).apply()
+        _isEnabled.value = enabled
+        if (enabled) start() else stop()
+    }
+
+    fun toggleEnabled() {
+        setEnabled(!_isEnabled.value)
     }
     
     /**

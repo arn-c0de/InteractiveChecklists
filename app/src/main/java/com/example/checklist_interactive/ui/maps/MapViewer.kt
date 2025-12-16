@@ -35,6 +35,7 @@ import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.TilesOverlay
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.isSystemInDarkTheme
 
 /**
@@ -58,7 +59,7 @@ fun MapViewer(
     val quickNoteManager = LocalQuickNoteManager.current
     val flightData by dataPadManager.flightData.collectAsState()
     val isConnected by dataPadManager.isConnected.collectAsState()
-    
+
     var mapView by remember { mutableStateOf<MapView?>(null) }
     var positionMarker by remember { mutableStateOf<Marker?>(null) }
     // Load previous map state from preferences
@@ -69,6 +70,9 @@ fun MapViewer(
     var showLayerDialog by remember { mutableStateOf(false) }
     var showQuickAccess by remember { mutableStateOf(false) }
     var showDataPad by remember { mutableStateOf(false) }
+
+    // Create a coroutine scope for state updates from listeners
+    val scope = rememberCoroutineScope()
 
     // Track last programmatic map movement to avoid treating it as a user scroll
     val lastProgrammaticMove = remember { mutableStateOf(0L) }
@@ -85,15 +89,19 @@ fun MapViewer(
     }
     
     // Update position marker when flight data changes
-    LaunchedEffect(flightData) {
+    LaunchedEffect(flightData, autoCenter) {
         val data = flightData
         val marker = positionMarker
         val map = mapView
-        
+
+        Log.d(TAG, "LaunchedEffect triggered: data=$data, marker=$marker, map=$map, autoCenter=$autoCenter")
+
         if (data != null && marker != null && map != null) {
             val lat = data.latitude
             val lon = data.longitude
-            
+
+            Log.d(TAG, "Position data: lat=$lat, lon=$lon")
+
             if (lat != 0.0 && lon != 0.0) {
                 val newPosition = GeoPoint(lat, lon)
                 marker.position = newPosition
@@ -113,6 +121,8 @@ fun MapViewer(
                     Log.d(TAG, "Auto-centering enabled, animating to: $lat,$lon")
                     lastProgrammaticMove.value = System.currentTimeMillis()
                     map.controller.animateTo(newPosition)
+                } else {
+                    Log.d(TAG, "Auto-center is disabled, not animating")
                 }
 
                 map.invalidate()
@@ -202,11 +212,10 @@ fun MapViewer(
                                 if (ev.action == MotionEvent.ACTION_DOWN || ev.action == MotionEvent.ACTION_MOVE) {
                                     lastUserTouch.value = System.currentTimeMillis()
                                     prefsManager.setMapAutoCenter(false)
-                                    try {
-                                        (ctx as? android.app.Activity)?.runOnUiThread {
-                                            autoCenter = false
-                                        }
-                                    } catch (_: Exception) {
+                                    // Use coroutine scope to properly update Compose state
+                                    scope.launch {
+                                        Log.d(TAG, "Touch detected - disabling autoCenter via scope.launch")
+                                        autoCenter = false
                                     }
                                 }
                             } catch (_: Exception) {
@@ -229,11 +238,10 @@ fun MapViewer(
                                     prefsManager.setMapCenter(center.latitude, center.longitude)
                                     prefsManager.setMapAutoCenter(false)
                                     Log.d(TAG, "User scroll detected — disabling auto-center (touch at ${now - lastUserTouch.value}ms)")
-                                    try {
-                                        (ctx as? android.app.Activity)?.runOnUiThread {
-                                            autoCenter = false
-                                        }
-                                    } catch (_: Exception) {
+                                    // Use coroutine scope to properly update Compose state
+                                    scope.launch {
+                                        Log.d(TAG, "User scroll - disabling autoCenter via scope.launch")
+                                        autoCenter = false
                                     }
                                     return true
                                 }
@@ -290,7 +298,7 @@ fun MapViewer(
                         autoCenter = true
                         prefsManager.setMapAutoCenter(true)
                         prefsManager.setMapCenter(data.latitude, data.longitude)
-                        Log.d(TAG, "Center FAB pressed — centering to live position ${data.latitude},${data.longitude}")
+                        Log.d(TAG, "Center FAB pressed — centering to live position ${data.latitude},${data.longitude}, autoCenter=$autoCenter")
                     } else {
                         // No live position yet — try to fall back to last saved center, or remember to center later
                         val saved = prefsManager.getMapCenter()
@@ -303,13 +311,13 @@ fun MapViewer(
                             }
                             autoCenter = true
                             prefsManager.setMapAutoCenter(true)
-                            Log.d(TAG, "Center FAB pressed — centering to saved position ${saved.first},${saved.second}")
+                            Log.d(TAG, "Center FAB pressed — centering to saved position ${saved.first},${saved.second}, autoCenter=$autoCenter")
                         } else {
                             // no center available — remember to center once we get a valid position
                             pendingCenter.value = null // will be set when new data arrives in the flight-data effect
                             autoCenter = true
                             prefsManager.setMapAutoCenter(true)
-                            Log.d(TAG, "Center FAB pressed — no position available yet, will enable auto-centering for future updates")
+                            Log.d(TAG, "Center FAB pressed — no position available yet, will enable auto-centering for future updates, autoCenter=$autoCenter")
                         }
                     }
                 },

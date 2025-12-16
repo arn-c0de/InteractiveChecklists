@@ -58,6 +58,7 @@ InteractiveChecklists is an Android application for viewing and interacting with
 - **QuickNotes:** Persistent notes powered by Room, with search, autosave, and markdown support.
 - **Data Persistence:** Stores user preferences, annotations, shortcuts, tags, and open tabs locally.
 - **DataPad (experimental):** Live flight telemetry display (UDP) for DCS World. Streams aircraft telemetry to the app for realtime status and popup details — see `docs/features/DATAPAD_FEATURE.md` for full details and setup instructions.
+- **Aviation Map (experimental):** OpenStreetMap-based map viewer with live aircraft position tracking from the DataPad stream. Adds a `MapViewer` tab showing aircraft position, heading, altitude and basic overlays — see `docs/features/AVIATION_MAP_FEATURE.md` for details and configuration.
 
 ## Experimental: DataPad (Live Flight Telemetry)
 
