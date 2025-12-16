@@ -13,4 +13,8 @@
 - **License:** Public Domain
 - **Source:** https://github.com/stleary/JSON-java
 
+## cryptography (pyca/cryptography)
+- **License:** Apache 2.0
+- **Source:** https://github.com/pyca/cryptography
+
 ---

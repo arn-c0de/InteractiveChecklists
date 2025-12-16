@@ -10,6 +10,9 @@ import kotlinx.serialization.json.Json
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.SocketTimeoutException
+import javax.crypto.Cipher
+import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.SecretKeySpec
 
 /**
  * Manages UDP reception of live flight data and provides state for UI consumption
@@ -20,6 +23,39 @@ class DataPadManager(private val context: Context) {
         private const val UDP_PORT = 5010
         private const val BUFFER_SIZE = 4096
         private const val SOCKET_TIMEOUT_MS = 1000
+        
+        // Pre-Shared Key (32 bytes for AES-256) - MUST match Python script!
+        // Change this to your own random key in production!
+        private val PRE_SHARED_KEY = "DCS_DataPad_Secret_Key_32BYTES!!".toByteArray(Charsets.UTF_8)
+        
+        /**
+         * Decrypt AES-GCM encrypted data
+         * Format: nonce (12 bytes) + ciphertext + tag (16 bytes)
+         */
+        private fun decryptPayload(encryptedData: ByteArray): ByteArray? {
+            return try {
+                if (encryptedData.size < 28) { // 12 (nonce) + 16 (tag) minimum
+                    Log.e(TAG, "Encrypted data too short: ${encryptedData.size} bytes")
+                    return null
+                }
+                
+                // Extract nonce (first 12 bytes)
+                val nonce = encryptedData.copyOfRange(0, 12)
+                // Extract ciphertext + tag (remaining bytes)
+                val ciphertext = encryptedData.copyOfRange(12, encryptedData.size)
+                
+                // Initialize AES-GCM cipher
+                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+                val keySpec = SecretKeySpec(PRE_SHARED_KEY, "AES")
+                val gcmSpec = GCMParameterSpec(128, nonce) // 128-bit authentication tag
+                
+                cipher.init(Cipher.DECRYPT_MODE, keySpec, gcmSpec)
+                cipher.doFinal(ciphertext)
+            } catch (e: Exception) {
+                Log.e(TAG, "Decryption failed: ${e.message}", e)
+                null
+            }
+        }
     }
 
     private val json = Json { 
@@ -102,18 +138,28 @@ class DataPadManager(private val context: Context) {
                 while (isActive) {
                     try {
                         udpSocket?.receive(packet)
-                        val message = String(packet.data, 0, packet.length, Charsets.UTF_8)
-                        Log.d(TAG, "UDP packet received (${packet.length} bytes): ${message.take(200)}")
+                        val receivedData = packet.data.copyOfRange(0, packet.length)
+                        Log.d(TAG, "UDP packet received (${packet.length} bytes)")
                         
-                        try {
-                            val data = json.decodeFromString<FlightData>(message)
-                            _flightData.value = data
-                            _lastUpdateTime.value = System.currentTimeMillis()
-                            _isConnected.value = true
-                            Log.d(TAG, "Received flight data: ${data.aircraft} at ${data.altitude}m")
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Failed to parse flight data: ${e.message}", e)
-                            Log.e(TAG, "Raw message: $message")
+                        // Try to decrypt the data
+                        val decryptedData = decryptPayload(receivedData)
+                        
+                        if (decryptedData != null) {
+                            val message = String(decryptedData, Charsets.UTF_8)
+                            Log.d(TAG, "Decrypted message: ${message.take(200)}")
+                            
+                            try {
+                                val data = json.decodeFromString<FlightData>(message)
+                                _flightData.value = data
+                                _lastUpdateTime.value = System.currentTimeMillis()
+                                _isConnected.value = true
+                                Log.d(TAG, "✅ Received encrypted flight data: ${data.aircraft} at ${data.altitude}m")
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed to parse flight data: ${e.message}", e)
+                                Log.e(TAG, "Raw message: $message")
+                            }
+                        } else {
+                            Log.e(TAG, "❌ Failed to decrypt packet - check Pre-Shared Key!")
                         }
                         
                     } catch (e: SocketTimeoutException) {
