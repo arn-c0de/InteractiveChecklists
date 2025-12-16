@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
@@ -195,7 +196,7 @@ fun InternalFileViewer(
                                 viewModel.resetChecklist()
                                 resetTrigger += 1
                             }, modifier = Modifier.size(40.dp)) {
-                                Icon(Icons.Default.Refresh, contentDescription = "Reset Checklist", modifier = Modifier.size(20.dp))
+                                Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.cd_reset_checklist), modifier = Modifier.size(20.dp))
                             }
                             IconButton(onClick = {
                                 expandAllSections = !expandAllSections
@@ -203,7 +204,7 @@ fun InternalFileViewer(
                             }, modifier = Modifier.size(40.dp)) {
                                 Icon(
                                     imageVector = if (expandAllSections) Icons.Default.UnfoldLess else Icons.Default.UnfoldMore,
-                                    contentDescription = if (expandAllSections) "Collapse all" else "Expand all",
+                                    contentDescription = stringResource(if (expandAllSections) R.string.cd_collapse_all else R.string.cd_expand_all),
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -265,7 +266,7 @@ fun InternalFileViewer(
                         defaultY = 0.9f,
                         visible = true,
                         onClick = { showQuickAccess = true },
-                        content = { Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Quick access") }
+                        content = { Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = stringResource(R.string.cd_quick_access)) }
                     )
 
                     // DataPad FAB for internal markdown viewer
@@ -284,7 +285,7 @@ fun InternalFileViewer(
                             android.util.Log.d("InternalFileViewer", "DataPad FAB clicked")
                             showDataPad = true
                         },
-                        content = { Icon(Icons.Default.Flight, contentDescription = "DataPad") }
+                        content = { Icon(Icons.Default.Flight, contentDescription = stringResource(R.string.cd_datapad)) }
                     )
                 }
 

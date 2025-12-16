@@ -1,6 +1,6 @@
-# Fehlende Datenpunkte für Export.lua (Stand: 16.12.2025)
+# Missing data points for Export.lua (as of: 2025-12-16)
 
-## Kritisch fehlend (Kern-Telemetrie)
+## Critically missing (core telemetry)
 
 - [x] Angle of Attack (AoA) — implemented in Export.lua
 - [x] G-Load (x, y, z) — implemented in Export.lua
@@ -9,17 +9,17 @@
 - [ ] Weight on Wheels
 
 
-## Erweiterte Features (optional)
+## Extended features (optional)
 
 - [ ] Systems Status (Electrical, Hydraulic, APU, Generator)
 - [ ] Nearby Units (id, name, type, coalition, distance)
 
 - [ ] RWR Contacts (id, type, bearing, azimuth, priority, locked)
 
-## Hinweise
-- Siehe FlightData.kt für alle Felder, die die App erwartet.
-- Siehe Export.lua für aktuelle Implementierung und API-Referenzen.
-- Haken setzen, sobald ein Datenpunkt im Lua-Skript korrekt exportiert wird.
+## Notes
+- See `FlightData.kt` for all fields the app expects.
+- See `Export.lua` for the current implementation and API references.
+- Tick the checkbox once a data point is correctly exported by the Lua script.
 
 
 not supported by api

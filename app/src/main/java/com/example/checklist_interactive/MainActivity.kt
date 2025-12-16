@@ -37,6 +37,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Modifier
 import java.io.File
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.res.stringResource
 import com.example.checklist_interactive.ui.theme.ChecklistInteractiveTheme
 import com.example.checklist_interactive.data.prefs.PreferencesManager
 import com.example.checklist_interactive.data.files.InternalFileManager
@@ -54,10 +55,12 @@ import com.example.checklist_interactive.ui.tabs.TabbedDocumentViewer
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.ExperimentalFoundationApi
+import android.content.res.Configuration
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
         companion object {
-            const val SOFTWARE_VERSION = "1.0.11"
+            const val SOFTWARE_VERSION = "1.0.12"
         }
 
         val softwareVersion = SOFTWARE_VERSION
@@ -65,6 +68,22 @@ class MainActivity : ComponentActivity() {
     // Singletons used by Compose and lifecycle methods so we can persist state reliably
     private val globalPrefsManager by lazy { com.example.checklist_interactive.data.prefs.PreferencesManager(this) }
     private val globalTabManager by lazy { com.example.checklist_interactive.data.tabs.TabManager(this) }
+    
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(updateLocale(newBase))
+    }
+    
+    private fun updateLocale(context: Context): Context {
+        val prefsManager = PreferencesManager(context)
+        val languageCode = prefsManager.getAppLanguage()
+        val locale = Locale(languageCode)
+        Locale.setDefault(locale)
+        
+        val config = Configuration(context.resources.configuration)
+        config.setLocale(locale)
+        
+        return context.createConfigurationContext(config)
+    }
     
     @OptIn(ExperimentalFoundationApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -322,7 +341,7 @@ class MainActivity : ComponentActivity() {
                                     pickMultipleDocumentsLauncher.launch(arrayOf("application/pdf", "text/markdown", "text/plain"))
                                     showImportDialog = false
                                 }) {
-                                    Text("Pick files")
+                                    Text(stringResource(R.string.dialog_pick_files))
                                 }
                             },
                             dismissButton = {
@@ -331,11 +350,11 @@ class MainActivity : ComponentActivity() {
                                     pickDocumentTreeLauncher.launch(null)
                                     showImportDialog = false
                                 }) {
-                                    Text("Pick folder")
+                                    Text(stringResource(R.string.dialog_pick_folder))
                                 }
                             },
-                            title = { Text("Import files from device") },
-                            text = { Text("No files were imported automatically. Would you like to pick files or a folder to import?\n(Recommended for PDFs and markdown files) ") }
+                            title = { Text(stringResource(R.string.dialog_import_files)) },
+                            text = { Text(stringResource(R.string.dialog_import_files_message)) }
                         )
                     }
 
@@ -615,7 +634,7 @@ private fun traverseAndImportDocumentFiles(docFile: DocumentFile, fileManager: I
 @Composable
 fun Greeting(name: String, modifier: Modifier = Modifier) {
     Text(
-        text = "Hello $name!",
+        text = stringResource(R.string.greeting_hello, name),
         modifier = modifier
     )
 }

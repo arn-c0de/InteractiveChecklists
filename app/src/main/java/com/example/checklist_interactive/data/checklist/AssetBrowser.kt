@@ -82,7 +82,7 @@ class AssetBrowser(private val context: Context) {
                 }
             }
         } catch (e: Exception) {
-            // Fehler ignorieren
+            // Ignore errors
         }
     }
 }

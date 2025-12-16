@@ -21,7 +21,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.input.pointer.pointerInput
+import com.example.checklist_interactive.R
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -76,7 +78,7 @@ fun TabBar(
             val scope = rememberCoroutineScope()
             if (tabs.isEmpty()) {
                 Text(
-                    text = "No tabs",
+                    text = stringResource(R.string.tab_no_tabs),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 8.dp)
@@ -173,7 +175,7 @@ fun TabBar(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Add,
-                                contentDescription = "New tab",
+                                contentDescription = stringResource(R.string.tab_new),
                                 modifier = Modifier.size(18.dp),
                                 tint = MaterialTheme.colorScheme.primary
                             )
@@ -272,7 +274,7 @@ private fun TabItem(
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
-                    contentDescription = "Close tab",
+                    contentDescription = stringResource(R.string.tab_close),
                     modifier = Modifier.size(12.dp),
                     tint = if (isActive) {
                         MaterialTheme.colorScheme.onPrimaryContainer
@@ -344,14 +346,14 @@ fun TabbedDocumentViewer(
                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                     )
                     Text(
-                        text = "No open tabs",
+                        text = stringResource(R.string.tab_no_open_tabs),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                     TextButton(onClick = onNewTab) {
                         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Open file")
+                        Text(stringResource(R.string.file_open))
                     }
                 }
             }
@@ -420,7 +422,7 @@ fun CompactTabIndicator(
             ) {
                 Icon(
                     imageVector = Icons.Default.Close, // Use appropriate icon
-                    contentDescription = "Previous tab",
+                    contentDescription = stringResource(R.string.tab_previous),
                     modifier = Modifier.size(16.dp)
                 )
             }
@@ -438,7 +440,7 @@ fun CompactTabIndicator(
             ) {
                 Icon(
                     imageVector = Icons.Default.Close, // Use appropriate icon
-                    contentDescription = "Next tab",
+                    contentDescription = stringResource(R.string.tab_next),
                     modifier = Modifier.size(16.dp)
                 )
             }

@@ -20,7 +20,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.example.checklist_interactive.R
 import com.example.checklist_interactive.data.checklist.AssetBrowser
 import com.example.checklist_interactive.data.checklist.AssetNode
 import com.example.checklist_interactive.ui.checklist.ChecklistViewModel
@@ -58,7 +60,7 @@ fun BrowseScreen(
                                 showFolderPopup = !showFolderPopup
                                 if (showFolderPopup) popupPath = currentPath
                             }) {
-                                Icon(Icons.Default.Folder, contentDescription = "Open folders")
+                                Icon(Icons.Default.Folder, contentDescription = stringResource(R.string.file_open_folders))
                             }
                         }
 
@@ -73,13 +75,13 @@ fun BrowseScreen(
                                 currentPath = if (parent.isEmpty()) startPath else parent
                             }
                         }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                         }
                     }
                 },
                 actions = {
                     IconButton(onClick = { showSettingsDialog = true }) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.nav_settings))
                     }
                 }
             )
@@ -87,11 +89,11 @@ fun BrowseScreen(
     ) { padding ->
         Column(modifier = Modifier.padding(padding)) {
             Row(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Path: ")
+                Text(stringResource(R.string.browse_path_label))
                 breadcrumb.forEachIndexed { index, segment ->
                     val isLast = index == breadcrumb.size - 1
                     Text(text = segment, modifier = Modifier.padding(horizontal = 4.dp))
-                    if (!isLast) Text("/")
+                    if (!isLast) Text(stringResource(R.string.browse_path_separator))
                 }
             }
             HorizontalDivider()
@@ -115,7 +117,7 @@ fun BrowseScreen(
         val popupNodes = remember(popupPath) { assetBrowser.list(popupPath) }
         AlertDialog(
             onDismissRequest = { showFolderPopup = false },
-            title = { Text(popupPath.ifBlank { "Assets" }) },
+            title = { Text(popupPath.ifBlank { stringResource(R.string.browse_default_location) }) },
             text = {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -126,7 +128,7 @@ fun BrowseScreen(
                                 popupPath = if (parent.isEmpty()) startPath else parent
                             }
                         }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Up")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.nav_up))
                         }
                         Text(popupPath, modifier = Modifier.padding(start = 8.dp))
                     }
@@ -136,8 +138,8 @@ fun BrowseScreen(
                             ListItem(
                                 headlineContent = { Text(node.name) },
                                 leadingContent = {
-                                    if (node.isDirectory) Icon(Icons.Default.Folder, contentDescription = "folder")
-                                    else Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = "file")
+                                    if (node.isDirectory) Icon(Icons.Default.Folder, contentDescription = stringResource(R.string.cd_folder))
+                                    else Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = stringResource(R.string.cd_file))
                                 },
                                 modifier = Modifier.clickable {
                                     if (node.isDirectory) {
@@ -156,10 +158,10 @@ fun BrowseScreen(
                 TextButton(onClick = {
                     currentPath = popupPath
                     showFolderPopup = false
-                }) { Text("Open") }
+                }) { Text(stringResource(R.string.action_open)) }
             },
             dismissButton = {
-                TextButton(onClick = { showFolderPopup = false }) { Text("Cancel") }
+                TextButton(onClick = { showFolderPopup = false }) { Text(stringResource(R.string.action_cancel)) }
             }
         )
     }
@@ -177,8 +179,8 @@ fun BrowseListItem(node: AssetNode, onClick: (AssetNode) -> Unit) {
     ListItem(
         headlineContent = { Text(displayName) },
         leadingContent = {
-            if (node.isDirectory) Icon(Icons.Default.Folder, contentDescription = "folder")
-            else Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = "file")
+            if (node.isDirectory) Icon(Icons.Default.Folder, contentDescription = stringResource(R.string.cd_folder))
+            else Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = stringResource(R.string.cd_file))
         },
         modifier = Modifier.clickable { onClick(node) }
     )
@@ -190,11 +192,11 @@ fun ThemeSettingsDialog(open: Boolean, isDark: Boolean, onDismiss: () -> Unit, o
     if (!open) return
 
     AlertDialog(onDismissRequest = onDismiss,
-        title = { Text("Settings") },
+        title = { Text(stringResource(R.string.nav_settings)) },
         text = {
             Column {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Dark mode")
+                    Text(stringResource(R.string.settings_dark_mode))
                     Spacer(modifier = Modifier.weight(1f))
                     Switch(checked = isDark, onCheckedChange = onChange)
                 }
@@ -202,7 +204,7 @@ fun ThemeSettingsDialog(open: Boolean, isDark: Boolean, onDismiss: () -> Unit, o
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("OK")
+                Text(stringResource(R.string.action_ok))
             }
         }
     )

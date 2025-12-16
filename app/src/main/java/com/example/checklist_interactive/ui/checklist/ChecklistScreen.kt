@@ -21,6 +21,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.example.checklist_interactive.R
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.example.checklist_interactive.data.checklist.Checklist
@@ -30,7 +32,6 @@ import com.example.checklist_interactive.data.checklist.AssetBrowser
 import com.example.checklist_interactive.data.checklist.AssetNode
 
 import androidx.compose.ui.platform.LocalContext
-import com.example.checklist_interactive.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,14 +70,14 @@ fun ChecklistScreen(viewModel: ChecklistViewModel, checklistId: String, onBack: 
                                     }) {
                                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = LocalContext.current.getString(R.string.up))
                                     }
-                                    Text(popupPath.ifBlank { "Assets" }, modifier = Modifier.padding(start = 8.dp))
+                                    Text(popupPath.ifBlank { stringResource(R.string.browse_default_location) }, modifier = Modifier.padding(start = 8.dp))
                                 }
                                 HorizontalDivider()
                                 LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
                                     items(popupNodes) { node: AssetNode ->
                                         ListItem(headlineContent = { Text(node.name) }, leadingContent = {
-                                            if (node.isDirectory) Icon(Icons.Default.Folder, contentDescription = "folder")
-                                            else Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = "file")
+                                            if (node.isDirectory) Icon(Icons.Default.Folder, contentDescription = LocalContext.current.getString(R.string.cd_folder))
+                                            else Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = LocalContext.current.getString(R.string.cd_file))
                                         }, modifier = Modifier.clickable {
                                             if (node.isDirectory) {
                                                 popupPath = node.path

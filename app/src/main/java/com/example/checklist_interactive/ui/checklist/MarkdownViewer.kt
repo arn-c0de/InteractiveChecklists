@@ -13,6 +13,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.example.checklist_interactive.R
 import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -80,7 +82,7 @@ fun MarkdownViewer(
             }
             markdownContent = content
         } catch (e: Exception) {
-            errorMessage = "Fehler beim Laden: ${e.message}"
+            errorMessage = context.getString(R.string.checklist_error_loading, e.message ?: "")
         } finally {
             isLoading = false
         }
@@ -129,7 +131,7 @@ fun MarkdownViewer(
                     contentAlignment = androidx.compose.ui.Alignment.Center
                 ) {
                     Text(
-                        text = errorMessage ?: "Unbekannter Fehler",
+                        text = errorMessage ?: stringResource(R.string.checklist_error_unknown),
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodyLarge
                     )
@@ -304,7 +306,7 @@ private fun SimpleMarkdownView(
                                     )
                                     Icon(
                                         imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                        contentDescription = if (isExpanded) "Einklappen" else "Ausklappen"
+                                        contentDescription = if (isExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand)
                                     )
                                 }
 
@@ -513,7 +515,7 @@ private fun SimpleMarkdownView(
                                 )
                                 Icon(
                                     imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                    contentDescription = if (isExpanded) "Einklappen" else "Ausklappen"
+                                    contentDescription = stringResource(if (isExpanded) R.string.markdown_collapse else R.string.markdown_expand)
                                 )
                             }
 
@@ -693,7 +695,7 @@ private fun RenderMarkdownLine(line: String, bodyFontSize: Int) {
         line.trim().startsWith("- ") -> {
             // Normal list item
             Row(modifier = Modifier.padding(vertical = 2.dp)) {
-                Text("• ", style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp))
+                Text(stringResource(R.string.markdown_bullet_point), style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp))
                 Text(
                     text = parseInlineMarkdown(line.trim().substring(2), bodyFontSize),
                     style = MaterialTheme.typography.bodyMedium.copy(fontSize = bodyFontSize.sp)
@@ -868,7 +870,7 @@ private fun InteractiveMarkdownView(
                                 )
                                 Icon(
                                     imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                    contentDescription = if (isExpanded) "Einklappen" else "Ausklappen"
+                                    contentDescription = stringResource(if (isExpanded) R.string.markdown_collapse else R.string.markdown_expand)
                                 )
                             }
 

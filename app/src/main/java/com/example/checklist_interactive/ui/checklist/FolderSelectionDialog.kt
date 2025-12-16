@@ -14,6 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.checklist_interactive.data.checklist.AssetBrowser
 import com.example.checklist_interactive.data.checklist.AssetNode
+import androidx.compose.ui.res.stringResource
+import com.example.checklist_interactive.R
 
 /**
  * Dialog to select a root folder from the assets
@@ -32,7 +34,7 @@ fun FolderSelectionDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Select folder") },
+        title = { Text(stringResource(R.string.select_folder)) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 // Navigation
@@ -45,11 +47,11 @@ fun FolderSelectionDialog(
                             val segments = currentPath.split('/')
                             currentPath = segments.dropLast(1).joinToString("/")
                         }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                         }
                     }
                     Text(
-                        text = if (currentPath.isEmpty()) "Root" else currentPath,
+                        text = if (currentPath.isEmpty()) stringResource(R.string.root) else currentPath,
                         style = MaterialTheme.typography.titleSmall,
                         modifier = Modifier.padding(start = 8.dp)
                     )
@@ -66,7 +68,7 @@ fun FolderSelectionDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            "No subfolders found",
+                            stringResource(R.string.no_subfolders_found),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.outline
                         )
@@ -102,12 +104,12 @@ fun FolderSelectionDialog(
                     onFolderSelected(currentPath)
                 }
             ) {
-                Text("Select this folder")
+                Text(stringResource(R.string.select_this_folder))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.action_cancel))
             }
         }
     )

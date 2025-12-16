@@ -13,7 +13,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.example.checklist_interactive.R
 import com.example.checklist_interactive.data.tags.FileTagManager
 
 /**
@@ -43,7 +45,7 @@ fun FileTagEditorDialog(
             Column {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Column {
-                        Text("Edit tags")
+                        Text(stringResource(R.string.tag_edit))
                         Text(
                             text = fileName,
                             style = MaterialTheme.typography.bodySmall,
@@ -51,7 +53,7 @@ fun FileTagEditorDialog(
                         )
                     }
                     TextButton(onClick = onMove, enabled = canMove) {
-                        Text("Move")
+                        Text(stringResource(R.string.tag_move))
                     }
                 }
             }
@@ -61,7 +63,7 @@ fun FileTagEditorDialog(
                 // Currently selected tags as chips
                 if (selectedTags.isNotEmpty()) {
                     Text(
-                        text = "Selected tags:",
+                        text = stringResource(R.string.tag_selected),
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
@@ -79,7 +81,7 @@ fun FileTagEditorDialog(
                                 trailingIcon = {
                                     Icon(
                                         imageVector = Icons.Default.Close,
-                                        contentDescription = "Remove",
+                                        contentDescription = stringResource(R.string.action_remove),
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
@@ -93,7 +95,7 @@ fun FileTagEditorDialog(
                 
                 // Available tags
                 Text(
-                    text = "Available tags:",
+                    text = stringResource(R.string.tag_available),
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
@@ -141,7 +143,7 @@ fun FileTagEditorDialog(
                     OutlinedTextField(
                         value = customTagText,
                         onValueChange = { customTagText = it },
-                        label = { Text("Custom tag") },
+                        label = { Text(stringResource(R.string.tag_custom)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         trailingIcon = {
@@ -157,13 +159,13 @@ fun FileTagEditorDialog(
                                     },
                                     enabled = customTagText.trim().isNotEmpty()
                                 ) {
-                                    Icon(Icons.Default.Check, contentDescription = "Add")
+                                    Icon(Icons.Default.Check, contentDescription = stringResource(R.string.action_add))
                                 }
                                 IconButton(onClick = { 
                                     showAddCustomTag = false
                                     customTagText = ""
                                 }) {
-                                    Icon(Icons.Default.Close, contentDescription = "Cancel")
+                                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_cancel))
                                 }
                             }
                         }
@@ -175,7 +177,7 @@ fun FileTagEditorDialog(
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Add custom tag")
+                        Text(stringResource(R.string.tag_add_custom))
                     }
                 }
 
@@ -184,12 +186,12 @@ fun FileTagEditorDialog(
         },
         confirmButton = {
             TextButton(onClick = { onSave(selectedTags) }) {
-                Text("Save")
+                Text(stringResource(R.string.action_save))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.action_cancel))
             }
         }
     )
@@ -216,7 +218,7 @@ fun TagFilterBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Filter by tags:",
+                text = stringResource(R.string.tag_filter_by),
                 style = MaterialTheme.typography.labelMedium
             )
             
@@ -226,13 +228,13 @@ fun TagFilterBar(
                     FilterChip(
                         selected = filterMode == "any",
                         onClick = { onFilterModeChange(if (filterMode == "any") "all" else "any") },
-                        label = { Text(if (filterMode == "any") "ANY" else "ALL") }
+                        label = { Text(stringResource(if (filterMode == "any") R.string.tag_filter_any else R.string.tag_filter_all)) }
                     )
                 }
                 
                 if (selectedTags.isNotEmpty()) {
                     TextButton(onClick = onClearAll) {
-                        Text("Clear all")
+                        Text(stringResource(R.string.tag_clear_all))
                     }
                 }
             }

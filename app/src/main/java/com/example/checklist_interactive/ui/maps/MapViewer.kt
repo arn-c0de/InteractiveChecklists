@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -113,7 +114,7 @@ fun MapViewer(
                 // Update marker snippet with altitude and speed
                 val altFt = (data.altitude * 3.28084).toInt()
                 val speedKts = (data.groundSpeed ?: 0.0) * 1.9438
-                marker.snippet = "Alt: ${altFt}ft | Spd: ${speedKts.toInt()}kt | Hdg: ${data.heading.toInt()}°"
+                marker.snippet = context.getString(R.string.marker_snippet_fmt, altFt, speedKts.toInt(), data.heading.toInt())
                 marker.title = data.aircraft
 
                 // Auto-center map on position if enabled
@@ -188,8 +189,8 @@ fun MapViewer(
 
                     // Create position marker
                     val marker = Marker(this).apply {
-                        title = "Aircraft Position"
-                        snippet = "Waiting for data..."
+                        title = context.getString(R.string.map_aircraft_position)
+                        snippet = context.getString(R.string.map_waiting_for_data)
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
 
                         // Try to use a custom aircraft icon
@@ -325,7 +326,7 @@ fun MapViewer(
             ) {
                 Icon(
                     imageVector = Icons.Default.MyLocation,
-                    contentDescription = "Center on aircraft"
+                    contentDescription = stringResource(R.string.map_center_on_aircraft)
                 )
             }
             
@@ -336,7 +337,7 @@ fun MapViewer(
             ) {
                 Icon(
                     imageVector = Icons.Default.Layers,
-                    contentDescription = "Map layers"
+                    contentDescription = stringResource(R.string.map_layers)
                 )
             }
             
@@ -347,7 +348,7 @@ fun MapViewer(
             ) {
                 Icon(
                     imageVector = if (isScreenLocked) Icons.Default.Lock else Icons.Default.LockOpen,
-                    contentDescription = if (isScreenLocked) "Unlock screen" else "Lock screen"
+                    contentDescription = if (isScreenLocked) stringResource(R.string.cd_unlock_screen) else stringResource(R.string.cd_lock_screen)
                 )
             }
         }
@@ -362,7 +363,7 @@ fun MapViewer(
                 shape = MaterialTheme.shapes.medium
             ) {
                 Text(
-                    text = "⚠ No DataPad connection - Map position unavailable",
+                    text = stringResource(R.string.map_no_datapad_connection),
                     modifier = Modifier.padding(12.dp),
                     color = MaterialTheme.colorScheme.onErrorContainer,
                     style = MaterialTheme.typography.bodySmall
@@ -377,7 +378,7 @@ fun MapViewer(
                 shape = MaterialTheme.shapes.medium
             ) {
                 Text(
-                    text = "ℹ Waiting for valid position data...",
+                    text = stringResource(R.string.map_waiting_for_valid_position),
                     modifier = Modifier.padding(12.dp),
                     color = MaterialTheme.colorScheme.onTertiaryContainer,
                     style = MaterialTheme.typography.bodySmall
@@ -400,7 +401,7 @@ fun MapViewer(
                     shape = MaterialTheme.shapes.small
                 ) {
                     Text(
-                        text = "🎯 Auto-centering (tap to disable)",
+                        text = stringResource(R.string.map_auto_center_enabled),
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         style = MaterialTheme.typography.labelSmall
@@ -419,7 +420,7 @@ fun MapViewer(
                     shape = MaterialTheme.shapes.small
                 ) {
                     Text(
-                        text = "Auto-center OFF (tap to enable)",
+                        text = stringResource(R.string.map_auto_center_disabled),
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelSmall
@@ -439,7 +440,7 @@ fun MapViewer(
                 shape = MaterialTheme.shapes.small
             ) {
                 Text(
-                    text = "tip: tap lock to look around the map",
+                    text = stringResource(R.string.map_tip_tap_lock),
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelSmall
@@ -464,7 +465,7 @@ fun MapViewer(
                 defaultY = 0.75f,
                 visible = true,
                 onClick = { showQuickAccess = true },
-                content = { Icon(Icons.Default.Note, contentDescription = "Quick Notes") },
+                content = { Icon(Icons.Default.Note, contentDescription = stringResource(R.string.quick_notes_title)) },
                 marginPx = fabMarginPx
             )
         }
@@ -479,7 +480,7 @@ fun MapViewer(
             defaultY = 0.85f,
             visible = true,
             onClick = { showDataPad = true },
-            content = { Icon(Icons.Default.Flight, contentDescription = "DataPad") },
+            content = { Icon(Icons.Default.Flight, contentDescription = stringResource(R.string.datapad_title)) },
             marginPx = fabMarginPx
         )
     }
@@ -531,11 +532,9 @@ fun MapViewer(
         QuickAccessSheet(
             onDismiss = { showQuickAccess = false },
             currentDocumentPath = "special://aviation_map",
-            currentDocumentName = "Aviation Map",
-            onOpenDocument = { _, _ -> }
+            currentDocumentName = stringResource(R.string.map_aviation_map)
         )
     }
-    
     // DataPad Popup
     if (showDataPad) {
         DataPadPopup(onDismiss = { showDataPad = false })
@@ -570,13 +569,13 @@ private fun LayerSelectionDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Map Layers") },
+        title = { Text(stringResource(R.string.map_layers_dialog_title)) },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "Select a map layer:",
+                    text = stringResource(R.string.map_select_layer),
                     style = MaterialTheme.typography.bodyMedium
                 )
 
@@ -585,7 +584,7 @@ private fun LayerSelectionDialog(
                     onClick = { onLayerSelected(null) },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Follow system theme")
+                    Text(stringResource(R.string.map_follow_system_theme))
                 }
                 
                 // Standard OpenStreetMap
@@ -593,7 +592,7 @@ private fun LayerSelectionDialog(
                     onClick = { onLayerSelected("MAPNIK") },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("OpenStreetMap")
+                    Text(stringResource(R.string.map_openstreetmap))
                 }
                 
                 // Topographic
@@ -601,7 +600,7 @@ private fun LayerSelectionDialog(
                     onClick = { onLayerSelected("OpenTopo") },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Topographic")
+                    Text(stringResource(R.string.map_topographic))
                 }
                 
                 // Satellite (if available)
@@ -609,7 +608,7 @@ private fun LayerSelectionDialog(
                     onClick = { onLayerSelected("USGS_SAT") },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Satellite (USGS)")
+                    Text(stringResource(R.string.map_satellite))
                 }
 
                 // Dark themed map (CartoDB Dark Matter)
@@ -617,13 +616,13 @@ private fun LayerSelectionDialog(
                     onClick = { onLayerSelected("CartoDB.DarkMatter") },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Dark map")
+                    Text(stringResource(R.string.map_dark))
                 }
 
                 Divider(modifier = Modifier.padding(vertical = 8.dp))
 
                 Text(
-                    text = "Note: Aviation sectional charts require additional configuration. See docs/technical/AVIATION_MAPS.md",
+                    text = stringResource(R.string.map_note_aviation_charts),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -631,7 +630,7 @@ private fun LayerSelectionDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Close")
+                Text(stringResource(R.string.action_close))
             }
         }
     )

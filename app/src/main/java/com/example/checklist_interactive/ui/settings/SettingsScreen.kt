@@ -24,7 +24,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.example.checklist_interactive.R
 import androidx.compose.ui.text.font.FontWeight
 import com.example.checklist_interactive.data.prefs.PreferencesManager
 import com.example.checklist_interactive.data.files.InternalFileManager
@@ -130,12 +132,12 @@ fun SettingsScreen(
                     fileManager.importAllBundledAssets("")
                 }
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Imported $imported files", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.resources.getQuantityString(R.plurals.imported_files, imported, imported), Toast.LENGTH_SHORT).show()
                     onFilesRefreshed()
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Import failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, context.getString(R.string.import_failed, e.message ?: ""), Toast.LENGTH_LONG).show()
                 }
             } finally {
                 isImporting = false
@@ -152,12 +154,12 @@ fun SettingsScreen(
                     fileManager.importAllBundledAssets("")
                 }
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Wiped and imported $imported files", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.resources.getQuantityString(R.plurals.wiped_imported_files, imported, imported), Toast.LENGTH_SHORT).show()
                     onFilesRefreshed()
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Wipe/Import failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, context.getString(R.string.wipe_import_failed, e.message ?: ""), Toast.LENGTH_LONG).show()
                 }
             } finally {
                 isImporting = false
@@ -170,9 +172,9 @@ fun SettingsScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Settings")
+                        Text(stringResource(R.string.settings_title))
                         Text(
-                            text = "Version: $softwareVersion",
+                            text = stringResource(R.string.settings_version, softwareVersion),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -180,7 +182,7 @@ fun SettingsScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 }
             )
@@ -219,13 +221,13 @@ fun SettingsScreen(
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "Viewer Layout",
+                            text = stringResource(R.string.settings_viewer_layout),
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Reset custom floating button (FAB) positions in all viewers (PDF, Markdown, and internal file viewer) to their default positions. Long-press any FAB to move it to a custom position.",
+                            text = stringResource(R.string.settings_fab_positions_explain),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -233,9 +235,61 @@ fun SettingsScreen(
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Button(onClick = {
                                 prefsManager.resetPdfViewerLayout()
-                                Toast.makeText(context, "FAB positions reset to defaults", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.msg_fab_positions_restored), Toast.LENGTH_SHORT).show()
                             }) {
-                                Text("Reset FAB positions")
+                                Text(stringResource(R.string.settings_reset_fab_positions))
+                            }
+                        }
+                    }
+                }
+            }
+
+            // === App Language ===
+            item {
+                Spacer(modifier = Modifier.height(12.dp))
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = stringResource(R.string.settings_language_label),
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        val languages = listOf("en" to stringResource(R.string.language_english), "de" to stringResource(R.string.language_german))
+                        var expandedLang by remember { mutableStateOf(false) }
+                        var selectedLang by remember { mutableStateOf(prefsManager.getAppLanguage()) }
+                        val selectedLabel = languages.find { it.first == selectedLang }?.second ?: stringResource(R.string.language_english)
+
+                        Box {
+                            OutlinedTextField(
+                                value = selectedLabel,
+                                onValueChange = {},
+                                readOnly = true,
+                                trailingIcon = {
+                                    IconButton(onClick = { expandedLang = !expandedLang }) {
+                                        Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            DropdownMenu(expanded = expandedLang, onDismissRequest = { expandedLang = false }) {
+                                languages.forEach { (code, label) ->
+                                    DropdownMenuItem(
+                                        text = { Text(label) },
+                                        onClick = {
+                                            if (code != selectedLang) {
+                                                prefsManager.setAppLanguage(code)
+                                                selectedLang = code
+                                                expandedLang = false
+                                                // Recreate activity to apply new locale
+                                                (context as? android.app.Activity)?.recreate()
+                                            } else {
+                                                expandedLang = false
+                                            }
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -246,7 +300,7 @@ fun SettingsScreen(
             item {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "Contributors",
+                    text = stringResource(R.string.contributors_title),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(vertical = 8.dp)
@@ -257,13 +311,13 @@ fun SettingsScreen(
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "Contributors",
+                            text = stringResource(R.string.contributors_title),
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Add contributors. Each person can have a website and an optional role.",
+                            text = stringResource(R.string.contributors_explain),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -277,11 +331,11 @@ fun SettingsScreen(
                                     )
                                     contributorsJsonContent = jsonString
                                 } catch (e: Exception) {
-                                    contributorsJsonContent = "Error encoding contributors: ${e.message}"
+                                    contributorsJsonContent = context.getString(R.string.error_encoding_contributors, e.message ?: "")
                                 }
                                 showContributorsJsonDialog = true
                             }) {
-                                Text("View contributors JSON")
+                                Text(stringResource(R.string.settings_view_contributors_json))
                             }
                         }
                         Spacer(modifier = Modifier.height(12.dp))
@@ -308,7 +362,7 @@ fun SettingsScreen(
                                         }
                                         if (!entry.role.isNullOrBlank()) {
                                             Text(
-                                                text = "Role: ${entry.role}",
+                                                text = stringResource(R.string.role_label, entry.role),
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
@@ -326,7 +380,7 @@ fun SettingsScreen(
             item {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "Document Sources",
+                    text = stringResource(R.string.document_sources_title),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(vertical = 8.dp)
@@ -344,14 +398,14 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Document Sources",
+                                text = stringResource(R.string.document_sources_title),
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.weight(1f)
                             )
                             Icon(
                                 imageVector = Icons.Default.KeyboardArrowDown,
-                                contentDescription = if (sourcesExpanded) "Collapse" else "Expand",
+                                contentDescription = if (sourcesExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
                                 modifier = Modifier.rotate(sourcesRotation)
                             )
                         }
@@ -363,7 +417,7 @@ fun SettingsScreen(
                             Column {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = "Sources for documents. Each source can have a website and a license.",
+                                    text = stringResource(R.string.document_sources_explain),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -392,7 +446,7 @@ fun SettingsScreen(
                                                 }
                                                 if (!entry.license.isNullOrBlank()) {
                                                     Text(
-                                                        text = "License: ${entry.license}",
+                                                        text = stringResource(R.string.license_label, entry.license),
                                                         style = MaterialTheme.typography.bodySmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                                     )
@@ -412,7 +466,7 @@ fun SettingsScreen(
             item {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "Visibility",
+                    text = stringResource(R.string.settings_visibility),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(vertical = 8.dp)
@@ -423,23 +477,23 @@ fun SettingsScreen(
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "Aircraft visibility",
+                            text = stringResource(R.string.settings_select_visible_aircraft),
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Choose which bundled aircraft categories are visible in My Files.",
+                            text = stringResource(R.string.settings_aircraft_visibility_explain),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Button(onClick = { showAircraftDialog = true }) {
-                                Text("Select visible aircraft")
+                                Text(stringResource(R.string.settings_select_visible_aircraft))
                             }
                             OutlinedButton(onClick = { showResetConfirm = true }) {
-                                Text("Reset to defaults")
+                                Text(stringResource(R.string.settings_reset_to_defaults))
                             }
                         }
                     }
@@ -450,7 +504,7 @@ fun SettingsScreen(
             item {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "Tags",
+                    text = stringResource(R.string.tags_title),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(vertical = 8.dp)
@@ -468,14 +522,14 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Internal tags JSON",
+                                text = stringResource(R.string.settings_view_internal_tag_json),
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.weight(1f)
                             )
                             Icon(
                                 imageVector = Icons.Default.KeyboardArrowDown,
-                                contentDescription = if (tagsExpanded) "Collapse" else "Expand",
+                                contentDescription = if (tagsExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
                                 modifier = Modifier.rotate(tagsRotation)
                             )
                         }
@@ -487,7 +541,7 @@ fun SettingsScreen(
                             Column {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = "View or copy the internal tag JSON currently stored by the app.",
+                                    text = stringResource(R.string.settings_view_internal_tag_json_explain),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -503,11 +557,11 @@ fun SettingsScreen(
                                             )
                                             tagJsonContent = jsonStr
                                         } catch (e: Exception) {
-                                            tagJsonContent = "Error loading tags: ${e.message}"
+                                            tagJsonContent = context.getString(R.string.error_loading_tags, e.message ?: "")
                                         }
                                         showTagJsonDialog = true
                                     }) {
-                                        Text("View internal tag JSON")
+                                        Text(stringResource(R.string.settings_view_internal_tag_json))
                                     }
                                     OutlinedButton(onClick = {
                                         // Show asset default file as JSON if present
@@ -516,11 +570,11 @@ fun SettingsScreen(
                                             val content = stream.bufferedReader().use { it.readText() }
                                             tagJsonContent = content
                                         } catch (e: Exception) {
-                                            tagJsonContent = "No default tags asset found."
+                                            tagJsonContent = context.getString(R.string.no_default_tags_asset)
                                         }
                                         showTagJsonDialog = true
                                     }) {
-                                        Text("View default asset JSON")
+                                        Text(stringResource(R.string.settings_view_default_asset_json))
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(16.dp))
@@ -534,14 +588,14 @@ fun SettingsScreen(
                                         }
                                         tagReloadKey++
                                         onFilesRefreshed()
-                                        Toast.makeText(context, "Tags imported and reloaded!", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, context.getString(R.string.msg_tags_imported), Toast.LENGTH_SHORT).show()
                                     } catch (e: Exception) {
-                                        Toast.makeText(context, "Import failed: ${e.message}", Toast.LENGTH_LONG).show()
+                                        Toast.makeText(context, context.getString(R.string.import_failed, e.message ?: ""), Toast.LENGTH_LONG).show()
                                     }
                                 }, modifier = Modifier.fillMaxWidth()) {
                                     Icon(Icons.Default.Refresh, contentDescription = null)
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Import & Reload Tags")
+                                    Text(stringResource(R.string.settings_import_reload_tags))
                                 }
                                 Spacer(modifier = Modifier.height(16.dp))
                                 // Tag statistics
@@ -552,11 +606,11 @@ fun SettingsScreen(
                                     Pair(uniqueTags.size, filesWithTags)
                                 }
                                 Text(
-                                    text = "Total unique tags: ${tagStats.first}",
+                                    text = stringResource(R.string.total_unique_tags, tagStats.first),
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                                 Text(
-                                    text = "Files with at least one tag: ${tagStats.second}",
+                                    text = stringResource(R.string.files_with_tags, tagStats.second),
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                             }
@@ -569,7 +623,7 @@ fun SettingsScreen(
             item {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "Markdown",
+                    text = stringResource(R.string.markdown_title),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(vertical = 8.dp)
@@ -587,14 +641,14 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Markdown font size",
+                                text = stringResource(R.string.settings_markdown_font_size),
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.weight(1f)
                             )
                             Icon(
                                 imageVector = Icons.Default.KeyboardArrowDown,
-                                contentDescription = if (markdownExpanded) "Collapse" else "Expand",
+                                contentDescription = if (markdownExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
                                 modifier = Modifier.rotate(markdownRotation)
                             )
                         }
@@ -629,7 +683,7 @@ fun SettingsScreen(
                                                 }
                                             )
                                             Spacer(modifier = Modifier.width(12.dp))
-                                            Text("$size sp")
+                                            Text(stringResource(R.string.settings_font_size, size))
                                         }
                                     }
                                 }
@@ -650,7 +704,7 @@ fun SettingsScreen(
 
         AlertDialog(
             onDismissRequest = { showAircraftDialog = false },
-            title = { Text("Select visible aircraft") },
+            title = { Text(stringResource(R.string.settings_aircraft_dialog_title)) },
             text = {
                 Column {
                     Row(
@@ -658,10 +712,10 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         TextButton(onClick = { selectedSet = availableAircrafts.toSet() }) {
-                            Text("Select all")
+                            Text(stringResource(R.string.settings_aircraft_select_all))
                         }
                         TextButton(onClick = { selectedSet = emptySet() }) {
-                            Text("Select none")
+                            Text(stringResource(R.string.settings_aircraft_select_none))
                         }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
@@ -704,10 +758,10 @@ fun SettingsScreen(
                     prefsManager.setVisibleAircrafts(selectedSet)
                     visibilityRefreshKey++
                     showAircraftDialog = false
-                }) { Text("Save") }
+                }) { Text(stringResource(R.string.action_save)) }
             },
             dismissButton = {
-                TextButton({ showAircraftDialog = false }) { Text("Cancel") }
+                TextButton({ showAircraftDialog = false }) { Text(stringResource(R.string.action_cancel)) }
             }
         )
     }
@@ -715,32 +769,30 @@ fun SettingsScreen(
     if (showTagJsonDialog) {
         AlertDialog(
             onDismissRequest = { showTagJsonDialog = false },
-            title = { Text("Tag JSON") },
+            title = { Text(stringResource(R.string.settings_tag_json_title)) },
             text = {
                 Box(modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 80.dp, max = 420.dp)
                     .verticalScroll(rememberScrollState())) {
                     Text(
-                        text = tagJsonContent.ifBlank { "(empty)" },
+                        text = tagJsonContent.ifBlank { stringResource(R.string.common_empty) },
                         style = MaterialTheme.typography.bodySmall,
                         fontFamily = FontFamily.Monospace
                     )
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showTagJsonDialog = false }) { Text("Close") }
+                TextButton(onClick = { showTagJsonDialog = false }) { Text(stringResource(R.string.action_close)) }
             },
             dismissButton = {
                 TextButton(onClick = { 
                     // Copy to clipboard
-                    try {
-                        val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
-                        val clip = android.content.ClipData.newPlainText("tags_json", tagJsonContent)
-                        clipboard.setPrimaryClip(clip)
-                        Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
-                    } catch (_: Exception) { }
-                }) { Text("Copy") }
+                    val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
+                    val clip = android.content.ClipData.newPlainText(context.getString(R.string.clipboard_tags_json_label), tagJsonContent)
+                    clipboard.setPrimaryClip(clip)
+                    Toast.makeText(context, context.getString(R.string.msg_copied_to_clipboard), Toast.LENGTH_SHORT).show()
+                }) { Text(stringResource(R.string.action_copy)) }
             }
         )
     }
@@ -748,31 +800,29 @@ fun SettingsScreen(
     if (showSourcesJsonDialog) {
         AlertDialog(
             onDismissRequest = { showSourcesJsonDialog = false },
-            title = { Text("Sources JSON") },
+            title = { Text(stringResource(R.string.settings_sources_json_title)) },
             text = {
                 Box(modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 80.dp, max = 420.dp)
                     .verticalScroll(rememberScrollState())) {
                     Text(
-                        text = sourcesJsonContent.ifBlank { "(empty)" },
+                        text = sourcesJsonContent.ifBlank { stringResource(R.string.common_empty) },
                         style = MaterialTheme.typography.bodySmall,
                         fontFamily = FontFamily.Monospace
                     )
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showSourcesJsonDialog = false }) { Text("Close") }
+                TextButton(onClick = { showSourcesJsonDialog = false }) { Text(stringResource(R.string.action_close)) }
             },
             dismissButton = {
                 TextButton(onClick = {
-                    try {
-                        val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
-                        val clip = android.content.ClipData.newPlainText("sources_json", sourcesJsonContent)
-                        clipboard.setPrimaryClip(clip)
-                        Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
-                    } catch (_: Exception) { }
-                }) { Text("Copy") }
+                    val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
+                    val clip = android.content.ClipData.newPlainText(context.getString(R.string.clipboard_sources_json_label), sourcesJsonContent)
+                    clipboard.setPrimaryClip(clip)
+                    Toast.makeText(context, context.getString(R.string.msg_copied_to_clipboard), Toast.LENGTH_SHORT).show()
+                }) { Text(stringResource(R.string.action_copy)) }
             }
         )
     }
@@ -780,31 +830,29 @@ fun SettingsScreen(
     if (showContributorsJsonDialog) {
         AlertDialog(
             onDismissRequest = { showContributorsJsonDialog = false },
-            title = { Text("Contributors JSON") },
+            title = { Text(stringResource(R.string.settings_contributors_json_title)) },
             text = {
                 Box(modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 80.dp, max = 420.dp)
                     .verticalScroll(rememberScrollState())) {
                     Text(
-                        text = contributorsJsonContent.ifBlank { "(empty)" },
+                        text = contributorsJsonContent.ifBlank { stringResource(R.string.common_empty) },
                         style = MaterialTheme.typography.bodySmall,
                         fontFamily = FontFamily.Monospace
                     )
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showContributorsJsonDialog = false }) { Text("Close") }
+                TextButton(onClick = { showContributorsJsonDialog = false }) { Text(stringResource(R.string.action_close)) }
             },
             dismissButton = {
                 TextButton(onClick = {
-                    try {
-                        val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
-                        val clip = android.content.ClipData.newPlainText("contributors_json", contributorsJsonContent)
-                        clipboard.setPrimaryClip(clip)
-                        Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
-                    } catch (_: Exception) { }
-                }) { Text("Copy") }
+                    val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
+                    val clip = android.content.ClipData.newPlainText(context.getString(R.string.clipboard_contributors_json_label), contributorsJsonContent)
+                    clipboard.setPrimaryClip(clip)
+                    Toast.makeText(context, context.getString(R.string.msg_copied_to_clipboard), Toast.LENGTH_SHORT).show()
+                }) { Text(stringResource(R.string.action_copy)) }
             }
         )
     }
@@ -813,17 +861,17 @@ fun SettingsScreen(
     if (showResetConfirm) {
         AlertDialog(
             onDismissRequest = { showResetConfirm = false },
-            title = { Text("Reset visibility to defaults") },
-            text = { Text("This will show all bundled aircraft categories. Continue?") },
+            title = { Text(stringResource(R.string.settings_reset_visibility_title)) },
+            text = { Text(stringResource(R.string.settings_reset_visibility_message)) },
             confirmButton = {
                 TextButton({
                     prefsManager.resetVisibleAircrafts()
                     visibilityRefreshKey++
                     showResetConfirm = false
-                }) { Text("Reset") }
+                }) { Text(stringResource(R.string.action_reset)) }
             },
             dismissButton = {
-                TextButton({ showResetConfirm = false }) { Text("Cancel") }
+                TextButton({ showResetConfirm = false }) { Text(stringResource(R.string.action_cancel)) }
             }
         )
     }
@@ -854,7 +902,7 @@ private fun ImportSettingsSection(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Import Settings",
+                    text = stringResource(R.string.settings_import_title),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f)
@@ -891,9 +939,9 @@ private fun ImportSettingsSection(
                             )
                             Spacer(modifier = Modifier.width(16.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("External Import Folder", style = MaterialTheme.typography.bodyLarge)
+                                Text(stringResource(R.string.settings_external_import_folder), style = MaterialTheme.typography.bodyLarge)
                                 Text(
-                                    text = if (currentFolderUri != null) "Folder selected" else "No folder selected – tap to choose",
+                                    text = if (currentFolderUri != null) stringResource(R.string.folder_selected) else stringResource(R.string.no_folder_selected_tap),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -912,7 +960,7 @@ private fun ImportSettingsSection(
                                 contentColor = MaterialTheme.colorScheme.onErrorContainer
                             )
                         ) {
-                            Text("Remove Import Folder")
+                            Text(stringResource(R.string.settings_remove_import_folder))
                         }
                         Spacer(modifier = Modifier.height(12.dp))
                     }
@@ -929,10 +977,10 @@ private fun ImportSettingsSection(
                                     strokeWidth = 2.dp
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Importing...")
+                                Text(stringResource(R.string.settings_importing))
                             }
                         } else {
-                            Text("Re-import bundled assets")
+                            Text(stringResource(R.string.settings_reimport_bundled_assets))
                         }
                     }
 
@@ -956,28 +1004,28 @@ private fun ImportSettingsSection(
                                         color = MaterialTheme.colorScheme.onErrorContainer
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Processing...")
+                                    Text(stringResource(R.string.settings_processing))
                                 }
                             } else {
-                                Text("Reset bundled imports (wipe + reimport)")
+                                Text(stringResource(R.string.settings_reset_bundled_imports))
                             }
                         }
 
                         if (showWipeConfirm) {
                             AlertDialog(
                                 onDismissRequest = { onShowWipeConfirm(false) },
-                                title = { Text("Reset bundled imports") },
+                                title = { Text(stringResource(R.string.settings_reset_bundled_imports_title)) },
                                 text = {
-                                    Text("This will delete all files from internal storage and re-import bundled assets. Continue?")
+                                    Text(stringResource(R.string.settings_reset_bundled_imports_message))
                                 },
                                 confirmButton = {
                                     TextButton({
                                         onShowWipeConfirm(false)
                                         onWipeAndReimport()
-                                    }) { Text("Yes") }
+                                    }) { Text(stringResource(R.string.action_yes)) }
                                 },
                                 dismissButton = {
-                                    TextButton({ onShowWipeConfirm(false) }) { Text("Cancel") }
+                                    TextButton({ onShowWipeConfirm(false) }) { Text(stringResource(R.string.action_cancel)) }
                                 }
                             )
                         }
@@ -988,13 +1036,13 @@ private fun ImportSettingsSection(
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
-                                text = "Import Settings Help",
+                                text = stringResource(R.string.settings_import_title),
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Select an external folder to automatically import PDF and Markdown files from. The app remembers this location and checks for new files on startup.",
+                                text = stringResource(R.string.settings_import_help),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

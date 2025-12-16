@@ -9,7 +9,7 @@ pcall(function()
 	local dumped_tables = {}
 	local UPDATE_INTERVAL = 0.2 -- seconds (5 Hz update rate)
 	local lastWrite = 0
-	local STREAMER_VERSION = "1.0.1"
+	local STREAMER_VERSION = "1.0.2"
 	-- Maximum number of JSON lines to keep in the output file. Set to 0 to disable trimming.
 	local MAX_JSON_LINES = 10000
 	-- If true, clear the JSON/log/debug files once when the export starts

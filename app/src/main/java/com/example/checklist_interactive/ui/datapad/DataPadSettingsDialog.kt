@@ -10,7 +10,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import com.example.checklist_interactive.R
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -131,13 +133,13 @@ fun DataPadSettingsDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "DataPad Settings",
+                        text = stringResource(R.string.datapad_settings_title),
                         style = MaterialTheme.typography.headlineSmall
                     )
                     IconButton(onClick = onDismiss) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Close"
+                            contentDescription = stringResource(R.string.action_close)
                         )
                     }
                 }
@@ -148,26 +150,26 @@ fun DataPadSettingsDialog(
                 OutlinedTextField(
                     value = portText,
                     onValueChange = { portText = it },
-                    label = { Text("UDP Port") },
-                    placeholder = { Text("5010") },
+                    label = { Text(stringResource(R.string.datapad_settings_udp_port)) },
+                    placeholder = { Text(stringResource(R.string.datapad_settings_udp_port_placeholder)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     supportingText = {
-                        Text("Port range: 1024-65535")
-                    }
+                        Text(stringResource(R.string.datapad_settings_port_range))
+                    },
                 )
-                
+
                 // Bind IP Setting
                 OutlinedTextField(
                     value = bindIpText,
                     onValueChange = { bindIpText = it },
-                    label = { Text("Bind IP Address") },
-                    placeholder = { Text("0.0.0.0 (all interfaces)") },
+                    label = { Text(stringResource(R.string.datapad_settings_bind_ip)) },
+                    placeholder = { Text(stringResource(R.string.datapad_settings_bind_ip_placeholder)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     supportingText = {
-                        Text("Empty = listen on all interfaces")
+                        Text(stringResource(R.string.datapad_settings_bind_ip_hint))
                     }
                 )
                 
@@ -178,8 +180,8 @@ fun DataPadSettingsDialog(
                         keyText = it
                         showKeyWarning = it.length != 32 && it.isNotEmpty()
                     },
-                    label = { Text("Pre-Shared Key (AES-256)") },
-                    placeholder = { Text("32 characters (masked)") },
+                    label = { Text(stringResource(R.string.datapad_settings_psk)) },
+                    placeholder = { Text(stringResource(R.string.datapad_settings_psk_placeholder)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     isError = showKeyWarning,
@@ -188,18 +190,18 @@ fun DataPadSettingsDialog(
                         IconButton(onClick = { keyVisible = !keyVisible }) {
                             Icon(
                                 imageVector = if (keyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                contentDescription = if (keyVisible) "Hide key" else "Show key"
+                                contentDescription = if (keyVisible) stringResource(R.string.datapad_hide_key) else stringResource(R.string.datapad_show_key)
                             )
                         }
                     },
                     supportingText = {
                         if (showKeyWarning) {
                             Text(
-                                text = "⚠️ Key must be exactly 32 characters (${keyText.length}/32)",
+                                text = stringResource(R.string.datapad_key_length_warning, keyText.length),
                                 color = MaterialTheme.colorScheme.error
                             )
                         } else {
-                            Text("Must match Python script key")
+                            Text(stringResource(R.string.datapad_settings_psk_hint))
                         }
                     }
                 )
@@ -211,7 +213,7 @@ fun DataPadSettingsDialog(
                         )
                     ) {
                         Text(
-                            text = "The Pre-Shared Key must be exactly 32 bytes (256 bits) for AES-256 encryption.",
+                            text = stringResource(R.string.datapad_key_length_message),
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.padding(12.dp),
                             color = MaterialTheme.colorScheme.onErrorContainer
@@ -228,7 +230,7 @@ fun DataPadSettingsDialog(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "⚠️ Default key detected. For production, reset and replace with a securely generated key (see docs/technical/AES_GCM_ENCRYPTION.md).",
+                            text = stringResource(R.string.datapad_default_key_warning),
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.padding(12.dp),
                             color = MaterialTheme.colorScheme.onErrorContainer
@@ -244,7 +246,7 @@ fun DataPadSettingsDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
                 ) {
                     TextButton(onClick = onDismiss) {
-                        Text("Cancel")
+                        Text(stringResource(R.string.action_cancel))
                     }
 
                     TextButton(onClick = {
@@ -253,7 +255,7 @@ fun DataPadSettingsDialog(
                         showKeyWarning = false
                         manager.updatePreSharedKey("")
                     }) {
-                        Text("Reset Key")
+                        Text(stringResource(R.string.datapad_settings_reset_key))
                     }
                     
                     Button(
@@ -273,7 +275,7 @@ fun DataPadSettingsDialog(
                         },
                         enabled = !showKeyWarning
                     ) {
-                        Text("Save & Restart")
+                        Text(stringResource(R.string.datapad_settings_save_restart))
                     }
                 }
                 
@@ -288,22 +290,18 @@ fun DataPadSettingsDialog(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
-                            text = "ℹ️ Configuration Tips",
+                            text = stringResource(R.string.datapad_configuration_tips_label),
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                         Text(
-                            text = "• Changing settings will restart the UDP socket\n" +
-                                    "• The Pre-Shared Key must match on both sides\n" +
-                                    "• Reset Key restores the default key (change it for production)\n" +
-                                    "• Leave Bind IP empty to listen on all interfaces\n" +
-                                    "• Default port: 5010",
+                            text = stringResource(R.string.datapad_configuration_tips_text),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "⚠️ Security note: For production, change the Pre-Shared Key and distribute it securely. Do NOT use the default key.",
+                            text = stringResource(R.string.datapad_security_note),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )

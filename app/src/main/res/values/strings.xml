@@ -1,40 +1,646 @@
 <resources>
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- APP METADATA -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="app_name">Checklist-Interactive</string>
-    <string name="title_my_files">My Files</string>
-    <string name="import_file">Import file</string>
-    <string name="refresh">Refresh</string>
-    <string name="toggle_dark_mode">Toggle dark mode</string>
-    <string name="no_files">No files available</string>
-    <string name="add_file">Add file</string>
-    <string name="delete_file">Delete file?</string>
-    <string name="delete_confirm">Do you really want to delete "%1$s"?</string>
-    <string name="delete">Delete</string>
-    <string name="cancel">Cancel</string>
-    <string name="category">Category</string>
-    <string name="file">File</string>
-    <string name="files">Files</string>
-    <string name="expand">Expand</string>
-    <string name="collapse">Collapse</string>
-    <string name="unsupported_file_format">Unsupported file format: .%1$s\nSupported: .md, .markdown</string>
-    <string name="back">Back</string>
-    <string name="file_list">File list</string>
-    <string name="settings">Settings</string>
-    <string name="dark_mode">Dark mode</string>
-    <string name="ok">OK</string>
-    <string name="error_loading_pdf">Error loading PDF: %1$s</string>
-    <string name="drawing">Drawing</string>
-    <string name="eraser">Eraser</string>
-    <string name="view">View</string>
-    <string name="width">Width:</string>
-    <string name="save">Save</string>
-    <string name="undo">Undo</string>
-    <string name="highlight">Highlight</string>
-    <string name="checklist">Checklist</string>
-    <string name="open_folders">Open folders</string>
-    <string name="up">Up</string>
-    <string name="open">Open</string>
-    <string name="reset">Reset</string>
-    <string name="export">Export</string>
-    <string name="loading">Loading…</string>
-    <string name="use_unified_viewer_for_pdf">Please use UnifiedViewerScreen for PDF files</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- COMMON ACTIONS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_ok">OK</string>
+    <string name="action_close">Close</string>
+    <string name="action_back">Back</string>
+    <string name="action_open">Open</string>
+    <string name="action_reset">Reset</string>
+    <string name="action_export">Export</string>
+    <string name="action_undo">Undo</string>
+    <string name="action_refresh">Refresh</string>
+    <string name="action_add">Add</string>
+    <string name="action_remove">Remove</string>
+    <string name="action_create">Create</string>
+    <string name="action_copy">Copy</string>
+    <string name="action_clear">Clear</string>
+    <string name="action_yes">Yes</string>
+    <string name="action_search">Search</string>
+    <string name="action_expand">Expand</string>
+    <string name="action_collapse">Collapse</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- NAVIGATION & UI ELEMENTS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="nav_settings">Settings</string>
+    <string name="nav_my_files">My Files</string>
+    <string name="nav_file_list">File list</string>
+    <string name="nav_expand">Expand</string>
+    <string name="nav_collapse">Collapse</string>
+    <string name="nav_up">Up</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- FILE OPERATIONS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="file_import">Import file</string>
+    <string name="file_add">Add file</string>
+    <string name="file_delete">Delete file?</string>
+    <string name="file_delete_confirm">Do you really want to delete \"%1$s\"?</string>
+    <string name="file_no_files">No files available</string>
+    <string name="file_category">Category</string>
+    <string name="file_single">File</string>
+    <string name="file_plural">Files</string>
+    <string name="file_open">Open file</string>
+    <string name="file_open_folders">Open folders</string>
+    <string name="file_unsupported_format">Unsupported file format: .%1$s\nSupported: .md, .markdown</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- TABS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="tab_new">New tab</string>
+    <string name="tab_close">Close tab</string>
+    <string name="tab_previous">Previous tab</string>
+    <string name="tab_next">Next tab</string>
+    <string name="tab_switch">Switch tabs</string>
+    <string name="tab_no_tabs">No tabs</string>
+    <string name="tab_no_open_tabs">No open tabs</string>
+    <string name="tab_open_tabs">Open tabs</string>
+    <string name="tab_recently_used">Recently used</string>
+    <string name="tab_all_tabs">All tabs (%1$d)</string>
+    <string name="tab_page_number">Page %1$d</string>
+    <string name="tab_active">Active</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- TAGS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="tag_edit">Edit tags</string>
+    <string name="tag_move">Move</string>
+    <string name="tag_custom">Custom tag</string>
+    <string name="tag_add_custom">Add custom tag</string>
+    <string name="tag_clear_all">Clear all</string>
+    <string name="tag_filter_any">ANY</string>
+    <string name="tag_filter_all">ALL</string>
+    <string name="tag_selected">Selected tags:</string>
+    <string name="tag_available">Available tags:</string>
+    <string name="tag_filter_by">Filter by tags:</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- CHECKLIST & MARKDOWN -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="checklist_title">Checklist</string>
+    <string name="checklist_error_loading">Error loading: %1$s</string>
+    <string name="checklist_error_unknown">Unknown error</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- PDF VIEWER -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="pdf_error_loading">Error loading PDF: %1$s</string>
+    <string name="pdf_use_unified_viewer">Please use UnifiedViewerScreen for PDF files</string>
+    <string name="pdf_drawing">Drawing</string>
+    <string name="pdf_eraser">Eraser</string>
+    <string name="pdf_view">View</string>
+    <string name="pdf_width">Width:</string>
+    <string name="pdf_highlight">Highlight</string>
+    <string name="pdf_highlight_page">Highlight page</string>
+    <string name="pdf_shortcut_create">Create shortcut</string>
+    <string name="pdf_shortcut_dialog_title">Create shortcut</string>
+    <string name="pdf_shortcut_dialog_message">Create a shortcut to page %1$d</string>
+    <string name="pdf_shortcut_name_label">Shortcut name</string>
+    <string name="pdf_shortcut_name_format">%1$s - Page %2$d</string>
+    <string name="pdf_link_to_quick_note">Link to quick note</string>
+    <string name="pdf_marked">Marked</string>
+    <string name="pdf_outline">Outline</string>
+    <string name="pdf_sharpen">Sharpen</string>
+    <string name="pdf_invert_colors">Invert Colors</string>
+    <string name="pdf_draw">Draw</string>
+    <string name="pdf_marker">Marker</string>
+    <string name="pdf_link">Link</string>
+    <string name="pdf_show_text">Show text</string>
+    <string name="pdf_delete_all_title">Delete all drawings?</string>
+    <string name="pdf_delete_all_message">Do you really want to permanently delete all drawings/annotations on this page?</string>
+    <string name="pdf_zoom_out">Zoom Out</string>
+    <string name="pdf_zoom_in">Zoom In</string>
+    <string name="pdf_pen">Pen</string>
+    <string name="pdf_special_brush">Special brush</string>
+    <string name="pdf_eraser_label">Eraser:</string>
+    <string name="pdf_reset_zoom">Reset zoom</string>
+    <string name="pdf_no_chapters">No chapters found. Showing page list as fallback.</string>
+    <string name="pdf_search_chapters">Search chapters</string>
+    <string name="pdf_text">PDF Text</string>
+    <string name="pdf_no_text_on_page">No text found on this page.</string>
+    <string name="pdf_clipboard_label">PDF Text</string>
+    <string name="pdf_hide_toolbar">Hide toolbar</string>
+    <string name="pdf_show_toolbar">Show toolbar</string>    <string name="pdf_page_progress">Page %1$d/%2$d</string>
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- BROWSE & NAVIGATION -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="browse_path_label">Path:</string>
+    <string name="browse_path_separator">/</string>
+    <string name="browse_default_location">Assets</string>
+    <string name="cd_folder">folder</string>
+    <string name="cd_file">file</string>
+    <string name="cd_close">Close</string>
+    <string name="cd_change_folder">Change folder</string>
+    <string name="cd_back">Back</string>
+    <string name="cd_outline">Outline</string>
+    <string name="cd_sharpen">Sharpen</string>
+    <string name="cd_invert_colors">Invert Colors</string>
+    <string name="cd_draw">Draw</string>
+    <string name="cd_marker">Marker</string>
+    <string name="cd_highlight_page">Highlight page</string>
+    <string name="cd_link">Link</string>
+    <string name="cd_show_text">Show text</string>
+    <string name="cd_undo">Undo</string>
+    <string name="cd_zoom_out">Zoom Out</string>
+    <string name="cd_zoom_in">Zoom In</string>
+    <string name="cd_eraser">Eraser</string>
+    <string name="cd_pen">Pen</string>
+    <string name="cd_link_to_quick_note">Link to quick note</string>
+    <string name="cd_clear">Clear/Delete</string>
+    <string name="pdf_shortcut">Shortcut</string>
+    <string name="shortcuts_title">Shortcuts</string>
+    <string name="cd_file_list">File list</string>
+    <string name="cd_datapad">DataPad</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- QUICK ACCESS & NOTES -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="quick_access_title">Quick access</string>
+    <string name="quick_notes_title">Quick Notes</string>
+    <string name="quick_notes_search_placeholder">Search notes…</string>
+    <string name="quick_notes_new_note">New note</string>
+    <string name="quick_notes_rename_title">Rename Note</string>
+    <string name="quick_notes_title_label">Title</string>
+    <string name="quick_notes_pin_document">Pin document</string>
+    <string name="quick_notes_callsign_label">CALLSIGN</string>
+    <string name="quick_notes_com1_label">COM1</string>
+    <string name="quick_notes_com2_label">COM2</string>
+    <string name="quick_notes_fm">FM</string>
+    <string name="quick_notes_am">AM</string>
+    <string name="quick_notes_mode_normal">Normal</string>
+    <string name="quick_notes_mode_markdown">Markdown</string>
+    <string name="quick_notes_field_text">Text</string>
+    <string name="quick_notes_field_numbers">Numbers</string>
+    <string name="quick_notes_field_frequency">Frequency</string>
+    <string name="quick_notes_field_coordinates">Coordinates</string>
+    <string name="quick_notes_field_flight_state">Flight State</string>
+    <string name="quick_notes_field_time">Time</string>
+    <string name="quick_notes_field_draw">Draw</string>
+    <string name="quick_notes_status_label">Status</string>
+    <string name="quick_notes_opacity_label">Opacity: %1$d%% (min 25%%)</string>
+    <string name="quick_notes_section_flight_info">Flight Info</string>
+    <string name="quick_notes_editor_markdown">Markdown Editor</string>
+    <string name="quick_notes_editor_note">Note</string>
+    <string name="quick_notes_mode_normal_chip">Normal</string>
+    <string name="quick_notes_mode_markdown_chip">Markdown</string>
+    <string name="quick_notes_markdown_placeholder">Markdown Editor\n\nLinks: [Text](internal://open?file=...)\n**Bold**, *Italic*</string>
+    <string name="quick_notes_placeholder">Write your notes here…</string>
+    <string name="quick_notes_empty_state">Note is empty</string>
+    <string name="quick_notes_empty_hint">Use quick input below</string>
+    <string name="quick_notes_untitled">Untitled</string>
+    <string name="quick_notes_delete_confirm">Press again to delete</string>
+    <string name="common_empty">(empty)</string>
+    <string name="greeting_hello">Hello %1$s!</string>
+    <string name="quick_notes_new_button">New</string>
+    <string name="quick_notes_com_prefix">COM:</string>
+    <string name="quick_notes_coord_template">N       E      </string>
+    <string name="quick_notes_flight_template">Alt: FL    / Speed:     / HDG:    </string>
+    <string name="quick_notes_coord_format">N %1$s E %2$s</string>
+    <string name="quick_notes_alt_prefix">Alt: FL </string>
+    <string name="quick_notes_speed_separator"> / Speed: </string>
+    <string name="quick_notes_hdg_separator"> / HDG: </string>
+    <string name="quick_notes_coord_placeholder">Enter numbers (e.g., 481234 for N48°12\'34\")</string>
+    <string name="quick_notes_freq_placeholder">e.g., 122.500</string>
+    <string name="quick_notes_time_placeholder">e.g., 14:30</string>
+    <string name="quick_notes_numbers_placeholder">Enter numbers…</string>
+    <string name="quick_notes_flight_placeholder">Enter numbers (e.g., 020000250090 for FL20000/250kt/HDG090)</string>
+    <string name="quick_notes_text_placeholder">Add text…</string>
+    <string name="quick_notes_drawing_saved">Drawing saved</string>
+    <string name="quick_notes_no_active_note">No active note to save drawing</string>
+    <string name="quick_notes_draw_button">Draw</string>
+    <string name="quick_notes_erase_button">Erase</string>
+    <string name="quick_notes_not_saved">Not saved</string>
+    <string name="quick_notes_saved">Saved</string>
+    <string name="quick_notes_count_singular">note</string>
+    <string name="quick_notes_count_plural">notes</string>
+    <string name="cd_add">Add</string>
+    <string name="cd_list_view">List view</string>
+    <string name="cd_grid_view">Grid view</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- FLIGHT STATUS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="flight_status_idle">Idle</string>
+    <string name="flight_status_startup">Startup</string>
+    <string name="flight_status_taxi">Taxi</string>
+    <string name="flight_status_holding">Holding</string>
+    <string name="flight_status_start_navigation">Start Navigation</string>
+    <string name="flight_status_navigation">Navigation</string>
+    <string name="flight_status_landing">Landing</string>
+    <string name="flight_status_shutdown">Shutdown</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- MAPS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="map_center_on_aircraft">Center on aircraft</string>
+    <string name="map_layers">Map layers</string>
+    <string name="map_layers_dialog_title">Map Layers</string>
+    <string name="map_follow_system_theme">Follow system theme</string>
+    <string name="map_openstreetmap">OpenStreetMap</string>
+    <string name="map_topographic">Topographic</string>
+    <string name="map_satellite">Satellite (USGS)</string>
+    <string name="map_dark">Dark map</string>
+    <string name="map_aircraft_position">Aircraft Position</string>
+    <string name="map_waiting_for_data">Waiting for data…</string>
+    <string name="map_no_datapad_connection">⚠ No DataPad connection - Map position unavailable</string>
+    <string name="map_waiting_for_valid_position">ℹ Waiting for valid position data…</string>
+    <string name="map_auto_centering_active">🎯 Auto-centering (tap to disable)</string>
+    <string name="map_auto_centering_off">Auto-center OFF (tap to enable)</string>
+    <string name="map_auto_center_enabled">🎯 Auto-centering (tap to disable)</string>
+    <string name="map_auto_center_disabled">Auto-center OFF (tap to enable)</string>
+    <string name="map_tip_lock_screen">tip: tap lock to look around the map</string>
+    <string name="map_tip_tap_lock">tip: tap lock to look around the map</string>
+    <string name="map_select_layer">Select a map layer:</string>
+    <string name="map_aviation_charts_note">Note: Aviation sectional charts require additional configuration. See docs/technical/AVIATION_MAPS.md</string>
+    <string name="map_note_aviation_charts">Note: Aviation sectional charts require additional configuration. See docs/technical/AVIATION_MAPS.md</string>
+    <string name="map_aviation_map">Aviation Map</string>
+    <string name="marker_snippet_fmt">Alt: %1$d ft | Speed: %2$d kts | Hdg: %3$d°</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- DATAPAD -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="datapad_title">DataPad</string>
+    <string name="datapad_encrypted_connection">🔒 AES-GCM encrypted • %1$s:%2$d</string>
+    <string name="datapad_setup_instructions">Make sure forward_parsed_udp.py is running</string>
+    <string name="datapad_command_example">python forward_parsed_udp.py --host %1$s --port %2$d</string>
+    <string name="datapad_encryption_info">🔒 Data is encrypted with AES-GCM</string>
+    <string name="datapad_default_key_warning">⚠️ Default key detected. For production, reset and replace with a securely generated key (see docs/technical/AES_GCM_ENCRYPTION.md).</string>
+    <string name="datapad_configuration_tips_label">Configuration Tips</string>
+    <string name="datapad_configuration_tips_text">• Changing settings will restart the UDP socket
+• The Pre-Shared Key must match on both sides
+• Reset Key restores the default key (change it for production)
+• Leave Bind IP empty to listen on all interfaces
+• Default port: 5010</string>
+    <string name="datapad_security_note">⚠️ Security note: For production, change the Pre-Shared Key and distribute it securely. Do NOT use the default key.</string>
+    <string name="datapad_section_aircraft_pilot">Aircraft &amp; Pilot</string>
+    <string name="datapad_section_flight_performance">Flight Performance</string>
+    <string name="datapad_field_angle_of_attack">Angle of Attack</string>
+    <string name="datapad_field_g_load_x">G-Load X</string>
+    <string name="datapad_field_g_load_y">G-Load Y</string>
+    <string name="datapad_field_g_load_z">G-Load Z</string>
+    <string name="datapad_section_engine">Engine</string>
+    <string name="datapad_field_rpm_left">RPM Left</string>
+    <string name="datapad_field_rpm_right">RPM Right</string>
+    <string name="datapad_field_egt_left">EGT Left</string>
+    <string name="datapad_field_egt_right">EGT Right</string>
+    <string name="datapad_field_throttle">Throttle</string>
+    <string name="datapad_field_afterburner">Afterburner</string>
+    <string name="datapad_section_aircraft_mass">Aircraft Mass</string>
+    <string name="datapad_field_total_mass">Total Mass</string>
+    <string name="datapad_field_empty_mass">Empty Mass</string>
+    <string name="datapad_field_payload">Payload</string>
+    <string name="datapad_section_flight_controls">Flight Controls &amp; Trim</string>
+    <string name="datapad_field_pitch">Pitch</string>
+    <string name="datapad_field_roll">Roll</string>
+    <string name="datapad_field_yaw">Yaw</string>
+    <string name="datapad_field_trim_pitch">Trim Pitch</string>
+    <string name="datapad_field_trim_roll">Trim Roll</string>
+    <string name="datapad_field_trim_yaw">Trim Yaw</string>
+    <string name="datapad_section_gear_config">Gear &amp; Configuration</string>
+    <string name="datapad_field_nose_gear">Nose Gear</string>
+    <string name="datapad_field_left_gear">Left Gear</string>
+    <string name="datapad_field_right_gear">Right Gear</string>
+    <string name="datapad_gear_down">DOWN</string>
+    <string name="datapad_gear_up">UP</string>
+    <string name="datapad_gear_transit">TRANSIT</string>
+    <string name="datapad_field_weight_on_wheels">Weight on Wheels</string>
+    <string name="datapad_field_flaps">Flaps</string>
+    <string name="datapad_field_speedbrake">Speedbrake</string>
+    <string name="datapad_field_canopy">Canopy</string>
+    <string name="datapad_canopy_open">OPEN</string>
+    <string name="datapad_canopy_closed">CLOSED</string>
+    <string name="datapad_canopy_moving">MOVING</string>
+    <string name="datapad_field_hook">Hook</string>
+    <string name="datapad_hook_down">DOWN</string>
+    <string name="datapad_hook_up">UP</string>
+    <string name="datapad_section_lights">Lights</string>
+    <string name="datapad_field_landing_light">Landing</string>
+    <string name="datapad_field_taxi_light">Taxi</string>
+    <string name="datapad_field_nav_light">Navigation</string>
+    <string name="datapad_field_strobe_light">Strobe</string>
+    <string name="datapad_field_formation_light">Formation</string>
+    <string name="datapad_section_systems_status">Systems Status</string>
+    <string name="datapad_field_electrical">Electrical</string>
+    <string name="datapad_field_hydraulic">Hydraulic</string>
+    <string name="datapad_field_apu">APU</string>
+    <string name="datapad_field_generator">Generator</string>
+    <string name="datapad_section_mission_time">Mission Time</string>
+    <string name="datapad_field_time">Time</string>
+    <string name="datapad_section_nearby_units">Nearby Units (%1$d)</string>
+    <string name="datapad_section_flight_params">Flight Parameters</string>
+    <string name="datapad_field_altitude">Altitude</string>
+    <string name="datapad_field_heading">Heading</string>
+    <string name="datapad_field_bank">Bank</string>
+    <string name="datapad_section_performance">Performance</string>
+    <string name="datapad_field_indicated_airspeed">Indicated Airspeed</string>
+    <string name="datapad_field_true_airspeed">True Airspeed</string>
+    <string name="datapad_field_vertical_speed">Vertical Speed</string>
+    <string name="datapad_field_mach">Mach</string>
+    <string name="datapad_section_weapons">Weapons &amp; Countermeasures</string>
+    <string name="datapad_field_master_arm">Master Arm</string>
+    <string name="datapad_master_arm_armed">ARMED</string>
+    <string name="datapad_master_arm_safe">SAFE</string>
+    <string name="datapad_field_stations">Stations</string>
+    <string name="datapad_field_total_count">Total Count</string>
+    <string name="datapad_field_flares">Flares</string>
+    <string name="datapad_field_chaff">Chaff</string>
+    <string name="datapad_field_radar_active">Radar Active</string>
+    <string name="datapad_field_jamming">Jamming</string>
+    <string name="datapad_field_ir_jamming">IR Jamming</string>
+    <string name="datapad_field_ai_on">AI On</string>
+    <string name="datapad_field_human">Human</string>
+    <string name="datapad_section_radar">Radar</string>
+    <string name="datapad_field_mode">Mode</string>
+    <string name="datapad_field_range">Range</string>
+    <string name="datapad_field_locked">Locked</string>
+    <string name="datapad_field_track_count">Track Count</string>
+    <string name="datapad_field_azimuth">Azimuth</string>
+    <string name="datapad_field_elevation">Elevation</string>
+    <string name="datapad_field_scan">Scan</string>
+    <string name="datapad_radar_tracks">Tracks:</string>
+    <string name="datapad_station_label">Station %1$s</string>
+    <string name="datapad_type_count">Type %1$s • Count %2$d</string>
+    <string name="datapad_track_label">Track %1$d</string>
+    <string name="datapad_track_detail">%1$s • %2$s</string>
+    <string name="datapad_section_rwr_threats">RWR Threats (%1$d)</string>
+    <string name="datapad_rwr_azimuth_prefix">Azimuth:</string>
+    <string name="datapad_rwr_priority_prefix">Priority:</string>
+    <string name="datapad_section_position">Position</string>
+    <string name="datapad_field_latitude">Latitude</string>
+    <string name="datapad_field_longitude">Longitude</string>
+    <string name="datapad_field_x">X</string>
+    <string name="datapad_field_y">Y</string>
+    <string name="datapad_field_z">Z</string>
+    <string name="datapad_section_additional_info">Additional Info</string>
+    <string name="datapad_field_timestamp">Timestamp</string>
+    <string name="datapad_field_unit_id">Unit ID</string>
+    <string name="datapad_field_streamer_version">Streamer Version</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- SETTINGS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_dark_mode">Dark mode</string>
+    <string name="settings_toggle_dark_mode">Toggle dark mode</string>
+    <string name="settings_reset_fab_positions">Reset FAB positions</string>
+    <string name="settings_view_contributors_json">View contributors JSON</string>
+    <string name="settings_select_visible_aircraft">Select visible aircraft</string>
+    <string name="settings_reset_to_defaults">Reset to defaults</string>
+    <string name="settings_view_internal_tag_json">View internal tag JSON</string>
+    <string name="settings_view_default_asset_json">View default asset JSON</string>
+    <string name="clipboard_tags_json_label">Tags JSON</string>
+    <string name="clipboard_sources_json_label">Sources JSON</string>
+    <string name="clipboard_contributors_json_label">Contributors JSON</string>
+    <string name="settings_import_reload_tags">Import &amp; Reload Tags</string>
+    <string name="settings_font_size">%1$d sp</string>
+    <string name="settings_aircraft_dialog_title">Select visible aircraft</string>
+    <string name="settings_aircraft_select_all">Select all</string>
+    <string name="settings_aircraft_select_none">Select none</string>
+    <string name="settings_tag_json_title">Tag JSON</string>
+    <string name="settings_sources_json_title">Sources JSON</string>
+    <string name="settings_contributors_json_title">Contributors JSON</string>
+    <string name="settings_reset_visibility_title">Reset visibility to defaults</string>
+    <string name="settings_reset_visibility_message">This will show all bundled aircraft categories. Continue?</string>
+    <string name="settings_external_import_folder">External Import Folder</string>
+    <string name="settings_remove_import_folder">Remove Import Folder</string>
+    <string name="settings_reimport_bundled_assets">Re-import bundled assets</string>
+    <string name="settings_reset_bundled_imports">Reset bundled imports (wipe + reimport)</string>
+    <string name="settings_reset_bundled_imports_title">Reset bundled imports</string>
+    <string name="settings_reset_bundled_imports_message">This will delete all files from internal storage and re-import bundled assets. Continue?</string>
+    <string name="settings_importing">Importing…</string>
+    <string name="settings_processing">Processing…</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_viewer_layout">Viewer Layout</string>
+    <string name="settings_fab_positions_explain">Reset floating action button positions to defaults</string>
+    <string name="contributors_title">Contributors</string>
+    <string name="contributors_explain">View and manage project contributors</string>
+    <string name="error_encoding_contributors">Error encoding contributors data</string>
+    <string name="role_label">Role: %1$s</string>
+    <string name="document_sources_title">Document Sources</string>
+    <string name="document_sources_explain">Manage document source references</string>
+    <string name="license_label">License: %1$s</string>
+    <string name="settings_visibility">Aircraft Visibility</string>
+    <string name="settings_aircraft_visibility_explain">Configure which aircraft appear in the browser</string>
+    <string name="tags_title">Tags</string>
+    <string name="settings_view_internal_tag_json_explain">View the internal tag configuration JSON</string>
+    <string name="error_loading_tags">Error loading tags</string>
+    <string name="no_default_tags_asset">No default tags asset found</string>
+    <string name="msg_tags_imported">Tags imported successfully</string>
+    <string name="total_unique_tags">Total unique tags: %1$d</string>
+    <string name="files_with_tags">Files with tags: %1$d</string>
+    <string name="markdown_title">Markdown Settings</string>
+    <string name="settings_markdown_font_size">Markdown font size</string>
+    <string name="msg_copied_to_clipboard">Copied to clipboard</string>
+    <string name="settings_import_title">Import Settings</string>
+    <string name="folder_selected">Folder: %1$s</string>
+    <string name="no_folder_selected_tap">No folder selected. Tap to select.</string>
+    <string name="settings_import_help">Select an external folder to import PDF and markdown files from</string>
+    <string name="import_failed">Import failed</string>
+    <string name="wipe_import_failed">Wipe and import failed: %1$s</string>
+    
+    <plurals name="files_imported">
+        <item quantity="one">%d file imported</item>
+        <item quantity="other">%d files imported</item>
+    </plurals>
+
+    <plurals name="imported_files">
+        <item quantity="one">%1$d file imported</item>
+        <item quantity="other">%1$d files imported</item>
+    </plurals>
+
+    <plurals name="wiped_imported_files">
+        <item quantity="one">%1$d file wiped and imported</item>
+        <item quantity="other">%1$d files wiped and imported</item>
+    </plurals>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- STATES & STATUS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="status_loading">Loading…</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- LANGUAGE -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="settings_language_label">Language</string>
+    <string name="language_english">English</string>
+    <string name="language_german">Deutsch</string>
+    <string name="settings_language_restart_message">Language saved. Please restart the app for changes to take effect.</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- CONTENT DESCRIPTIONS (Accessibility) -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="cd_marked">Marked</string>
+    <string name="cd_shortcut">Shortcut</string>
+    <string name="cd_note">Note</string>
+    <string name="cd_flight">Flight</string>
+    <string name="cd_reset_checklist">Reset Checklist</string>
+    <string name="cd_collapse_all">Collapse all</string>
+    <string name="cd_expand_all">Expand all</string>
+    <string name="cd_quick_access">Quick access</string>
+    <string name="cd_filter_by_tags">Filter by tags</string>
+    <string name="cd_search_files">Search files</string>
+    <string name="cd_open_aviation_map">Open Aviation Map</string>
+    <string name="cd_edit_tags">Edit tags</string>
+    <string name="cd_rename">Rename</string>
+    <string name="cd_settings">Settings</string>
+    <string name="cd_lock_screen">Lock screen</string>
+    <string name="cd_unlock_screen">Unlock screen</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- UI DIALOGS & MESSAGES -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="dialog_import">Import</string>
+    <string name="dialog_file">File</string>
+    <string name="dialog_folder">Folder</string>
+    <string name="dialog_rename_shortcut">Rename Shortcut</string>
+    <string name="dialog_name">Name</string>
+    <string name="dialog_search_files">Search files</string>
+    <string name="dialog_select_category">Select category</string>
+    <string name="dialog_import_files">Import files from device</string>
+    <string name="dialog_import_files_message">No files were imported automatically. Would you like to pick files or a folder to import?\n(Recommended for PDFs and markdown files)</string>
+    <string name="dialog_pick_files">Pick files</string>
+    <string name="dialog_pick_folder">Pick folder</string>
+    <string name="msg_no_matching_files">No matching files found</string>
+    <string name="msg_file_already_in_category">File is already in this category</string>
+    <string name="msg_fab_positions_restored">FAB positions restored</string>
+    <string name="shortcuts">Shortcuts</string>
+    <string name="greeting_default_name">Android</string>
+    <string name="state_on">ON</string>
+    <string name="state_off">OFF</string>
+    <string name="pdf_page_number">PDF page %1$d</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- DATAPAD -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="datapad_reception_on">Reception: ON</string>
+    <string name="datapad_reception_off">Reception: OFF</string>
+    <string name="datapad_connected">Connected</string>
+    <string name="datapad_waiting_for_data">Waiting for data</string>
+    <string name="datapad_toggle_reception_on">Disable reception</string>
+    <string name="datapad_toggle_reception_off">Enable reception</string>
+    <string name="datapad_no_data">No flight data received yet</string>
+    <string name="datapad_expected_command">Expected command:</string>
+    <string name="datapad_aircraft">Aircraft</string>
+    <string name="datapad_pilot">Pilot</string>
+    <string name="datapad_coalition">Coalition</string>
+    <string name="datapad_group">Group</string>
+    <string name="datapad_environment">Environment</string>
+    <string name="datapad_temperature">Temperature</string>
+    <string name="datapad_pressure">Pressure</string>
+    <string name="datapad_wind_speed">Wind Speed</string>
+    <string name="datapad_wind_direction">Wind Direction</string>
+    <string name="datapad_visibility">Visibility</string>
+    <string name="datapad_clouds">Clouds</string>
+    <string name="datapad_not_available">Not available</string>
+
+    <!--═══════════════════════════════════════════════════════════════════════ -->
+    <!-- DATAPAD SETTINGS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="datapad_settings_title">DataPad Settings</string>
+    <string name="datapad_settings_udp_port">UDP Port</string>
+    <string name="datapad_settings_udp_port_placeholder">5010</string>
+    <string name="datapad_settings_port_range">Port range: 1024-65535</string>
+    <string name="datapad_settings_bind_ip">Bind IP Address</string>
+    <string name="datapad_settings_bind_ip_placeholder">0.0.0.0 (all interfaces)</string>
+    <string name="datapad_settings_bind_ip_hint">Empty = listen on all interfaces</string>
+    <string name="datapad_settings_psk">Pre-Shared Key (AES-256)</string>
+    <string name="datapad_settings_psk_placeholder">32 characters (masked)</string>
+    <string name="datapad_settings_psk_hint">Must match Python script key</string>
+    <string name="datapad_hide_key">Hide key</string>
+    <string name="datapad_show_key">Show key</string>
+    <string name="datapad_key_length_warning">⚠️ Key must be exactly 32 characters (%1$d/32)</string>
+    <string name="datapad_key_length_message">The Pre-Shared Key must be exactly 32 bytes (256 bits) for AES-256 encryption.</string>
+    <string name="datapad_settings_reset_key">Reset Key</string>
+    <string name="datapad_settings_save_restart">Save &amp; Restart</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- FILES & FOLDERS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="files_in_folder">Files in: %1$s</string>
+    <string name="select_another_folder">Select another folder</string>
+    <string name="select_folder">Select folder</string>
+    <string name="select_this_folder">Select this folder</string>
+    <string name="import_file_or_folder">Import a file or the whole folder (all .pdf/.md files)?</string>
+    <string name="moved_to_category">Moved to %1$s</string>
+    <string name="msg_could_not_move">Could not move: %1$s</string>
+    <string name="could_not_move">Could not move: %1$s</string>
+    <string name="page_text_title">Page text (Page %1$d)</string>
+    <string name="pdf_text_clip_label">PDF Text</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- MARKDOWN VIEWER -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="markdown_bullet_point">• </string>
+    <string name="markdown_collapse">Einklappen</string>
+    <string name="markdown_expand">Ausklappen</string>
+    <string name="cd_menu">Menu</string>
+    <string name="cd_hide_key">Hide key</string>
+    <string name="cd_show_key">Show key</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- INTERNAL FILES -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="no_files_found">No files found</string>
+    <string name="no_subfolders_found">No subfolders found</string>
+    <string name="root">Root</string>
+    <string name="file_or_files">file</string>
+    <string name="files_multiple">files</string>
+    <string name="shortcuts_label">Shortcuts</string>
+    <string name="rename_label">Rename</string>
+    <string name="page_number_format">Page %1$d</string>
+    <string name="edit_tags_label">Edit tags</string>
+    <string name="cd_list_view_label">List view</string>
+    <string name="cd_grid_view_label">Grid view</string>
+    <string name="cd_search_files_label">Search files</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- LEGACY COMPATIBILITY (deprecated - use semantic names above) -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="title_my_files">@string/nav_my_files</string>
+    <string name="import_file">@string/file_import</string>
+    <string name="refresh">@string/action_refresh</string>
+    <string name="toggle_dark_mode">@string/settings_toggle_dark_mode</string>
+    <string name="no_files">@string/file_no_files</string>
+    <string name="add_file">@string/file_add</string>
+    <string name="delete_file">@string/file_delete</string>
+    <string name="delete_confirm">@string/file_delete_confirm</string>
+    <string name="delete">@string/action_delete</string>
+    <string name="cancel">@string/action_cancel</string>
+    <string name="category">@string/file_category</string>
+    <string name="file">@string/file_single</string>
+    <string name="files">@string/file_plural</string>
+    <string name="expand">@string/nav_expand</string>
+    <string name="collapse">@string/nav_collapse</string>
+    <string name="unsupported_file_format">@string/file_unsupported_format</string>
+    <string name="back">@string/action_back</string>
+    <string name="file_list">@string/nav_file_list</string>
+    <string name="settings">@string/nav_settings</string>
+    <string name="dark_mode">@string/settings_dark_mode</string>
+    <string name="ok">@string/action_ok</string>
+    <string name="error_loading_pdf">@string/pdf_error_loading</string>
+    <string name="drawing">@string/pdf_drawing</string>
+    <string name="eraser">@string/pdf_eraser</string>
+    <string name="view">@string/pdf_view</string>
+    <string name="width">@string/pdf_width</string>
+    <string name="save">@string/action_save</string>
+    <string name="undo">@string/action_undo</string>
+    <string name="highlight">@string/pdf_highlight</string>
+    <string name="checklist">@string/checklist_title</string>
+    <string name="open_folders">@string/file_open_folders</string>
+    <string name="up">@string/nav_up</string>
+    <string name="open">@string/action_open</string>
+    <string name="reset">@string/action_reset</string>
+    <string name="export">@string/action_export</string>
+    <string name="loading">@string/status_loading</string>
+    <string name="use_unified_viewer_for_pdf">@string/pdf_use_unified_viewer</string>
+
 </resources>
