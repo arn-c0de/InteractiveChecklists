@@ -1,6 +1,5 @@
 # Third-Party Licenses
 
-
 ## kotlinx.coroutines
 - **License:** [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0)
 - **Source:** https://github.com/Kotlin/kotlinx.coroutines
@@ -17,4 +16,7 @@
 - **License:** Apache 2.0
 - **Source:** https://github.com/pyca/cryptography
 
----
+## OpenStreetMap
+- **License:** [ODbL 1.0](https://www.openstreetmap.org/copyright)
+- **Source:** https://www.openstreetmap.org
+- **Attribution:** © OpenStreetMap contributors
