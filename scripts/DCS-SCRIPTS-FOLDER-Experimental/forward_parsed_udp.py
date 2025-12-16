@@ -31,7 +31,13 @@ DEFAULT_PORT = 5010
 
 # Pre-Shared Key (32 bytes for AES-256) - MUST match Android app!
 # Change this to your own random key in production!
-PRE_SHARED_KEY = b'DCS_DataPad_Secret_Key_32BYTES!!'
+# WARNING: This file ships with a default key for convenience — change it before using in production.
+DEFAULT_PRE_SHARED_KEY = b'DCS_DataPad_Secret_Key_32BYTES!!'
+PRE_SHARED_KEY = DEFAULT_PRE_SHARED_KEY
+
+# If the default key is still in use, warn the operator (printed to stderr)
+if PRE_SHARED_KEY == DEFAULT_PRE_SHARED_KEY:
+    sys.stderr.write("WARNING: Using default PRE_SHARED_KEY in forward_parsed_udp.py. Change this key before running in production. See docs/technical/AES_GCM_ENCRYPTION.md\n")
 
 def encrypt_payload(data: bytes, key: bytes = PRE_SHARED_KEY) -> bytes:
     """Encrypt data using AES-GCM with a random 12-byte nonce.
