@@ -34,4 +34,11 @@ google-services.json
 # Android Profiling
 *.hprof
 
+# Python virtual environment and cache
+.venv/
+__pycache__/
+
+# MapDatabaseTools - Downloaded Leaflet assets
+scripts/MapDatabaseTools/leaflet/
+
 

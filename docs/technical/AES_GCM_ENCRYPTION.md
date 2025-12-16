@@ -104,8 +104,8 @@ Minimale Paketgröße: 28 Bytes (Nonce + Tag)
 ## Fehlerbehebung
 
 ### "Failed to decrypt packet - check Pre-Shared Key!"
-- Stellen Sie sicher, dass der Pre-Shared Key in beiden Dateien identisch ist
-- Überprüfen Sie, dass das Python-Skript mit der `cryptography` Bibliothek läuft
+- Ensure the Pre-Shared Key is identical in both files
+- Ensure the Python script uses the `cryptography` library
 
 ### Import-Fehler in Python
 ```bash
