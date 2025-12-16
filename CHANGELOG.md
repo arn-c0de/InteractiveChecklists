@@ -4,6 +4,7 @@ All relevant changes are summarized here by version.
 ## [1.0.11] - 2025-12-16
 ### Added
 - **DataPad — AES-GCM encryption:** Implemented AES-GCM encrypted UDP telemetry for DataPad. Python forwarder (`forward_parsed_udp.py`) now encrypts packets by default and the app (`DataPadManager.kt`) performs AES-GCM decryption.
+- **Aviation Map (experimental):** Integrated an OpenStreetMap-based `MapViewer` with live aircraft position tracking using DataPad. Adds a Map tab and documentation (`docs/features/AVIATION_MAP_FEATURE.md`).
 
 ### Changed
 - **UI:** DataPad connection status now indicates encryption ("🔒 AES-GCM encrypted").

@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -54,6 +55,7 @@ fun DataPadPopup(
     val lastUpdateTime by manager.lastUpdateTime.collectAsState()
     val deviceIpAddress by manager.deviceIpAddress.collectAsState()
     val udpPort by manager.udpPort.collectAsState()
+    val isEnabled by manager.isEnabled.collectAsState()
     
     var showSettingsDialog by remember { mutableStateOf(false) }
     
@@ -176,7 +178,6 @@ fun DataPadPopup(
                         )
                     }
                 }
-
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Connection Status
@@ -184,7 +185,10 @@ fun DataPadPopup(
                     isConnected = isConnected,
                     timeSinceUpdate = timeSinceUpdate,
                     deviceIpAddress = deviceIpAddress,
-                    udpPort = udpPort
+                    udpPort = udpPort,
+                    isEnabled = isEnabled,
+                    onToggleEnabled = { manager.toggleEnabled() },
+                    onOpenSettings = { showSettingsDialog = true }
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -215,7 +219,10 @@ private fun ConnectionStatusCard(
     isConnected: Boolean,
     timeSinceUpdate: String,
     deviceIpAddress: String,
-    udpPort: Int
+    udpPort: Int,
+    isEnabled: Boolean,
+    onToggleEnabled: () -> Unit,
+    onOpenSettings: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -237,6 +244,14 @@ private fun ConnectionStatusCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Enabled indicator
+                    Text(
+                        text = if (isEnabled) "Empfang: AN" else "Empfang: AUS",
+                        color = if (isEnabled) Color(0xFFB9F6CA) else Color(0xFFB0BEC5),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Box(
                         modifier = Modifier
                             .size(8.dp)
@@ -253,11 +268,35 @@ private fun ConnectionStatusCard(
                         fontSize = 14.sp
                     )
                 }
-                Text(
-                    text = timeSinceUpdate,
-                    color = Color.White.copy(alpha = 0.8f),
-                    fontSize = 11.sp
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onToggleEnabled,
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PowerSettingsNew,
+                            contentDescription = if (isEnabled) "Empfang deaktivieren" else "Empfang aktivieren",
+                            tint = if (isEnabled) Color(0xFF1B5E20) else Color.Gray
+                        )
+                    }
+
+                    IconButton(
+                        onClick = onOpenSettings,
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Einstellungen",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Text(
+                        text = timeSinceUpdate,
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontSize = 11.sp
+                    )
+                }
             }
             Spacer(modifier = Modifier.height(2.dp))
             Text(
