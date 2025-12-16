@@ -15,6 +15,15 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import android.view.View
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.delay
 
 /**
  * Settings dialog for DataPad configuration
@@ -35,8 +44,74 @@ fun DataPadSettingsDialog(
     var keyText by remember { mutableStateOf(currentKey) }
     var showKeyWarning by remember { mutableStateOf(false) }
     var keyVisible by remember { mutableStateOf(false) }
-    
+
     Dialog(onDismissRequest = onDismiss) {
+        // Try to hide the system UI inside the dialog window
+        val dialogView = LocalView.current
+
+        // Immediately attempt to hide system UI before first draw to avoid flash.
+        DisposableEffect(dialogView) {
+            val dialogWindow = (dialogView.context as? android.app.Activity)?.window
+            val controller = dialogWindow?.let { WindowCompat.getInsetsController(it, dialogView) }
+            // Also set old-style flags for older API's
+            @Suppress("DEPRECATION")
+            dialogView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_FULLSCREEN
+                    or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            )
+
+            val preDrawListener = object : android.view.ViewTreeObserver.OnPreDrawListener {
+                override fun onPreDraw(): Boolean {
+                    controller?.hide(WindowInsetsCompat.Type.systemBars())
+                    try {
+                        controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    } catch (_: Throwable) {
+                    }
+                    dialogView.viewTreeObserver.removeOnPreDrawListener(this)
+                    return true
+                }
+            }
+            dialogView.viewTreeObserver.addOnPreDrawListener(preDrawListener)
+            val attachListener = object : View.OnAttachStateChangeListener {
+                override fun onViewAttachedToWindow(v: View) {
+                    val vWindow = (v.context as? android.app.Activity)?.window
+                    val c = vWindow?.let { WindowCompat.getInsetsController(it, v) }
+                    c?.hide(WindowInsetsCompat.Type.systemBars())
+                    try {
+                        c?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    } catch (_: Throwable) {
+                    }
+                    @Suppress("DEPRECATION")
+                    v.systemUiVisibility = (
+                        View.SYSTEM_UI_FLAG_FULLSCREEN
+                            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                            or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    )
+                }
+
+                override fun onViewDetachedFromWindow(v: View) {}
+            }
+            dialogView.addOnAttachStateChangeListener(attachListener)
+            onDispose {
+                try {
+                    dialogView.viewTreeObserver.removeOnPreDrawListener(preDrawListener)
+                    dialogView.removeOnAttachStateChangeListener(attachListener)
+                } catch (_: Throwable) {
+                }
+            }
+        }
+
+        // Keep ensuring hide while dialog is visible
+        LaunchedEffect(dialogView) {
+            val dialogWindow = (dialogView.context as? android.app.Activity)?.window
+            val dialogController = dialogWindow?.let { WindowCompat.getInsetsController(it, dialogView) }
+            while (isActive) {
+                dialogController?.hide(WindowInsetsCompat.Type.systemBars())
+                delay(100L)
+            }
+        }
+
         Card(
             modifier = Modifier
                 .fillMaxWidth()
