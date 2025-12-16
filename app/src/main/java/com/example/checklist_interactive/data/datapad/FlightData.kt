@@ -67,6 +67,48 @@ data class FlightData(
     @SerialName("fuel")
     val fuel: FuelData? = null,
     
+    // === Angle of Attack & G-Load ===
+    @SerialName("angleOfAttack")
+    val angleOfAttack: Double? = null,
+    
+    @SerialName("gLoad")
+    val gLoad: GLoadData? = null,
+    
+    // === Aircraft Mass ===
+    @SerialName("aircraftMass")
+    val aircraftMass: AircraftMassData? = null,
+    
+    // === Engine Data ===
+    @SerialName("engines")
+    val engines: EngineData? = null,
+    
+    // === Flight Controls & Trim ===
+    @SerialName("flightControls")
+    val flightControls: FlightControlsData? = null,
+    
+    // === Mechanical (Gear, Flaps, etc.) ===
+    @SerialName("mechanical")
+    val mechanical: MechanicalData? = null,
+    
+    @SerialName("weightOnWheels")
+    val weightOnWheels: Boolean = false,
+    
+    // === Lights ===
+    @SerialName("lights")
+    val lights: LightsData? = null,
+    
+    // === Mission Time ===
+    @SerialName("missionTime")
+    val missionTime: Double? = null,
+    
+    // === Systems Status ===
+    @SerialName("systems")
+    val systems: SystemsData? = null,
+    
+    // === Nearby Units ===
+    @SerialName("nearbyUnits")
+    val nearbyUnits: List<NearbyUnit>? = null,
+    
     // === Navigation & Waypoints ===
     @SerialName("waypoint")
     val waypoint: WaypointData? = null,
@@ -255,7 +297,10 @@ data class RwrContact(
     val type: String = "", // SAM, AAA, AI (air intercept)
     
     @SerialName("bearing")
-    val bearing: Double = 0.0,
+    val bearing: Double? = null,
+    
+    @SerialName("azimuth")
+    val azimuth: Double? = null,
     
     @SerialName("priority")
     val priority: Int = 0, // 0=low, 1=medium, 2=high, 3=critical
@@ -276,7 +321,37 @@ data class RadarData(
     val locked: Boolean = false,
     
     @SerialName("trackCount")
-    val trackCount: Int = 0
+    val trackCount: Int = 0,
+    
+    @SerialName("azimuth")
+    val azimuth: Double? = null,
+    
+    @SerialName("elevation")
+    val elevation: Double? = null,
+    
+    @SerialName("scan")
+    val scan: String? = null,
+    
+    @SerialName("tracks")
+    val tracks: List<RadarTrack>? = null
+)
+
+@Serializable
+data class RadarTrack(
+    @SerialName("id")
+    val id: Int = 0,
+    
+    @SerialName("range")
+    val range: Double? = null,
+    
+    @SerialName("azimuth")
+    val azimuth: Double? = null,
+    
+    @SerialName("elevation")
+    val elevation: Double? = null,
+    
+    @SerialName("locked")
+    val locked: Boolean = false
 )
 
 @Serializable
@@ -364,4 +439,169 @@ data class EnvironmentData(
     
     @SerialName("clouds")
     val clouds: String? = null
+)
+
+@Serializable
+data class GLoadData(
+    @SerialName("x")
+    val x: Double = 0.0,
+    
+    @SerialName("y")
+    val y: Double = 0.0,
+    
+    @SerialName("z")
+    val z: Double = 0.0
+)
+
+@Serializable
+data class AircraftMassData(
+    @SerialName("total")
+    val total: Double? = null, // kg
+    
+    @SerialName("empty")
+    val empty: Double? = null,
+    
+    @SerialName("payload")
+    val payload: Double? = null
+)
+
+@Serializable
+data class EngineData(
+    @SerialName("rpm")
+    val rpm: EngineRpmData? = null,
+    
+    @SerialName("egt")
+    val egt: EngineEgtData? = null,
+    
+    @SerialName("throttle")
+    val throttle: Double? = null,
+    
+    @SerialName("afterburner")
+    val afterburner: Boolean = false
+)
+
+@Serializable
+data class EngineRpmData(
+    @SerialName("left")
+    val left: Double? = null,
+    
+    @SerialName("right")
+    val right: Double? = null
+)
+
+@Serializable
+data class EngineEgtData(
+    @SerialName("left")
+    val left: Double? = null,
+    
+    @SerialName("right")
+    val right: Double? = null
+)
+
+@Serializable
+data class FlightControlsData(
+    @SerialName("pitch")
+    val pitch: Double? = null,
+    
+    @SerialName("roll")
+    val roll: Double? = null,
+    
+    @SerialName("yaw")
+    val yaw: Double? = null,
+    
+    @SerialName("trimPitch")
+    val trimPitch: Double? = null,
+    
+    @SerialName("trimRoll")
+    val trimRoll: Double? = null,
+    
+    @SerialName("trimYaw")
+    val trimYaw: Double? = null
+)
+
+@Serializable
+data class MechanicalData(
+    @SerialName("gear")
+    val gear: GearData? = null,
+    
+    @SerialName("flaps")
+    val flaps: Double? = null, // 0.0 to 1.0
+    
+    @SerialName("speedbrake")
+    val speedbrake: Double? = null,
+    
+    @SerialName("canopy")
+    val canopy: Double? = null,
+    
+    @SerialName("hook")
+    val hook: Double? = null,
+    
+    @SerialName("wheelBrake")
+    val wheelBrake: Double? = null,
+    
+    @SerialName("noseGearSteeringEnabled")
+    val noseGearSteeringEnabled: Boolean? = null
+)
+
+@Serializable
+data class GearData(
+    @SerialName("nose")
+    val nose: Double? = null, // 0.0=up, 1.0=down
+    
+    @SerialName("left")
+    val left: Double? = null,
+    
+    @SerialName("right")
+    val right: Double? = null
+)
+
+@Serializable
+data class LightsData(
+    @SerialName("landing")
+    val landing: Double? = null,
+    
+    @SerialName("taxi")
+    val taxi: Double? = null,
+    
+    @SerialName("navigation")
+    val navigation: Double? = null,
+    
+    @SerialName("strobe")
+    val strobe: Double? = null,
+    
+    @SerialName("formation")
+    val formation: Double? = null
+)
+
+@Serializable
+data class SystemsData(
+    @SerialName("electrical")
+    val electrical: String? = null,
+    
+    @SerialName("hydraulic")
+    val hydraulic: String? = null,
+    
+    @SerialName("apuOn")
+    val apuOn: Boolean? = null,
+    
+    @SerialName("generatorOn")
+    val generatorOn: Boolean? = null
+)
+
+@Serializable
+data class NearbyUnit(
+    @SerialName("id")
+    val id: String = "",
+    
+    @SerialName("name")
+    val name: String = "",
+    
+    @SerialName("type")
+    val type: String = "",
+    
+    @SerialName("coalition")
+    val coalition: String = "",
+    
+    @SerialName("distance")
+    val distance: Double? = null // meters
 )
