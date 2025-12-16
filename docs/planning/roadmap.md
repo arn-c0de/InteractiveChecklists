@@ -46,6 +46,9 @@ This roadmap outlines planned features, priorities, and future directions for Ch
 	- Visualize active squad members.
 	- Show real-time cursors/annotations from other users.
 	- Notification system for shared content updates.
+ - **OSMMap Integration UI:**
+	- Smooth map interaction for telemetry display.
+    - Toggle layers, trails, and squad overlays easily. 
 
 ---
 
