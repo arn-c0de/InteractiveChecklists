@@ -3,7 +3,7 @@
 ## Overview
 DataPad is a live flight data display panel that receives real-time aircraft telemetry via UDP from DCS World through the `forward_parsed_udp.py` script.
 
-**Phase 1 (experimental):** This implementation represents Phase 1 of DataPad. Future phases will expand telemetry coverage and add visual and security improvements, including live animated aircraft visualizations based on flight attitude, a dedicated DataPad UI redesign, and a planned migration to encrypted transport (TCP or UDP with AES encryption).
+Phase 1 (experimental): This implementation represents Phase 1 of DataPad. Future phases will expand telemetry coverage and add visual and security improvements, including live animated aircraft visualizations based on flight attitude and a dedicated DataPad UI redesign. DataPad now supports AES-GCM encrypted UDP telemetry (AEAD) with a pre-shared key. See `docs/technical/AES_GCM_ENCRYPTION.md` for configuration and key setup.
 
 ## Architecture
 
@@ -135,6 +135,11 @@ New-NetFirewallRule -DisplayName "DCS DataPad" -Direction Inbound -Protocol UDP 
 
 ### Android Network Permissions
 - `INTERNET` permission is required in AndroidManifest.xml (already added)
+
+## Security
+- AES-GCM encryption for UDP telemetry is **enabled by default** in the Python forwarder (`forward_parsed_udp.py`).
+- To temporarily disable encryption for debugging use `--no-encrypt` (not recommended in production).
+- The Pre-Shared Key (32 bytes) **must match** on both Python and Android sides. See `docs/technical/AES_GCM_ENCRYPTION.md` for generation and configuration instructions.
 
 ## Data Format
 Expected JSON format (one object per UDP datagram):
@@ -383,4 +388,4 @@ A comprehensive list of fields the DataPad will receive from the UDP JSON stream
 - [ ] Map integration with position overlay
 - [ ] Live animated aircraft visualization showing orientation (pitch/roll/heading) and movement
 - [ ] Dedicated DataPad UI/UX redesign and controls
-- [ ] Transition to encrypted transport (TCP or UDP) with AES-based encryption for secure telemetry streams
+- ✅ Implemented: AES-GCM encrypted UDP telemetry (see `docs/technical/AES_GCM_ENCRYPTION.md`) 

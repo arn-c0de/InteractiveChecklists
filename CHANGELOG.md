@@ -1,8 +1,15 @@
 # Changelog
 
 All relevant changes are summarized here by version.
+## [1.0.11] - 2025-12-16
+### Added
+- **DataPad — AES-GCM encryption:** Implemented AES-GCM encrypted UDP telemetry for DataPad. Python forwarder (`forward_parsed_udp.py`) now encrypts packets by default and the app (`DataPadManager.kt`) performs AES-GCM decryption.
 
-## [1.0.10] - 2025-12-16
+### Changed
+- **UI:** DataPad connection status now indicates encryption ("🔒 AES-GCM encrypted").
+
+### Security
+- Added guidance for generating and configuring a 32‑byte (256‑bit) pre-shared key and recommended using hex-formatted keys and secure distribution.
 
 ## [1.0.10] - 2025-12-15
 ### Added

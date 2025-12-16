@@ -68,6 +68,7 @@ Key points:
 - Default UDP port: **5010** (configurable in the app)
 - Run the forwarder script and point it to your device IP and port (see `docs/features/DATAPAD_FEATURE.md`)
 - Ensure your firewall allows UDP traffic on the chosen port
+- Packets are AES-GCM encrypted by default; to disable for debugging use `--no-encrypt`. Ensure the pre-shared key matches the Android app (see `docs/technical/AES_GCM_ENCRYPTION.md`).
 
 See `docs/features/DATAPAD_FEATURE.md` for full usage, configuration, and troubleshooting.
 

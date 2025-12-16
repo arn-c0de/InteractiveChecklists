@@ -1,1 +1,4 @@
-python forward_parsed_udp.py --repeat-last --interval 5 --host 192.168.178.131 --port 5010 --verbose
+pip install cryptography  
+
+
+python forward_parsed_udp.py --repeat-last --interval 2 --host 192.168.178.131 --port 5010 --verbose

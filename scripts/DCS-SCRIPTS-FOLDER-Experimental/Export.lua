@@ -10,6 +10,10 @@ pcall(function()
 	local UPDATE_INTERVAL = 0.2 -- seconds (5 Hz update rate)
 	local lastWrite = 0
 	local STREAMER_VERSION = "1.0.1"
+	-- Maximum number of JSON lines to keep in the output file. Set to 0 to disable trimming.
+	local MAX_JSON_LINES = 10000
+	-- If true, clear the JSON/log/debug files once when the export starts
+	local CLEAR_ON_START = true
 
 	local function format_pos(p)
 		if not p then return 'N/A' end
@@ -276,20 +280,35 @@ pcall(function()
 
 		-- Environment (limited)
 		local wind = safe_get(function() return LoGetVectorWindVelocity() end, nil)
-		if wind then
-			local windSpeed = math.sqrt((wind.x or 0)^2 + (wind.z or 0)^2)
-			local windDir = math.deg(math.atan2(wind.z or 0, wind.x or 0))
-			data.environment = {
-				windDirection = windDir,
-				windSpeed = windSpeed,
-				temperature = safe_get(function() return LoGetTemperature() end, nil),
-				pressure = safe_get(function() return LoGetPressure() end, nil),
-				visibility = nil,
-				clouds = nil
-			}
-		end
-
-		-- Status flags
+	local temp = safe_get(function() return LoGetTemperature() end, nil)
+	local pressure = safe_get(function() return LoGetPressure() end, nil)
+	if wind then
+		local windSpeed = math.sqrt((wind.x or 0)^2 + (wind.z or 0)^2)
+		local windDir = math.deg(math.atan2(wind.z or 0, wind.x or 0))
+		if windDir < 0 then windDir = windDir + 360 end
+		data.environment = {
+			windDirection = windDir,
+			windSpeed = windSpeed,
+			temperature = temp,
+			pressure = pressure,
+			visibility = nil,
+			clouds = nil
+		}
+	else
+		data.environment = {
+			temperature = temp,
+			pressure = pressure,
+			visibility = nil,
+			clouds = nil
+		}
+	end
+	-- convenience top-level fields for easy access
+	data.temperature = temp
+	data.pressure = pressure
+	data.wind = {
+		speed = wind and (math.sqrt((wind.x or 0)^2 + (wind.z or 0)^2)) or 0,
+		direction = wind and (function() local d = math.deg(math.atan2((wind.z or 0),(wind.x or 0))); if d < 0 then d = d + 360 end; return d end)() or nil
+	}
 		data.isHuman = safe_get(function() return LoGetSelfData() end, {}).Player or false
 		data.jamming = false
 		data.irJamming = false
@@ -317,6 +336,29 @@ pcall(function()
 			f:write(json .. '\n')
 			f:close()
 		end)
+
+		-- Trim the JSONL file to keep only the last MAX_JSON_LINES entries (if enabled).
+		if MAX_JSON_LINES and MAX_JSON_LINES > 0 then
+			pcall(function()
+				-- Read and keep only the last MAX_JSON_LINES lines to bound memory usage
+				local tmp = {}
+				local ok, r = pcall(io.open, JSON_PATH, 'r')
+				if not ok or not r then return end
+				for line in r:lines() do
+					table.insert(tmp, line)
+					if #tmp > MAX_JSON_LINES then
+						table.remove(tmp, 1)
+					end
+				end
+				r:close()
+				local ok2, w = pcall(io.open, JSON_PATH, 'w')
+				if not ok2 or not w then return end
+				for _, l in ipairs(tmp) do
+					w:write(l .. '\n')
+				end
+				w:close()
+			end)
+		end
 	end
 
 	local function serialize_table(obj, depth, maxDepth, seen)
@@ -355,8 +397,17 @@ pcall(function()
 
 	function LuaExportStart()
 		lastWrite = 0
-		local telemetry = collect_telemetry()
-		write_json(telemetry)
+	-- clear files once at start if requested
+	if CLEAR_ON_START then
+		pcall(function()
+			local f = io.open(JSON_PATH, 'w')
+			if f then f:write('') f:close() end
+			local lf = io.open(LOG_PATH, 'w')
+			if lf then lf:write('') lf:close() end
+			local df = io.open(DEBUG_LOG_PATH, 'w')
+			if df then df:write('') df:close() end
+		end)
+	end
 		if DEBUG_DUMP_TABLES then
 			debug_dump_once(telemetry)
 		end

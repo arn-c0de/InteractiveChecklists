@@ -241,7 +241,7 @@ private fun ConnectionStatusCard(
             }
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = "Listening on: $deviceIpAddress:5010",
+                text = "🔒 AES-GCM encrypted • $deviceIpAddress:5010",
                 color = Color.White.copy(alpha = 0.9f),
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Medium
@@ -287,10 +287,16 @@ private fun NoDataCard() {
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "python forward_parsed_udp.py $deviceIpAddress 5010",
+                text = "python forward_parsed_udp.py --host $deviceIpAddress --port 5010",
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "🔒 Data is encrypted with AES-GCM",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.secondary
             )
         }
     }
@@ -313,9 +319,19 @@ private fun FlightDataDisplay(data: FlightData?) {
         // Environment
         DataSection(title = "Environment") {
             data?.environment?.let { env ->
+                DataRow("Temperature", env.temperature?.let { String.format("%.1f", it) + "°C (${String.format("%.1f", celsiusToFahrenheit(it))}°F)" } ?: "Not available")
+                DataRow("Pressure", env.pressure?.let { String.format("%.1f", it) + " hPa (${String.format("%.2f", hpaToInHg(it))} inHg)" } ?: "Not available")
                 DataRow("Wind Speed", env.windSpeed?.let { String.format("%.1f", it) + " m/s (${String.format("%.1f", mpsToKts(it))} kt)" } ?: "Not available")
                 DataRow("Wind Direction", env.windDirection?.let { String.format("%.1f", it) + "°" } ?: "Not available")
+                env.visibility?.let { vis ->
+                    DataRow("Visibility", String.format("%.0f", vis) + " m (${String.format("%.1f", metersToNm(vis))} nm)")
+                }
+                env.clouds?.let { clouds ->
+                    DataRow("Clouds", clouds)
+                }
             } ?: run {
+                DataRow("Temperature", "Not available")
+                DataRow("Pressure", "Not available")
                 DataRow("Wind Speed", "Not available")
                 DataRow("Wind Direction", "Not available")
             }
@@ -522,6 +538,12 @@ private fun StatusRow(label: String, active: Boolean) {
 private fun mpsToKts(mps: Double): Double = mps * 1.9438444924406
 
 private fun mpsToFpm(mps: Double): Double = mps * 196.850393701
+
+private fun celsiusToFahrenheit(celsius: Double): Double = celsius * 9.0 / 5.0 + 32.0
+
+private fun hpaToInHg(hpa: Double): Double = hpa * 0.02953
+
+private fun metersToNm(meters: Double): Double = meters * 0.000539957
 
 private fun formatSpeedWithKnots(value: Double): String =
     "${String.format("%.1f", value)} m/s (${String.format("%.1f", mpsToKts(value))} kt)"

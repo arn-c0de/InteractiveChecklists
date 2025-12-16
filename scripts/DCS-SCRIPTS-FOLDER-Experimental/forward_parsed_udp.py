@@ -4,9 +4,13 @@ forward_parsed_udp.py
 Tail a JSON-lines file (player_aircraft_parsed.jsonl) and send each JSON object
 as a single UDP datagram to a configured host:port.
 
+Now with AES-GCM encryption for secure data transmission!
+
 Usage examples:
   python forward_parsed_udp.py --host 192.168.178.100 --port 5010
   python forward_parsed_udp.py --once --send-existing
+
+Requires: pip install cryptography
 
 This script is safe to run outside DCS and avoids modifying any DCS files.
 """
@@ -17,15 +21,36 @@ import os
 import socket
 import sys
 import time
+import json
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.backends import default_backend
 
 DEFAULT_FILE = os.path.expanduser(r"~\Saved Games\DCS\Scripts\player_aircraft_parsed.jsonl")
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 5010
 
+# Pre-Shared Key (32 bytes for AES-256) - MUST match Android app!
+# Change this to your own random key in production!
+PRE_SHARED_KEY = b'DCS_DataPad_Secret_Key_32BYTES!!'
 
-def send_udp(payload: bytes, host: str, port: int, sock: socket.socket) -> bool:
+def encrypt_payload(data: bytes, key: bytes = PRE_SHARED_KEY) -> bytes:
+    """Encrypt data using AES-GCM with a random 12-byte nonce.
+    
+    Returns: nonce (12 bytes) + ciphertext + tag (16 bytes)
+    """
+    aesgcm = AESGCM(key)
+    nonce = os.urandom(12)  # 96-bit nonce recommended for GCM
+    ciphertext = aesgcm.encrypt(nonce, data, None)  # no additional authenticated data
+    return nonce + ciphertext
+
+
+def send_udp(payload: bytes, host: str, port: int, sock: socket.socket, encrypt: bool = True) -> bool:
     try:
-        sock.sendto(payload, (host, port))
+        if encrypt:
+            encrypted = encrypt_payload(payload)
+            sock.sendto(encrypted, (host, port))
+        else:
+            sock.sendto(payload, (host, port))
         return True
     except Exception as e:
         print(f"Send error: {e}", file=sys.stderr)
@@ -62,7 +87,7 @@ def _is_same_file(f, path: str) -> bool:
     return (int(st1.st_mtime) == int(st2.st_mtime)) and (st1.st_size == st2.st_size)
 
 
-def tail_and_send(path: str, host: str, port: int, send_existing=False, once=False, interval=0.2, verbose=False):
+def tail_and_send(path: str, host: str, port: int, send_existing=False, once=False, interval=0.2, verbose=False, show_env=False, encrypt=True):
     """Tail a file and send only new JSON lines as UDP datagrams (nie bestehende senden)."""
     if not os.path.exists(path):
         raise FileNotFoundError(path)
@@ -123,11 +148,24 @@ def tail_and_send(path: str, host: str, port: int, send_existing=False, once=Fal
             jsonpart = extract_json_from_line(line)
             if not jsonpart:
                 continue
-            sent = send_udp(jsonpart.encode('utf-8'), host, port, sock)
-            if verbose:
+            sent = send_udp(jsonpart.encode('utf-8'), host, port, sock, encrypt=encrypt)
+            if verbose or show_env:
                 ts = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
                 if sent:
-                    print(f"{ts} GESENDET {host}:{port} {jsonpart}")
+                    if show_env:
+                        try:
+                            obj = json.loads(jsonpart)
+                            env = obj.get('environment', {})
+                            temp = obj.get('temperature', env.get('temperature'))
+                            pres = obj.get('pressure', env.get('pressure'))
+                            wind = env.get('wind') or {'speed': env.get('windSpeed'), 'direction': env.get('windDirection')}
+                            wspeed = wind.get('speed')
+                            wdir = wind.get('direction')
+                            print(f"{ts} GESENDET {host}:{port} temp={temp}C pres={pres} wind={wspeed}@{wdir}")
+                        except Exception:
+                            print(f"{ts} GESENDET {host}:{port} {jsonpart}")
+                    else:
+                        print(f"{ts} GESENDET {host}:{port} {jsonpart}")
                 else:
                     print(f"{ts} FEHLER {host}:{port} {jsonpart}")
     finally:
@@ -139,7 +177,7 @@ def tail_and_send(path: str, host: str, port: int, send_existing=False, once=Fal
 
 
 # Neue Funktion: Wiederholt alle X Sekunden die letzte Zeile senden
-def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=False):
+def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=False, show_env=False, encrypt=True):
     """Sendet alle <interval> Sekunden die letzte Zeile der Datei als UDP."""
     if not os.path.exists(path):
         raise FileNotFoundError(path)
@@ -158,11 +196,24 @@ def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=Fals
                 if not jsonpart:
                     time.sleep(interval)
                     continue
-                sent = send_udp(jsonpart.encode('utf-8'), host, port, sock)
-                if verbose:
+                sent = send_udp(jsonpart.encode('utf-8'), host, port, sock, encrypt=encrypt)
+                if verbose or show_env:
                     ts = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
                     if sent:
-                        print(f"{ts} REPEAT {host}:{port} {jsonpart}")
+                        if show_env:
+                            try:
+                                obj = json.loads(jsonpart)
+                                env = obj.get('environment', {})
+                                temp = obj.get('temperature', env.get('temperature'))
+                                pres = obj.get('pressure', env.get('pressure'))
+                                wind = env.get('wind') or {'speed': env.get('windSpeed'), 'direction': env.get('windDirection')}
+                                wspeed = wind.get('speed')
+                                wdir = wind.get('direction')
+                                print(f"{ts} REPEAT {host}:{port} temp={temp}C pres={pres} wind={wspeed}@{wdir}")
+                            except Exception:
+                                print(f"{ts} REPEAT {host}:{port} {jsonpart}")
+                        else:
+                            print(f"{ts} REPEAT {host}:{port} {jsonpart}")
                     else:
                         print(f"{ts} FEHLER {host}:{port} {jsonpart}")
             except Exception as e:
@@ -180,17 +231,22 @@ def main(argv=None):
     p.add_argument('--interval', type=float, default=0.2, help='Polling interval in seconds')
     p.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
     p.add_argument('--repeat-last', action='store_true', help='Alle <interval> Sekunden immer die letzte Zeile erneut senden')
+    p.add_argument('--show-env', action='store_true', help='Print temperature/pressure/wind when sending')
+    p.add_argument('--no-encrypt', action='store_true', help='Disable AES-GCM encryption (not recommended)')
     args = p.parse_args(argv)
 
+    encrypt = not args.no_encrypt
+    enc_status = "🔒 AES-GCM encrypted" if encrypt else "⚠️ UNENCRYPTED"
+    
     try:
         if args.repeat_last:
-            print(f"Wiederhole alle {args.interval} Sekunden letzten Eintrag von {args.file} an {args.host}:{args.port}")
-            repeat_last_line(args.file, args.host, args.port, interval=args.interval, verbose=args.verbose)
+            print(f"Wiederhole alle {args.interval} Sekunden letzten Eintrag von {args.file} an {args.host}:{args.port} ({enc_status})")
+            repeat_last_line(args.file, args.host, args.port, interval=args.interval, verbose=args.verbose, show_env=args.show_env, encrypt=encrypt)
         else:
-            print(f"Forwarding {args.file} to {args.host}:{args.port} (immer nur neue Zeilen)")
+            print(f"Forwarding {args.file} to {args.host}:{args.port} (immer nur neue Zeilen) ({enc_status})")
             while True:
                 try:
-                    tail_and_send(args.file, args.host, args.port, send_existing=False, once=False, interval=args.interval, verbose=args.verbose)
+                    tail_and_send(args.file, args.host, args.port, send_existing=False, once=False, interval=args.interval, verbose=args.verbose, show_env=args.show_env, encrypt=encrypt)
                 except KeyboardInterrupt:
                     raise
                 except FileNotFoundError:
