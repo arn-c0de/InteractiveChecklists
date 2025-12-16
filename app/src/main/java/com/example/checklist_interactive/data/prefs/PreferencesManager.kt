@@ -38,6 +38,14 @@ class PreferencesManager(context: Context) {
         private const val KEY_PDF_FAB_PREFIX = "pdf_fab_"
         private const val KEY_PDF_TOOLBAR_VISIBLE = "pdf_toolbar_visible"
 
+        // Map preferences
+        private const val KEY_MAP_CENTER_LAT = "map_center_lat"
+        private const val KEY_MAP_CENTER_LON = "map_center_lon"
+        private const val KEY_MAP_ZOOM = "map_zoom"
+        private const val KEY_MAP_AUTO_CENTER = "map_auto_center"
+        // Persisted map tile source id (e.g. "MAPNIK", "OpenTopo", "USGS_SAT", "CartoDB.DarkMatter")
+        private const val KEY_MAP_TILE_SOURCE = "map_tile_source"
+
         // Shared Json instance to avoid redundant creation
         private val json = Json { prettyPrint = true }
     }
@@ -298,6 +306,50 @@ class PreferencesManager(context: Context) {
 
     fun resetDocumentSourcesToDefaults() {
         setDocumentSources(listOf(SourceEntry("PLATZHALTER)", "PLATZHALTER", "CC BY-NC-SA 3.0 DE")))
+    }
+
+    // --- Map view persistence helpers ---
+
+    fun setMapCenter(lat: Double, lon: Double) {
+        prefs.edit().putLong(KEY_MAP_CENTER_LAT, java.lang.Double.doubleToRawLongBits(lat)).apply()
+        prefs.edit().putLong(KEY_MAP_CENTER_LON, java.lang.Double.doubleToRawLongBits(lon)).apply()
+    }
+
+    fun getMapCenter(): Pair<Double, Double>? {
+        if (!prefs.contains(KEY_MAP_CENTER_LAT) || !prefs.contains(KEY_MAP_CENTER_LON)) return null
+        val lat = java.lang.Double.longBitsToDouble(prefs.getLong(KEY_MAP_CENTER_LAT, 0L))
+        val lon = java.lang.Double.longBitsToDouble(prefs.getLong(KEY_MAP_CENTER_LON, 0L))
+        return Pair(lat, lon)
+    }
+
+    fun setMapZoom(zoom: Double) {
+        prefs.edit().putLong(KEY_MAP_ZOOM, java.lang.Double.doubleToRawLongBits(zoom)).apply()
+    }
+
+    fun getMapZoom(): Double? {
+        if (!prefs.contains(KEY_MAP_ZOOM)) return null
+        return java.lang.Double.longBitsToDouble(prefs.getLong(KEY_MAP_ZOOM, 0L))
+    }
+
+    fun setMapAutoCenter(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_MAP_AUTO_CENTER, enabled).apply()
+    }
+
+    fun isMapAutoCenterEnabled(): Boolean {
+        return prefs.getBoolean(KEY_MAP_AUTO_CENTER, false)
+    }
+
+    /**
+     * Persist the selected tile source identifier for the map (nullable).
+     * If null, the app will follow the system theme (dark/light) to pick the tile source.
+     */
+    fun setMapTileSourceId(id: String?) {
+        if (id == null) prefs.edit().remove(KEY_MAP_TILE_SOURCE).apply()
+        else prefs.edit().putString(KEY_MAP_TILE_SOURCE, id).apply()
+    }
+
+    fun getMapTileSourceId(): String? {
+        return prefs.getString(KEY_MAP_TILE_SOURCE, null)
     }
 
     /**

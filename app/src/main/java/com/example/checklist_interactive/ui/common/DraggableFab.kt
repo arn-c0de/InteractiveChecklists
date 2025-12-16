@@ -44,40 +44,46 @@ fun DraggableFab(
     onClick: () -> Unit,
     containerColor: Color? = null,
     contentColor: Color? = null,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
+    marginPx: Int = 0 // horizontal margin on both sides
 ) {
     if (!visible) return
 
     val coroutineScope = rememberCoroutineScope()
     
-    // Load saved position or use defaults
+    // Load saved position or use defaults (normalized to the available area excluding margins)
     val (savedXPercent, savedYPercent) = remember(name) {
         prefsManager.getPdfViewerFabPosition(name, defaultX, defaultY)
     }
     
-    // Calculate available area (screen minus FAB size)
-    val availableWidth = (screenWidthPx - fabSizePx).coerceAtLeast(1)
-    val availableHeight = (screenHeightPx - fabSizePx).coerceAtLeast(1)
+    // Calculate available area (screen minus FAB size and margins)
+    val availableWidth = (screenWidthPx - fabSizePx - marginPx * 2).coerceAtLeast(1)
+    val availableHeight = (screenHeightPx - fabSizePx - marginPx * 2).coerceAtLeast(1)
     
-    // Convert percentage to pixels
+    // Convert percentage to pixels and offset by left margin
     var offsetX by remember(savedXPercent, availableWidth) {
-        mutableFloatStateOf((savedXPercent * availableWidth).coerceIn(0f, availableWidth.toFloat()))
+        mutableFloatStateOf((marginPx + (savedXPercent * availableWidth)).coerceIn(marginPx.toFloat(), (marginPx + availableWidth).toFloat()))
     }
     var offsetY by remember(savedYPercent, availableHeight) {
-        mutableFloatStateOf((savedYPercent * availableHeight).coerceIn(0f, availableHeight.toFloat()))
+        mutableFloatStateOf((marginPx + (savedYPercent * availableHeight)).coerceIn(marginPx.toFloat(), (marginPx + availableHeight).toFloat()))
     }
 
     // Clamp any positions that might be outside the available area (e.g., due to layout/padding changes)
     // and persist corrected values so old off-screen positions are fixed automatically.
     LaunchedEffect(name, availableWidth, availableHeight) {
-        val clampedX = offsetX.coerceIn(0f, availableWidth.toFloat())
-        val clampedY = offsetY.coerceIn(0f, availableHeight.toFloat())
+        val minX = marginPx.toFloat()
+        val maxX = (marginPx + availableWidth).toFloat()
+        val minY = marginPx.toFloat()
+        val maxY = (marginPx + availableHeight).toFloat()
+
+        val clampedX = offsetX.coerceIn(minX, maxX)
+        val clampedY = offsetY.coerceIn(minY, maxY)
         if (clampedX != offsetX || clampedY != offsetY) {
             offsetX = clampedX
             offsetY = clampedY
-            // Save corrected normalized values
-            val xPercent = if (availableWidth > 0) (offsetX / availableWidth) else 0f
-            val yPercent = if (availableHeight > 0) (offsetY / availableHeight) else 0f
+            // Save corrected normalized values (relative to available area)
+            val xPercent = if (availableWidth > 0) ((offsetX - marginPx) / availableWidth) else 0f
+            val yPercent = if (availableHeight > 0) ((offsetY - marginPx) / availableHeight) else 0f
             coroutineScope.launch {
                 try {
                     prefsManager.setPdfViewerFabPosition(name, xPercent, yPercent)
@@ -114,15 +120,19 @@ fun DraggableFab(
                         },
                         onDrag = { change, dragAmount ->
                             change.consume()
-                            // Update position
-                            offsetX = (offsetX + dragAmount.x).coerceIn(0f, availableWidth.toFloat())
-                            offsetY = (offsetY + dragAmount.y).coerceIn(0f, availableHeight.toFloat())
+                            // Update position (respect margins)
+                            val minX = marginPx.toFloat()
+                            val maxX = (marginPx + availableWidth).toFloat()
+                            val minY = marginPx.toFloat()
+                            val maxY = (marginPx + availableHeight).toFloat()
+                            offsetX = (offsetX + dragAmount.x).coerceIn(minX, maxX)
+                            offsetY = (offsetY + dragAmount.y).coerceIn(minY, maxY)
                         },
                         onDragEnd = {
                             if (isDragging) {
-                                // Save position as percentage
-                                val xPercent = offsetX / availableWidth
-                                val yPercent = offsetY / availableHeight
+                                // Save position as percentage (normalized to available area excluding margins)
+                                val xPercent = if (availableWidth > 0) ((offsetX - marginPx) / availableWidth) else 0f
+                                val yPercent = if (availableHeight > 0) ((offsetY - marginPx) / availableHeight) else 0f
 
                                 coroutineScope.launch {
                                     prefsManager.setPdfViewerFabPosition(name, xPercent, yPercent)
@@ -159,15 +169,19 @@ fun DraggableFab(
                         },
                         onDrag = { change, dragAmount ->
                             change.consume()
-                            // Update position
-                            offsetX = (offsetX + dragAmount.x).coerceIn(0f, availableWidth.toFloat())
-                            offsetY = (offsetY + dragAmount.y).coerceIn(0f, availableHeight.toFloat())
+                            // Update position (respect margins)
+                            val minX = marginPx.toFloat()
+                            val maxX = (marginPx + availableWidth).toFloat()
+                            val minY = marginPx.toFloat()
+                            val maxY = (marginPx + availableHeight).toFloat()
+                            offsetX = (offsetX + dragAmount.x).coerceIn(minX, maxX)
+                            offsetY = (offsetY + dragAmount.y).coerceIn(minY, maxY)
                         },
                         onDragEnd = {
                             if (isDragging) {
-                                // Save position as percentage
-                                val xPercent = offsetX / availableWidth
-                                val yPercent = offsetY / availableHeight
+                                // Save position as percentage (normalized to available area excluding margins)
+                                val xPercent = if (availableWidth > 0) ((offsetX - marginPx) / availableWidth) else 0f
+                                val yPercent = if (availableHeight > 0) ((offsetY - marginPx) / availableHeight) else 0f
 
                                 coroutineScope.launch {
                                     prefsManager.setPdfViewerFabPosition(name, xPercent, yPercent)

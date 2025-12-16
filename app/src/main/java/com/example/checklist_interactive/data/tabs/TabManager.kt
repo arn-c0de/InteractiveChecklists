@@ -28,12 +28,26 @@ class TabManager(private val context: Context) {
         private const val KEY_TAB_HISTORY = "tab_history"
         private const val MAX_TABS = 10
         private const val MAX_HISTORY = 20
+        
+        // Special identifier for map tab
+        const val MAP_TAB_PATH = "special://aviation_map"
+    }
+    
+    sealed class TabContent {
+        data class DocumentTab(val fileInfo: FileInfo, val pageNumber: Int = -1) : TabContent()
+        object MapTab : TabContent()
     }
     
     data class TabInfo(
-        val fileInfo: FileInfo,
-        val pageNumber: Int = -1
-    )
+        val content: TabContent,
+        val fileInfo: FileInfo // For compatibility, map tabs use a synthetic FileInfo
+    ) {
+        val pageNumber: Int
+            get() = when (content) {
+                is TabContent.DocumentTab -> content.pageNumber
+                is TabContent.MapTab -> -1
+            }
+    }
     
     private val _openTabs = MutableStateFlow<List<TabInfo>>(emptyList())
     val openTabs: StateFlow<List<TabInfo>> = _openTabs.asStateFlow()
@@ -61,8 +75,11 @@ class TabManager(private val context: Context) {
             // Switch to existing tab
             _activeTabIndex.value = existingIndex
             // Update page number if provided
-            if (pageNumber >= 0) {
-                currentTabs[existingIndex] = currentTabs[existingIndex].copy(pageNumber = pageNumber)
+            if (pageNumber >= 0 && currentTabs[existingIndex].content is TabContent.DocumentTab) {
+                val oldContent = currentTabs[existingIndex].content as TabContent.DocumentTab
+                currentTabs[existingIndex] = currentTabs[existingIndex].copy(
+                    content = oldContent.copy(pageNumber = pageNumber)
+                )
                 _openTabs.value = currentTabs
             }
             // Add to history & persist
@@ -86,7 +103,7 @@ class TabManager(private val context: Context) {
                 }
             }
 
-            currentTabs.add(TabInfo(fileInfo, pageNumber))
+            currentTabs.add(TabInfo(TabContent.DocumentTab(fileInfo, pageNumber), fileInfo))
             _openTabs.value = currentTabs
             _activeTabIndex.value = currentTabs.size - 1
 
@@ -100,6 +117,52 @@ class TabManager(private val context: Context) {
                 // ignore
             }
 
+            return _activeTabIndex.value
+        }
+    }
+    
+    /**
+     * Open the aviation map tab or switch to it if already open
+     */
+    fun openMapTab(): Int {
+        val currentTabs = _openTabs.value.toMutableList()
+        
+        // Check if map tab already exists
+        val existingIndex = currentTabs.indexOfFirst { it.content is TabContent.MapTab }
+        
+        if (existingIndex >= 0) {
+            // Switch to existing map tab
+            _activeTabIndex.value = existingIndex
+            return existingIndex
+        } else {
+            // Add new map tab
+            if (currentTabs.size >= MAX_TABS) {
+                // Remove oldest tab (first one that's not active)
+                val indexToRemove = if (_activeTabIndex.value == 0) 1 else 0
+                currentTabs.removeAt(indexToRemove)
+                if (_activeTabIndex.value > indexToRemove) {
+                    _activeTabIndex.value -= 1
+                }
+            }
+            
+            // Create synthetic FileInfo for map tab
+            val mapFileInfo = FileInfo(
+                name = "aviation_map",
+                displayName = "Aviation Map",
+                path = MAP_TAB_PATH,
+                category = "maps",
+                size = 0,
+                lastModified = System.currentTimeMillis(),
+                extension = "map"
+            )
+            
+            currentTabs.add(TabInfo(TabContent.MapTab, mapFileInfo))
+            _openTabs.value = currentTabs
+            _activeTabIndex.value = currentTabs.size - 1
+            
+            addToHistory(MAP_TAB_PATH)
+            saveTabsToPreferences(blocking = true)
+            
             return _activeTabIndex.value
         }
     }
@@ -196,12 +259,15 @@ class TabManager(private val context: Context) {
     fun updateCurrentTabPage(pageNumber: Int) {
         val index = _activeTabIndex.value
         if (index < 0 || index >= _openTabs.value.size) return
-        
+
         val currentTabs = _openTabs.value.toMutableList()
-        currentTabs[index] = currentTabs[index].copy(pageNumber = pageNumber)
-        _openTabs.value = currentTabs
-        
-        saveTabsToPreferences()
+        val tab = currentTabs[index]
+        if (tab.content is TabContent.DocumentTab) {
+            val doc = tab.content as TabContent.DocumentTab
+            currentTabs[index] = tab.copy(content = doc.copy(pageNumber = pageNumber))
+            _openTabs.value = currentTabs
+            saveTabsToPreferences()
+        }
     }
     
     /**
@@ -317,10 +383,25 @@ class TabManager(private val context: Context) {
         val restoredTabs = mutableListOf<TabInfo>()
         
         paths.forEachIndexed { index, path ->
-            val fileInfo = pathToFileInfoResolver(path)
-            if (fileInfo != null) {
-                val pageNumber = pages.getOrNull(index) ?: -1
-                restoredTabs.add(TabInfo(fileInfo, pageNumber))
+            if (path == MAP_TAB_PATH) {
+                // Recreate map tab
+                val mapFileInfo = FileInfo(
+                    name = "aviation_map",
+                    displayName = "Aviation Map",
+                    path = MAP_TAB_PATH,
+                    category = "maps",
+                    size = 0,
+                    lastModified = System.currentTimeMillis(),
+                    extension = "map"
+                )
+                restoredTabs.add(TabInfo(TabContent.MapTab, mapFileInfo))
+            } else {
+                val fileInfo = pathToFileInfoResolver(path)
+                if (fileInfo != null) {
+                    val pageNumber = pages.getOrNull(index) ?: -1
+                    val content = TabContent.DocumentTab(fileInfo, pageNumber)
+                    restoredTabs.add(TabInfo(content, fileInfo))
+                }
             }
         }
         

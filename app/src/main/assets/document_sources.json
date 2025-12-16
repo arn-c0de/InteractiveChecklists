@@ -1,7 +1,7 @@
 [
   {
-    "name": "Public",
-    "website": "",
-    "license": "Various / Public Domain"
+    "name": "OpenStreetMap",
+    "website": "https://www.openstreetmap.org",
+    "license": "Open Database License (ODbL) 1.0 – © OpenStreetMap contributors"
   }
 ]

@@ -43,6 +43,7 @@ import com.example.checklist_interactive.data.shortcuts.ShortcutManager
 import com.example.checklist_interactive.data.shortcuts.PageShortcut
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
@@ -78,7 +79,8 @@ fun InternalFilesScreen(
     isDarkTheme: Boolean,
     onToggleTheme: () -> Unit,
     onShowSettings: () -> Unit = {},
-    onOpenLinkedDocument: ((filePath: String, pageNumber: Int?) -> Unit)? = null
+    onOpenLinkedDocument: ((filePath: String, pageNumber: Int?) -> Unit)? = null,
+    onOpenMap: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val prefsManager = remember { PreferencesManager(context) }
@@ -403,6 +405,12 @@ fun InternalFilesScreen(
                     }
                     IconButton(onClick = { showSearchDialog = true }) {
                         Icon(Icons.Default.Search, contentDescription = "Search files")
+                    }
+                    // Aviation Map button
+                    if (onOpenMap != null) {
+                        IconButton(onClick = onOpenMap) {
+                            Icon(Icons.Default.Map, contentDescription = "Open Aviation Map")
+                        }
                     }
                     IconButton(onClick = onShowSettings) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
