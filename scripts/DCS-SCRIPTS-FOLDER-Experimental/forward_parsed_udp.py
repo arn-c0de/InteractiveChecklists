@@ -70,6 +70,33 @@ def check_psk_security():
             sys.stderr.write("\n\n❌ Aborted by user.\n")
             sys.exit(1)
 
+def check_bind_security(bind_ip: str):
+    """Check if binding to all interfaces (0.0.0.0) and require confirmation"""
+    if bind_ip == '0.0.0.0':
+        sys.stderr.write("\n" + "="*70 + "\n")
+        sys.stderr.write("🚨 CRITICAL SECURITY WARNING: Binding to ALL network interfaces!\n")
+        sys.stderr.write("="*70 + "\n")
+        sys.stderr.write("This exposes your server to:\n")
+        sys.stderr.write("  - Internet (if PC has public IP)\n")
+        sys.stderr.write("  - Local network (LAN)\n")
+        sys.stderr.write("  - VPN connections\n")
+        sys.stderr.write("  - ALL other network interfaces\n")
+        sys.stderr.write("\n")
+        sys.stderr.write("RECOMMENDATION: Use --bind-ip 127.0.0.1 (localhost only)\n")
+        sys.stderr.write("                or bind to specific LAN IP only\n")
+        sys.stderr.write("="*70 + "\n")
+        
+        # Require explicit confirmation
+        try:
+            response = input("\nType 'ALLOW_INSECURE_BIND' to continue (NOT RECOMMENDED): ")
+            if response.strip() != 'ALLOW_INSECURE_BIND':
+                sys.stderr.write("\n❌ Aborted. Use --bind-ip to specify a safer address.\n")
+                sys.exit(1)
+            sys.stderr.write("\n⚠️  Proceeding with INSECURE bind to 0.0.0.0\n\n")
+        except (EOFError, KeyboardInterrupt):
+            sys.stderr.write("\n\n❌ Aborted by user.\n")
+            sys.exit(1)
+
 # Global nonce counter for SERVER side (0x01 prefix)
 _nonce_counter = 0
 _nonce_lock = __import__('threading').Lock()
@@ -219,7 +246,7 @@ def _is_same_file(f, path: str) -> bool:
 
 
 def tail_and_send(path: str, host: str, port: int, send_existing=False, once=False, interval=0.2, 
-                  verbose=False, show_env=False, encrypt=True, session_mgr: 'SessionManager' = None, handshake_port: int = None):
+                  verbose=False, show_env=False, encrypt=True, session_mgr: 'SessionManager' = None, handshake_port: int = None, bind_ip: str = '127.0.0.1'):
     """Tail a file and send only new JSON lines as UDP datagrams (do not send existing lines)."""
     if not os.path.exists(path):
         raise FileNotFoundError(path)
@@ -229,13 +256,12 @@ def tail_and_send(path: str, host: str, port: int, send_existing=False, once=Fal
     if session_mgr:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        # SECURITY NOTE: Binding to 0.0.0.0 allows connections from all network interfaces.
-        # For production use on untrusted networks, bind to specific IP (e.g., '127.0.0.1' or LAN IP)
+        # SECURITY: Default bind to localhost only for safety
         # Use handshake_port if specified, otherwise use data port
         listen_port = handshake_port if handshake_port is not None else port
-        sock.bind(('0.0.0.0', listen_port))  # Bind to handshake port
+        sock.bind((bind_ip, listen_port))  # Bind to specified IP (default: localhost)
         sock.settimeout(1.0)  # Non-blocking with timeout
-        logger.info(f"🔐 Listening for handshakes on port {listen_port}")
+        logger.info(f"🔐 Listening for handshakes on {bind_ip}:{listen_port}")
         if handshake_port is not None and handshake_port != port:
             logger.info(f"📤 Will send data to {host}:{port}")
         handshake_sock = sock  # Use same socket for handshake and data
@@ -256,19 +282,21 @@ def tail_and_send(path: str, host: str, port: int, send_existing=False, once=Fal
             if handshake_sock:
                 try:
                     data, addr = handshake_sock.recvfrom(4096)
-                    # Try to parse as handshake message
+                    # Try to parse as handshake message (PLAINTEXT - no PSK encryption)
                     try:
                         msg_str = data.decode('utf-8')
                         msg = json.loads(msg_str)
                         if 'type' in msg and msg['type'] == 'ClientHello':
                             logger.info(f"📥 Received ClientHello from {addr}")
                             response = session_mgr.handle_client_hello(msg, addr)
+                            # Send response in PLAINTEXT (no PSK encryption)
                             response_json = json.dumps(response).encode('utf-8')
                             handshake_sock.sendto(response_json, addr)
                             logger.info(f"📤 Sent ServerHello to {addr}")
                         elif 'type' in msg and msg['type'] == 'KeyConfirm':
                             logger.info(f"📥 Received KeyConfirm from {addr}")
                             response = session_mgr.handle_key_confirm(msg)
+                            # Send response in PLAINTEXT (no PSK encryption)
                             response_json = json.dumps(response).encode('utf-8')
                             handshake_sock.sendto(response_json, addr)
                             if response.get('status') == 'ready':
@@ -378,7 +406,7 @@ def tail_and_send(path: str, host: str, port: int, send_existing=False, once=Fal
 
 # New feature: repeat the last line every X seconds
 def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=False, show_env=False, encrypt=True, 
-                     session_mgr: 'SessionManager' = None, handshake_port: int = None):
+                     session_mgr: 'SessionManager' = None, handshake_port: int = None, bind_ip: str = '127.0.0.1'):
     """Send the last line of the file as a UDP datagram every <interval> seconds."""
     if not os.path.exists(path):
         raise FileNotFoundError(path)
@@ -388,13 +416,12 @@ def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=Fals
     if session_mgr:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        # SECURITY NOTE: Binding to 0.0.0.0 allows connections from all network interfaces.
-        # For production use on untrusted networks, bind to specific IP (e.g., '127.0.0.1' or LAN IP)
+        # SECURITY: Default bind to localhost only for safety
         # Use handshake_port if specified, otherwise use data port
         listen_port = handshake_port if handshake_port is not None else port
-        sock.bind(('0.0.0.0', listen_port))  # Bind to handshake port
+        sock.bind((bind_ip, listen_port))  # Bind to specified IP (default: localhost)
         sock.settimeout(0.1)  # Non-blocking with short timeout
-        logger.info(f"🔐 Listening for handshakes on port {listen_port}")
+        logger.info(f"🔐 Listening for handshakes on {bind_ip}:{listen_port}")
         if handshake_port is not None and handshake_port != port:
             logger.info(f"📤 Will send data to {host}:{port}")
         handshake_sock = sock  # Use same socket for handshake and data
@@ -411,30 +438,12 @@ def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=Fals
             if handshake_sock:
                 try:
                     data, addr = handshake_sock.recvfrom(4096)
-                    # Try to decrypt and parse as handshake message
+                    # Parse handshake message (PLAINTEXT - no PSK encryption)
                     try:
-                        # Handshake messages are encrypted with PSK
                         logger.info(f"📦 Received {len(data)} bytes from {addr}")
-                        logger.info(f"📦 First 32 bytes (hex): {data[:32].hex()}")
                         
-                        aesgcm = AESGCM(PRE_SHARED_KEY)
-                        if len(data) >= 28:  # 12 (nonce) + 16 (tag) minimum
-                            nonce = data[:12]
-                            ciphertext = data[12:]
-                            try:
-                                decrypted = aesgcm.decrypt(nonce, ciphertext, None)
-                                msg_str = decrypted.decode('utf-8')
-                                logger.info(f"✅ Successfully decrypted message")
-                            except Exception as decrypt_err:
-                                logger.error(f"❌ Decryption failed: {decrypt_err}")
-                                # Try plain text as fallback
-                                logger.warning(f"Trying plain text fallback")
-                                msg_str = data.decode('utf-8')
-                        else:
-                            # Try plain text (for debugging)
-                            logger.warning(f"Received short packet ({len(data)} bytes), trying plain text")
-                            msg_str = data.decode('utf-8')
-                        
+                        # Handshake messages are sent in PLAINTEXT for proper ECDH
+                        msg_str = data.decode('utf-8')
                         logger.info(f"📄 Full message: {msg_str}")
                         msg = json.loads(msg_str)
                         logger.info(f"📨 Parsed message type: {msg.get('type')} from {addr}")
@@ -443,22 +452,20 @@ def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=Fals
                         if 'type' in msg and msg['type'] == 'ClientHello':
                             logger.info(f"📥 Received ClientHello from {addr}")
                             response = session_mgr.handle_client_hello(msg, addr)
+                            # Send response in PLAINTEXT (no PSK encryption)
                             response_json = json.dumps(response).encode('utf-8')
-                            # Encrypt response with PSK
-                            encrypted_response = encrypt_payload(response_json, PRE_SHARED_KEY)
-                            handshake_sock.sendto(encrypted_response, addr)
+                            handshake_sock.sendto(response_json, addr)
                             logger.info(f"📤 Sent ServerHello to {addr}")
                         elif 'type' in msg and msg['type'] == 'KeyConfirm':
                             logger.info(f"📥 Received KeyConfirm from {addr}")
                             response = session_mgr.handle_key_confirm(msg)
+                            # Send response in PLAINTEXT (no PSK encryption)
                             response_json = json.dumps(response).encode('utf-8')
-                            # Encrypt response with PSK
-                            encrypted_response = encrypt_payload(response_json, PRE_SHARED_KEY)
-                            handshake_sock.sendto(encrypted_response, addr)
+                            handshake_sock.sendto(response_json, addr)
                             if response.get('status') == 'ready':
                                 logger.info(f"✅ Session established with device {msg.get('sessionId', 'unknown')[:8]}...")
                     except (json.JSONDecodeError, UnicodeDecodeError, Exception) as decode_err:
-                        # Not a handshake message or decryption failed, ignore
+                        # Not a handshake message, ignore
                         logger.debug(f"Failed to parse handshake: {decode_err}")
                         pass
                 except socket.timeout:
@@ -534,6 +541,9 @@ def main(argv=None):
     p.add_argument('--file', '-f', default=DEFAULT_FILE, help='Path to JSONL file')
     p.add_argument('--host', default=DEFAULT_HOST, help='Destination host')
     p.add_argument('--port', '-p', type=int, default=DEFAULT_PORT, help='Destination port')
+    p.add_argument('--bind-ip', default='127.0.0.1', 
+                   help='IP address to bind to for ECDH handshakes (default: 127.0.0.1 for localhost only). '
+                        'Use 0.0.0.0 to bind to all interfaces (INSECURE - requires confirmation)')
     p.add_argument('--handshake-port', type=int, default=None, 
                    help='Port to listen for ECDH handshakes (default: same as --port). '
                         'Use different port when sender and receiver are on same PC.')
@@ -563,6 +573,10 @@ def main(argv=None):
             return 2
         print("🔐 ECDH Handshake Mode ENABLED")
         print(f"📂 Authorized devices: {args.authorized_devices}")
+        
+        # Security check: warn if binding to all interfaces
+        check_bind_security(args.bind_ip)
+        
         session_mgr = SessionManager(
             authorized_devices_path=args.authorized_devices,
             aircraft_name=args.aircraft
@@ -581,14 +595,14 @@ def main(argv=None):
         if args.repeat_last:
             print(f"Repeating last line every {args.interval} seconds from {args.file} to {args.host}:{args.port} ({enc_status})")
             repeat_last_line(args.file, args.host, args.port, interval=args.interval, verbose=args.verbose, 
-                           show_env=args.show_env, encrypt=encrypt, session_mgr=session_mgr, handshake_port=args.handshake_port)
+                           show_env=args.show_env, encrypt=encrypt, session_mgr=session_mgr, handshake_port=args.handshake_port, bind_ip=args.bind_ip)
         else:
             print(f"Forwarding {args.file} to {args.host}:{args.port} (forward only new lines) ({enc_status})")
             while True:
                 try:
                     tail_and_send(args.file, args.host, args.port, send_existing=False, once=False, 
                                 interval=args.interval, verbose=args.verbose, show_env=args.show_env, 
-                                encrypt=encrypt, session_mgr=session_mgr, handshake_port=args.handshake_port)
+                                encrypt=encrypt, session_mgr=session_mgr, handshake_port=args.handshake_port, bind_ip=args.bind_ip)
                 except KeyboardInterrupt:
                     raise
                 except FileNotFoundError:

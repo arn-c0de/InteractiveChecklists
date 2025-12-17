@@ -286,15 +286,16 @@ class DataPadReceiver:
     
     def decrypt_payload(self, encrypted_data: bytes) -> Optional[bytes]:
         """
-        Decrypt AES-GCM encrypted data
+        Decrypt AES-GCM encrypted data (for DATA packets, not handshake)
         Format: nonce (12 bytes) + ciphertext + tag (16 bytes)
+        Note: Handshake messages are sent in PLAINTEXT
         """
         try:
             # Use ECDH session key if available
             if self.use_ecdh and self.ecdh_client:
                 return self.ecdh_client.decrypt_payload(encrypted_data)
             
-            # Fallback to pre-shared key
+            # Fallback to pre-shared key (PSK mode)
             if len(encrypted_data) < 28:  # 12 (nonce) + 16 (tag) minimum
                 print(f"Encrypted data too short: {len(encrypted_data)} bytes")
                 return None
