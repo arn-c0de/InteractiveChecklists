@@ -68,6 +68,7 @@
     <string name="tab_all_tabs">All tabs (%1$d)</string>
     <string name="tab_page_number">Page %1$d</string>
     <string name="tab_active">Active</string>
+    <string name="aviation_map_tab_title">Aviation Map</string>
 
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <!-- TAGS -->
@@ -82,6 +83,21 @@
     <string name="tag_selected">Selected tags:</string>
     <string name="tag_available">Available tags:</string>
     <string name="tag_filter_by">Filter by tags:</string>
+    <string name="tag_startup">Startup</string>
+    <string name="tag_start">Start</string>
+    <string name="tag_navigation">Navigation</string>
+    <string name="tag_landing">Landing</string>
+    <string name="tag_combat">Combat</string>
+    <string name="tag_takeoff">Takeoff</string>
+    <string name="tag_taxi">Taxi</string>
+    <string name="tag_preflight">Preflight</string>
+    <string name="tag_postflight">Postflight</string>
+    <string name="tag_more_count">+%1$d more</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- COMMON -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="common_ellipsis">...</string>
 
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <!-- CHECKLIST & MARKDOWN -->
@@ -113,12 +129,34 @@
     <string name="pdf_invert_colors">Invert Colors</string>
     <string name="pdf_draw">Draw</string>
     <string name="pdf_marker">Marker</string>
+    <string name="pdf_hint_draw">Draw</string>
+    <string name="pdf_hint_undo">Undo</string>
+    <string name="pdf_hint_save">Save</string>
+    <string name="pdf_hint_eraser">Eraser</string>
+    <string name="pdf_brush_type_eraser">Eraser</string>
+    <string name="pdf_brush_type_highlight">Highlight</string>
+    <string name="pdf_brush_type_special">Special</string>
+    <string name="pdf_brush_type_draw">Draw</string>
+    <string name="pdf_brush_type_view">View</string>
+    <string name="pdf_sharpness_label">Sharpness:</string>
+    <string name="pdf_sharpen_label">Sharpen: %1$s%%</string>
+    <string name="pdf_hint_pen">Pen</string>
+    <string name="pdf_hint_marker">Marker</string>
+    <string name="pdf_hint_special">Special</string>
+    <string name="pdf_outline_title">Outline</string>
+    <string name="pdf_toc_title">Table of contents</string>
+    <string name="pdf_unnamed_outline_item">Unnamed</string>
+    <string name="quick_notes_default_title_notes">Notes</string>
+    <string name="parser_default_general">General</string>
+    <string name="parser_default_checklist">Checklist</string>
     <string name="pdf_link">Link</string>
     <string name="pdf_show_text">Show text</string>
     <string name="pdf_delete_all_title">Delete all drawings?</string>
     <string name="pdf_delete_all_message">Do you really want to permanently delete all drawings/annotations on this page?</string>
     <string name="pdf_zoom_out">Zoom Out</string>
     <string name="pdf_zoom_in">Zoom In</string>
+    <string name="pdf_apply_to_current_page">Apply to current page</string>
+    <string name="pdf_page_prefix">Page </string>
     <string name="pdf_pen">Pen</string>
     <string name="pdf_special_brush">Special brush</string>
     <string name="pdf_eraser_label">Eraser:</string>
@@ -199,8 +237,14 @@
     <string name="quick_notes_untitled">Untitled</string>
     <string name="quick_notes_delete_confirm">Press again to delete</string>
     <string name="common_empty">(empty)</string>
+    <string name="common_placeholder_dash">-</string>
     <string name="greeting_hello">Hello %1$s!</string>
     <string name="quick_notes_new_button">New</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- FORMATS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="format_time_hh_mm_ss">HH:mm:ss</string>
     <string name="quick_notes_com_prefix">COM:</string>
     <string name="quick_notes_coord_template">N       E      </string>
     <string name="quick_notes_flight_template">Alt: FL    / Speed:     / HDG:    </string>
@@ -225,6 +269,8 @@
     <string name="cd_add">Add</string>
     <string name="cd_list_view">List view</string>
     <string name="cd_grid_view">Grid view</string>
+    <string name="quick_notes_default_title">My Notes</string>
+    <string name="quick_notes_new_note_title">New Note</string>
 
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <!-- FLIGHT STATUS -->
@@ -259,6 +305,12 @@
     <string name="map_auto_center_disabled">Auto-center OFF (tap to enable)</string>
     <string name="map_tip_lock_screen">tip: tap lock to look around the map</string>
     <string name="map_tip_tap_lock">tip: tap lock to look around the map</string>
+    <string name="settings_clear_map_cache">Clear map cache</string>
+    <string name="settings_clear_map_cache_explain">Delete downloaded map tiles stored on the device (osmdroid cache). Use only when you want to free space or force re-download.</string>
+    <string name="settings_clear_map_cache_title">Delete map cache?</string>
+    <string name="settings_clear_map_cache_message">This will delete all downloaded map tiles (osmdroid cache). Continue?</string>
+    <string name="msg_map_cache_cleared">Map cache cleared</string>
+    <string name="msg_map_cache_clear_failed">Failed to clear map cache: %1$s</string>
     <string name="map_select_layer">Select a map layer:</string>
     <string name="map_aviation_charts_note">Note: Aviation sectional charts require additional configuration. See docs/technical/AVIATION_MAPS.md</string>
     <string name="map_note_aviation_charts">Note: Aviation sectional charts require additional configuration. See docs/technical/AVIATION_MAPS.md</string>
@@ -375,6 +427,9 @@
     <string name="datapad_rwr_azimuth_prefix">Azimuth:</string>
     <string name="datapad_rwr_priority_prefix">Priority:</string>
     <string name="datapad_section_position">Position</string>
+    <string name="datapad_time_seconds_ago">%1$ds ago</string>
+    <string name="datapad_time_minutes_ago">%1$dm ago</string>
+    <string name="datapad_time_hours_ago">%1$dh ago</string>
     <string name="datapad_field_latitude">Latitude</string>
     <string name="datapad_field_longitude">Longitude</string>
     <string name="datapad_field_x">X</string>
@@ -575,11 +630,32 @@
     <string name="could_not_move">Could not move: %1$s</string>
     <string name="page_text_title">Page text (Page %1$d)</string>
     <string name="pdf_text_clip_label">PDF Text</string>
+    <string name="pdf_error_unsupported_pixel_format">Unsupported pixel format for page %1$d</string>
+    <string name="viewer_unsupported_format_md_pdf">Unsupported file format: .%1$s\nSupported: .md, .markdown, .pdf</string>
 
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <!-- MARKDOWN VIEWER -->
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="markdown_label_h1">Heading 1</string>
+    <string name="markdown_label_custom_block">Custom Block</string>
+    <string name="markdown_label_blockquote">Blockquote</string>
+    <string name="markdown_label_code_block">Code Block</string>
+    <string name="markdown_label_ordered_list">Ordered List</string>
+    <string name="markdown_label_unordered_list">Unordered List</string>
+    <string name="markdown_label_table">Table</string>
+    <string name="markdown_label_horizontal_rule">Horizontal Rule</string>
+    <string name="markdown_label_image">Image</string>
+    <string name="markdown_label_link">Link</string>
+    <string name="markdown_label_task_list">Task List</string>
+    <string name="markdown_label_bullet_point_text">Bullet Point</string>
+    <string name="markdown_label_strikethrough">Strikethrough</string>
+    <string name="markdown_label_superscript">Superscript</string>
+    <string name="markdown_label_subscript">Subscript</string>
+    <string name="markdown_label_highlight">Highlight</string>
+    <string name="markdown_label_inline_code">Inline Code</string>
+    <string name="markdown_label_emoji">Emoji</string>
     <string name="markdown_bullet_point">• </string>
+    <string name="markdown_checkbox_count_format"> | %1$d/%2$d</string>
     <string name="markdown_collapse">Einklappen</string>
     <string name="markdown_expand">Ausklappen</string>
     <string name="cd_menu">Menu</string>

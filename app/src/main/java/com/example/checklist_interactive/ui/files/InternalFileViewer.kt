@@ -153,7 +153,13 @@ fun InternalFileViewer(
                 }
             }
             val parsedChecklist = remember(markdownContent) {
-                MarkdownChecklistParser().parse(fileInfo.path, markdownContent)
+                MarkdownChecklistParser().parse(
+                    id = fileInfo.path,
+                    markdown = markdownContent,
+                    context = context,
+                    defaultSectionTitle = context.getString(R.string.parser_default_general),
+                    defaultChecklistTitle = context.getString(R.string.parser_default_checklist)
+                )
             }
 
             val viewModel: ChecklistViewModel = viewModel(

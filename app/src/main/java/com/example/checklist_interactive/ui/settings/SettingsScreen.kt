@@ -35,6 +35,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.example.checklist_interactive.data.prefs.SourceEntry
+import org.osmdroid.config.Configuration
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.text.font.FontFamily
@@ -62,6 +63,10 @@ fun SettingsScreen(
     var showAircraftDialog by remember { mutableStateOf(false) }
     var showResetConfirm by remember { mutableStateOf(false) }
     var visibilityRefreshKey by remember { mutableIntStateOf(0) }
+
+    // Map cache clear state
+    var showClearMapCacheConfirm by remember { mutableStateOf(false) }
+    var isClearingMapCache by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -109,6 +114,7 @@ fun SettingsScreen(
     var tagsExpanded by remember { mutableStateOf(false) }
     var markdownExpanded by remember { mutableStateOf(false) }
     var sourcesExpanded by remember { mutableStateOf(false) }
+    var mapCacheExpanded by remember { mutableStateOf(false) }
 
     // Launcher for folder picker (SAF)
     val folderPicker = rememberLauncherForActivityResult(
@@ -163,6 +169,35 @@ fun SettingsScreen(
                 }
             } finally {
                 isImporting = false
+            }
+        }
+    }
+
+    // Clear map cache (osmdroid) — deletes the osmdroid cache directory
+    fun handleClearMapCache() {
+        coroutineScope.launch {
+            isClearingMapCache = true
+            try {
+                withContext(Dispatchers.IO) {
+                    try {
+                        val basePathFile = Configuration.getInstance().osmdroidBasePath
+                        if (basePathFile != null && basePathFile.exists()) {
+                            // Delete the osmdroid base directory recursively
+                            basePathFile.deleteRecursively()
+                        }
+                    } catch (e: Exception) {
+                        throw e
+                    }
+                }
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, context.getString(R.string.msg_map_cache_cleared), Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, context.getString(R.string.msg_map_cache_clear_failed, e.message ?: ""), Toast.LENGTH_LONG).show()
+                }
+            } finally {
+                isClearingMapCache = false
             }
         }
     }
@@ -238,6 +273,73 @@ fun SettingsScreen(
                                 Toast.makeText(context, context.getString(R.string.msg_fab_positions_restored), Toast.LENGTH_SHORT).show()
                             }) {
                                 Text(stringResource(R.string.settings_reset_fab_positions))
+                            }
+                        }
+                    }
+                }
+            }
+
+            // === Map Cache ===
+            item {
+                Spacer(modifier = Modifier.height(12.dp))
+                val mapCacheRotation by animateFloatAsState(targetValue = if (mapCacheExpanded) 180f else 0f)
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { mapCacheExpanded = !mapCacheExpanded },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = stringResource(R.string.settings_clear_map_cache),
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = if (mapCacheExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
+                                modifier = Modifier.rotate(mapCacheRotation)
+                            )
+                        }
+
+                        AnimatedVisibility(
+                            visible = mapCacheExpanded,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            Column {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = stringResource(R.string.settings_clear_map_cache_explain),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Button(
+                                    onClick = { showClearMapCacheConfirm = true },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    enabled = !isClearingMapCache,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                ) {
+                                    if (isClearingMapCache) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(16.dp),
+                                                strokeWidth = 2.dp,
+                                                color = MaterialTheme.colorScheme.onErrorContainer
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(stringResource(R.string.settings_processing))
+                                        }
+                                    } else {
+                                        Text(stringResource(R.string.settings_clear_map_cache))
+                                    }
+                                }
                             }
                         }
                     }
@@ -853,6 +955,24 @@ fun SettingsScreen(
                     clipboard.setPrimaryClip(clip)
                     Toast.makeText(context, context.getString(R.string.msg_copied_to_clipboard), Toast.LENGTH_SHORT).show()
                 }) { Text(stringResource(R.string.action_copy)) }
+            }
+        )
+    }
+
+    // Clear Map Cache confirmation
+    if (showClearMapCacheConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearMapCacheConfirm = false },
+            title = { Text(stringResource(R.string.settings_clear_map_cache_title)) },
+            text = { Text(stringResource(R.string.settings_clear_map_cache_message)) },
+            confirmButton = {
+                TextButton({
+                    showClearMapCacheConfirm = false
+                    handleClearMapCache()
+                }) { Text(stringResource(R.string.action_yes)) }
+            },
+            dismissButton = {
+                TextButton({ showClearMapCacheConfirm = false }) { Text(stringResource(R.string.action_cancel)) }
             }
         )
     }

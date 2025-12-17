@@ -87,7 +87,13 @@ fun MarkdownViewerScreen(
         }
     }
     val parsedChecklist = remember(markdownContent) {
-        val parsed = MarkdownChecklistParser().parse(assetPath, markdownContent)
+        val parsed = MarkdownChecklistParser().parse(
+            id = assetPath,
+            markdown = markdownContent,
+            context = context,
+            defaultSectionTitle = context.getString(R.string.parser_default_general),
+            defaultChecklistTitle = context.getString(R.string.parser_default_checklist)
+        )
         android.util.Log.d("MarkdownViewerScreen", "Parsed checklist: sections=${parsed.sections.size}, items=${parsed.sections.sumOf { it.items.size }}")
         parsed
     }

@@ -317,7 +317,7 @@ fun PdfViewer(
                         }
                         if (bitmap == null) {
                             withContext(Dispatchers.Main) {
-                                errorMessage = context.getString(R.string.error_loading_pdf, "Unsupported pixel format for page ${pageIndex + 1}")
+                                errorMessage = context.getString(R.string.pdf_error_unsupported_pixel_format, pageIndex + 1)
                             }
                         }
                     }
@@ -773,7 +773,7 @@ fun PdfViewer(
                                     annotateMode = !annotateMode
                                     if (annotateMode) eraseMode = false
                                 },
-                                hint = "Draw",
+                                hint = stringResource(R.string.pdf_hint_draw),
                                 onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
@@ -793,7 +793,7 @@ fun PdfViewer(
                                         eraseMode = false
                                     }
                                 },
-                                hint = "Markieren",
+                                hint = stringResource(R.string.pdf_brush_type_highlight),
                                 onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
@@ -882,7 +882,7 @@ fun PdfViewer(
                                     val idx = strokes.indexOfLast { it.page == currentPage }
                                     if (idx >= 0) strokes.removeAt(idx)
                                 },
-                                hint = "Undo",
+                                hint = stringResource(R.string.pdf_hint_undo),
                                 onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
@@ -908,7 +908,7 @@ fun PdfViewer(
                                 onClick = {
                                     AnnotationsRepository.save(context, pdfPath, strokes.toList())
                                 },
-                                hint = "Save",
+                                hint = stringResource(R.string.pdf_hint_save),
                                 onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
@@ -999,7 +999,7 @@ fun PdfViewer(
                                         if (brushType == BrushType.Marker) brushType = BrushType.Pen
                                     }
                                 },
-                                hint = "Eraser",
+                                hint = stringResource(R.string.pdf_hint_eraser),
                                 onHintChange = { hoveredHint = it },
                                 modifier = Modifier.size(36.dp)
                             ) {
@@ -1013,11 +1013,11 @@ fun PdfViewer(
                             Spacer(modifier = Modifier.width(8.dp))
                             Spacer(modifier = Modifier.weight(1f))
                             Text(
-                                text = if (eraseMode) "Eraser"
-                                       else if (annotateMode && brushType == BrushType.Marker) "Highlight"
-                                       else if (annotateMode && brushType == BrushType.Special) "Special"
-                                       else if (annotateMode) "Draw"
-                                       else "View",
+                                text = if (eraseMode) stringResource(R.string.pdf_brush_type_eraser)
+                                       else if (annotateMode && brushType == BrushType.Marker) stringResource(R.string.pdf_brush_type_highlight)
+                                       else if (annotateMode && brushType == BrushType.Special) stringResource(R.string.pdf_brush_type_special)
+                                       else if (annotateMode) stringResource(R.string.pdf_brush_type_draw)
+                                       else stringResource(R.string.pdf_brush_type_view),
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold
                             )
@@ -1071,7 +1071,7 @@ fun PdfViewer(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                "Sharpness:",
+                                stringResource(R.string.pdf_sharpness_label),
                                 style = MaterialTheme.typography.labelSmall,
                                 modifier = Modifier.width(70.dp)
                             )
@@ -1091,7 +1091,7 @@ fun PdfViewer(
                                     onCheckedChange = { sharpenApplyToCurrentPage = it }
                                 )
                                 Text(
-                                    "Apply to current page",
+                                    stringResource(R.string.pdf_apply_to_current_page),
                                     style = MaterialTheme.typography.labelSmall,
                                     modifier = Modifier.padding(start = 4.dp).widthIn(max = 140.dp),
                                     maxLines = 1,
@@ -1099,12 +1099,10 @@ fun PdfViewer(
                                 )
                             }
 
-                            Text(
-                                "${String.format("%.1f", sharpenIntensity)}x",
-                                style = MaterialTheme.typography.labelSmall,
-                                modifier = Modifier.width(40.dp),
-                                textAlign = TextAlign.End
-                            )
+                        Text(
+                            stringResource(R.string.pdf_sharpen_label, sharpenIntensity.toInt()),
+                            style = MaterialTheme.typography.bodySmall
+                        )
                         }
                     }
 
@@ -1144,7 +1142,7 @@ fun PdfViewer(
                                 annotateMode = true
                                 eraseMode = false
                             },
-                            hint = "Pen",
+                            hint = stringResource(R.string.pdf_hint_pen),
                             onHintChange = { hoveredHint = it },
                             modifier = Modifier.size(36.dp)
                         ) {
@@ -1162,7 +1160,7 @@ fun PdfViewer(
                                 annotateMode = true
                                 eraseMode = false
                             },
-                            hint = "Marker",
+                            hint = stringResource(R.string.pdf_hint_marker),
                             onHintChange = { hoveredHint = it },
                             modifier = Modifier.size(36.dp)
                         ) {
@@ -1180,7 +1178,7 @@ fun PdfViewer(
                                 annotateMode = true
                                 eraseMode = false
                             },
-                            hint = "Special",
+                            hint = stringResource(R.string.pdf_hint_special),
                             onHintChange = { hoveredHint = it },
                             modifier = Modifier.size(36.dp)
                         ) {
@@ -1202,7 +1200,7 @@ fun PdfViewer(
                                     if (brushType == BrushType.Marker) brushType = BrushType.Pen
                                 }
                             },
-                            hint = "Eraser",
+                            hint = stringResource(R.string.pdf_hint_eraser),
                             onHintChange = { hoveredHint = it },
                             modifier = Modifier.size(36.dp)
                         ) {
@@ -1651,7 +1649,7 @@ fun PdfViewer(
 
             AlertDialog(
                 onDismissRequest = { showTocDialog = false },
-                title = { Text(if (outlineItems.isNotEmpty()) "Outline" else "Table of contents") },
+                title = { Text(if (outlineItems.isNotEmpty()) stringResource(R.string.pdf_outline_title) else stringResource(R.string.pdf_toc_title)) },
                 text = {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         if (chapters.isEmpty()) {
@@ -1694,7 +1692,7 @@ fun PdfViewer(
                                 ) {
                                     Spacer(modifier = Modifier.width((level * 16).dp + 16.dp))
                                             Column {
-                                        val displayTitle = titleText.trim().takeIf { it.isNotBlank() } ?: "Page ${pageIndex + 1}"
+                                        val displayTitle = titleText.trim().takeIf { it.isNotBlank() } ?: (stringResource(R.string.pdf_page_prefix) + (pageIndex + 1))
                                         val safeTitle = displayTitle.replace(Regex("[\u0000-\u001F\u007F]+"), " ").trim()
                                         Text(
                                             text = safeTitle,

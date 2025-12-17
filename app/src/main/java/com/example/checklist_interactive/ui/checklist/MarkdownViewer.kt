@@ -295,7 +295,7 @@ private fun SimpleMarkdownView(
                                     val checkedCheckboxes = section.content.mapIndexed { lidx, line ->
                                         if (isCheckboxLine(line)) checkboxStates[Pair(index, lidx)] ?: (line.trim().startsWith("- [x]") || line.trim().startsWith("- [X]")) else false
                                     }.count { it }
-                                    val countText = if (totalCheckboxes > 0) " | $checkedCheckboxes/$totalCheckboxes" else ""
+                                    val countText = if (totalCheckboxes > 0) stringResource(R.string.markdown_checkbox_count_format, checkedCheckboxes, totalCheckboxes) else ""
 
                                     val isAllChecked = totalCheckboxes > 0 && checkedCheckboxes == totalCheckboxes
                                     Text(
@@ -306,7 +306,7 @@ private fun SimpleMarkdownView(
                                     )
                                     Icon(
                                         imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                        contentDescription = if (isExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand)
+                                        contentDescription = stringResource(if (isExpanded) R.string.markdown_collapse else R.string.markdown_expand)
                                     )
                                 }
 
@@ -859,7 +859,7 @@ private fun InteractiveMarkdownView(
                                 // Count checked and total checkboxes in this section
                                 val totalCheckboxes = section.items.size
                                 val checkedCheckboxes = section.items.count { it.isChecked }
-                                val countText = if (totalCheckboxes > 0) " | $checkedCheckboxes/$totalCheckboxes" else ""
+                                val countText = if (totalCheckboxes > 0) stringResource(R.string.markdown_checkbox_count_format, checkedCheckboxes, totalCheckboxes) else ""
 
                                 val isAllCheckedInteractive = totalCheckboxes > 0 && checkedCheckboxes == totalCheckboxes
                                 Text(

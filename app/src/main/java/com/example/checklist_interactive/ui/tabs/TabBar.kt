@@ -198,8 +198,9 @@ private fun TabItem(
     onSelect: () -> Unit,
     onClose: () -> Unit
 ) {
-    val fileName = remember(tabInfo.fileInfo.displayName) {
-        tabInfo.fileInfo.displayName.take(20) + if (tabInfo.fileInfo.displayName.length > 20) "..." else ""
+    val ellipsis = stringResource(R.string.common_ellipsis)
+    val fileName = remember(tabInfo.fileInfo.displayName, ellipsis) {
+        tabInfo.fileInfo.displayName.take(20) + if (tabInfo.fileInfo.displayName.length > 20) ellipsis else ""
     }
     
     val fileExtension = remember(tabInfo.fileInfo.extension) {

@@ -297,19 +297,19 @@ class PreferencesManager(context: Context) {
         val raw = prefs.getString(KEY_DOCUMENT_SOURCES_JSON, null)
         return if (raw.isNullOrBlank()) {
             // Default source list: PLATZHALTER
-            listOf(SourceEntry("PLATZHALTER)", "PLATZHALTER", "CC BY-NC-SA 3.0 DE"))
+            emptyList()
         } else {
             try {
                 json.decodeFromString(ListSerializer(SourceEntry.serializer()), raw)
             } catch (e: Exception) {
                 // If parsing fails, reset to defaults
-                listOf(SourceEntry("PLATZHALTER", "PLATZHALTER", "CC BY-NC-SA 3.0 DE"))
+                emptyList()
             }
         }
     }
 
     fun resetDocumentSourcesToDefaults() {
-        setDocumentSources(listOf(SourceEntry("PLATZHALTER)", "PLATZHALTER", "CC BY-NC-SA 3.0 DE")))
+        setDocumentSources(emptyList())
     }
 
     // --- Map view persistence helpers ---

@@ -53,7 +53,7 @@ fun ChecklistScreen(viewModel: ChecklistViewModel, checklistId: String, onBack: 
                             showFolderPopup = !showFolderPopup
                             if (showFolderPopup) popupPath = ""
                         }) {
-                            Icon(Icons.Default.Folder, contentDescription = LocalContext.current.getString(R.string.open_folders))
+                            Icon(Icons.Default.Folder, contentDescription = stringResource(R.string.open_folders))
                         }
                     }
                     if (showFolderPopup && assetBrowser != null) {
@@ -68,7 +68,7 @@ fun ChecklistScreen(viewModel: ChecklistViewModel, checklistId: String, onBack: 
                                             popupPath = if (parent.isEmpty()) "" else parent
                                         }
                                     }) {
-                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = LocalContext.current.getString(R.string.up))
+                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.up))
                                     }
                                     Text(popupPath.ifBlank { stringResource(R.string.browse_default_location) }, modifier = Modifier.padding(start = 8.dp))
                                 }
@@ -76,8 +76,8 @@ fun ChecklistScreen(viewModel: ChecklistViewModel, checklistId: String, onBack: 
                                 LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
                                     items(popupNodes) { node: AssetNode ->
                                         ListItem(headlineContent = { Text(node.name) }, leadingContent = {
-                                            if (node.isDirectory) Icon(Icons.Default.Folder, contentDescription = LocalContext.current.getString(R.string.cd_folder))
-                                            else Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = LocalContext.current.getString(R.string.cd_file))
+                                            if (node.isDirectory) Icon(Icons.Default.Folder, contentDescription = stringResource(R.string.cd_folder))
+                                            else Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = stringResource(R.string.cd_file))
                                         }, modifier = Modifier.clickable {
                                             if (node.isDirectory) {
                                                 popupPath = node.path
@@ -93,30 +93,30 @@ fun ChecklistScreen(viewModel: ChecklistViewModel, checklistId: String, onBack: 
                             TextButton(onClick = {
                                 onOpenFile?.invoke(popupPath)
                                 showFolderPopup = false
-                            }) { Text(LocalContext.current.getString(R.string.open)) }
+                            }) { Text(stringResource(R.string.open)) }
                         }, dismissButton = {
-                            TextButton(onClick = { showFolderPopup = false }) { Text(LocalContext.current.getString(R.string.cancel)) }
+                            TextButton(onClick = { showFolderPopup = false }) { Text(stringResource(R.string.cancel)) }
                         })
                     }
 
                     Spacer(modifier = Modifier.width(6.dp))
 
                     IconButton(onClick = { onBack?.invoke() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = LocalContext.current.getString(R.string.back))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 }
             }, actions = {
                 IconButton(onClick = { viewModel.resetChecklist() }) {
-                    Icon(Icons.Default.Refresh, contentDescription = LocalContext.current.getString(R.string.reset))
+                    Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.reset))
                 }
                 IconButton(onClick = {
                     val md = viewModel.exportChecklistMarkdown()
                     onExport?.invoke(md)
                 }) {
-                    Icon(Icons.Default.Share, contentDescription = LocalContext.current.getString(R.string.export))
+                    Icon(Icons.Default.Share, contentDescription = stringResource(R.string.export))
                 }
                 IconButton(onClick = { showSettingsDialog = true }) {
-                    Icon(Icons.Default.Settings, contentDescription = LocalContext.current.getString(R.string.settings))
+                    Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings))
                 }
             })
         }

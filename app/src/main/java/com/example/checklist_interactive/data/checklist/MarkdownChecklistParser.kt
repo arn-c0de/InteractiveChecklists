@@ -1,10 +1,17 @@
 package com.example.checklist_interactive.data.checklist
 
+import android.content.Context
 class MarkdownChecklistParser {
 
     private val parser = MarkdownParser()
 
-    fun parse(id: String, markdown: String): Checklist {
+    fun parse(
+        id: String,
+        markdown: String,
+        context: Context,
+        defaultSectionTitle: String,
+        defaultChecklistTitle: String
+    ): Checklist {
         val document = parser.parse(markdown.trim())
 
         var checklistTitle = findMainTitle(document)
@@ -16,7 +23,7 @@ class MarkdownChecklistParser {
         // Default section if we start directly with items
         fun ensureSection() {
             if (currentSectionTitle.isEmpty()) {
-                currentSectionTitle = checklistTitle.ifEmpty { "General" }
+                currentSectionTitle = checklistTitle.ifEmpty { defaultSectionTitle }
             }
         }
 
@@ -57,23 +64,23 @@ class MarkdownChecklistParser {
 
         // Add remaining items
         if (currentItems.isNotEmpty()) {
-            sections.add(ChecklistSection(currentSectionTitle.ifEmpty { checklistTitle.ifEmpty { "General" } }, currentItems))
+            sections.add(ChecklistSection(currentSectionTitle.ifEmpty { checklistTitle.ifEmpty { defaultSectionTitle } }, currentItems))
         }
 
         // Fallback: if nothing was parsed, try line-by-line regex
         if (sections.isEmpty() || sections.all { it.items.isEmpty() }) {
-            val fallback = parseWithSimpleRegex(id, markdown, checklistTitle)
+            val fallback = parseWithSimpleRegex(id, markdown, checklistTitle, defaultChecklistTitle)
             if (fallback.sections.isNotEmpty()) return fallback
         }
 
         // Ensure at least one section exists
         if (sections.isEmpty()) {
-            val title = checklistTitle.ifEmpty { "Checklist" }
+            val title = checklistTitle.ifEmpty { defaultChecklistTitle }
             sections.add(ChecklistSection(title, emptyList()))
         }
 
         if (checklistTitle.isEmpty()) {
-            checklistTitle = sections.firstOrNull()?.title ?: "Checklist"
+            checklistTitle = sections.firstOrNull()?.title ?: defaultChecklistTitle
         }
 
         return Checklist(id, checklistTitle, sections)
@@ -116,7 +123,7 @@ class MarkdownChecklistParser {
         }
     }
 
-    private fun parseWithSimpleRegex(id: String, markdown: String, suggestedTitle: String): Checklist {
+    private fun parseWithSimpleRegex(id: String, markdown: String, suggestedTitle: String, defaultChecklistTitle: String): Checklist {
         val items = mutableListOf<ChecklistItem>()
         var counter = 0
 
@@ -131,9 +138,9 @@ class MarkdownChecklistParser {
             }
         }
 
-        if (items.isEmpty()) return Checklist(id, suggestedTitle.ifEmpty { "Checklist" }, emptyList())
+        if (items.isEmpty()) return Checklist(id, suggestedTitle.ifEmpty { defaultChecklistTitle }, emptyList())
 
-        val title = suggestedTitle.ifEmpty { "Checklist" }
+        val title = suggestedTitle.ifEmpty { defaultChecklistTitle }
         return Checklist(id, title, listOf(ChecklistSection(title, items)))
     }
 }

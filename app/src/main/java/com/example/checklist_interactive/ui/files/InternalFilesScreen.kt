@@ -445,7 +445,7 @@ fun InternalFilesScreen(
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            context.getString(R.string.no_files),
+                            text = stringResource(R.string.no_files),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.outline
                         )

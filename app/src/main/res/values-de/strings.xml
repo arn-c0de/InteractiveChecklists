@@ -223,6 +223,12 @@
     <string name="map_auto_center_enabled">🎯 Autozentrierung (antippen zum Deaktivieren)</string>
     <string name="map_auto_center_disabled">Autozentrierung AUS (antippen zum Aktivieren)</string>
     <string name="map_tip_tap_lock">Tipp: Sperre antippen, um die Karte zu betrachten</string>
+    <string name="settings_clear_map_cache">Karten-Cache löschen</string>
+    <string name="settings_clear_map_cache_explain">Löscht heruntergeladene Kartenkacheln, die auf dem Gerät gespeichert sind (osmdroid-Cache). Nur verwenden, wenn Sie Speicher freigeben oder ein erneutes Herunterladen erzwingen möchten.</string>
+    <string name="settings_clear_map_cache_title">Karten-Cache löschen?</string>
+    <string name="settings_clear_map_cache_message">Alle heruntergeladenen Kartenkacheln (osmdroid-Cache) werden gelöscht. Fortfahren?</string>
+    <string name="msg_map_cache_cleared">Karten-Cache gelöscht</string>
+    <string name="msg_map_cache_clear_failed">Konnte Karten-Cache nicht löschen: %1$s</string>
     <string name="map_select_layer">Wählen Sie eine Kartenebene:</string>
     <string name="map_note_aviation_charts">Hinweis: Luftfahrt-Karten erfordern zusätzliche Konfiguration. Siehe docs/technical/AVIATION_MAPS.md</string>
     <string name="map_aviation_map">Luftfahrtkarte</string>
@@ -378,6 +384,28 @@
     <string name="total_unique_tags">Gesamt eindeutige Tags: %1$d</string>
     <string name="files_with_tags">Dateien mit Tags: %1$d</string>
     <string name="markdown_title">Markdown-Einstellungen</string>
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- MARKDOWN VIEWER -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="markdown_label_h1">Überschrift 1</string>
+    <string name="markdown_label_custom_block">Benutzerdefinierter Block</string>
+    <string name="markdown_label_blockquote">Zitatblock</string>
+    <string name="markdown_label_code_block">Codeblock</string>
+    <string name="markdown_label_ordered_list">Geordnete Liste</string>
+    <string name="markdown_label_unordered_list">Ungeordnete Liste</string>
+    <string name="markdown_label_table">Tabelle</string>
+    <string name="markdown_label_horizontal_rule">Horizontale Linie</string>
+    <string name="markdown_label_image">Bild</string>
+    <string name="markdown_label_link">Link</string>
+    <string name="markdown_label_task_list">Aufgabenliste</string>
+    <string name="markdown_label_bullet_point_text">Aufzählungspunkt</string>
+    <string name="markdown_label_strikethrough">Durchgestrichen</string>
+    <string name="markdown_label_superscript">Hochgestellt</string>
+    <string name="markdown_label_subscript">Tiefgestellt</string>
+    <string name="markdown_label_highlight">Hervorheben</string>
+    <string name="markdown_label_inline_code">Inline-Code</string>
+    <string name="markdown_label_emoji">Emoji</string>
+    <string name="markdown_bullet_point">• </string>
     <string name="msg_copied_to_clipboard">In Zwischenablage kopiert</string>
     <string name="settings_import_title">Import-Einstellungen</string>
     <string name="folder_selected">Ordner: %1$s</string>
@@ -465,6 +493,10 @@
     
     
     
+    <string name="datapad_reception_on">Empfang: AN</string>
+    <string name="datapad_reception_off">Empfang: AUS</string>
+    <string name="datapad_toggle_reception_on">Empfang deaktivieren</string>
+    <string name="datapad_toggle_reception_off">Empfang aktivieren</string>
     <string name="datapad_connected">Verbunden</string>
     <string name="datapad_waiting_for_data">Warte auf Daten</string>
     <string name="datapad_no_data">Noch keine Flugdaten empfangen</string>
@@ -514,11 +546,31 @@
     <string name="could_not_move">Konnte nicht verschieben: %1$s</string>
     <string name="page_text_title">Seitentext (Seite %1$d)</string>
     <string name="pdf_text_clip_label">PDF-Text</string>
+    <string name="pdf_error_unsupported_pixel_format">Nicht unterstütztes Pixelformat für Seite %1$d</string>
 
     
     
     
     <string name="pdf_width_label">Breite:</string>
+    <string name="pdf_hint_draw">Zeichnen</string>
+    <string name="pdf_hint_undo">Rückgängig</string>
+    <string name="pdf_hint_save">Speichern</string>
+    <string name="pdf_hint_eraser">Radierer</string>
+    <string name="pdf_brush_type_eraser">Radierer</string>
+    <string name="pdf_brush_type_highlight">Markieren</string>
+    <string name="pdf_brush_type_special">Spezial</string>
+    <string name="pdf_brush_type_draw">Zeichnen</string>
+    <string name="pdf_brush_type_view">Ansicht</string>
+    <string name="pdf_sharpness_label">Schärfe:</string>
+    <string name="pdf_hint_pen">Stift</string>
+    <string name="pdf_hint_marker">Marker</string>
+    <string name="pdf_hint_special">Spezial</string>
+    <string name="pdf_outline_title">Gliederung</string>
+    <string name="pdf_toc_title">Inhaltsverzeichnis</string>
+    <string name="pdf_unnamed_outline_item">Unbenannt</string>
+    <string name="quick_notes_default_title_notes">Notizen</string>
+    <string name="parser_default_general">Allgemein</string>
+    <string name="parser_default_checklist">Checkliste</string>
 
     
     
