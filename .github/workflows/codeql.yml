@@ -128,7 +128,8 @@ jobs:
         export ANDROID_SDK_ROOT=$HOME/android-sdk
         export ANDROID_HOME=$ANDROID_SDK_ROOT
         export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
-        ./gradlew assemble --no-daemon --stacktrace || (echo "Gradle build failed" && exit 1)
+        # Ensure Gradle uses the runner's JAVA_HOME (overrides any repo gradle.properties value)
+        ./gradlew -Dorg.gradle.java.home="$JAVA_HOME" assemble --no-daemon --stacktrace || (echo "Gradle build failed" && exit 1)
 
     - name: Run manual build steps (non-Android Java)
       if: matrix.build-mode == 'manual' && matrix.language != 'java-kotlin'
