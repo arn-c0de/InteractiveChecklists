@@ -79,11 +79,22 @@ jobs:
         key: ${{ runner.os }}-gradle-${{ hashFiles('**/gradle-wrapper.properties') }}
         restore-keys: ${{ runner.os }}-gradle-
 
-    - name: Set up Android SDK
-      uses: android-actions/setup-android@v2
-      with:
-        api-level: 33
-        build-tools: '33.0.2'
+    - name: Install Android command-line tools and packages
+      run: |
+        set -e
+        echo "Installing Android command-line tools..."
+        mkdir -p $HOME/android-sdk/cmdline-tools
+        TMP_ZIP="$RUNNER_TEMP/cmdline-tools.zip"
+        curl -sSfL https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -o "$TMP_ZIP"
+        unzip -q "$TMP_ZIP" -d $HOME/android-sdk/cmdline-tools
+        # Move contents into 'latest' as expected by sdkmanager
+        mkdir -p $HOME/android-sdk/cmdline-tools/latest
+        mv $HOME/android-sdk/cmdline-tools/cmdline-tools/* $HOME/android-sdk/cmdline-tools/latest/ || true
+        export ANDROID_SDK_ROOT=$HOME/android-sdk
+        export ANDROID_HOME=$ANDROID_SDK_ROOT
+        export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
+        yes | sdkmanager --licenses || true
+        sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
 
     # - name: Setup runtime (example)
     #   uses: actions/setup-example@v1
@@ -112,13 +123,11 @@ jobs:
       run: |
         set -e
         echo "Setting up JDK (Temurin 17)..."
-        # Use actions/setup-java via a different step on GitHub Actions runners; here we ensure Java is available.
-        echo "##[section]Install JDK"
-        # Install Android SDK command-line tools and required packages
-        echo "Installing Android SDK components..."
-        yes | sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2" || true
         echo "Building project with Gradle wrapper..."
         chmod +x ./gradlew || true
+        export ANDROID_SDK_ROOT=$HOME/android-sdk
+        export ANDROID_HOME=$ANDROID_SDK_ROOT
+        export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
         ./gradlew assemble --no-daemon --stacktrace || (echo "Gradle build failed" && exit 1)
 
     - name: Run manual build steps (non-Android Java)
