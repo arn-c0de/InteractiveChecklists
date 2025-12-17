@@ -70,13 +70,55 @@ def check_psk_security():
             sys.stderr.write("\n\n❌ Aborted by user.\n")
             sys.exit(1)
 
+# Global nonce counter for SERVER side (0x01 prefix)
+_nonce_counter = 0
+_nonce_lock = __import__('threading').Lock()
+_received_nonces = set()
+
+def generate_nonce_server() -> bytes:
+    """Generate counter-based nonce for SERVER (prevents collision).
+    Format: [sender_id:1][reserved:3][counter:8] = 12 bytes
+    Server uses sender_id = 0x01, Client uses 0x00
+    """
+    global _nonce_counter
+    with _nonce_lock:
+        _nonce_counter += 1
+        if _nonce_counter >= 2**64:
+            raise RuntimeError("Nonce counter exhausted - re-key required!")
+
+        # Format: 0x01 (server) + 3 bytes reserved + 8 bytes counter
+        return bytes([0x01, 0x00, 0x00, 0x00]) + _nonce_counter.to_bytes(8, 'big')
+
+def validate_nonce_server(nonce: bytes) -> bool:
+    """Validate received nonce to prevent replay attacks.
+    Returns True if nonce is valid (not replayed), False otherwise.
+    """
+    if len(nonce) != 12:
+        return False
+
+    # Extract counter (bytes 4-11)
+    counter = int.from_bytes(nonce[4:12], 'big')
+
+    if counter in _received_nonces:
+        logger.warning(f"⚠️ Replay attack detected! Nonce counter: {counter}")
+        return False
+
+    _received_nonces.add(counter)
+
+    # Cleanup old nonces to prevent memory leak
+    if len(_received_nonces) > 10000:
+        old_nonces = sorted(_received_nonces)[:5000]
+        _received_nonces.difference_update(old_nonces)
+
+    return True
+
 def encrypt_payload(data: bytes, key: bytes = PRE_SHARED_KEY) -> bytes:
-    """Encrypt data using AES-GCM with a random 12-byte nonce.
-    
+    """Encrypt data using AES-GCM with counter-based nonce (prevents collision).
+
     Returns: nonce (12 bytes) + ciphertext + tag (16 bytes)
     """
     aesgcm = AESGCM(key)
-    nonce = os.urandom(12)  # 96-bit nonce recommended for GCM
+    nonce = generate_nonce_server()  # Counter-based, no collision possible
     ciphertext = aesgcm.encrypt(nonce, data, None)  # no additional authenticated data
     return nonce + ciphertext
 

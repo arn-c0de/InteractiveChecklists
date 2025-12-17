@@ -1,4 +1,3 @@
-pip install cryptography  
+python forward_parsed_udp.py --repeat-last --interval 3 --host 192.168.178.131 --port 5010 --verbose
 
-
-python forward_parsed_udp.py --repeat-last --interval 2 --host 192.168.178.131 --port 5010 --verbose
+python forward_parsed_udp.py --repeat-last --interval 3 --host 192.168.178.131 --port 5010 --verbose --use-handshake --authorized-devices authorized_devices.json

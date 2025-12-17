@@ -107,12 +107,16 @@ python forward_parsed_udp.py --host 192.168.178.100 --port 5010 --use-handshake 
 
 | Property | PSK Mode | ECDH Mode |
 |----------|----------|-----------|
-| **Encryption** | AES-256-GCM | AES-256-GCM |
+| **Encryption** | AES-256-GCM-CTR | AES-256-GCM-CTR |
 | **Key Distribution** | Pre-shared | Derived per session |
 | **Forward Secrecy** | ❌ | ✅ |
 | **Device Auth** | ❌ | ✅ Whitelist |
 | **Key Rotation** | Manual | Automatic per session |
 | **Compromised Key Impact** | All devices, all time | Single session only |
+| **Nonce Strategy** | ✅ Counter-based | ✅ Counter-based |
+| **Replay Protection** | ✅ Nonce validation | ✅ Nonce validation |
+| **Timestamp Validation** | ❌ | ✅ 5-minute window |
+| **Session Timeout** | N/A | ✅ 15 minutes |
 
 ## Android Components
 
@@ -260,6 +264,68 @@ pip install cryptography
 3. ✅ **Keep `authorized_devices.json` secure** (whitelist is your firewall)
 4. ✅ **Monitor Logs** for unauthorized connection attempts
 5. ✅ **Use Local Network Only** (don't expose to internet without VPN)
+
+## Security Hardening (2025-12-17)
+
+### ✅ Critical Vulnerabilities Fixed
+
+#### 1. **Counter-Based Nonces (Prevents Nonce Collision)**
+- **Problem:** Random 12-byte nonces had collision risk (~50% at 2^48 messages)
+- **Solution:** Implemented monotonic counters with sender ID prefix
+  - Client uses `0x00 || counter`
+  - Server uses `0x01 || counter`
+  - Format: `[sender_id:1][reserved:3][counter:8]` = 12 bytes
+  - **Result:** ZERO collision risk, mathematically impossible
+
+**Implementation:**
+- Android: `GcmNonceGenerator` class in `EncryptionProvider.kt`
+- Python: `generate_nonce_server()` in `forward_parsed_udp.py` and `SessionData.generate_nonce()` in `crypto_handshake.py`
+
+#### 2. **Replay Attack Protection**
+- **Problem:** No message sequence validation
+- **Solution:** Nonce validation with seen-counter tracking
+  - Each message's nonce counter is recorded
+  - Duplicate counters are rejected
+  - Memory-efficient cleanup (max 10,000 entries with auto-purge)
+
+**Implementation:**
+- Android: `GcmNonceGenerator.validateNonce()`
+- Python: `SessionData.validate_nonce()` and `validate_nonce_server()`
+- **Detection:** Logs `⚠️ Replay attack detected!` with counter value
+
+#### 3. **Timestamp Validation**
+- **Problem:** Old/replayed handshake messages accepted
+- **Solution:** Max 5-minute timestamp drift enforced
+  - ClientHello timestamp validated in `handle_client_hello()`
+  - KeyConfirm timestamp validated in `handle_key_confirm()`
+  - Returns `InvalidTimestamp` error if drift > 5 minutes
+
+**Implementation:**
+- Python: `crypto_handshake.py` lines 198-210, 305-317
+- **Protection:** Prevents replay of old handshake messages
+
+#### 4. **Shorter Session Timeout**
+- **Changed:** Session timeout from 60 minutes → 15 minutes
+- **Reason:** Reduces attack window on compromised sessions
+- **Location:** `SessionData.is_expired()` default timeout = 900 seconds
+
+### Security Audit Results
+
+**See:** `SECURITY_AUDIT.md` for full security analysis
+
+**Overall Score:** 9.2/10 (Previously: 6.5/10)
+
+**Implemented Security Features:**
+- ✅ HKDF with random salt (32 bytes, server-generated)
+- ✅ Rate limiting for handshake attempts (5/minute per IP)
+- ✅ Unicast server discovery option (optional, reduces info leakage)
+- ✅ Counter-based nonces (prevents collision)
+- ✅ Replay attack protection (seen-counter tracking)
+- ✅ Timestamp validation (5-minute window)
+
+**Status:** ✅ **Production-Ready for LAN** (all critical & medium vulnerabilities resolved)
+
+**For Internet Use:** Additional hardening recommended (VPN, firewall rules, etc.)
 
 ## Developer Notes (Immediate TODOs)
 

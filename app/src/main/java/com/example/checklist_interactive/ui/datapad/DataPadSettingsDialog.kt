@@ -17,6 +17,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -39,19 +40,27 @@ fun DataPadSettingsDialog(
     val manager = LocalDataPadManager.current
     val currentPort by manager.udpPort.collectAsState()
     val currentBindIp by manager.bindIp.collectAsState()
+    val currentServerIp by manager.serverIp.collectAsState()
     val currentKey by manager.preSharedKey.collectAsState()
     val useEcdh by manager.useEcdh.collectAsState()
     val deviceName by manager.deviceName.collectAsState()
-    
+
     var portText by remember { mutableStateOf(currentPort.toString()) }
     var bindIpText by remember { mutableStateOf(currentBindIp) }
+    var serverIpText by remember { mutableStateOf(currentServerIp) }
     var keyText by remember { mutableStateOf(currentKey) }
     var deviceNameText by remember { mutableStateOf(deviceName) }
     var showKeyWarning by remember { mutableStateOf(false) }
     var keyVisible by remember { mutableStateOf(false) }
     var useEcdhLocal by remember { mutableStateOf(useEcdh) }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            dismissOnClickOutside = true,
+            dismissOnBackPress = true
+        )
+    ) {
         // Try to hide the system UI inside the dialog window
         val dialogView = LocalView.current
 
@@ -261,7 +270,22 @@ fun DataPadSettingsDialog(
                         Text(stringResource(R.string.datapad_settings_bind_ip_hint))
                     }
                 )
-                
+
+                // Server IP (Unicast - more secure than broadcast)
+                if (useEcdhLocal) {
+                    OutlinedTextField(
+                        value = serverIpText,
+                        onValueChange = { serverIpText = it },
+                        label = { Text("Server IP (Unicast)") },
+                        placeholder = { Text("192.168.178.100") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        supportingText = {
+                            Text("Leave empty for broadcast discovery (less secure)")
+                        }
+                    )
+                }
+
                 // Pre-Shared Key Setting (masked by default)
                 OutlinedTextField(
                     value = keyText,
@@ -361,17 +385,18 @@ fun DataPadSettingsDialog(
                             }
                             
                             manager.updateBindIp(bindIpText.trim())
-                            
+                            manager.updateServerIp(serverIpText.trim())
+
                             if (keyText.length == 32 || keyText.isEmpty()) {
                                 manager.updatePreSharedKey(keyText)
                             }
-                            
+
                             // Update ECDH mode and device name
                             manager.setUseEcdh(useEcdhLocal)
                             if (deviceNameText.isNotBlank()) {
                                 manager.updateDeviceName(deviceNameText.trim())
                             }
-                            
+
                             onDismiss()
                         },
                         enabled = !showKeyWarning

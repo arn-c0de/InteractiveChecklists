@@ -93,7 +93,9 @@ fun DataPadPopup(
 
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
-        confirmValueChange = { it != SheetValue.Hidden }
+        // Allow the sheet to be hidden by scrim clicks or external interactions so
+        // clicking on the background (e.g. switching tabs) will dismiss the DataPad.
+        confirmValueChange = { true }
     )
     val configuration = LocalConfiguration.current
     val sheetHeightDp = (configuration.screenHeightDp.toFloat() * sheetFraction).dp
