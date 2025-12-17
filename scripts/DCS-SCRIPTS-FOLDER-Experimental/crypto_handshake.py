@@ -63,10 +63,20 @@ class SessionData:
             # Format: 0x01 (server) + 3 bytes reserved + 8 bytes counter
             return bytes([0x01, 0x00, 0x00, 0x00]) + self._nonce_counter.to_bytes(8, 'big')
 
-    def validate_nonce(self, nonce: bytes) -> bool:
-        """Validate received nonce to prevent replay attacks"""
+    def validate_nonce(self, nonce: bytes, expected_sender: int = 0x00) -> bool:
+        """Validate received nonce to prevent replay attacks and check sender id.
+
+        Nonce format: [sender_id:1][reserved:3][counter:8]
+        For messages coming from the client to the server, sender_id MUST be 0x00.
+        """
         if len(nonce) != 12:
             return False
+
+        # Validate sender prefix to prevent messages from the wrong origin
+        if nonce[0] != expected_sender:
+            logger.warning(f"⚠️ Invalid nonce sender id: {nonce[0]:#02x} - expected {expected_sender:#02x} for session {self.session_id[:8]}...")
+            return False
+
         # Extract counter (bytes 4-11)
         counter = int.from_bytes(nonce[4:12], 'big')
 
@@ -278,7 +288,19 @@ class SessionManager:
                 }
 
             logger.info(f"✅ Device authorized: {self.authorized_devices[device_id].name}")
-            
+
+            # SECURITY: Verify that the provided client public key matches the whitelist entry for this device
+            authorized_device = self.authorized_devices.get(device_id)
+            if authorized_device and authorized_device.public_key:
+                if client_public_key_b64 != authorized_device.public_key:
+                    logger.warning(f"❌ Client public key mismatch for device {device_id[:8]}... - potential impersonation attempt")
+                    return {
+                        "type": "Error",
+                        "error": "InvalidClientPublicKey",
+                        "message": "Client public key does not match authorized device entry",
+                        "timestamp": int(server_time)
+                    }
+
             # Parse client public key
             client_public_key = serialization.load_der_public_key(
                 self._base64_decode(client_public_key_b64),
