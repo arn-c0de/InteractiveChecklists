@@ -473,7 +473,7 @@
     <string name="settings_reset_bundled_imports_message">This will delete all files from internal storage and re-import bundled assets. Continue?</string>
     <string name="settings_importing">Importing…</string>
     <string name="settings_processing">Processing…</string>
-    <string name="settings_version">Version</string>
+    <string name="settings_version">Version: %1$s</string>
     <string name="settings_viewer_layout">Viewer Layout</string>
     <string name="settings_fab_positions_explain">Reset floating action button positions to defaults</string>
     <string name="contributors_title">Contributors</string>
