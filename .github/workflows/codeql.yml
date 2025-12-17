@@ -46,7 +46,7 @@ jobs:
         - language: actions
           build-mode: none
         - language: java-kotlin
-          build-mode: autobuild
+          build-mode: manual
         - language: python
           build-mode: none
         # CodeQL supports the following values keywords for 'language': 'actions', 'c-cpp', 'csharp', 'go', 'java-kotlin', 'javascript-typescript', 'python', 'ruby', 'rust', 'swift'
@@ -86,16 +86,40 @@ jobs:
     # to build your code.
     # ℹ️ Command-line programs to run using the OS shell.
     # 📚 See https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsrun
-    - name: Run manual build steps
-      if: matrix.build-mode == 'manual'
+    - name: Run manual build steps (Android)
+      if: matrix.build-mode == 'manual' && matrix.language == 'java-kotlin'
+      run: |
+        set -e
+        echo "Setting up JDK (Temurin 17)..."
+        # Use actions/setup-java via a different step on GitHub Actions runners; here we ensure Java is available.
+        echo "##[section]Install JDK"
+        # Install Android SDK command-line tools and required packages
+        echo "Installing Android SDK components..."
+        yes | sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2" || true
+        echo "Building project with Gradle wrapper..."
+        chmod +x ./gradlew || true
+        ./gradlew assemble --no-daemon --stacktrace || (echo "Gradle build failed" && exit 1)
+
+    - name: Run manual build steps (non-Android Java)
+      if: matrix.build-mode == 'manual' && matrix.language != 'java-kotlin'
       shell: bash
       run: |
-        echo 'If you are using a "manual" build mode for one or more of the' \
-          'languages you are analyzing, replace this with the commands to build' \
-          'your code, for example:'
-        echo '  make bootstrap'
-        echo '  make release'
+        echo 'Add custom build steps for this language here, for example:'
+        echo '  ./gradlew build'
         exit 1
+
+    # Alternative: explicitly set up JDK and Android SDK with actions for more reliable results
+    # Example (uncomment and adapt if available):
+    # - name: Set up Java
+    #   uses: actions/setup-java@v4
+    #   with:
+    #     distribution: 'temurin'
+    #     java-version: '17'
+    # - name: Set up Android SDK
+    #   uses: android-actions/setup-android@v2
+    #   with:
+    #     api-level: 33
+    #     build-tools: '33.0.2'
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v4
