@@ -37,6 +37,7 @@ import androidx.core.view.WindowInsetsCompat
 import android.view.View
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetValue
 import androidx.compose.ui.platform.LocalDensity
 import com.example.checklist_interactive.data.datapad.FlightData
 import com.example.checklist_interactive.R
@@ -90,7 +91,10 @@ fun DataPadPopup(
     val sheetMax = 0.95f
     var sheetFraction by rememberSaveable { mutableStateOf(savedFraction.coerceIn(sheetMin, sheetMax)) }
 
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { it != SheetValue.Hidden }
+    )
     val configuration = LocalConfiguration.current
     val sheetHeightDp = (configuration.screenHeightDp.toFloat() * sheetFraction).dp
     val view = LocalView.current
@@ -222,20 +226,34 @@ fun DataPadPopup(
             .height(sheetHeightDp)
             .padding(horizontal = 16.dp)
         ) {
-            // Drag handle at top (drag vertically to resize)
+            // Drag handle at top (drag vertically to resize and swipe down from the handle to dismiss)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(28.dp)
                     .pointerInput(Unit) {
+                        var dragAccum = 0f
                         detectDragGestures(
+                            onDragStart = { dragAccum = 0f },
                             onDrag = { change: PointerInputChange, dragAmount: Offset ->
+                                // accumulate vertical displacement (positive = downward)
+                                dragAccum += dragAmount.y
                                 val screenPx = with(density) { configuration.screenHeightDp.dp.toPx() }
                                 val fracDelta = dragAmount.y / screenPx
                                 sheetFraction = (sheetFraction - fracDelta).coerceIn(sheetMin, sheetMax)
                             },
                             onDragEnd = {
+                                // persist saved fraction
                                 prefs.edit().putFloat(KEY_SHEET_FRACTION, sheetFraction).apply()
+                                // If user swiped down sufficiently on the handle, dismiss the sheet
+                                val threshold = with(density) { 64.dp.toPx() } // about 64dp downward to dismiss
+                                if (dragAccum > threshold) {
+                                    onDismiss()
+                                }
+                                dragAccum = 0f
+                            },
+                            onDragCancel = {
+                                dragAccum = 0f
                             }
                         )
                     }

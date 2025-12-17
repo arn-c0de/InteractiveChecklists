@@ -555,8 +555,10 @@ fun QuickAccessSheet(
                 } else {
                     if (strokesState.isNotEmpty()) {
                         val drawingJson = json.encodeToString(strokesState.toList())
-                        if (id != null) noteManager.saveDrawing(id, drawingJson)
+                        if (id != null) {
+                            noteManager.saveDrawing(id, drawingJson)
                             drawingDirty = false
+                        }
                     }
                 }
 
