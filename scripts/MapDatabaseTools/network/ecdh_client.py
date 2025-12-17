@@ -18,6 +18,13 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey
+
+# GCM nonce validation helper
+try:
+    from .gcm_nonce import default_gcm_nonce_manager
+except Exception:
+    from gcm_nonce import default_gcm_nonce_manager  # fallback for direct script run
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +105,12 @@ class ECDHClient:
                 logger.error(f"Encrypted data too short: {len(encrypted_data)} bytes")
                 return None
             nonce = encrypted_data[:12]
+
+            # Validate nonce prefix and sliding window (server responses should be sender 0x01)
+            if not default_gcm_nonce_manager.validate_nonce(nonce, expected_sender=0x01):
+                logger.warning("Rejected handshake message due to invalid or replayed nonce")
+                return None
+
             ciphertext = encrypted_data[12:]
             aesgcm = AESGCM(self.psk)
             return aesgcm.decrypt(nonce, ciphertext, None)
@@ -167,6 +180,25 @@ class ECDHClient:
                 server_pubkey_der,
                 backend=default_backend()
             )
+
+            # Validate server public key: must be EC P-256 and point must be on curve
+            if not isinstance(server_public_key, EllipticCurvePublicKey):
+                logger.error("Server public key is not an EC public key")
+                return False
+
+            curve_name = server_public_key.curve.name
+            if curve_name != 'secp256r1':
+                logger.error(f"Server public key uses unexpected curve: {curve_name}")
+                return False
+
+            # Validate point by reconstructing public numbers (will raise on invalid points)
+            try:
+                pubnums = server_public_key.public_numbers()
+                # Reconstruct using known curve type
+                ec.EllipticCurvePublicNumbers(pubnums.x, pubnums.y, ec.SECP256R1()).public_key(default_backend())
+            except Exception as e:
+                logger.error(f"Server public key failed point validation: {e}")
+                return False
             
             # Perform ECDH
             shared_secret = self.private_key.exchange(ec.ECDH(), server_public_key)

@@ -46,6 +46,8 @@ class GcmNonceGenerator(private val senderId: Byte) {
     // Thread-safe counter
     private val counter = AtomicLong(0)
     private val receivedCounters = mutableSetOf<Long>()
+    private val highestCounter = AtomicLong(-1)
+    private val WINDOW: Long = 10000L // sliding window size for replay protection
 
     /**
      * Generate next nonce with monotonic counter
@@ -68,10 +70,20 @@ class GcmNonceGenerator(private val senderId: Byte) {
 
     /**
      * Validate received nonce to detect replay attacks
+     * - Validates sender prefix (must be the remote sender id)
+     * - Uses sliding-window replay protection (bounded memory)
      * @return true if nonce is valid (not replayed), false otherwise
      */
     fun validateNonce(nonce: ByteArray, maxAge: Long = 10000): Boolean {
         if (nonce.size != 12) return false
+
+        // Validate sender prefix: incoming nonce must be from the OTHER party
+        val senderByte = nonce[0]
+        val expectedSender: Byte = if (senderId == SENDER_ID_CLIENT) SENDER_ID_SERVER else SENDER_ID_CLIENT
+        if (senderByte != expectedSender) {
+            android.util.Log.e("GcmNonceGenerator", "Invalid nonce sender id: $senderByte - expected $expectedSender")
+            return false
+        }
 
         // Extract counter from nonce
         val buffer = ByteBuffer.wrap(nonce)
@@ -79,18 +91,30 @@ class GcmNonceGenerator(private val senderId: Byte) {
         val receivedCounter = buffer.long
 
         synchronized(receivedCounters) {
+            val highest = highestCounter.get()
+
+            // Reject counters that are far in the past (stale/too old)
+            if (highest >= 0 && receivedCounter <= (highest - WINDOW)) {
+                android.util.Log.w("GcmNonceGenerator", "Stale nonce detected (too old): $receivedCounter (highest: $highest)")
+                return false
+            }
+
             // Check for replay
             if (receivedCounter in receivedCounters) {
                 android.util.Log.w("GcmNonceGenerator", "Replay attack detected! Counter: $receivedCounter")
                 return false
             }
 
-            // Add to seen set
+            // Add to seen set and update highest
             receivedCounters.add(receivedCounter)
+            if (receivedCounter > highest) {
+                highestCounter.set(receivedCounter)
+            }
 
-            // Cleanup old counters (prevent memory leak)
-            if (receivedCounters.size > maxAge) {
-                val toRemove = receivedCounters.sorted().take((maxAge / 2).toInt())
+            // Cleanup old counters (keep only sliding window)
+            val minAllowed = kotlin.math.max(0L, highestCounter.get() - WINDOW)
+            val toRemove = receivedCounters.filter { it < minAllowed }
+            if (toRemove.isNotEmpty()) {
                 receivedCounters.removeAll(toRemove.toSet())
             }
         }
