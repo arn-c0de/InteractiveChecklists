@@ -14,11 +14,13 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.backends import default_backend
 import threading
 import time
+import os
 
 
 # Default settings (matching Kotlin app)
 DEFAULT_UDP_PORT = 5010
-DEFAULT_BIND_IP = "0.0.0.0"  # Listen on all interfaces
+# Default to localhost for safety; binding to all interfaces (0.0.0.0) is potentially unsafe.
+DEFAULT_BIND_IP = "127.0.0.1"  # Listen on localhost by default
 DEFAULT_PRE_SHARED_KEY = "DCS_DataPad_Secret_Key_32BYTES!!"
 BUFFER_SIZE = 4096
 SOCKET_TIMEOUT = 1.0
@@ -183,10 +185,14 @@ class DataPadReceiver:
     
     def __init__(self, port: int = DEFAULT_UDP_PORT, 
                  bind_ip: str = DEFAULT_BIND_IP,
-                 pre_shared_key: str = DEFAULT_PRE_SHARED_KEY):
+                 pre_shared_key: str = DEFAULT_PRE_SHARED_KEY,
+                 show_sensitive: bool = False,
+                 allow_bind_all: bool = False):
         self.port = port
         self.bind_ip = bind_ip
         self.pre_shared_key = pre_shared_key.encode('utf-8')
+        self.show_sensitive = show_sensitive
+        self.allow_bind_all = allow_bind_all  # must be explicitly set to allow binding to 0.0.0.0
         
         self.socket: Optional[socket.socket] = None
         self.running = False
@@ -268,8 +274,14 @@ class DataPadReceiver:
         self.running = True
         self.receive_thread = threading.Thread(target=self._receive_loop, daemon=True)
         self.receive_thread.start()
-        print(f"DataPad receiver started on {self.bind_ip}:{self.port}")
-        print(f"Local IP: {self.get_local_ip()}")
+        if self.show_sensitive:
+            print(f"DataPad receiver started on {self.bind_ip}:{self.port}")
+            print(f"Local IP: {self.get_local_ip()}")
+        else:
+            print(f"DataPad receiver started on port {self.port}")
+            print("Local IP: [REDACTED]")
+        if self.bind_ip == "0.0.0.0" and not self.allow_bind_all and os.getenv("DATAPAD_ALLOW_BIND_ALL", "0") != "1":
+            print("WARNING: requested bind to 0.0.0.0 but allow_bind_all is not enabled. For safety, the receiver will bind to localhost instead. To allow binding to all interfaces set DATAPAD_ALLOW_BIND_ALL=1 or pass allow_bind_all=True to the constructor.")
     
     def stop(self):
         """Stop listening for UDP packets"""
@@ -290,13 +302,25 @@ class DataPadReceiver:
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.socket.settimeout(SOCKET_TIMEOUT)
             
-            # Bind to address
-            if self.bind_ip:
-                self.socket.bind((self.bind_ip, self.port))
+            # Bind to address with safety checks (avoid binding to all interfaces by default)
+            bind_target = self.bind_ip
+            if bind_target == "0.0.0.0":
+                env_allow = os.getenv("DATAPAD_ALLOW_BIND_ALL", "0") == "1"
+                if not (self.allow_bind_all or env_allow):
+                    # Override to localhost for safety
+                    print("WARN: binding to all interfaces (0.0.0.0) is disabled by default for security. Binding to localhost instead.")
+                    bind_target = "127.0.0.1"
+                else:
+                    print("WARN: binding to all interfaces (0.0.0.0) as explicitly allowed by configuration")
+
+            self.socket.bind((bind_target, self.port))
+            if self.show_sensitive:
+                print(f"UDP socket opened on {bind_target}:{self.port}")
             else:
-                self.socket.bind(('0.0.0.0', self.port))
-            
-            print(f"UDP socket opened on {self.bind_ip}:{self.port}")
+                if bind_target in ("127.0.0.1", "localhost"):
+                    print(f"UDP socket opened on localhost:{self.port}")
+                else:
+                    print(f"UDP socket opened on port {self.port}")
             print(f"Waiting for encrypted UDP packets...")
             
             consecutive_timeouts = 0
@@ -305,7 +329,10 @@ class DataPadReceiver:
                 try:
                     # Receive UDP packet
                     data, addr = self.socket.recvfrom(BUFFER_SIZE)
-                    print(f"Received {len(data)} bytes from {addr}")
+                    if self.show_sensitive:
+                        print(f"Received {len(data)} bytes from {addr}")
+                    else:
+                        print(f"Received {len(data)} bytes")
                     
                     # Try to decrypt
                     decrypted_data = self.decrypt_payload(data)
@@ -366,7 +393,10 @@ class DataPadReceiver:
 
 if __name__ == "__main__":
     # Simple test without GUI
-    receiver = DataPadReceiver()
+    # Opt-in: only print sensitive details (exact location/IP) if env var DATAPAD_DEBUG_SHOW_SENSITIVE=1
+    show_sensitive = os.getenv("DATAPAD_DEBUG_SHOW_SENSITIVE", "0") == "1"
+    allow_bind_all = os.getenv("DATAPAD_ALLOW_BIND_ALL", "0") == "1"
+    receiver = DataPadReceiver(show_sensitive=show_sensitive, allow_bind_all=allow_bind_all)
     
     def on_data(flight_data):
         print(f"\n=== Flight Data Update ===")
@@ -374,7 +404,11 @@ if __name__ == "__main__":
         print(f"Altitude: {flight_data.altitude:.1f} m")
         print(f"Speed: {flight_data.groundSpeed:.1f} m/s" if flight_data.groundSpeed else "Speed: N/A")
         print(f"Heading: {flight_data.heading:.1f}°")
-        print(f"Lat/Long: {flight_data.latitude:.6f}, {flight_data.longitude:.6f}")
+        if show_sensitive:
+            print(f"Lat/Long: {flight_data.latitude:.6f}, {flight_data.longitude:.6f}")
+        else:
+            # Reduce precision to protect exact location in logs
+            print(f"Lat/Long: {flight_data.latitude:.2f}, {flight_data.longitude:.2f} (rounded for privacy)")
     
     def on_connection(connected):
         status = "CONNECTED" if connected else "DISCONNECTED"
