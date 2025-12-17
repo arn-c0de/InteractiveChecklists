@@ -157,7 +157,7 @@ fun DataPadSettingsDialog(
                     }
                 }
                 
-                Divider()
+                HorizontalDivider()
                 
                 // ECDH Handshake Mode Toggle
                 Card(
@@ -177,7 +177,7 @@ fun DataPadSettingsDialog(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "ECDH Handshake Mode",
+                                text = stringResource(R.string.datapad_ecdh_title),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = if (useEcdhLocal) 
                                     MaterialTheme.colorScheme.onPrimaryContainer 
@@ -186,9 +186,9 @@ fun DataPadSettingsDialog(
                             )
                             Text(
                                 text = if (useEcdhLocal)
-                                    "Secure session-based encryption (Recommended)"
+                                    stringResource(R.string.datapad_ecdh_description_secure)
                                 else
-                                    "Using legacy PSK mode",
+                                    stringResource(R.string.datapad_ecdh_description_legacy),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (useEcdhLocal) 
                                     MaterialTheme.colorScheme.onPrimaryContainer 
@@ -208,12 +208,12 @@ fun DataPadSettingsDialog(
                     OutlinedTextField(
                         value = deviceNameText,
                         onValueChange = { deviceNameText = it },
-                        label = { Text("Device Name") },
-                        placeholder = { Text("Android Tablet") },
+                        label = { Text(stringResource(R.string.datapad_device_name_label)) },
+                        placeholder = { Text(stringResource(R.string.datapad_device_name_placeholder)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         supportingText = {
-                            Text("Used to identify this device during handshake")
+                            Text(stringResource(R.string.datapad_device_name_support))
                         }
                     )
                     
@@ -228,7 +228,7 @@ fun DataPadSettingsDialog(
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Text(
-                                text = "Device ID (derived from key)",
+                                text = stringResource(R.string.datapad_device_id_label),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer
                             )
@@ -242,7 +242,7 @@ fun DataPadSettingsDialog(
                     }
                 }
                 
-                Divider()
+                HorizontalDivider()
                 
                 // UDP Port Setting
                 OutlinedTextField(
@@ -276,12 +276,12 @@ fun DataPadSettingsDialog(
                     OutlinedTextField(
                         value = serverIpText,
                         onValueChange = { serverIpText = it },
-                        label = { Text("Server IP (Unicast)") },
-                        placeholder = { Text("192.168.178.100") },
+                        label = { Text(stringResource(R.string.datapad_server_ip_label)) },
+                        placeholder = { Text(stringResource(R.string.datapad_server_ip_placeholder)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         supportingText = {
-                            Text("Leave empty for broadcast discovery (less secure)")
+                            Text(stringResource(R.string.datapad_server_ip_hint))
                         }
                     )
                 }
@@ -293,7 +293,7 @@ fun DataPadSettingsDialog(
                         keyText = it
                         showKeyWarning = it.length != 32 && it.isNotEmpty()
                     },
-                    label = { Text(stringResource(R.string.datapad_settings_psk) + if (useEcdhLocal) " (for handshake)" else "") },
+                    label = { Text(if (useEcdhLocal) stringResource(R.string.datapad_settings_psk_handshake) else stringResource(R.string.datapad_settings_psk)) },
                     placeholder = { Text(stringResource(R.string.datapad_settings_psk_placeholder)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -315,15 +315,14 @@ fun DataPadSettingsDialog(
                             )
                         } else {
                             Text(
-                                if (useEcdhLocal)
-                                    "PSK used only for handshake encryption, data uses session key"
+                                text = if (useEcdhLocal)
+                                    stringResource(R.string.datapad_psk_handshake_hint)
                                 else
                                     stringResource(R.string.datapad_settings_psk_hint)
                             )
                         }
                     }
                 )
-                
                 if (showKeyWarning) {
                     Card(
                         colors = CardDefaults.cardColors(
@@ -356,7 +355,7 @@ fun DataPadSettingsDialog(
                     }
                 }
                 
-                Divider()
+                HorizontalDivider()
                 
                 // Action Buttons
                 Row(
@@ -416,13 +415,13 @@ fun DataPadSettingsDialog(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
-                            text = if (useEcdhLocal) "ECDH Mode Information" else stringResource(R.string.datapad_configuration_tips_label),
+                            text = if (useEcdhLocal) stringResource(R.string.datapad_ecdh_info_title) else stringResource(R.string.datapad_configuration_tips_label),
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                         Text(
                             text = if (useEcdhLocal)
-                                "• Device must be added to authorized_devices.json on DCS server\n• Handshake establishes session key automatically\n• Session key changes each connection (Forward Secrecy)\n• PSK only protects handshake, not data"
+                                stringResource(R.string.datapad_ecdh_info_text)
                             else
                                 stringResource(R.string.datapad_configuration_tips_text),
                             style = MaterialTheme.typography.bodySmall,
@@ -431,7 +430,7 @@ fun DataPadSettingsDialog(
                         if (useEcdhLocal) {
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "⚠️ ECDH requires Python server update (see docs/technical/ECDH_HANDSHAKE_PROPOSAL.md)",
+                                text = stringResource(R.string.datapad_ecdh_warning),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.error
                             )
