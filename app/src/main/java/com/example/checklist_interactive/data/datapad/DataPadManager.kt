@@ -243,51 +243,62 @@ class DataPadManager(private val context: Context) {
                         udpSocket?.receive(packet)
                         val receivedData = packet.data.copyOfRange(0, packet.length)
                         udpLogD("UDP packet received (${packet.length} bytes) from ${packet.address.hostAddress}:${packet.port}")
-                        
-                        // FIRST: Try to parse as PLAINTEXT handshake message (ECDH mode)
-                        // Handshake messages are NEVER encrypted for proper ECDH Perfect Forward Secrecy
-                        try {
-                            val plaintextMessage = String(receivedData, Charsets.UTF_8)
-                            if (plaintextMessage.contains("\"type\":") && 
-                                (plaintextMessage.contains("ServerHello") || 
-                                 plaintextMessage.contains("Ack") || 
-                                 plaintextMessage.contains("Error") ||
-                                 plaintextMessage.contains("ClientHello"))) {
-                                // This is a handshake message - handle as PLAINTEXT
-                                udpLogD("📥 Received handshake message (PLAINTEXT): ${plaintextMessage.take(100)}")
-                                handleIncomingMessage(plaintextMessage, packet.address, packet.port)
-                                continue // Skip decryption for handshake messages
+
+                        // SECURITY FIX: Only accept plaintext handshake messages DURING handshake phase
+                        // CRITICAL: After session is established, ALL messages MUST be encrypted
+                        // Note: encryptionProvider is set AFTER Ack is received (line 570), not when currentSession is set
+                        val isHandshakePhase = _useEcdh.value && encryptionProvider == null
+
+                        if (isHandshakePhase) {
+                            // ONLY during ECDH handshake: Try to parse as PLAINTEXT handshake message
+                            // Handshake messages are NEVER encrypted for proper ECDH Perfect Forward Secrecy
+                            try {
+                                val plaintextMessage = String(receivedData, Charsets.UTF_8)
+                                if (plaintextMessage.contains("\"type\":") &&
+                                    (plaintextMessage.contains("ServerHello") ||
+                                     plaintextMessage.contains("Ack") ||
+                                     plaintextMessage.contains("Error"))) {
+                                    // This is a handshake response - handle as PLAINTEXT
+                                    udpLogD("📥 Received handshake message (PLAINTEXT): ${plaintextMessage.take(100)}")
+                                    handleIncomingMessage(plaintextMessage, packet.address, packet.port)
+                                    continue // Skip decryption for handshake messages
+                                }
+                            } catch (e: Exception) {
+                                // Not a valid UTF-8 string, probably encrypted data - continue to decryption
                             }
-                        } catch (e: Exception) {
-                            // Not a valid UTF-8 string, probably encrypted data - continue to decryption
                         }
-                        
-                        // SECOND: Try to decrypt as encrypted data (flight data or PSK mode)
+
+                        // SECURITY FIX: Enforce encryption - NO plaintext fallback!
+                        // Use the configured encryption provider (PSK or ECDH session key)
                         val provider = encryptionProvider
                         val decryptedData = if (provider != null) {
+                            // Use configured encryption provider
                             provider.decrypt(receivedData)
-                        } else {
-                            // Fallback to PSK for encrypted data
+                        } else if (!_useEcdh.value) {
+                            // ONLY in PSK mode: fallback to PSK if no provider set
                             val keyBytes = _preSharedKey.value.toByteArray(Charsets.UTF_8)
                             decryptPayload(receivedData, keyBytes)
+                        } else {
+                            // ECDH mode but no session key: REJECT
+                            null
                         }
-                        
+
                         if (decryptedData != null) {
                             val message = String(decryptedData, Charsets.UTF_8)
                             udpLogD("Decrypted message: ${message.take(200)}")
-                            
+
                             // Parse as flight data
                             try {
                                 val data = json.decodeFromString<FlightData>(message)
-                                
+
                                 // If ECDH mode, verify we have active session
                                 if (_useEcdh.value && currentSession == null) {
-                                    udpLogE("Received flight data but no active session")
+                                    udpLogE("Received flight data but no active session - rejecting")
                                 } else {
                                     _flightData.value = data
                                     _lastUpdateTime.value = System.currentTimeMillis()
                                     _isConnected.value = true
-                                    currentSession?.let { 
+                                    currentSession?.let {
                                         udpLogD("✅ Received encrypted flight data: ${data.aircraft} at ${data.altitude}m (session: ${it.sessionId.take(8)}...)")
                                     } ?: udpLogD("✅ Received encrypted flight data: ${data.aircraft} at ${data.altitude}m")
                                 }
@@ -296,7 +307,8 @@ class DataPadManager(private val context: Context) {
                                 udpLogE("Raw message: $message")
                             }
                         } else {
-                            udpLogE("❌ Failed to decrypt packet - check encryption key!")
+                            // SECURITY: Decryption failed - REJECT packet (no plaintext fallback!)
+                            udpLogE("❌ Failed to decrypt packet - rejecting (encryption enforced)")
                         }
                         
                     } catch (e: SocketTimeoutException) {
