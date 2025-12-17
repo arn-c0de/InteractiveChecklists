@@ -74,6 +74,9 @@ def check_psk_security():
 _nonce_counter = 0
 _nonce_lock = __import__('threading').Lock()
 _received_nonces = set()
+# Highest counter observed from clients and sliding window for replay protection
+_highest_counter = 0
+_REPLAY_WINDOW = 10000  # keep recent counters within this window
 
 def generate_nonce_server() -> bytes:
     """Generate counter-based nonce for SERVER (prevents collision).
@@ -91,24 +94,46 @@ def generate_nonce_server() -> bytes:
 
 def validate_nonce_server(nonce: bytes) -> bool:
     """Validate received nonce to prevent replay attacks.
+
+    Additional checks added:
+      - ensure nonce prefix indicates a CLIENT message (0x00)
+      - sliding-window replay protection with bounded memory
+
     Returns True if nonce is valid (not replayed), False otherwise.
     """
     if len(nonce) != 12:
         return False
 
+    # Validate prefix: client messages must have sender_id = 0x00
+    if nonce[0] != 0x00:
+        logger.warning(f"⚠️ Invalid nonce sender id: {nonce[0]:#02x} - expected client (0x00)")
+        return False
+
     # Extract counter (bytes 4-11)
     counter = int.from_bytes(nonce[4:12], 'big')
 
-    if counter in _received_nonces:
-        logger.warning(f"⚠️ Replay attack detected! Nonce counter: {counter}")
-        return False
+    with _nonce_lock:
+        global _highest_counter
+        # Reject counters that are far in the past (stale)
+        if _highest_counter and counter <= (_highest_counter - _REPLAY_WINDOW):
+            logger.warning(f"⚠️ Stale nonce detected (too old): {counter} (highest: {_highest_counter})")
+            return False
 
-    _received_nonces.add(counter)
+        # Replay detection
+        if counter in _received_nonces:
+            logger.warning(f"⚠️ Replay attack detected! Nonce counter: {counter}")
+            return False
 
-    # Cleanup old nonces to prevent memory leak
-    if len(_received_nonces) > 10000:
-        old_nonces = sorted(_received_nonces)[:5000]
-        _received_nonces.difference_update(old_nonces)
+        # Accept and record
+        _received_nonces.add(counter)
+        if counter > _highest_counter:
+            _highest_counter = counter
+
+        # Cleanup old nonces to prevent memory leak (keep window)
+        min_allowed = max(0, _highest_counter - _REPLAY_WINDOW)
+        old_nonces = [n for n in _received_nonces if n < min_allowed]
+        for n in old_nonces:
+            _received_nonces.remove(n)
 
     return True
 

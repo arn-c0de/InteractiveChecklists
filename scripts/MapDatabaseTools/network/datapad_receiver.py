@@ -18,6 +18,12 @@ import threading
 import time
 import os
 
+# GCM nonce validation
+try:
+    from .gcm_nonce import default_gcm_nonce_manager
+except Exception:
+    from gcm_nonce import default_gcm_nonce_manager  # fallback for direct script run
+
 try:
     from .ecdh_client import ECDHClient
 except ImportError:
@@ -295,6 +301,11 @@ class DataPadReceiver:
             
             # Extract nonce (first 12 bytes)
             nonce = encrypted_data[:12]
+            # Validate nonce prefix and sliding window (server should be sender 0x01)
+            if not default_gcm_nonce_manager.validate_nonce(nonce, expected_sender=0x01):
+                print("Rejected message due to invalid or replayed nonce")
+                return None
+
             # Extract ciphertext + tag (remaining bytes)
             ciphertext = encrypted_data[12:]
             
