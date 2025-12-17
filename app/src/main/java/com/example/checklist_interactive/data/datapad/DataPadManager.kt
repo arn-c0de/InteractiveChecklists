@@ -113,7 +113,10 @@ class DataPadManager(private val context: Context) {
     
     private val _deviceName = MutableStateFlow(prefs.getString(KEY_DEVICE_NAME, "Android Tablet") ?: "Android Tablet")
     val deviceName: StateFlow<String> = _deviceName.asStateFlow()
-    
+
+    private val _serverIp = MutableStateFlow(prefs.getString("server_ip", "") ?: "")
+    val serverIp: StateFlow<String> = _serverIp.asStateFlow()
+
     private val _handshakeStatus = MutableStateFlow<String?>(null)
     val handshakeStatus: StateFlow<String?> = _handshakeStatus.asStateFlow()
     
@@ -393,6 +396,18 @@ class DataPadManager(private val context: Context) {
             restart()
         }
     }
+
+    /**
+     * Set server IP address for unicast handshake (more secure than broadcast)
+     * @param serverIp Server IP address (empty = use broadcast)
+     */
+    fun updateServerIp(serverIp: String) {
+        prefs.edit().putString("server_ip", serverIp).apply()
+        _serverIp.value = serverIp
+        if (isStarted && _useEcdh.value) {
+            restart()
+        }
+    }
     
     /**
      * Restart the UDP socket with new settings
@@ -423,13 +438,23 @@ class DataPadManager(private val context: Context) {
                     publicKey = keyManager.exportPublicKey()
                 )
                 
-                // For ECDH handshake, we need a specific server address
-                // If bindIp is empty, try to discover server via broadcast and wait for response
-                val serverAddress = if (_bindIp.value.isNotEmpty()) {
-                    InetAddress.getByName(_bindIp.value)
-                } else {
-                    // Use broadcast for discovery
-                    InetAddress.getByName("255.255.255.255")
+                // SECURITY: Prefer unicast over broadcast for server discovery
+                val serverAddress = when {
+                    // 1st priority: Explicit server IP (most secure)
+                    _serverIp.value.isNotEmpty() -> {
+                        udpLogD("🎯 Using unicast to server: ${_serverIp.value}")
+                        InetAddress.getByName(_serverIp.value)
+                    }
+                    // 2nd priority: Bind IP (if specified)
+                    _bindIp.value.isNotEmpty() -> {
+                        udpLogD("🎯 Using bind IP as server: ${_bindIp.value}")
+                        InetAddress.getByName(_bindIp.value)
+                    }
+                    // Fallback: Broadcast discovery (less secure, info leakage)
+                    else -> {
+                        udpLogD("⚠️ Using broadcast discovery (255.255.255.255)")
+                        InetAddress.getByName("255.255.255.255")
+                    }
                 }
                 
                 sendHandshakeMessage(clientHello, serverAddress)
@@ -449,10 +474,18 @@ class DataPadManager(private val context: Context) {
             }
             
             udpLogD("📥 Received ServerHello, authorized: ${serverHello.authorized}")
-            
-            // Step 3: Derive session key
+
+            // Step 3: Derive session key with server-provided salt
             val serverPublicKey = keyManager.importPublicKey(serverHello.publicKey)
-            val sessionKey = keyManager.deriveSessionKey(serverPublicKey)
+            val salt = serverHello.salt?.let {
+                try {
+                    Base64.getDecoder().decode(it)
+                } catch (e: Exception) {
+                    udpLogE("Failed to decode salt: ${e.message}")
+                    null
+                }
+            }
+            val sessionKey = keyManager.deriveSessionKey(serverPublicKey, salt)
             
             // SECURITY: Verify server knows the session key (mutual authentication)
             // Server sends HMAC of "server_{sessionId}" with the derived session key

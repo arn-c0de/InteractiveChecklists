@@ -51,30 +51,33 @@ data class ClientHello(
 data class ServerHello(
     @SerialName("type")
     override val type: String = "ServerHello",
-    
+
     @SerialName("version")
     val version: String = "1.0",
-    
+
     @SerialName("sessionId")
     val sessionId: String,
-    
+
     @SerialName("publicKey")
     val publicKey: String, // Base64 encoded EC public key
-    
+
     @SerialName("timestamp")
     override val timestamp: Long = System.currentTimeMillis(),
-    
+
     @SerialName("authorized")
     val authorized: Boolean,
-    
+
     @SerialName("aircraft")
     val aircraft: String? = null,
-    
+
     @SerialName("message")
     val message: String? = null,
-    
+
     @SerialName("serverHmac")
-    val serverHmac: String? = null  // For mutual authentication
+    val serverHmac: String? = null,  // For mutual authentication
+
+    @SerialName("salt")
+    val salt: String? = null  // Base64 encoded random salt for HKDF (32 bytes)
 ) : HandshakeMessage
 
 /**

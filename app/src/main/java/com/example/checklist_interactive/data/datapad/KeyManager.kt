@@ -83,23 +83,31 @@ class KeyManager(private val context: Context) {
     /**
      * Derive an AES-256 session key from the peer's public key using ECDH
      * @param peerPublicKey The other party's EC public key
+     * @param salt Optional salt for HKDF (recommended: 32 random bytes from server)
      * @return A 256-bit AES key derived from the shared secret
      */
-    fun deriveSessionKey(peerPublicKey: PublicKey): SecretKey {
+    fun deriveSessionKey(peerPublicKey: PublicKey, salt: ByteArray? = null): SecretKey {
         try {
             val deviceKeyPair = getOrCreateDeviceKeyPair()
-            
+
             // Perform ECDH key agreement
             val keyAgreement = KeyAgreement.getInstance("ECDH")
             keyAgreement.init(deviceKeyPair.private)
             keyAgreement.doPhase(peerPublicKey, true)
-            
+
             val sharedSecret = keyAgreement.generateSecret()
             Log.d(TAG, "ECDH shared secret generated (${sharedSecret.size} bytes)")
-            
-            // Derive AES key using HKDF-SHA256
-            val aesKeyBytes = hkdfSha256(sharedSecret, HKDF_INFO.toByteArray(), AES_KEY_SIZE)
-            
+
+            // Derive AES key using HKDF-SHA256 with provided salt (or zeros if null)
+            val actualSalt = salt ?: ByteArray(32)  // Default to zeros if no salt provided
+            val aesKeyBytes = hkdfSha256(sharedSecret, actualSalt, HKDF_INFO.toByteArray(), AES_KEY_SIZE)
+
+            if (salt != null) {
+                Log.d(TAG, "✅ HKDF with random salt (${salt.size} bytes)")
+            } else {
+                Log.w(TAG, "⚠️ HKDF with zero salt (legacy mode)")
+            }
+
             return SecretKeySpec(aesKeyBytes, "AES")
         } catch (e: Exception) {
             Log.e(TAG, "Error deriving session key: ${e.message}", e)
@@ -142,38 +150,38 @@ class KeyManager(private val context: Context) {
     }
     
     /**
-     * HKDF-SHA256 key derivation function (simplified implementation)
+     * HKDF-SHA256 key derivation function (RFC 5869)
      * @param inputKeyMaterial The shared secret from ECDH
+     * @param salt Random salt (should be 32 bytes from server)
      * @param info Context and application specific information
      * @param outputLength Desired output key length in bytes
      * @return Derived key material
      */
-    private fun hkdfSha256(inputKeyMaterial: ByteArray, info: ByteArray, outputLength: Int): ByteArray {
-        // Step 1: Extract (using HMAC-SHA256 with salt=zeros)
+    private fun hkdfSha256(inputKeyMaterial: ByteArray, salt: ByteArray, info: ByteArray, outputLength: Int): ByteArray {
+        // Step 1: Extract (using HMAC-SHA256 with provided salt)
         val mac = javax.crypto.Mac.getInstance("HmacSHA256")
-        val salt = ByteArray(32) // All zeros as salt
         mac.init(SecretKeySpec(salt, "HmacSHA256"))
         val prk = mac.doFinal(inputKeyMaterial)
-        
+
         // Step 2: Expand
         mac.init(SecretKeySpec(prk, "HmacSHA256"))
         val okm = ByteArray(outputLength)
         var t = ByteArray(0)
         var offset = 0
         var i = 1
-        
+
         while (offset < outputLength) {
             mac.update(t)
             mac.update(info)
             mac.update(i.toByte())
             t = mac.doFinal()
-            
+
             val copyLength = minOf(t.size, outputLength - offset)
             System.arraycopy(t, 0, okm, offset, copyLength)
             offset += copyLength
             i++
         }
-        
+
         return okm
     }
     

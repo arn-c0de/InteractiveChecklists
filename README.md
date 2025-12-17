@@ -65,7 +65,28 @@ InteractiveChecklists is an Android application for viewing and interacting with
 
 DataPad is an experimental feature that receives real-time aircraft telemetry from DCS World via UDP (default port **5010**). It is intended for advanced users and requires running the `forward_parsed_udp.py` script to forward telemetry to your device.
 
-Key points:
+### Security Features (NEW - December 2025)
+
+**✅ ECDH Handshake Mode** - Production-ready secure communication:
+- **End-to-end encryption** with per-session AES-256-GCM keys
+- **Device authentication** via whitelist (`authorized_devices.json`)
+- **Forward secrecy** - compromising one session doesn't affect others
+- **Replay attack protection** with counter-based nonces
+- **Timestamp validation** (5-minute window)
+- **Mutual authentication** (client ↔ server)
+
+**Quick Start (ECDH Mode):**
+```bash
+# Python: Enable handshake mode
+python forward_parsed_udp.py --host 192.168.178.100 --port 5010 --use-handshake --verbose
+
+# Android: Settings → DataPad → Enable "ECDH Handshake Mode"
+# Add your device ID to authorized_devices.json on server
+```
+
+See `docs/technical/ECDH_USAGE_GUIDE.md` for complete setup instructions.
+
+### Legacy PSK Mode
 
 - Default UDP port: **5010** (configurable in the app)
 - Run the forwarder script and point it to your device IP and port (see `docs/features/DATAPAD_FEATURE.md`)
@@ -76,7 +97,7 @@ See `docs/features/DATAPAD_FEATURE.md` for full usage, configuration, and troubl
 
 **Phase 1 (experimental)**: This release represents Phase 1 of DataPad. Future phases will expand telemetry coverage and add visual and security improvements, including live animated aircraft visualizations and a dedicated UI redesign.
 
-**Next up:** 2-way (experimental) — enabling data flow from the app back to DCS.
+**Next up:** 2-way communication (experimental) — enabling data flow from the app back to DCS.
 
 Planned enhancements include additional telemetry (speed, vertical speed, fuel, systems), live animated aircraft visualizations, and UI/UX improvements.
 

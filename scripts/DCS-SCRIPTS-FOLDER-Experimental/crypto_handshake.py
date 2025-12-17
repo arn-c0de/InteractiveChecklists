@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 class SessionData:
     """Information about an active session"""
-    def __init__(self, session_id: str, device_id: str, session_key: bytes, 
+    def __init__(self, session_id: str, device_id: str, session_key: bytes,
                  peer_public_key: bytes, aircraft: Optional[str] = None):
         self.session_id = session_id
         self.device_id = device_id
@@ -41,14 +41,45 @@ class SessionData:
         self.aircraft = aircraft
         self.created_at = time.time()
         self.last_activity = time.time()
-    
-    def is_expired(self, timeout_seconds: int = 3600) -> bool:
-        """Check if session has expired (default 1 hour)"""
+        # Counter for nonce generation (thread-safe)
+        self._nonce_counter = 0
+        self._nonce_lock = __import__('threading').Lock()
+        self._received_nonces = set()
+
+    def is_expired(self, timeout_seconds: int = 900) -> bool:
+        """Check if session has expired (default 15 minutes - shorter for security)"""
         return (time.time() - self.last_activity) > timeout_seconds
-    
+
     def update_activity(self):
         """Update last activity timestamp"""
         self.last_activity = time.time()
+
+    def generate_nonce(self) -> bytes:
+        """Generate counter-based nonce for this session (SERVER side, 0x01 prefix)"""
+        with self._nonce_lock:
+            self._nonce_counter += 1
+            if self._nonce_counter >= 2**64:
+                raise RuntimeError(f"Nonce counter exhausted for session {self.session_id} - re-key required!")
+            # Format: 0x01 (server) + 3 bytes reserved + 8 bytes counter
+            return bytes([0x01, 0x00, 0x00, 0x00]) + self._nonce_counter.to_bytes(8, 'big')
+
+    def validate_nonce(self, nonce: bytes) -> bool:
+        """Validate received nonce to prevent replay attacks"""
+        if len(nonce) != 12:
+            return False
+        # Extract counter (bytes 4-11)
+        counter = int.from_bytes(nonce[4:12], 'big')
+
+        with self._nonce_lock:
+            if counter in self._received_nonces:
+                logger.warning(f"⚠️ Replay attack detected in session {self.session_id[:8]}... ! Nonce counter: {counter}")
+                return False
+            self._received_nonces.add(counter)
+            # Cleanup old nonces
+            if len(self._received_nonces) > 10000:
+                old_nonces = sorted(self._received_nonces)[:5000]
+                self._received_nonces.difference_update(old_nonces)
+        return True
 
 
 class AuthorizedDevice:
@@ -64,7 +95,7 @@ class AuthorizedDevice:
 
 class SessionManager:
     """Manages ECDH handshake and session lifecycle"""
-    
+
     def __init__(self, authorized_devices_path: str = "authorized_devices.json",
                  aircraft_name: Optional[str] = None):
         self.sessions: Dict[str, SessionData] = {}  # session_id -> SessionData
@@ -75,6 +106,12 @@ class SessionManager:
         self.last_cleanup = time.time()
         self._cleanup_thread = None
         self._stop_cleanup = False
+
+        # Rate limiting: IP -> (attempt_count, window_start_time)
+        self.handshake_attempts: Dict[str, Tuple[int, float]] = {}
+        self.rate_limit_lock = __import__('threading').Lock()
+        self.MAX_HANDSHAKE_ATTEMPTS = 5  # Max attempts per window
+        self.RATE_LIMIT_WINDOW = 60.0  # Window in seconds (1 minute)
         
         # Generate server key pair (ephemeral, regenerated each run)
         self.server_private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
@@ -151,6 +188,46 @@ class SessionManager:
         self.load_authorized_devices()
         return device_id in self.authorized_devices
     
+    def is_rate_limited(self, ip_address: str) -> bool:
+        """Check if IP address is rate limited for handshake attempts"""
+        with self.rate_limit_lock:
+            current_time = time.time()
+
+            if ip_address in self.handshake_attempts:
+                count, window_start = self.handshake_attempts[ip_address]
+
+                # Check if window has expired
+                if current_time - window_start > self.RATE_LIMIT_WINDOW:
+                    # Reset window
+                    self.handshake_attempts[ip_address] = (1, current_time)
+                    return False
+
+                # Within window - check count
+                if count >= self.MAX_HANDSHAKE_ATTEMPTS:
+                    logger.warning(f"⚠️ Rate limit exceeded for {ip_address} ({count} attempts in {current_time - window_start:.1f}s)")
+                    return True
+
+                # Increment count
+                self.handshake_attempts[ip_address] = (count + 1, window_start)
+                return False
+            else:
+                # First attempt from this IP
+                self.handshake_attempts[ip_address] = (1, current_time)
+                return False
+
+    def cleanup_rate_limits(self):
+        """Remove expired rate limit entries (prevent memory leak)"""
+        with self.rate_limit_lock:
+            current_time = time.time()
+            expired = [
+                ip for ip, (_, window_start) in self.handshake_attempts.items()
+                if current_time - window_start > self.RATE_LIMIT_WINDOW * 2
+            ]
+            for ip in expired:
+                del self.handshake_attempts[ip]
+            if expired:
+                logger.debug(f"🧹 Cleaned up {len(expired)} expired rate limit entries")
+
     def handle_client_hello(self, message: dict, sender_address: Tuple[str, int]) -> dict:
         """
         Handle ClientHello message from Android app
@@ -160,9 +237,35 @@ class SessionManager:
             device_id = message.get('deviceId', '')
             device_name = message.get('deviceName', 'Unknown')
             client_public_key_b64 = message.get('publicKey', '')
-            
-            logger.info(f"📥 ClientHello from {device_name} ({device_id[:16]}...) @ {sender_address[0]}")
-            
+            client_timestamp = message.get('timestamp', 0)
+            ip_address = sender_address[0]
+
+            logger.info(f"📥 ClientHello from {device_name} ({device_id[:16]}...) @ {ip_address}")
+
+            # SECURITY: Rate limiting (prevent DoS attacks)
+            if self.is_rate_limited(ip_address):
+                logger.warning(f"🚫 Rate limit exceeded for {ip_address} - rejecting handshake")
+                return {
+                    "type": "Error",
+                    "error": "RateLimitExceeded",
+                    "message": f"Too many handshake attempts. Please wait {self.RATE_LIMIT_WINDOW}s and try again.",
+                    "timestamp": int(time.time() * 1000)
+                }
+
+            # SECURITY: Validate timestamp (prevent replay of old messages)
+            server_time = time.time() * 1000  # milliseconds
+            time_diff = abs(server_time - client_timestamp)
+            MAX_TIMESTAMP_DRIFT_MS = 300000  # 5 minutes
+
+            if time_diff > MAX_TIMESTAMP_DRIFT_MS:
+                logger.warning(f"❌ Timestamp too old/future: {time_diff/1000:.1f}s drift (max {MAX_TIMESTAMP_DRIFT_MS/1000}s)")
+                return {
+                    "type": "Error",
+                    "error": "InvalidTimestamp",
+                    "message": f"Timestamp drift too large: {time_diff/1000:.1f}s (max {MAX_TIMESTAMP_DRIFT_MS/1000}s). Check device clock.",
+                    "timestamp": int(server_time)
+                }
+
             # Check authorization
             if not self.is_device_authorized(device_id):
                 logger.warning(f"❌ Unauthorized device: {device_id[:16]}... ({device_name})")
@@ -171,9 +274,9 @@ class SessionManager:
                     "type": "Error",
                     "error": "Unauthorized",
                     "message": f"Device {device_id[:16]}... is not authorized. Add to authorized_devices.json on server.",
-                    "timestamp": int(time.time() * 1000)
+                    "timestamp": int(server_time)
                 }
-            
+
             logger.info(f"✅ Device authorized: {self.authorized_devices[device_id].name}")
             
             # Parse client public key
@@ -186,9 +289,13 @@ class SessionManager:
             shared_secret = self.server_private_key.exchange(
                 ec.ECDH(), client_public_key
             )
-            
-            # Derive session key using HKDF-SHA256
-            session_key = self._derive_session_key(shared_secret)
+
+            # Generate random salt for HKDF (32 bytes)
+            salt = os.urandom(32)
+            logger.info(f"🔑 Generated random salt for HKDF ({len(salt)} bytes)")
+
+            # Derive session key using HKDF-SHA256 with random salt
+            session_key = self._derive_session_key(shared_secret, salt)
             
             # Create session
             session_id = str(uuid.uuid4())
@@ -234,7 +341,8 @@ class SessionManager:
                 "timestamp": int(time.time() * 1000),
                 "authorized": True,
                 "aircraft": self.aircraft_name,
-                "serverHmac": self._base64_encode(server_hmac)
+                "serverHmac": self._base64_encode(server_hmac),
+                "salt": self._base64_encode(salt)  # Send random salt to client
             }
         
         except Exception as e:
@@ -254,7 +362,22 @@ class SessionManager:
         try:
             session_id = message.get('sessionId', '')
             client_hmac_b64 = message.get('hmac', '')
-            
+            client_timestamp = message.get('timestamp', 0)
+
+            # SECURITY: Validate timestamp
+            server_time = time.time() * 1000
+            time_diff = abs(server_time - client_timestamp)
+            MAX_TIMESTAMP_DRIFT_MS = 300000  # 5 minutes
+
+            if time_diff > MAX_TIMESTAMP_DRIFT_MS:
+                logger.warning(f"❌ KeyConfirm timestamp too old/future: {time_diff/1000:.1f}s drift")
+                return {
+                    "type": "Error",
+                    "error": "InvalidTimestamp",
+                    "message": f"Timestamp drift too large: {time_diff/1000:.1f}s",
+                    "timestamp": int(server_time)
+                }
+
             # Find session
             session = self.sessions.get(session_id)
             if not session:
@@ -263,9 +386,9 @@ class SessionManager:
                     "type": "Error",
                     "error": "InvalidSession",
                     "message": "Session not found or expired",
-                    "timestamp": int(time.time() * 1000)
+                    "timestamp": int(server_time)
                 }
-            
+
             # Verify HMAC
             expected_hmac = hmac_lib.new(
                 session.session_key,
@@ -317,28 +440,33 @@ class SessionManager:
         return None
     
     def encrypt_with_session(self, data: bytes, session_id: str) -> Optional[bytes]:
-        """Encrypt data with session key"""
+        """Encrypt data with session key using counter-based nonce"""
         session = self.get_session_by_id(session_id)
         if not session:
             return None
-        
+
         aesgcm = AESGCM(session.session_key)
-        nonce = os.urandom(12)
+        nonce = session.generate_nonce()  # Counter-based, no collision possible
         ciphertext = aesgcm.encrypt(nonce, data, None)
         return nonce + ciphertext
-    
+
     def decrypt_with_session(self, encrypted_data: bytes, session_id: str) -> Optional[bytes]:
-        """Decrypt data with session key"""
+        """Decrypt data with session key and validate nonce"""
         session = self.get_session_by_id(session_id)
         if not session:
             return None
-        
+
         if len(encrypted_data) < 28:  # 12 (nonce) + 16 (tag)
             return None
-        
+
         nonce = encrypted_data[:12]
         ciphertext = encrypted_data[12:]
-        
+
+        # SECURITY: Validate nonce to prevent replay attacks
+        if not session.validate_nonce(nonce):
+            logger.error(f"❌ Replay attack detected - rejecting message for session {session_id[:8]}...")
+            return None
+
         aesgcm = AESGCM(session.session_key)
         try:
             return aesgcm.decrypt(nonce, ciphertext, None)
@@ -347,7 +475,7 @@ class SessionManager:
             return None
     
     def cleanup_expired_sessions(self, max_age_seconds: int = 3600):
-        """Remove expired sessions"""
+        """Remove expired sessions and rate limit entries"""
         expired = [
             sid for sid, session in self.sessions.items()
             if session.is_expired(max_age_seconds)
@@ -360,7 +488,10 @@ class SessionManager:
                     del self.device_sessions[session.device_id]
             del self.sessions[sid]
             logger.info(f"🗑️ Cleaned up expired session: {sid[:8]}...")
-        
+
+        # Also cleanup rate limits
+        self.cleanup_rate_limits()
+
         self.last_cleanup = time.time()
         if expired:
             logger.info(f"📊 Active sessions: {len(self.sessions)}, Devices: {len(self.device_sessions)}")
@@ -390,12 +521,12 @@ class SessionManager:
             self._cleanup_thread.join(timeout=2.0)
             logger.info("🧹 Session cleanup thread stopped")
     
-    def _derive_session_key(self, shared_secret: bytes) -> bytes:
-        """Derive 256-bit AES key from ECDH shared secret using HKDF"""
+    def _derive_session_key(self, shared_secret: bytes, salt: bytes) -> bytes:
+        """Derive 256-bit AES key from ECDH shared secret using HKDF with random salt"""
         hkdf = HKDF(
             algorithm=hashes.SHA256(),
             length=32,  # 256 bits
-            salt=None,
+            salt=salt,  # Use provided random salt (32 bytes)
             info=b'DataPad-Session-Key',
             backend=default_backend()
         )
