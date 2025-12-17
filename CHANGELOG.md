@@ -1,9 +1,13 @@
 # Changelog
 
 All relevant changes are summarized here by version.
+## [1.0.13] - 2025-12-17
+
+
 ## [1.0.12] - 2025-12-17
 ### Added
 - **Multilanguage Support:** The app now supports multiple languages (English and German) via string resources. Language can be switched in the Settings menu. All UI text is available in English; German is also available for most screens.
+- **ECDH Handshake:** Added ECDH (P-256) handshake for DataPad telemetry with session-based AES-256-GCM encryption, device whitelist, and mutual authentication. Provides forward secrecy and secure session keys.
 
 ### Changed
 - Settings menu updated to allow language selection.
