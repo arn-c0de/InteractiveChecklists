@@ -64,6 +64,27 @@ jobs:
     # Add any setup steps before running the `github/codeql-action/init` action.
     # This includes steps like installing compilers or runtimes (`actions/setup-node`
     # or others). This is typically only required for manual builds.
+    - name: Set up Java (Temurin 17)
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Cache Gradle packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/gradle-wrapper.properties') }}
+        restore-keys: ${{ runner.os }}-gradle-
+
+    - name: Set up Android SDK
+      uses: android-actions/setup-android@v2
+      with:
+        api-level: 33
+        build-tools: '33.0.2'
+
     # - name: Setup runtime (example)
     #   uses: actions/setup-example@v1
 
