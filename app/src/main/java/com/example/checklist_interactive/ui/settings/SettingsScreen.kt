@@ -208,8 +208,9 @@ fun SettingsScreen(
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(stringResource(R.string.settings_title))
+                        val displayVersion = softwareVersion.ifBlank { "—" }
                         Text(
-                            text = stringResource(R.string.settings_version, softwareVersion),
+                            text = stringResource(R.string.settings_version, displayVersion),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
