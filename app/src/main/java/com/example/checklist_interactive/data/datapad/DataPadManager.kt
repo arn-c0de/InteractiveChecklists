@@ -6,13 +6,19 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.SocketTimeoutException
+import java.net.InetAddress
 import javax.crypto.Cipher
+import javax.crypto.Mac
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
+import java.util.Base64
 
 /**
  * Manages UDP reception of live flight data and provides state for UI consumption
@@ -29,9 +35,14 @@ class DataPadManager(private val context: Context) {
         private const val KEY_BIND_IP = "bind_ip"
         private const val KEY_PRE_SHARED_KEY = "pre_shared_key"
         private const val KEY_ENABLED = "enabled"
+        private const val KEY_USE_ECDH = "use_ecdh"
+        private const val KEY_DEVICE_NAME = "device_name"
         
         // Default Pre-Shared Key (32 bytes for AES-256)
         private const val DEFAULT_PRE_SHARED_KEY = "DCS_DataPad_Secret_Key_32BYTES!!"
+        
+        // Handshake timeout
+        private const val HANDSHAKE_TIMEOUT_MS = 10000L
         
         /**
          * Decrypt AES-GCM encrypted data
@@ -97,9 +108,25 @@ class DataPadManager(private val context: Context) {
     private val _preSharedKey = MutableStateFlow(prefs.getString(KEY_PRE_SHARED_KEY, DEFAULT_PRE_SHARED_KEY) ?: DEFAULT_PRE_SHARED_KEY)
     val preSharedKey: StateFlow<String> = _preSharedKey.asStateFlow()
     
+    private val _useEcdh = MutableStateFlow(prefs.getBoolean(KEY_USE_ECDH, false))
+    val useEcdh: StateFlow<Boolean> = _useEcdh.asStateFlow()
+    
+    private val _deviceName = MutableStateFlow(prefs.getString(KEY_DEVICE_NAME, "Android Tablet") ?: "Android Tablet")
+    val deviceName: StateFlow<String> = _deviceName.asStateFlow()
+    
+    private val _handshakeStatus = MutableStateFlow<String?>(null)
+    val handshakeStatus: StateFlow<String?> = _handshakeStatus.asStateFlow()
+    
     private var udpSocket: DatagramSocket? = null
     private var receiveJob: Job? = null
     private var isStarted = false
+    
+    // ECDH components
+    private val keyManager = KeyManager(context)
+    private var encryptionProvider: EncryptionProvider? = null
+    private var currentSession: SessionInfo? = null
+    private val pendingHandshakeResponses = java.util.concurrent.ConcurrentHashMap<String, CompletableDeferred<HandshakeMessage>>()
+    private val handshakeLock = kotlinx.coroutines.sync.Mutex()
 
     // Helper functions to gate UDP-related logs when disabled
     private fun udpLogD(message: String) {
@@ -148,16 +175,7 @@ class DataPadManager(private val context: Context) {
         
         receiveJob = scope.launch {
             try {
-                // Get and log device IP
-                val deviceIp = getLocalIpAddress()
-                _deviceIpAddress.value = deviceIp
-                udpLogD("Device IP address: $deviceIp")
-                
-                // Log network info
-                val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
-                val activeNetwork = cm.activeNetworkInfo
-                udpLogD("Active network: ${activeNetwork?.typeName}, connected: ${activeNetwork?.isConnected}")
-                
+                // Initialize socket FIRST (needed for handshake)
                 val port = _udpPort.value
                 val bindAddress = _bindIp.value
                 
@@ -171,10 +189,49 @@ class DataPadManager(private val context: Context) {
                     broadcast = true
                 }
                 udpLogD("UDP socket opened on ${if (bindAddress.isNotEmpty()) bindAddress else "0.0.0.0"}:$port")
+                
+                // Initialize encryption provider based on mode
+                encryptionProvider = if (_useEcdh.value) {
+                    null // Will be set after handshake
+                } else {
+                    PskEncryption(_preSharedKey.value)
+                }
+
+                // Get and log device IP
+                val deviceIp = getLocalIpAddress()
+                _deviceIpAddress.value = deviceIp
+                udpLogD("Device IP address: $deviceIp")
+                
+                // Log network info
+                val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+                val activeNetwork = cm.activeNetworkInfo
+                udpLogD("Active network: ${activeNetwork?.typeName}, connected: ${activeNetwork?.isConnected}")
+                
                 udpLogD("Socket local address: ${udpSocket?.localAddress?.hostAddress}")
                 udpLogD("Socket local port: ${udpSocket?.localPort}")
-                udpLogD("Waiting for UDP packets on ${if (bindAddress.isNotEmpty()) bindAddress else deviceIp}:${_udpPort.value}...")
-                
+                udpLogD("Waiting for UDP packets on ${if (_bindIp.value.isNotEmpty()) _bindIp.value else deviceIp}:${_udpPort.value}...")
+
+                // If ECDH mode, perform handshake in background (concurrently with receive loop)
+                if (_useEcdh.value) {
+                    scope.launch {
+                        try {
+                            _handshakeStatus.value = "Initiating handshake..."
+                            val success = performHandshake()
+                            if (!success) {
+                                _handshakeStatus.value = "Handshake failed"
+                                udpLogE("Handshake failed, stopping")
+                                stop()
+                            } else {
+                                _handshakeStatus.value = "Handshake successful"
+                            }
+                        } catch (e: Exception) {
+                            _handshakeStatus.value = "Handshake error: ${e.message}"
+                            udpLogE("Handshake error: ${e.message}", e)
+                            stop()
+                        }
+                    }
+                }
+
                 val buffer = ByteArray(BUFFER_SIZE)
                 val packet = DatagramPacket(buffer, buffer.size)
                 
@@ -182,28 +239,49 @@ class DataPadManager(private val context: Context) {
                     try {
                         udpSocket?.receive(packet)
                         val receivedData = packet.data.copyOfRange(0, packet.length)
-                        udpLogD("UDP packet received (${packet.length} bytes)")
+                        udpLogD("UDP packet received (${packet.length} bytes) from ${packet.address.hostAddress}:${packet.port}")
                         
                         // Try to decrypt the data
-                        val keyBytes = _preSharedKey.value.toByteArray(Charsets.UTF_8)
-                        val decryptedData = decryptPayload(receivedData, keyBytes)
+                        val provider = encryptionProvider
+                        val decryptedData = if (provider != null) {
+                            provider.decrypt(receivedData)
+                        } else {
+                            // Fallback to PSK for handshake messages
+                            val keyBytes = _preSharedKey.value.toByteArray(Charsets.UTF_8)
+                            decryptPayload(receivedData, keyBytes)
+                        }
                         
                         if (decryptedData != null) {
                             val message = String(decryptedData, Charsets.UTF_8)
                             udpLogD("Decrypted message: ${message.take(200)}")
                             
-                            try {
-                                val data = json.decodeFromString<FlightData>(message)
-                                _flightData.value = data
-                                _lastUpdateTime.value = System.currentTimeMillis()
-                                _isConnected.value = true
-                                udpLogD("✅ Received encrypted flight data: ${data.aircraft} at ${data.altitude}m")
-                            } catch (e: Exception) {
-                                udpLogE("Failed to parse flight data: ${e.message}", e)
-                                udpLogE("Raw message: $message")
+                            // Check if this is a handshake message (contains type field)
+                            if (message.contains("\"type\":") && 
+                                (message.contains("ServerHello") || message.contains("Ack") || message.contains("Error"))) {
+                                handleIncomingMessage(message, packet.address, packet.port)
+                            } else {
+                                // Parse as flight data
+                                try {
+                                    val data = json.decodeFromString<FlightData>(message)
+                                    
+                                    // If ECDH mode, verify we have active session
+                                    if (_useEcdh.value && currentSession == null) {
+                                        udpLogE("Received flight data but no active session")
+                                    } else {
+                                        _flightData.value = data
+                                        _lastUpdateTime.value = System.currentTimeMillis()
+                                        _isConnected.value = true
+                                        currentSession?.let { 
+                                            udpLogD("✅ Received encrypted flight data: ${data.aircraft} at ${data.altitude}m (session: ${it.sessionId.take(8)}...)")
+                                        } ?: udpLogD("✅ Received encrypted flight data: ${data.aircraft} at ${data.altitude}m")
+                                    }
+                                } catch (e: Exception) {
+                                    udpLogE("Failed to parse flight data: ${e.message}", e)
+                                    udpLogE("Raw message: $message")
+                                }
                             }
                         } else {
-                            udpLogE("❌ Failed to decrypt packet - check Pre-Shared Key!")
+                            udpLogE("❌ Failed to decrypt packet - check encryption key!")
                         }
                         
                     } catch (e: SocketTimeoutException) {
@@ -298,10 +376,257 @@ class DataPadManager(private val context: Context) {
     }
     
     /**
+     * Update device name for handshake identification
+     */
+    fun updateDeviceName(newName: String) {
+        prefs.edit().putString(KEY_DEVICE_NAME, newName).apply()
+        _deviceName.value = newName
+    }
+    
+    /**
+     * Enable or disable ECDH handshake mode
+     */
+    fun setUseEcdh(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_USE_ECDH, enabled).apply()
+        _useEcdh.value = enabled
+        if (isStarted) {
+            restart()
+        }
+    }
+    
+    /**
      * Restart the UDP socket with new settings
      */
     private fun restart() {
         stop()
         start()
     }
+    
+    // ========== ECDH Handshake Methods ==========
+    
+    /**
+     * Perform ECDH handshake with DCS server
+     * @return true if handshake successful, false otherwise
+     */
+    private suspend fun performHandshake(): Boolean = withContext(Dispatchers.IO) {
+        return@withContext handshakeLock.withLock {
+            try {
+                udpLogD("🔐 Starting ECDH handshake...")
+                
+                // Clear any old pending responses
+                pendingHandshakeResponses.clear()
+                
+                // Step 1: Send ClientHello
+                val clientHello = ClientHello(
+                    deviceId = keyManager.getDeviceId(),
+                    deviceName = _deviceName.value,
+                    publicKey = keyManager.exportPublicKey()
+                )
+                
+                // For ECDH handshake, we need a specific server address
+                // If bindIp is empty, try to discover server via broadcast and wait for response
+                val serverAddress = if (_bindIp.value.isNotEmpty()) {
+                    InetAddress.getByName(_bindIp.value)
+                } else {
+                    // Use broadcast for discovery
+                    InetAddress.getByName("255.255.255.255")
+                }
+                
+                sendHandshakeMessage(clientHello, serverAddress)
+                udpLogD("📤 Sent ClientHello to ${serverAddress.hostAddress}")
+                
+                // Step 2: Wait for ServerHello
+                val serverHelloDeferred = CompletableDeferred<ServerHello>()
+                pendingHandshakeResponses["ServerHello"] = serverHelloDeferred as CompletableDeferred<HandshakeMessage>
+                
+                val serverHello = withTimeout(HANDSHAKE_TIMEOUT_MS) {
+                    serverHelloDeferred.await()
+                }
+            
+            if (!serverHello.authorized) {
+                udpLogE("❌ Server rejected handshake: ${serverHello.message}")
+                return@withLock false
+            }
+            
+            udpLogD("📥 Received ServerHello, authorized: ${serverHello.authorized}")
+            
+            // Step 3: Derive session key
+            val serverPublicKey = keyManager.importPublicKey(serverHello.publicKey)
+            val sessionKey = keyManager.deriveSessionKey(serverPublicKey)
+            
+            // SECURITY: Verify server knows the session key (mutual authentication)
+            // Server sends HMAC of "server_{sessionId}" with the derived session key
+            if (serverHello.serverHmac != null) {
+                val expectedData = "server_${serverHello.sessionId}".toByteArray(Charsets.UTF_8)
+                val expectedHmac = computeHmac(sessionKey.encoded, expectedData)
+                val receivedHmac = try {
+                    Base64.getDecoder().decode(serverHello.serverHmac)
+                } catch (e: Exception) {
+                    udpLogE("Failed to decode serverHmac: ${e.message}")
+                    _handshakeStatus.value = "Error: Invalid server HMAC format"
+                    return@withLock false
+                }
+                
+                if (!expectedHmac.contentEquals(receivedHmac)) {
+                    udpLogE("Server HMAC verification FAILED - possible MITM attack!")
+                    _handshakeStatus.value = "Error: Server authentication failed"
+                    return@withLock false
+                }
+                udpLogD("✅ Server HMAC verified - mutual authentication successful")
+            } else {
+                udpLogD("⚠️ No serverHmac received - mutual authentication skipped")
+            }
+            
+            // Store session info (but don't update encryption provider yet)
+            currentSession = SessionInfo(
+                sessionId = serverHello.sessionId,
+                sessionKey = sessionKey,
+                establishedAt = System.currentTimeMillis(),
+                serverPublicKey = serverPublicKey,
+                aircraft = serverHello.aircraft
+            )
+
+            udpLogD("🔑 Session key derived")
+
+            // Step 4: Send KeyConfirm with HMAC proof
+            val hmac = computeHmac(sessionKey.encoded, serverHello.sessionId.toByteArray())
+            val keyConfirm = KeyConfirm(
+                sessionId = serverHello.sessionId,
+                hmac = Base64.getEncoder().encodeToString(hmac)
+            )
+
+            sendHandshakeMessage(keyConfirm, serverAddress)
+            udpLogD("📤 Sent KeyConfirm")
+
+            // Step 5: Wait for Ack (still encrypted with PSK)
+            val ackDeferred = CompletableDeferred<Ack>()
+            pendingHandshakeResponses["Ack"] = ackDeferred as CompletableDeferred<HandshakeMessage>
+
+            val ack = withTimeout(HANDSHAKE_TIMEOUT_MS) {
+                ackDeferred.await()
+            }
+
+            if (ack.status != "ready") {
+                udpLogE("❌ Server not ready: ${ack.message}")
+                currentSession = null
+                encryptionProvider = null
+                return@withLock false
+            }
+
+            // Verify Ack matches our session
+            if (ack.sessionId != serverHello.sessionId) {
+                udpLogE("❌ Session ID mismatch in Ack")
+                currentSession = null
+                encryptionProvider = null
+                return@withLock false
+            }
+
+            // NOW switch to session key encryption (after handshake complete)
+            encryptionProvider = EcdhEncryption(sessionKey)
+            udpLogD("✅ Handshake complete! Session: ${serverHello.sessionId}")
+            udpLogD("🔒 Now using session key for encryption")
+            true
+            
+        } catch (e: TimeoutCancellationException) {
+            udpLogE("⏱️ Handshake timeout - no response from server")
+            currentSession = null
+            encryptionProvider = null
+            false
+        } catch (e: Exception) {
+            udpLogE("❌ Handshake error: ${e.message}", e)
+            currentSession = null
+            encryptionProvider = null
+            false
+        } finally {
+            // Don't clear immediately - responses might still arrive
+            scope.launch {
+                delay(1000)
+                pendingHandshakeResponses.clear()
+            }
+        }
+        }
+    }
+    
+    /**
+     * Send a handshake message via UDP
+     */
+    private fun sendHandshakeMessage(message: HandshakeMessage, address: InetAddress) {
+        try {
+            val json = Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+                encodeDefaults = true  // Include fields with default values
+            }
+
+            val jsonString = when (message) {
+                is ClientHello -> json.encodeToString(message)
+                is KeyConfirm -> json.encodeToString(message)
+                else -> throw IllegalArgumentException("Unknown handshake message type")
+            }
+            
+            val plainData = jsonString.toByteArray(Charsets.UTF_8)
+            
+            // Encrypt with PSK for handshake messages
+            val keyBytes = _preSharedKey.value.toByteArray(Charsets.UTF_8)
+            val encryptedData = PskEncryption(_preSharedKey.value).encrypt(plainData)
+            
+            val packet = DatagramPacket(
+                encryptedData,
+                encryptedData.size,
+                address,
+                _udpPort.value
+            )
+            
+            udpSocket?.send(packet)
+        } catch (e: Exception) {
+            udpLogE("Error sending handshake message: ${e.message}", e)
+        }
+    }
+    
+    /**
+     * Handle incoming UDP messages and route to appropriate handler
+     */
+    private fun handleIncomingMessage(message: String, address: InetAddress, port: Int) {
+        try {
+            // Try to parse as different message types (handle both compact and formatted JSON)
+            when {
+                message.contains("ServerHello") -> {
+                    val serverHello = json.decodeFromString<ServerHello>(message)
+                    udpLogD("📥 Received ServerHello, completing handshake deferred")
+                    pendingHandshakeResponses["ServerHello"]?.complete(serverHello)
+                }
+                message.contains("\"Ack\"") -> {
+                    val ack = json.decodeFromString<Ack>(message)
+                    udpLogD("📥 Received Ack, completing handshake deferred")
+                    pendingHandshakeResponses["Ack"]?.complete(ack)
+                }
+                message.contains("\"Error\"") -> {
+                    val error = json.decodeFromString<HandshakeError>(message)
+                    udpLogE("Server error: ${error.error} - ${error.message}")
+                }
+            }
+        } catch (e: Exception) {
+            udpLogE("Error handling incoming message: ${e.message}", e)
+        }
+    }
+    
+    /**
+     * Compute HMAC-SHA256 for key confirmation
+     */
+    private fun computeHmac(key: ByteArray, data: ByteArray): ByteArray {
+        val mac = Mac.getInstance("HmacSHA256")
+        val secretKey = SecretKeySpec(key, "HmacSHA256")
+        mac.init(secretKey)
+        return mac.doFinal(data)
+    }
+    
+    /**
+     * Get current session info (null if no session)
+     */
+    fun getCurrentSession(): SessionInfo? = currentSession
+    
+    /**
+     * Get device ID for display in UI
+     */
+    fun getDeviceId(): String = keyManager.getDeviceId()
 }
