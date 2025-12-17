@@ -204,6 +204,8 @@ def tail_and_send(path: str, host: str, port: int, send_existing=False, once=Fal
     if session_mgr:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # SECURITY NOTE: Binding to 0.0.0.0 allows connections from all network interfaces.
+        # For production use on untrusted networks, bind to specific IP (e.g., '127.0.0.1' or LAN IP)
         sock.bind(('0.0.0.0', port))  # Bind to port so data comes from same port
         sock.settimeout(1.0)  # Non-blocking with timeout
         logger.info(f"🔐 Listening for handshakes on port {port}")
@@ -357,6 +359,8 @@ def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=Fals
     if session_mgr:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # SECURITY NOTE: Binding to 0.0.0.0 allows connections from all network interfaces.
+        # For production use on untrusted networks, bind to specific IP (e.g., '127.0.0.1' or LAN IP)
         sock.bind(('0.0.0.0', port))  # Bind to port so data comes from same port
         sock.settimeout(0.1)  # Non-blocking with short timeout
         logger.info(f"🔐 Listening for handshakes on port {port}")

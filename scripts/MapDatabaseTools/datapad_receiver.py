@@ -404,11 +404,8 @@ if __name__ == "__main__":
         print(f"Altitude: {flight_data.altitude:.1f} m")
         print(f"Speed: {flight_data.groundSpeed:.1f} m/s" if flight_data.groundSpeed else "Speed: N/A")
         print(f"Heading: {flight_data.heading:.1f}°")
-        if show_sensitive:
-            print(f"Lat/Long: {flight_data.latitude:.6f}, {flight_data.longitude:.6f}")
-        else:
-            # Reduce precision to protect exact location in logs
-            print(f"Lat/Long: {flight_data.latitude:.2f}, {flight_data.longitude:.2f} (rounded for privacy)")
+        # Location data omitted from logs to prevent sensitive coordinate exposure
+        print(f"Position data: available (not logged for security)")
     
     def on_connection(connected):
         status = "CONNECTED" if connected else "DISCONNECTED"
