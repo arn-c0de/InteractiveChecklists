@@ -11,7 +11,7 @@ InteractiveChecklists takes security seriously. We appreciate responsible disclo
 
 | Version | Supported           |
 | ------- | ------------------- |
-| 1.0.0   | ✅ Supported        |
+| 1.0  | ✅ Supported        |
 
 ---
 
