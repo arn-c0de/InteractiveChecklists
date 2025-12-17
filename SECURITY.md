@@ -59,4 +59,4 @@ We follow **coordinated vulnerability disclosure**:
 
 ---
 
-Thank you for helping keep ChecklistInteractive secure!
+Thank you for helping keep InteractiveChecklists secure!
