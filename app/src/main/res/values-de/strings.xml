@@ -250,6 +250,24 @@
 • Reset stellt den Standardschlüssel wieder her (für den produktiven Einsatz ändern)
 • Bind-IP leer lassen, um auf allen Schnittstellen zu lauschen
 • Standardport: 5010</string>
+
+    <!-- ECDH / Geräteeinstellungen -->
+    <string name="datapad_ecdh_title">ECDH-Handshakemodus</string>
+    <string name="datapad_ecdh_description_secure">Sichere, sitzungsbasierte Verschlüsselung (empfohlen)</string>
+    <string name="datapad_ecdh_description_legacy">Verwende den veralteten PSK-Modus</string>
+    <string name="datapad_device_name_label">Gerätename</string>
+    <string name="datapad_device_name_placeholder">Android-Tablet</string>
+    <string name="datapad_device_name_support">Wird zur Identifikation dieses Geräts während des Handshakes verwendet</string>
+    <string name="datapad_device_id_label">Geräte-ID (vom Schlüssel abgeleitet)</string>
+    <string name="datapad_server_ip_label">Server-IP (Unicast)</string>
+    <string name="datapad_server_ip_placeholder">192.168.178.100</string>
+    <string name="datapad_server_ip_hint">Leer lassen für Broadcast-Erkennung (weniger sicher)</string>
+    <string name="datapad_psk_handshake_hint">PSK schützt nur den Handshake; die Daten verwenden den Sitzungsschlüssel</string>
+    <string name="datapad_ecdh_info_title">ECDH-Modus-Informationen</string>
+    <string name="datapad_ecdh_info_text">• Gerät muss in authorized_devices.json auf dem DCS-Server hinzugefügt werden\n• Handshake stellt automatisch einen Sitzungsschlüssel her\n• Sitzungsschlüssel ändert sich bei jeder Verbindung (Forward Secrecy)\n• PSK schützt nur den Handshake, nicht die Daten</string>
+    <string name="datapad_ecdh_warning">⚠️ ECDH erfordert ein Python-Server-Update (siehe docs/technical/ECDH_HANDSHAKE_PROPOSAL.md)</string>
+    <string name="datapad_settings_psk_handshake">Pre-Shared Key (für Handshake)</string>
+
     <string name="datapad_security_note">⚠️ Sicherheitshinweis: Für den produktiven Einsatz ändern Sie den Pre-Shared Key und verteilen Sie ihn sicher. Verwenden Sie nicht den Standardschlüssel.</string>
     <string name="datapad_section_aircraft_pilot">Flugzeug &amp; Pilot</string>
     <string name="datapad_section_flight_performance">Flugleistung</string>

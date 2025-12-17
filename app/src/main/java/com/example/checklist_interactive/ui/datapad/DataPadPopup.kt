@@ -91,6 +91,18 @@ fun DataPadPopup(
     val sheetMax = 0.95f
     var sheetFraction by rememberSaveable { mutableStateOf(savedFraction.coerceIn(sheetMin, sheetMax)) }
 
+    // Transparency control (persisted)
+    val KEY_SHEET_OPACITY = "datapad_sheet_opacity"
+    val savedOpacity = prefs.getFloat(KEY_SHEET_OPACITY, 1.0f)
+    // Ensure minimum opacity of 25% so sheet never becomes invisible
+    var sheetOpacity by rememberSaveable { mutableStateOf(savedOpacity.coerceIn(0.25f, 1.0f)) }
+    var showOpacitySlider by remember { mutableStateOf(false) }
+
+    // Persist opacity when changed
+    LaunchedEffect(sheetOpacity) {
+        prefs.edit().putFloat(KEY_SHEET_OPACITY, sheetOpacity).apply()
+    }
+
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
         // Allow the sheet to be hidden by scrim clicks or external interactions so
@@ -150,7 +162,7 @@ fun DataPadPopup(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface
+        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = sheetOpacity)
     ) {
         // Try to hide the system UI inside the dialog window that hosts the sheet.
         val dialogView = LocalView.current
@@ -258,7 +270,8 @@ fun DataPadPopup(
                                 dragAccum = 0f
                             }
                         )
-                    }
+                    },
+                contentAlignment = Alignment.TopCenter
             ) {
                 Box(
                     modifier = Modifier
@@ -284,15 +297,48 @@ fun DataPadPopup(
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold
                     )
-                    IconButton(onClick = { showSettingsDialog = true }) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = stringResource(R.string.cd_settings),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
+                    Row {
+                        FilledTonalIconButton(
+                            onClick = { showOpacitySlider = !showOpacitySlider },
+                            modifier = Modifier.padding(end = 4.dp)
+                        ) {
+                            Text(
+                                text = "${(sheetOpacity * 100).toInt()}%",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        IconButton(onClick = { showSettingsDialog = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = stringResource(R.string.cd_settings),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
+
+                AnimatedVisibility(visible = showOpacitySlider) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.quick_notes_opacity_label, (sheetOpacity * 100).toInt()),
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        Slider(
+                            value = sheetOpacity,
+                            onValueChange = { sheetOpacity = it },
+                            valueRange = 0.25f..1.0f,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
 
                 // Connection Status
                 ConnectionStatusCard(

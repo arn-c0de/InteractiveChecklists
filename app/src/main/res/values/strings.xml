@@ -334,6 +334,24 @@
 • Reset Key restores the default key (change it for production)
 • Leave Bind IP empty to listen on all interfaces
 • Default port: 5010</string>
+
+    <!-- ECDH / Device settings -->
+    <string name="datapad_ecdh_title">ECDH Handshake Mode</string>
+    <string name="datapad_ecdh_description_secure">Secure session-based encryption (Recommended)</string>
+    <string name="datapad_ecdh_description_legacy">Using legacy PSK mode</string>
+    <string name="datapad_device_name_label">Device Name</string>
+    <string name="datapad_device_name_placeholder">Android Tablet</string>
+    <string name="datapad_device_name_support">Used to identify this device during handshake</string>
+    <string name="datapad_device_id_label">Device ID (derived from key)</string>
+    <string name="datapad_server_ip_label">Server IP (Unicast)</string>
+    <string name="datapad_server_ip_placeholder">192.168.178.100</string>
+    <string name="datapad_server_ip_hint">Leave empty for broadcast discovery (less secure)</string>
+    <string name="datapad_psk_handshake_hint">PSK used only for handshake encryption, data uses session key</string>
+    <string name="datapad_ecdh_info_title">ECDH Mode Information</string>
+    <string name="datapad_ecdh_info_text">• Device must be added to authorized_devices.json on DCS server\n• Handshake establishes session key automatically\n• Session key changes each connection (Forward Secrecy)\n• PSK only protects handshake, not data</string>
+    <string name="datapad_ecdh_warning">⚠️ ECDH requires Python server update (see docs/technical/ECDH_HANDSHAKE_PROPOSAL.md)</string>
+    <string name="datapad_settings_psk_handshake">Pre-Shared Key (for handshake)</string>
+
     <string name="datapad_security_note">⚠️ Security note: For production, change the Pre-Shared Key and distribute it securely. Do NOT use the default key.</string>
     <string name="datapad_section_aircraft_pilot">Aircraft &amp; Pilot</string>
     <string name="datapad_section_flight_performance">Flight Performance</string>

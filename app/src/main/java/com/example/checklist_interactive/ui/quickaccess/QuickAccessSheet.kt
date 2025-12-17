@@ -1451,11 +1451,8 @@ fun QuickAccessSheet(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         val keyboardType = when (quickInputMode) {
-                            stringResource(R.string.quick_notes_field_coordinates),
-                            stringResource(R.string.quick_notes_field_frequency),
-                            stringResource(R.string.quick_notes_field_numbers),
-                            stringResource(R.string.quick_notes_field_flight_state) -> KeyboardType.Number
-                            stringResource(R.string.quick_notes_field_time) -> KeyboardType.Number
+                            "coord", "freq", "number", "fluglage", "flight_state" -> KeyboardType.Number
+                            "time" -> KeyboardType.Number
                             else -> KeyboardType.Text
                         }
 
@@ -1690,11 +1687,11 @@ fun QuickAccessSheet(
                                 },
                             placeholder = {
                                 Text(when (quickInputMode) {
-                                    stringResource(R.string.quick_notes_field_coordinates) -> stringResource(R.string.quick_notes_coord_placeholder)
-                                    stringResource(R.string.quick_notes_field_frequency) -> stringResource(R.string.quick_notes_freq_placeholder)
-                                    stringResource(R.string.quick_notes_field_time) -> stringResource(R.string.quick_notes_time_placeholder)
-                                    stringResource(R.string.quick_notes_field_numbers) -> stringResource(R.string.quick_notes_numbers_placeholder)
-                                    stringResource(R.string.quick_notes_field_flight_state) -> stringResource(R.string.quick_notes_flight_placeholder)
+                                    "coord" -> stringResource(R.string.quick_notes_coord_placeholder)
+                                    "freq" -> stringResource(R.string.quick_notes_freq_placeholder)
+                                    "time" -> stringResource(R.string.quick_notes_time_placeholder)
+                                    "number" -> stringResource(R.string.quick_notes_numbers_placeholder)
+                                    "flight_state" -> stringResource(R.string.quick_notes_flight_placeholder)
                                     else -> stringResource(R.string.quick_notes_text_placeholder)
                                 })
                             },
