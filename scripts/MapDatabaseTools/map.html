@@ -53,6 +53,8 @@
                 setTimeout(function() { statusEl.style.display = 'none'; }, 2000);
 
                 var aircraftMarker = null;
+                var markersLayer = L.layerGroup().addTo(map);
+                var locationMarkers = {};
 
                 window.setMarker = function(lat, lon, heading, center) {
                     try {
@@ -83,6 +85,86 @@
                         }
                     } catch (e) {
                         console.error('setMarker error', e);
+                    }
+                };
+                
+                window.centerMap = function(lat, lon) {
+                    try {
+                        var latnum = Number(lat);
+                        var lonnum = Number(lon);
+                        map.setView([latnum, lonnum], map.getZoom() > 10 ? map.getZoom() : 10);
+                    } catch (e) {
+                        console.error('centerMap error', e);
+                    }
+                };
+                
+                window.updateMarkers = function(markersJson) {
+                    try {
+                        var markers = JSON.parse(markersJson);
+                        
+                        // Clear existing markers
+                        markersLayer.clearLayers();
+                        locationMarkers = {};
+                        
+                        // Add new markers
+                        markers.forEach(function(m) {
+                            try {
+                                // Create icon from HTML
+                                var icon = L.divIcon({
+                                    html: m.icon.html,
+                                    className: m.icon.className || 'custom-marker',
+                                    iconSize: m.icon.iconSize || [24, 24],
+                                    iconAnchor: m.icon.iconAnchor || [12, 12],
+                                    popupAnchor: m.icon.popupAnchor || [0, -12]
+                                });
+                                
+                                var marker = L.marker([m.lat, m.lon], { icon: icon });
+                                
+                                // Build popup content
+                                var popupContent = '<div style="font-family: sans-serif;">';
+                                popupContent += '<h3 style="margin: 0 0 5px 0;">' + m.name + '</h3>';
+                                
+                                if (m.icao) {
+                                    popupContent += '<p style="margin: 2px 0;"><b>ICAO:</b> ' + m.icao + '</p>';
+                                }
+                                
+                                if (m.runways) {
+                                    popupContent += '<p style="margin: 2px 0;"><b>Runways:</b> ' + m.runways + '</p>';
+                                }
+                                
+                                if (m.coalition) {
+                                    var coalColor = m.coalition === 'BLUFOR' ? '#00A8FF' : 
+                                                   m.coalition === 'OPFOR' ? '#FF4444' : '#00FF00';
+                                    popupContent += '<p style="margin: 2px 0;"><b>Coalition:</b> <span style="color:' + coalColor + ';">' + m.coalition + '</span></p>';
+                                }
+                                
+                                if (m.threat) {
+                                    var threatStr = '⚠️'.repeat(m.threat);
+                                    popupContent += '<p style="margin: 2px 0;"><b>Threat:</b> ' + threatStr + '</p>';
+                                }
+                                
+                                if (m.description) {
+                                    popupContent += '<p style="margin: 5px 0; font-size: 11px; color: #666;">' + m.description + '</p>';
+                                }
+                                
+                                popupContent += '<p style="margin: 5px 0 0 0; font-size: 10px; color: #999;">';
+                                popupContent += m.lat.toFixed(6) + ', ' + m.lon.toFixed(6);
+                                popupContent += '</p></div>';
+                                
+                                marker.bindPopup(popupContent);
+                                
+                                markersLayer.addLayer(marker);
+                                locationMarkers[m.id] = marker;
+                                
+                            } catch (e) {
+                                console.error('Error adding marker:', e, m);
+                            }
+                        });
+                        
+                        console.log('Updated ' + markers.length + ' markers');
+                        
+                    } catch (e) {
+                        console.error('updateMarkers error', e);
                     }
                 };
             } catch (e) {

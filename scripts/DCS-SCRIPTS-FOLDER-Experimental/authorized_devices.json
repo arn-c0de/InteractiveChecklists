@@ -9,6 +9,15 @@
         "send_commands"
       ],
       "addedDate": "2025-12-17T15:55:00Z"
+    },
+    {
+      "deviceId": "0cca9e8ac44abbda19566f710556f888",
+      "name": "Python DataPad",
+      "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEJ8LruW5kGcWSkhzbY7aJqoKQuf23goVD4/vdXO3/3QEBdIXAiAAPio8+WhIpziWo/HJa524y0cqveTVtjuGSog==",
+      "permissions": [
+        "receive"
+      ],
+      "addedDate": "2025-12-17T21:00:00Z"
     }
   ],
   "_instructions": {

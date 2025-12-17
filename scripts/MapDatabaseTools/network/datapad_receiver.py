@@ -7,6 +7,8 @@ Matches the functionality of the Kotlin DataPadManager.
 import socket
 import json
 import struct
+import uuid
+import logging
 from datetime import datetime
 from typing import Optional, Dict, Any
 from dataclasses import dataclass, field
@@ -15,6 +17,11 @@ from cryptography.hazmat.backends import default_backend
 import threading
 import time
 import os
+
+try:
+    from .ecdh_client import ECDHClient
+except ImportError:
+    from ecdh_client import ECDHClient
 
 
 # Default settings (matching Kotlin app)
@@ -187,16 +194,58 @@ class DataPadReceiver:
                  bind_ip: str = DEFAULT_BIND_IP,
                  pre_shared_key: str = DEFAULT_PRE_SHARED_KEY,
                  show_sensitive: bool = False,
-                 allow_bind_all: bool = False):
+                 allow_bind_all: bool = False,
+                 use_ecdh: bool = False,
+                 sender_ip: Optional[str] = None,
+                 sender_port: Optional[int] = None,
+                 device_id: Optional[str] = None,
+                 device_name: str = "Python DataPad"):
         self.port = port
         self.bind_ip = bind_ip
         self.pre_shared_key = pre_shared_key.encode('utf-8')
         self.show_sensitive = show_sensitive
         self.allow_bind_all = allow_bind_all  # must be explicitly set to allow binding to 0.0.0.0
         
+        # ECDH support
+        self.use_ecdh = use_ecdh
+        self.sender_ip = sender_ip
+        self.sender_port = sender_port if sender_port is not None else port  # Use same port if not specified
+        self.ecdh_client: Optional[ECDHClient] = None
+        
+        if self.use_ecdh:
+            # Load or create persistent device (if no explicit device_id provided)
+            from .ecdh_device import get_or_create_device, get_public_key_b64_from_pem
+
+            if device_id is None:
+                dev = get_or_create_device()
+                device_id = dev['deviceId']
+                private_pem = dev['privateKeyPem']
+                logging.info(f"🔐 Loaded persistent device {device_id} from disk")
+            else:
+                # If user provided device_id, check for stored device
+                dev = None
+                stored = get_or_create_device()  # creates default if none
+                if stored and stored.get('deviceId') == device_id:
+                    dev = stored
+                    private_pem = dev['privateKeyPem']
+                else:
+                    private_pem = None
+
+            self.device_id = device_id
+            self.device_name = device_name
+            
+            # Initialize ECDH client with optional private key PEM for persistence
+            self.ecdh_client = ECDHClient(device_id=self.device_id, device_name=self.device_name, private_key_pem=private_pem)
+            logging.info(f"🔐 ECDH mode enabled")
+            logging.info(f"📱 Device ID: {self.device_id}")
+            
+            if not self.sender_ip:
+                logging.warning("⚠️ ECDH enabled but no sender_ip specified - handshake will fail")
+        
         self.socket: Optional[socket.socket] = None
         self.running = False
         self.receive_thread: Optional[threading.Thread] = None
+        self.handshake_thread: Optional[threading.Thread] = None
         
         self.flight_data: Optional[FlightData] = None
         self.last_update_time: Optional[float] = None
@@ -235,6 +284,11 @@ class DataPadReceiver:
         Format: nonce (12 bytes) + ciphertext + tag (16 bytes)
         """
         try:
+            # Use ECDH session key if available
+            if self.use_ecdh and self.ecdh_client:
+                return self.ecdh_client.decrypt_payload(encrypted_data)
+            
+            # Fallback to pre-shared key
             if len(encrypted_data) < 28:  # 12 (nonce) + 16 (tag) minimum
                 print(f"Encrypted data too short: {len(encrypted_data)} bytes")
                 return None
@@ -272,6 +326,12 @@ class DataPadReceiver:
             return
             
         self.running = True
+        
+        # Perform ECDH handshake if enabled
+        if self.use_ecdh and self.ecdh_client and self.sender_ip:
+            self.handshake_thread = threading.Thread(target=self._perform_handshake, daemon=True)
+            self.handshake_thread.start()
+        
         self.receive_thread = threading.Thread(target=self._receive_loop, daemon=True)
         self.receive_thread.start()
         if self.show_sensitive:
@@ -290,9 +350,56 @@ class DataPadReceiver:
             self.socket.close()
         if self.receive_thread:
             self.receive_thread.join(timeout=2.0)
+        if self.handshake_thread:
+            self.handshake_thread.join(timeout=2.0)
         self.is_connected = False
         self._notify_connection_callbacks()
         print("DataPad receiver stopped")
+    
+    def _perform_handshake(self):
+        """Perform ECDH handshake with sender (runs in separate thread)"""
+        if not self.ecdh_client or not self.sender_ip:
+            return
+
+        logging.info(f"🤝 Attempting ECDH handshake with {self.sender_ip}:{self.sender_port}")
+
+        # Wait for receive loop to initialize socket
+        max_wait = 5.0
+        waited = 0.0
+        while self.socket is None and waited < max_wait:
+            time.sleep(0.1)
+            waited += 0.1
+        
+        if not self.running or self.socket is None:
+            logging.error("❌ Receiver socket not ready, cannot perform handshake")
+            return
+
+        # Use the SAME socket that's bound to the receiver port (like Kotlin app)
+        # This prevents collision: server sends data to client's receiver port,
+        # client receives on receiver port, server listens for handshakes on sender_port
+        logging.info(f"ℹ️ Using receiver socket for handshake (bound to port {self.port})")
+        logging.info(f"📤 Connecting to sender's handshake port: {self.sender_port}")
+
+        # Try handshake with a few retries
+        attempts = 3
+        for attempt in range(1, attempts+1):
+            logging.info(f"🔁 Handshake attempt {attempt}/{attempts}")
+            try:
+                # Use the ALREADY BOUND receiver socket for handshake
+                # Connect to sender's handshake port (may be different from data port)
+                success = self.ecdh_client.perform_handshake(self.sender_ip, self.sender_port, timeout=5.0, sock=self.socket)
+            except Exception as e:
+                logging.error(f"❌ Handshake exception: {e}")
+                success = False
+
+            if success:
+                logging.info("✅ ECDH handshake successful - ready to receive encrypted data")
+                return
+            else:
+                logging.warning(f"⚠️ Handshake attempt {attempt} failed, retrying...")
+                time.sleep(1 + attempt)
+
+        logging.error("❌ ECDH handshake failed after retries - check sender and authorization")
     
     def _receive_loop(self):
         """Main receive loop (runs in separate thread)"""
@@ -302,8 +409,9 @@ class DataPadReceiver:
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.socket.settimeout(SOCKET_TIMEOUT)
             
-            # Bind to address with safety checks (avoid binding to all interfaces by default)
+            # Bind to address - client MUST bind to port to receive data
             bind_target = self.bind_ip
+
             if bind_target == "0.0.0.0":
                 env_allow = os.getenv("DATAPAD_ALLOW_BIND_ALL", "0") == "1"
                 if not (self.allow_bind_all or env_allow):
@@ -313,7 +421,15 @@ class DataPadReceiver:
                 else:
                     print("WARN: binding to all interfaces (0.0.0.0) as explicitly allowed by configuration")
 
-            self.socket.bind((bind_target, self.port))
+            try:
+                self.socket.bind((bind_target, self.port))
+            except OSError as e:
+                print(f"ERROR: Failed to bind to {bind_target}:{self.port} - {e}")
+                print("      Port may already be in use. Close other DataPad instances or choose a different port.")
+                self.socket.close()
+                self.socket = None
+                return
+
             if self.show_sensitive:
                 print(f"UDP socket opened on {bind_target}:{self.port}")
             else:
@@ -321,6 +437,7 @@ class DataPadReceiver:
                     print(f"UDP socket opened on localhost:{self.port}")
                 else:
                     print(f"UDP socket opened on port {self.port}")
+            
             print(f"Waiting for encrypted UDP packets...")
             
             consecutive_timeouts = 0
@@ -391,7 +508,8 @@ class DataPadReceiver:
             return f"{int(elapsed / 3600)}h ago"
 
 
-if __name__ == "__main__":
+def main():
+    """Console mode test runner"""
     # Simple test without GUI
     # Opt-in: only print sensitive details (exact location/IP) if env var DATAPAD_DEBUG_SHOW_SENSITIVE=1
     show_sensitive = os.getenv("DATAPAD_DEBUG_SHOW_SENSITIVE", "0") == "1"
@@ -423,3 +541,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\nStopping...")
         receiver.stop()
+
+
+if __name__ == "__main__":
+    main()

@@ -194,21 +194,25 @@ def _is_same_file(f, path: str) -> bool:
 
 
 def tail_and_send(path: str, host: str, port: int, send_existing=False, once=False, interval=0.2, 
-                  verbose=False, show_env=False, encrypt=True, session_mgr: 'SessionManager' = None):
+                  verbose=False, show_env=False, encrypt=True, session_mgr: 'SessionManager' = None, handshake_port: int = None):
     """Tail a file and send only new JSON lines as UDP datagrams (do not send existing lines)."""
     if not os.path.exists(path):
         raise FileNotFoundError(path)
     
-    # For ECDH mode: create a UDP socket bound to port for both handshake and data
+    # For ECDH mode: create a UDP socket bound to handshake_port for handshake, send data to destination port
     # For PSK mode: create unbound socket
     if session_mgr:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         # SECURITY NOTE: Binding to 0.0.0.0 allows connections from all network interfaces.
         # For production use on untrusted networks, bind to specific IP (e.g., '127.0.0.1' or LAN IP)
-        sock.bind(('0.0.0.0', port))  # Bind to port so data comes from same port
+        # Use handshake_port if specified, otherwise use data port
+        listen_port = handshake_port if handshake_port is not None else port
+        sock.bind(('0.0.0.0', listen_port))  # Bind to handshake port
         sock.settimeout(1.0)  # Non-blocking with timeout
-        logger.info(f"🔐 Listening for handshakes on port {port}")
+        logger.info(f"🔐 Listening for handshakes on port {listen_port}")
+        if handshake_port is not None and handshake_port != port:
+            logger.info(f"📤 Will send data to {host}:{port}")
         handshake_sock = sock  # Use same socket for handshake and data
     else:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -349,21 +353,25 @@ def tail_and_send(path: str, host: str, port: int, send_existing=False, once=Fal
 
 # New feature: repeat the last line every X seconds
 def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=False, show_env=False, encrypt=True, 
-                     session_mgr: 'SessionManager' = None):
+                     session_mgr: 'SessionManager' = None, handshake_port: int = None):
     """Send the last line of the file as a UDP datagram every <interval> seconds."""
     if not os.path.exists(path):
         raise FileNotFoundError(path)
     
-    # For ECDH mode: create a UDP socket bound to port for both handshake and data
+    # For ECDH mode: create a UDP socket bound to handshake_port for handshake, send data to destination port
     # For PSK mode: create unbound socket
     if session_mgr:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         # SECURITY NOTE: Binding to 0.0.0.0 allows connections from all network interfaces.
         # For production use on untrusted networks, bind to specific IP (e.g., '127.0.0.1' or LAN IP)
-        sock.bind(('0.0.0.0', port))  # Bind to port so data comes from same port
+        # Use handshake_port if specified, otherwise use data port
+        listen_port = handshake_port if handshake_port is not None else port
+        sock.bind(('0.0.0.0', listen_port))  # Bind to handshake port
         sock.settimeout(0.1)  # Non-blocking with short timeout
-        logger.info(f"🔐 Listening for handshakes on port {port}")
+        logger.info(f"🔐 Listening for handshakes on port {listen_port}")
+        if handshake_port is not None and handshake_port != port:
+            logger.info(f"📤 Will send data to {host}:{port}")
         handshake_sock = sock  # Use same socket for handshake and data
     else:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -501,6 +509,9 @@ def main(argv=None):
     p.add_argument('--file', '-f', default=DEFAULT_FILE, help='Path to JSONL file')
     p.add_argument('--host', default=DEFAULT_HOST, help='Destination host')
     p.add_argument('--port', '-p', type=int, default=DEFAULT_PORT, help='Destination port')
+    p.add_argument('--handshake-port', type=int, default=None, 
+                   help='Port to listen for ECDH handshakes (default: same as --port). '
+                        'Use different port when sender and receiver are on same PC.')
     p.add_argument('--interval', type=float, default=0.2, help='Polling interval in seconds')
     p.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
     p.add_argument('--repeat-last', action='store_true', help='Repeat the last line every <interval> seconds')
@@ -545,14 +556,14 @@ def main(argv=None):
         if args.repeat_last:
             print(f"Repeating last line every {args.interval} seconds from {args.file} to {args.host}:{args.port} ({enc_status})")
             repeat_last_line(args.file, args.host, args.port, interval=args.interval, verbose=args.verbose, 
-                           show_env=args.show_env, encrypt=encrypt, session_mgr=session_mgr)
+                           show_env=args.show_env, encrypt=encrypt, session_mgr=session_mgr, handshake_port=args.handshake_port)
         else:
             print(f"Forwarding {args.file} to {args.host}:{args.port} (forward only new lines) ({enc_status})")
             while True:
                 try:
                     tail_and_send(args.file, args.host, args.port, send_existing=False, once=False, 
                                 interval=args.interval, verbose=args.verbose, show_env=args.show_env, 
-                                encrypt=encrypt, session_mgr=session_mgr)
+                                encrypt=encrypt, session_mgr=session_mgr, handshake_port=args.handshake_port)
                 except KeyboardInterrupt:
                     raise
                 except FileNotFoundError:
