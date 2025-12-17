@@ -63,12 +63,8 @@ This roadmap outlines planned features, priorities, and future directions for Ch
 
 ## 5. Localization & Internationalization
 
-- **English-Only (Current):**
-	- Project and documentation are currently English-only.
-- **Prepare for Localization:**
-	- Plan for future translation and localization.
 - **Multilanguage Support:**
-	- Implement localization using externalized string resources and a translation workflow.
+	- Add more String translation languages, currently only EN an DE.
 
 ---
 
