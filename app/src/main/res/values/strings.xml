@@ -115,6 +115,7 @@
     <string name="pdf_eraser">Eraser</string>
     <string name="pdf_view">View</string>
     <string name="pdf_width">Width:</string>
+    <string name="pdf_width_label">Width:</string>
     <string name="pdf_highlight">Highlight</string>
     <string name="pdf_highlight_page">Highlight page</string>
     <string name="pdf_shortcut_create">Create shortcut</string>
@@ -237,6 +238,7 @@
     <string name="quick_notes_untitled">Untitled</string>
     <string name="quick_notes_delete_confirm">Press again to delete</string>
     <string name="common_empty">(empty)</string>
+    <string name="text_empty">(empty)</string>
     <string name="common_placeholder_dash">-</string>
     <string name="greeting_hello">Hello %1$s!</string>
     <string name="quick_notes_new_button">New</string>
