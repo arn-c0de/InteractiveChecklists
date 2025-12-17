@@ -1,6 +1,16 @@
 # Changelog
 
 All relevant changes are summarized here by version.
+## [1.0.12] - 2025-12-17
+### Added
+- **Multilanguage Support:** The app now supports multiple languages (English and German) via string resources. Language can be switched in the Settings menu. All UI text is available in English; German is also available for most screens.
+
+### Changed
+- Settings menu updated to allow language selection.
+
+### Notes
+- Initial implementation covers all main UI and navigation. Some advanced/experimental features may remain English-only.
+
 ## [1.0.11] - 2025-12-16
 ### Added
 - **DataPad — AES-GCM encryption:** Implemented AES-GCM encrypted UDP telemetry for DataPad. Python forwarder (`forward_parsed_udp.py`) now encrypts packets by default and the app (`DataPadManager.kt`) performs AES-GCM decryption.
