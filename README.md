@@ -60,6 +60,7 @@ InteractiveChecklists is an Android application for viewing and interacting with
 - **Data Persistence:** Stores user preferences, annotations, shortcuts, tags, and open tabs locally.
 - **DataPad (experimental):** Live flight telemetry display (UDP) for DCS World. Streams aircraft telemetry to the app for realtime status and popup details — see `docs/features/DATAPAD_FEATURE.md` for full details and setup instructions.
 - **Aviation Map (experimental):** OpenStreetMap-based map viewer with live aircraft position tracking from the DataPad stream. Adds a `MapViewer` tab showing aircraft position, heading, altitude and basic overlays — see `docs/features/AVIATION_MAP_FEATURE.md` for details and configuration.
+- **MapDatabaseTools (Python):** A collection of Python utilities for receiving, decrypting (AES-GCM), and visualizing DCS flight telemetry. Includes a PySide6 GUI with an embedded OpenStreetMap/Leaflet map for live aircraft tracking, a marker database, and helper scripts to manage map assets. See `scripts/MapDatabaseTools/README.md` for usage and configuration.
 
 ## Experimental: DataPad (Live Flight Telemetry)
 
