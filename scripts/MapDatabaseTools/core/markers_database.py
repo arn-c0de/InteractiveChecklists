@@ -70,6 +70,39 @@ class Runway:
 
 
 @dataclass
+class Border:
+    """Map border/region boundary data model"""
+    id: Optional[int] = None
+    name: str = ""
+    points: List[Tuple[float, float]] = None  # List of (lat, lon) tuples
+    description: str = ""
+    color: str = "#FF0000"  # Hex color for border line
+    created: Optional[str] = None
+    modified: Optional[str] = None
+    
+    def __post_init__(self):
+        if self.points is None:
+            self.points = []
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization"""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'points': self.points,
+            'description': self.description,
+            'color': self.color,
+            'created': self.created,
+            'modified': self.modified
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'Border':
+        """Create from dictionary"""
+        return cls(**data)
+
+
+@dataclass
 class Location:
     """Location/Marker data model"""
     id: Optional[int] = None
@@ -184,6 +217,21 @@ class MarkersDatabase:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_coalition ON locations(coalition)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_location ON locations(latitude, longitude)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_name ON locations(name)")
+        
+        # Borders table for map region boundaries
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS borders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                points TEXT NOT NULL,  -- JSON array of [lat, lon] pairs
+                description TEXT,
+                color TEXT NOT NULL DEFAULT '#FF0000',
+                created TEXT NOT NULL,
+                modified TEXT NOT NULL
+            )
+        """)
+        
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_border_name ON borders(name)")
         
         self.conn.commit()
     
@@ -407,6 +455,84 @@ class MarkersDatabase:
             count += 1
         
         return count
+    
+    # Border CRUD operations
+    def add_border(self, border: Border) -> int:
+        """Add a new border to the database"""
+        now = datetime.utcnow().isoformat()
+        border.created = border.created or now
+        border.modified = now
+        
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            INSERT INTO borders (name, points, description, color, created, modified)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            border.name,
+            json.dumps(border.points),
+            border.description,
+            border.color,
+            border.created,
+            border.modified
+        ))
+        
+        self.conn.commit()
+        return cursor.lastrowid
+    
+    def update_border(self, border: Border) -> bool:
+        """Update an existing border"""
+        if border.id is None:
+            return False
+        
+        border.modified = datetime.utcnow().isoformat()
+        
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            UPDATE borders SET name=?, points=?, description=?, color=?, modified=?
+            WHERE id=?
+        """, (
+            border.name,
+            json.dumps(border.points),
+            border.description,
+            border.color,
+            border.modified,
+            border.id
+        ))
+        
+        self.conn.commit()
+        return cursor.rowcount > 0
+    
+    def delete_border(self, border_id: int) -> bool:
+        """Delete a border by ID"""
+        cursor = self.conn.cursor()
+        cursor.execute("DELETE FROM borders WHERE id=?", (border_id,))
+        self.conn.commit()
+        return cursor.rowcount > 0
+    
+    def get_border(self, border_id: int) -> Optional[Border]:
+        """Get a border by ID"""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT * FROM borders WHERE id=?", (border_id,))
+        row = cursor.fetchone()
+        return self._row_to_border(row) if row else None
+    
+    def get_all_borders(self) -> List[Border]:
+        """Get all borders"""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT * FROM borders ORDER BY name")
+        return [self._row_to_border(row) for row in cursor.fetchall()]
+    
+    def _row_to_border(self, row: sqlite3.Row) -> Border:
+        """Convert database row to Border object"""
+        return Border(
+            id=row['id'],
+            name=row['name'],
+            points=json.loads(row['points']) if row['points'] else [],
+            description=row['description'],
+            color=row['color'],
+            created=row['created'],
+            modified=row['modified']
+        )
     
     def close(self):
         """Close database connection"""
