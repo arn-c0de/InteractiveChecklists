@@ -1,0 +1,8 @@
+{
+  "senderIp": "127.0.0.1",
+  "senderPort": 5011,
+  "useEcdh": true,
+  "deviceName": "Python DataPad",
+  "port": 5010,
+  "bindIp": "0.0.0.0"
+}

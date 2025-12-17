@@ -16,7 +16,8 @@ ASSETS = {
     "leaflet.rotatedMarker.js": "https://raw.githubusercontent.com/bbecquet/Leaflet.RotatedMarker/master/leaflet.rotatedMarker.js",
 }
 
-OUT_DIR = Path(__file__).parent / "leaflet"
+# Leaflet assets are in the parent MapDatabaseTools directory
+OUT_DIR = Path(__file__).parent.parent / "leaflet"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 

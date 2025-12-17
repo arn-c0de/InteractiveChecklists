@@ -1,3 +1,7 @@
 python forward_parsed_udp.py --repeat-last --interval 3 --host 192.168.178.131 --port 5010 --verbose
 
 python forward_parsed_udp.py --repeat-last --interval 3 --host 192.168.178.131 --port 5010 --verbose --use-handshake --authorized-devices authorized_devices.json
+
+
+Map-Tools
+python forward_parsed_udp.py --repeat-last --interval 3 --host 127.0.0.1 --port 5010 --handshake-port 5011 --verbose --use-handshake --authorized-devices authorized_devices.json

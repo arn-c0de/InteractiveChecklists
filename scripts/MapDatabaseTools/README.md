@@ -68,12 +68,37 @@ This will install:
 
 **Important**: The pre-shared key must match the key configured in your DCS export script that sends the UDP data.
 
+## Project Structure
+
+```
+MapDatabaseTools/
+├── core/               # Core data models and database
+│   ├── markers_database.py
+│   ├── marker_icons.py
+│   └── __init__.py
+├── network/            # Network communication
+│   ├── datapad_receiver.py
+│   └── __init__.py
+├── gui/                # GUI components
+│   ├── datapad_gui.py
+│   ├── location_manager.py
+│   └── __init__.py
+├── utils/              # Utility scripts
+│   ├── fetch_map_assets.py
+│   └── __init__.py
+├── leaflet/            # Map assets
+├── run_datapad.py      # Main launcher
+├── run_location_manager.py
+├── map.html
+└── markers.db
+```
+
 ## Usage
 
 ### Running with GUI
 
 ```bash
-python datapad_gui.py
+python run_datapad.py
 ```
 
 This will:
@@ -82,12 +107,20 @@ This will:
 3. Display flight data as it arrives
 4. Show connection status and time since last update
 
+### Running Location Manager
+
+```bash
+python run_location_manager.py
+```
+
+Manage tactical markers and locations in the database.
+
 ### Running in Console Mode (No GUI)
 
 For testing or debugging, you can run the receiver without GUI:
 
 ```bash
-python datapad_receiver.py
+python -m network.datapad_receiver
 ```
 
 This will print received data to the console.

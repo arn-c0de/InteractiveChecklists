@@ -9,15 +9,47 @@ import os
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QScrollArea, QGroupBox, QGridLayout,
-    QDialog, QLineEdit, QMessageBox, QFrame
+    QDialog, QLineEdit, QMessageBox, QFrame, QSplitter, QCheckBox
 )
 from PySide6.QtCore import Qt, QTimer, Signal, QObject, QUrl
 from PySide6.QtGui import QFont, QPalette, QColor
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings
-from datapad_receiver import DataPadReceiver, FlightData
+from network.datapad_receiver import DataPadReceiver, FlightData
+from core.markers_database import MarkersDatabase, Location
+from gui.location_manager import LocationManagerWidget
 from typing import Optional
+import json
+import os
 
+
+CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'datapad_config.json')
+
+def load_config() -> dict:
+    """Load config from file or return defaults"""
+    defaults = {
+        'senderIp': '192.168.178.100',
+        'senderPort': None,  # Use same as port if not specified
+        'useEcdh': False,
+        'deviceName': 'Python DataPad',
+        'port': 5010,
+        'bindIp': '0.0.0.0'  # Default to all interfaces for ECDH compatibility
+    }
+    try:
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                return {**defaults, **json.load(f)}
+    except Exception:
+        pass
+    return defaults
+
+def save_config(config: dict):
+    """Save config to file"""
+    try:
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=2)
+    except Exception:
+        pass
 
 class DataSignals(QObject):
     """Signals for thread-safe GUI updates"""
@@ -31,6 +63,7 @@ class SettingsDialog(QDialog):
     def __init__(self, receiver: DataPadReceiver, parent=None):
         super().__init__(parent)
         self.receiver = receiver
+        self.config = load_config()
         self.setWindowTitle("DataPad Settings")
         self.setModal(True)
         self.setup_ui()
@@ -61,6 +94,84 @@ class SettingsDialog(QDialog):
         key_layout.addWidget(self.key_edit)
         layout.addLayout(key_layout)
         
+        # ECDH Section
+        ecdh_group = QGroupBox("ECDH Handshake Settings")
+        ecdh_layout = QVBoxLayout()
+        
+        # Load persistent device
+        from network.ecdh_device import load_device, get_public_key_b64_from_pem
+        persistent_device = load_device()
+        
+        # Enable ECDH checkbox
+        self.ecdh_checkbox = QCheckBox("Enable ECDH Handshake")
+        self.ecdh_checkbox.setChecked(self.config.get('useEcdh', False))
+        self.ecdh_checkbox.toggled.connect(self._on_ecdh_toggled)
+        ecdh_layout.addWidget(self.ecdh_checkbox)
+        
+        # Sender IP
+        sender_ip_layout = QHBoxLayout()
+        sender_ip_layout.addWidget(QLabel("Sender IP:"))
+        self.sender_ip_edit = QLineEdit(self.config.get('senderIp', ''))
+        self.sender_ip_edit.setPlaceholderText("e.g., 192.168.1.100")
+        sender_ip_layout.addWidget(self.sender_ip_edit)
+        ecdh_layout.addLayout(sender_ip_layout)
+        
+        # Sender Port (for same-PC setup)
+        sender_port_layout = QHBoxLayout()
+        sender_port_layout.addWidget(QLabel("Sender Handshake Port:"))
+        self.sender_port_edit = QLineEdit(str(self.config.get('senderPort', '')))
+        self.sender_port_edit.setPlaceholderText("Leave empty to use same as UDP Port")
+        self.sender_port_edit.setToolTip("Use different port when sender and receiver are on same PC (e.g., 5011)")
+        sender_port_layout.addWidget(self.sender_port_edit)
+        ecdh_layout.addLayout(sender_port_layout)
+        
+        # Device ID (read-only, auto-loaded) with copy button
+        device_id_layout = QHBoxLayout()
+        device_id_layout.addWidget(QLabel("Device ID:"))
+        device_id_value = persistent_device['deviceId'] if persistent_device else 'Auto-generated on first start'
+        self.device_id_edit = QLineEdit(device_id_value)
+        self.device_id_edit.setReadOnly(True)
+        self.device_id_edit.setStyleSheet("color: #42A5F5; font-family: monospace;")
+        self.device_id_edit.setToolTip(device_id_value)
+        device_id_layout.addWidget(self.device_id_edit)
+        copy_id_btn = QPushButton("Copy")
+        copy_id_btn.setToolTip("Copy full Device ID to clipboard")
+        copy_id_btn.clicked.connect(self._copy_device_id)
+        device_id_layout.addWidget(copy_id_btn)
+        ecdh_layout.addLayout(device_id_layout)
+        
+        # Public Key (read-only, for copy)
+        if persistent_device:
+            pubkey_layout = QHBoxLayout()
+            pubkey_layout.addWidget(QLabel("Public Key:"))
+            self.pubkey_b64 = get_public_key_b64_from_pem(persistent_device['privateKeyPem'])
+            self.pubkey_label = QLineEdit(self.pubkey_b64)
+            self.pubkey_label.setReadOnly(True)
+            self.pubkey_label.setStyleSheet("font-family: monospace; font-size: 9pt;")
+            pubkey_layout.addWidget(self.pubkey_label)
+            copy_btn = QPushButton("Copy")
+            copy_btn.clicked.connect(self._copy_pubkey)
+            pubkey_layout.addWidget(copy_btn)
+            ecdh_layout.addLayout(pubkey_layout)
+        
+        # Device Name
+        device_name_layout = QHBoxLayout()
+        device_name_layout.addWidget(QLabel("Device Name:"))
+        self.device_name_edit = QLineEdit(self.config.get('deviceName', 'Python DataPad'))
+        device_name_layout.addWidget(self.device_name_edit)
+        ecdh_layout.addLayout(device_name_layout)
+        
+        # Info label for ECDH
+        ecdh_info = QLabel("⚠️ Device must be in authorized_devices.json on sender")
+        ecdh_info.setStyleSheet("color: orange; font-style: italic;")
+        ecdh_layout.addWidget(ecdh_info)
+        
+        ecdh_group.setLayout(ecdh_layout)
+        layout.addWidget(ecdh_group)
+        
+        # Update ECDH fields state
+        self._on_ecdh_toggled(self.ecdh_checkbox.isChecked())
+        
         # Info label
         info = QLabel("Changes require restart of the receiver")
         info.setStyleSheet("color: gray; font-style: italic;")
@@ -77,10 +188,30 @@ class SettingsDialog(QDialog):
         layout.addLayout(button_layout)
         
         self.setLayout(layout)
+    
+    def _on_ecdh_toggled(self, checked: bool):
+        """Enable/disable ECDH fields based on checkbox"""
+        self.sender_ip_edit.setEnabled(checked)
+        self.device_name_edit.setEnabled(checked)
+    
+    def _copy_pubkey(self):
+        """Copy public key to clipboard"""
+        from PySide6.QtWidgets import QApplication
+        QApplication.clipboard().setText(self.pubkey_b64)
+        QMessageBox.information(self, "Copied", "Public key copied to clipboard!")
+
+    def _copy_device_id(self):
+        """Copy device ID to clipboard"""
+        from PySide6.QtWidgets import QApplication
+        QApplication.clipboard().setText(self.device_id_edit.text())
+        QMessageBox.information(self, "Copied", "Device ID copied to clipboard!")
         
     def save_and_restart(self):
         """Save settings and restart receiver"""
         try:
+            import uuid
+            from network.datapad_receiver import DataPadReceiver
+            
             port = int(self.port_edit.text())
             if port < 1024 or port > 65535:
                 QMessageBox.warning(self, "Invalid Port", "Port must be between 1024 and 65535")
@@ -91,12 +222,77 @@ class SettingsDialog(QDialog):
                 QMessageBox.warning(self, "Invalid Key", "Pre-shared key must be exactly 32 characters")
                 return
             
-            # Update receiver settings
+            # ECDH settings
+            use_ecdh = self.ecdh_checkbox.isChecked()
+            sender_ip = self.sender_ip_edit.text() if use_ecdh else None
+            device_name = self.device_name_edit.text() if use_ecdh else "Python DataPad"
+            
+            if use_ecdh and not sender_ip:
+                QMessageBox.warning(self, "Invalid Input", "Sender IP is required for ECDH mode")
+                return
+            
+            # Load or create persistent device (device_id is auto-managed)
+            from network.ecdh_device import get_or_create_device
+            device = get_or_create_device()
+            device_id = device['deviceId'] if use_ecdh else None
+            
+            # Save config
+            self.config['useEcdh'] = use_ecdh
+            self.config['senderIp'] = sender_ip or ''
+            sender_port_text = self.sender_port_edit.text().strip()
+            self.config['senderPort'] = int(sender_port_text) if sender_port_text else None
+            self.config['deviceName'] = device_name
+            self.config['port'] = port
+            self.config['bindIp'] = self.ip_edit.text()
+            save_config(self.config)
+            
+            # Stop old receiver
             self.receiver.stop()
-            self.receiver.port = port
-            self.receiver.bind_ip = self.ip_edit.text()
-            self.receiver.pre_shared_key = key.encode('utf-8')
-            self.receiver.start()
+            
+            # For ECDH: need to bind to 0.0.0.0 to reach external sender
+            bind_ip = self.ip_edit.text()
+            allow_bind_all = False
+            if use_ecdh:
+                bind_ip = '0.0.0.0'
+                allow_bind_all = True
+                # Update config with correct bind IP
+                self.config['bindIp'] = '0.0.0.0'
+            
+            # Create new receiver with updated settings
+            new_receiver = DataPadReceiver(
+                port=port,
+                bind_ip=bind_ip,
+                allow_bind_all=allow_bind_all,
+                pre_shared_key=key,
+                use_ecdh=use_ecdh,
+                sender_ip=sender_ip,
+                sender_port=self.config.get('senderPort'),
+                device_id=device_id,
+                device_name=device_name
+            )
+            
+            # Copy callbacks
+            new_receiver.data_callbacks = self.receiver.data_callbacks
+            new_receiver.connection_callbacks = self.receiver.connection_callbacks
+            
+            # Replace receiver in parent
+            if hasattr(self.parent(), 'receiver'):
+                self.parent().receiver = new_receiver
+            
+            # Start new receiver
+            new_receiver.start()
+            
+            if use_ecdh:
+                from network.ecdh_device import get_public_key_b64_from_pem
+                pubkey = get_public_key_b64_from_pem(device['privateKeyPem'])
+                QMessageBox.information(
+                    self,
+                    "ECDH Enabled",
+                    f"ECDH handshake enabled.\n\n"
+                    f"Device ID: {device_id}\n"
+                    f"Public Key: {pubkey[:32]}...\n\n"
+                    f"⚠️ Add this device to authorized_devices.json on sender:\n{sender_ip}"
+                )
             
             self.accept()
             
@@ -109,7 +305,35 @@ class DataPadGUI(QMainWindow):
     
     def __init__(self):
         super().__init__()
-        self.receiver = DataPadReceiver()
+        
+        # Load config and create receiver with saved settings
+        config = load_config()
+        
+        # Load persistent device for ECDH if enabled
+        device_id = None
+        if config.get('useEcdh', False):
+            from network.ecdh_device import get_or_create_device
+            device = get_or_create_device()
+            device_id = device['deviceId']
+        
+        # For ECDH: need to bind to 0.0.0.0 to reach external sender
+        bind_ip = config.get('bindIp', '127.0.0.1')
+        allow_bind_all = False
+        if config.get('useEcdh', False):
+            bind_ip = '0.0.0.0'
+            allow_bind_all = True
+        
+        self.receiver = DataPadReceiver(
+            port=config.get('port', 5010),
+            bind_ip=bind_ip,
+            allow_bind_all=allow_bind_all,
+            use_ecdh=config.get('useEcdh', False),
+            sender_ip=config.get('senderIp') if config.get('useEcdh') else None,
+            sender_port=config.get('senderPort'),
+            device_id=device_id,
+            device_name=config.get('deviceName', 'Python DataPad')
+        )
+        self.db = MarkersDatabase()
         self.signals = DataSignals()
         # Map behavior
         self.auto_center = True
@@ -132,22 +356,25 @@ class DataPadGUI(QMainWindow):
         
     def setup_ui(self):
         """Setup the user interface"""
-        self.setWindowTitle("DCS DataPad - Live Flight Data")
-        self.setGeometry(100, 100, 1200, 900)
+        self.setWindowTitle("DCS DataPad - Live Flight Data & Tactical Markers")
+        self.setGeometry(100, 100, 1400, 900)
         
         # Main widget and split layout (left: 1/3 info, right: 2/3 map)
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
         main_layout = QHBoxLayout(main_widget)
 
-        # Left column (info panel)
-        left_container = QWidget()
-        left_layout = QVBoxLayout(left_container)
-        left_layout.setContentsMargins(0, 0, 0, 0)
+        # Left column - vertical splitter for FlightData (top) and LocationManager (bottom)
+        left_splitter = QSplitter(Qt.Orientation.Vertical)
+        
+        # Top: FlightData panel
+        flight_data_container = QWidget()
+        flight_data_layout = QVBoxLayout(flight_data_container)
+        flight_data_layout.setContentsMargins(0, 0, 0, 0)
 
         # Header with connection status and controls
         header = self.create_header()
-        left_layout.addWidget(header)
+        flight_data_layout.addWidget(header)
 
         # Scroll area for flight data
         scroll = QScrollArea()
@@ -158,7 +385,19 @@ class DataPadGUI(QMainWindow):
         self.data_layout = QVBoxLayout(self.data_widget)
         scroll.setWidget(self.data_widget)
 
-        left_layout.addWidget(scroll)
+        flight_data_layout.addWidget(scroll)
+        left_splitter.addWidget(flight_data_container)
+        
+        # Bottom: Location Manager panel
+        self.location_manager = LocationManagerWidget(self.db)
+        self.location_manager.location_selected.connect(self.on_location_selected)
+        self.location_manager.location_added.connect(self.on_location_changed)
+        self.location_manager.location_updated.connect(self.on_location_changed)
+        self.location_manager.location_deleted.connect(self.on_location_changed)
+        left_splitter.addWidget(self.location_manager)
+        
+        # Set initial splitter sizes (60% flight data, 40% locations)
+        left_splitter.setSizes([600, 400])
 
         # Right column: embedded OSM map using Leaflet (map.html)
         self.webview = QWebEngineView()
@@ -167,7 +406,8 @@ class DataPadGUI(QMainWindow):
         self.webview.settings().setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
         self.webview.settings().setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
         
-        map_path = os.path.join(os.path.dirname(__file__), 'map.html')
+        # map.html is in parent directory
+        map_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'map.html')
         if os.path.exists(map_path):
             self.webview.load(QUrl.fromLocalFile(map_path))
         else:
@@ -175,12 +415,15 @@ class DataPadGUI(QMainWindow):
             html = "<html><body><h3>map.html not found</h3></body></html>"
             self.webview.setHtml(html)
 
-        # Add left and right with stretch factors (1:2)
-        main_layout.addWidget(left_container, 1)
+        # Add left splitter and right map with stretch factors (1:2)
+        main_layout.addWidget(left_splitter, 1)
         main_layout.addWidget(self.webview, 2)
 
         # Initial "No Data" display
         self.show_no_data()
+        
+        # Load markers on map after initial setup
+        QTimer.singleShot(1000, self.refresh_map_markers)
         
     def create_header(self) -> QWidget:
         """Create header with connection status and controls"""
@@ -298,6 +541,70 @@ class DataPadGUI(QMainWindow):
                 self.webview.page().runJavaScript(js)
         except Exception:
             pass
+    
+    def on_location_selected(self, location: Location):
+        """Handle location selection from LocationManager"""
+        if self.webview and location:
+            # Center map on selected location
+            js = f"centerMap({location.latitude:.6f}, {location.longitude:.6f});"
+            try:
+                self.webview.page().runJavaScript(js)
+            except Exception:
+                pass
+    
+    def on_location_changed(self, *args):
+        """Handle location add/update/delete - refresh markers"""
+        self.refresh_map_markers()
+    
+    def refresh_map_markers(self):
+        """Load all markers from database and display on map"""
+        if not self.webview:
+            return
+        
+        try:
+            from core.marker_icons import TacticalMarkerStyle
+            import json
+            
+            locations = self.db.get_all_locations()
+            markers_data = []
+            
+            for loc in locations:
+                # Get icon config
+                icon_config = TacticalMarkerStyle.get_leaflet_icon_config(
+                    loc.marker_type,
+                    loc.coalition or "",
+                    loc.tactical_symbol
+                )
+                
+                # Build marker info
+                marker_info = {
+                    'id': loc.id,
+                    'lat': loc.latitude,
+                    'lon': loc.longitude,
+                    'name': loc.name,
+                    'icon': icon_config,
+                    'description': loc.description or "",
+                    'type': loc.marker_type,
+                    'coalition': loc.coalition
+                }
+                
+                # Add type-specific info
+                if loc.icao:
+                    marker_info['icao'] = loc.icao
+                if loc.runways:
+                    marker_info['runways'] = len(loc.runways)
+                if loc.threat_level:
+                    marker_info['threat'] = loc.threat_level
+                
+                markers_data.append(marker_info)
+            
+            # Send to map as JSON
+            markers_json = json.dumps(markers_data).replace("'", "\\'")
+            js = f"updateMarkers('{markers_json}');"
+            self.webview.page().runJavaScript(js)
+            
+        except Exception as e:
+            print(f"Error refreshing markers: {e}")
 
     def show_no_data(self):
         """Display 'No Data' message"""
@@ -549,10 +856,18 @@ class DataPadGUI(QMainWindow):
     def closeEvent(self, event):
         """Clean up when closing"""
         self.receiver.stop()
+        self.db.close()
         event.accept()
 
 
 def main():
+    import logging
+    # Enable debug logging for ECDH handshake diagnostics
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(levelname)s:%(name)s:%(message)s'
+    )
+    
     app = QApplication(sys.argv)
     
     # Set dark theme
