@@ -244,12 +244,30 @@ class DataPadManager(private val context: Context) {
                         val receivedData = packet.data.copyOfRange(0, packet.length)
                         udpLogD("UDP packet received (${packet.length} bytes) from ${packet.address.hostAddress}:${packet.port}")
                         
-                        // Try to decrypt the data
+                        // FIRST: Try to parse as PLAINTEXT handshake message (ECDH mode)
+                        // Handshake messages are NEVER encrypted for proper ECDH Perfect Forward Secrecy
+                        try {
+                            val plaintextMessage = String(receivedData, Charsets.UTF_8)
+                            if (plaintextMessage.contains("\"type\":") && 
+                                (plaintextMessage.contains("ServerHello") || 
+                                 plaintextMessage.contains("Ack") || 
+                                 plaintextMessage.contains("Error") ||
+                                 plaintextMessage.contains("ClientHello"))) {
+                                // This is a handshake message - handle as PLAINTEXT
+                                udpLogD("📥 Received handshake message (PLAINTEXT): ${plaintextMessage.take(100)}")
+                                handleIncomingMessage(plaintextMessage, packet.address, packet.port)
+                                continue // Skip decryption for handshake messages
+                            }
+                        } catch (e: Exception) {
+                            // Not a valid UTF-8 string, probably encrypted data - continue to decryption
+                        }
+                        
+                        // SECOND: Try to decrypt as encrypted data (flight data or PSK mode)
                         val provider = encryptionProvider
                         val decryptedData = if (provider != null) {
                             provider.decrypt(receivedData)
                         } else {
-                            // Fallback to PSK for handshake messages
+                            // Fallback to PSK for encrypted data
                             val keyBytes = _preSharedKey.value.toByteArray(Charsets.UTF_8)
                             decryptPayload(receivedData, keyBytes)
                         }
@@ -258,30 +276,24 @@ class DataPadManager(private val context: Context) {
                             val message = String(decryptedData, Charsets.UTF_8)
                             udpLogD("Decrypted message: ${message.take(200)}")
                             
-                            // Check if this is a handshake message (contains type field)
-                            if (message.contains("\"type\":") && 
-                                (message.contains("ServerHello") || message.contains("Ack") || message.contains("Error"))) {
-                                handleIncomingMessage(message, packet.address, packet.port)
-                            } else {
-                                // Parse as flight data
-                                try {
-                                    val data = json.decodeFromString<FlightData>(message)
-                                    
-                                    // If ECDH mode, verify we have active session
-                                    if (_useEcdh.value && currentSession == null) {
-                                        udpLogE("Received flight data but no active session")
-                                    } else {
-                                        _flightData.value = data
-                                        _lastUpdateTime.value = System.currentTimeMillis()
-                                        _isConnected.value = true
-                                        currentSession?.let { 
-                                            udpLogD("✅ Received encrypted flight data: ${data.aircraft} at ${data.altitude}m (session: ${it.sessionId.take(8)}...)")
-                                        } ?: udpLogD("✅ Received encrypted flight data: ${data.aircraft} at ${data.altitude}m")
-                                    }
-                                } catch (e: Exception) {
-                                    udpLogE("Failed to parse flight data: ${e.message}", e)
-                                    udpLogE("Raw message: $message")
+                            // Parse as flight data
+                            try {
+                                val data = json.decodeFromString<FlightData>(message)
+                                
+                                // If ECDH mode, verify we have active session
+                                if (_useEcdh.value && currentSession == null) {
+                                    udpLogE("Received flight data but no active session")
+                                } else {
+                                    _flightData.value = data
+                                    _lastUpdateTime.value = System.currentTimeMillis()
+                                    _isConnected.value = true
+                                    currentSession?.let { 
+                                        udpLogD("✅ Received encrypted flight data: ${data.aircraft} at ${data.altitude}m (session: ${it.sessionId.take(8)}...)")
+                                    } ?: udpLogD("✅ Received encrypted flight data: ${data.aircraft} at ${data.altitude}m")
                                 }
+                            } catch (e: Exception) {
+                                udpLogE("Failed to parse flight data: ${e.message}", e)
+                                udpLogE("Raw message: $message")
                             }
                         } else {
                             udpLogE("❌ Failed to decrypt packet - check encryption key!")
@@ -581,7 +593,7 @@ class DataPadManager(private val context: Context) {
     }
     
     /**
-     * Send a handshake message via UDP
+     * Send a handshake message via UDP (PLAINTEXT - no PSK encryption for proper ECDH)
      */
     private fun sendHandshakeMessage(message: HandshakeMessage, address: InetAddress) {
         try {
@@ -597,20 +609,19 @@ class DataPadManager(private val context: Context) {
                 else -> throw IllegalArgumentException("Unknown handshake message type")
             }
             
+            // Send handshake messages in PLAINTEXT (no PSK encryption)
+            // This ensures proper ECDH with Perfect Forward Secrecy
             val plainData = jsonString.toByteArray(Charsets.UTF_8)
             
-            // Encrypt with PSK for handshake messages
-            val keyBytes = _preSharedKey.value.toByteArray(Charsets.UTF_8)
-            val encryptedData = PskEncryption(_preSharedKey.value).encrypt(plainData)
-            
             val packet = DatagramPacket(
-                encryptedData,
-                encryptedData.size,
+                plainData,
+                plainData.size,
                 address,
                 _udpPort.value
             )
             
             udpSocket?.send(packet)
+            udpLogD("📤 Sent handshake message: ${message::class.simpleName} [PLAINTEXT]")
         } catch (e: Exception) {
             udpLogE("Error sending handshake message: ${e.message}", e)
         }
@@ -618,10 +629,12 @@ class DataPadManager(private val context: Context) {
     
     /**
      * Handle incoming UDP messages and route to appropriate handler
+     * Handshake messages are received in PLAINTEXT (no PSK encryption)
      */
     private fun handleIncomingMessage(message: String, address: InetAddress, port: Int) {
         try {
             // Try to parse as different message types (handle both compact and formatted JSON)
+            // Note: Handshake messages (ServerHello, Ack) are in PLAINTEXT
             when {
                 message.contains("ServerHello") -> {
                     val serverHello = json.decodeFromString<ServerHello>(message)

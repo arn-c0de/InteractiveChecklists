@@ -84,39 +84,12 @@ class ECDHClient:
         logger.info(f"📝 Device Name: {self.device_name}")
     
     def _generate_nonce(self) -> bytes:
-        """Generate counter-based nonce for CLIENT (0x00 prefix)"""
+        """Generate counter-based nonce for CLIENT (0x00 prefix) - used for DATA encryption with session key"""
         self._nonce_counter += 1
         if self._nonce_counter >= 2**64:
             raise RuntimeError("Nonce counter exhausted!")
         # Format: 0x00 (client) + 3 bytes reserved + 8 bytes counter
         return bytes([0x00, 0x00, 0x00, 0x00]) + self._nonce_counter.to_bytes(8, 'big')
-    
-    def _encrypt_message(self, data: bytes) -> bytes:
-        """Encrypt message with PSK for handshake"""
-        aesgcm = AESGCM(self.psk)
-        nonce = self._generate_nonce()
-        ciphertext = aesgcm.encrypt(nonce, data, None)
-        return nonce + ciphertext
-    
-    def _decrypt_message(self, encrypted_data: bytes) -> Optional[bytes]:
-        """Decrypt message with PSK for handshake"""
-        try:
-            if len(encrypted_data) < 28:
-                logger.error(f"Encrypted data too short: {len(encrypted_data)} bytes")
-                return None
-            nonce = encrypted_data[:12]
-
-            # Validate nonce prefix and sliding window (server responses should be sender 0x01)
-            if not default_gcm_nonce_manager.validate_nonce(nonce, expected_sender=0x01):
-                logger.warning("Rejected handshake message due to invalid or replayed nonce")
-                return None
-
-            ciphertext = encrypted_data[12:]
-            aesgcm = AESGCM(self.psk)
-            return aesgcm.decrypt(nonce, ciphertext, None)
-        except Exception as e:
-            logger.error(f"Decryption failed: {e}")
-            return None
     
     def perform_handshake(self, target_ip: str, target_port: int, timeout: float = 10.0, sock: Optional[socket.socket] = None) -> bool:
         """
@@ -134,25 +107,18 @@ class ECDHClient:
             prev_timeout = sock.gettimeout()
             sock.settimeout(timeout)
             
-            # Step 1: Send ClientHello
+            # Step 1: Send ClientHello (PLAINTEXT - no PSK encryption)
             client_hello = self._build_client_hello()
-            encrypted_hello = self._encrypt_message(client_hello)
-            logger.debug(f"📤 ClientHello plaintext: {client_hello}")
-            logger.debug(f"📤 ClientHello bytes (hex): {encrypted_hello[:64].hex()}...")
+            logger.debug(f"📤 ClientHello: {client_hello}")
             
-            sock.sendto(encrypted_hello, (target_ip, target_port))
-            logger.info(f"📤 Sent ClientHello ({len(encrypted_hello)} bytes)")
+            sock.sendto(client_hello, (target_ip, target_port))
+            logger.info(f"📤 Sent ClientHello ({len(client_hello)} bytes) [PLAINTEXT]")
             
-            # Step 2: Receive ServerHello
+            # Step 2: Receive ServerHello (PLAINTEXT)
             response, addr = sock.recvfrom(4096)
-            logger.info(f"📥 Received ServerHello ({len(response)} bytes) from {addr}")
+            logger.info(f"📥 Received ServerHello ({len(response)} bytes) from {addr} [PLAINTEXT]")
             
-            decrypted = self._decrypt_message(response)
-            if not decrypted:
-                logger.error("❌ Failed to decrypt ServerHello")
-                return False
-            
-            server_hello = json.loads(decrypted.decode('utf-8'))
+            server_hello = json.loads(response.decode('utf-8'))
             logger.info(f"📨 ServerHello type: {server_hello.get('type')}")
             
             if server_hello.get('type') == 'Error':
@@ -238,7 +204,7 @@ class ECDHClient:
                     return False
                 logger.info("✅ Server HMAC verified")
             
-            # Step 4: Send KeyConfirm
+            # Step 4: Send KeyConfirm (PLAINTEXT)
             client_hmac = hmac.new(
                 session_key,
                 session_id.encode(),
@@ -253,9 +219,9 @@ class ECDHClient:
                 "timestamp": int(time.time() * 1000)
             }
             
-            encrypted_confirm = self._encrypt_message(json.dumps(key_confirm).encode('utf-8'))
-            sock.sendto(encrypted_confirm, (target_ip, target_port))
-            logger.info(f"📤 Sent KeyConfirm ({len(encrypted_confirm)} bytes)")
+            key_confirm_bytes = json.dumps(key_confirm).encode('utf-8')
+            sock.sendto(key_confirm_bytes, (target_ip, target_port))
+            logger.info(f"📤 Sent KeyConfirm ({len(key_confirm_bytes)} bytes) [PLAINTEXT]")
             
             # Create session IMMEDIATELY after sending KeyConfirm
             # The DCS server doesn't send a separate "Ready" message - it starts sending encrypted data right away
