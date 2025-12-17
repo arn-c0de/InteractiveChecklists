@@ -8,7 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Flight
-import androidx.compose.material.icons.filled.Note
+import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material3.*
@@ -89,6 +89,36 @@ fun MapViewer(
         Configuration.getInstance().load(context, context.getSharedPreferences("osmdroid", Context.MODE_PRIVATE))
     }
     
+    // Map theme helper
+    val isDarkTheme = isSystemInDarkTheme()
+
+    // Helper: create an airplane emoji bitmap drawable, optionally rotated to heading
+    fun createPlaneDrawable(ctx: Context, sizeDp: Float, color: Int, heading: Float = 0f): BitmapDrawable {
+        val emoji = "\u2708\uFE0F"
+        val metrics = ctx.resources.displayMetrics
+        val sizePx = (sizeDp * metrics.density).toInt().coerceAtLeast(16)
+        val paint = android.graphics.Paint().apply {
+            isAntiAlias = true
+            textSize = sizePx.toFloat()
+            this.color = color
+            textAlign = android.graphics.Paint.Align.CENTER
+        }
+        val baseline = -paint.ascent()
+        val width = sizePx
+        val height = (baseline + paint.descent()).toInt().coerceAtLeast(sizePx)
+        val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+        canvas.drawText(emoji, width / 2f, baseline, paint)
+        return if ((heading % 360f) != 0f) {
+            val matrix = android.graphics.Matrix()
+            matrix.postRotate(heading, width / 2f, height / 2f)
+            val rotated = android.graphics.Bitmap.createBitmap(bitmap, 0, 0, width, height, matrix, true)
+            BitmapDrawable(ctx.resources, rotated)
+        } else {
+            BitmapDrawable(ctx.resources, bitmap)
+        }
+    }
+
     // Update position marker when flight data changes
     LaunchedEffect(flightData, autoCenter) {
         val data = flightData
@@ -109,7 +139,15 @@ fun MapViewer(
                 marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
 
                 // Update marker rotation based on heading
-                marker.rotation = data.heading.toFloat()
+                val heading = data.heading.toFloat()
+                marker.rotation = heading
+                try {
+                    val color = if (isDarkTheme) android.graphics.Color.WHITE else android.graphics.Color.BLACK
+                    marker.icon = createPlaneDrawable(context, 28f, color, heading)
+                    marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                } catch (e: Exception) {
+                    // ignore
+                }
 
                 // Update marker snippet with altitude and speed
                 val altFt = (data.altitude * 3.28084).toInt()
@@ -153,7 +191,6 @@ fun MapViewer(
     val initialZoom: Double = savedZoom ?: 8.0
 
     // Map theme / tile helpers (moved out so they are accessible from the layer dialog handler)
-    val isDarkTheme = isSystemInDarkTheme()
     val darkTile = org.osmdroid.tileprovider.tilesource.XYTileSource(
         "CartoDB.DarkMatter",
         0, 18, 256, ".png",
@@ -171,6 +208,9 @@ fun MapViewer(
         }
     }
     val initialTileSource = savedTileId?.let { tileSourceForId(it) } ?: if (isDarkTheme) darkTile else TileSourceFactory.MAPNIK
+
+    // createPlaneDrawable moved earlier to be visible to flight-data LaunchedEffect
+
 
     Box(modifier = modifier.fillMaxSize()) {
 
@@ -191,12 +231,13 @@ fun MapViewer(
                     val marker = Marker(this).apply {
                         title = context.getString(R.string.map_aircraft_position)
                         snippet = context.getString(R.string.map_waiting_for_data)
-                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                        // anchor center for correct rotation
+                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
 
-                        // Try to use a custom aircraft icon
+                        // initial plane icon
                         try {
-                            val drawable = ContextCompat.getDrawable(ctx, android.R.drawable.ic_menu_mylocation)
-                            icon = drawable
+                            val color = if (isDarkTheme) android.graphics.Color.WHITE else android.graphics.Color.BLACK
+                            icon = createPlaneDrawable(ctx, 28f, color)
                         } catch (e: Exception) {
                             // Use default marker
                         }
@@ -465,7 +506,7 @@ fun MapViewer(
                 defaultY = 0.75f,
                 visible = true,
                 onClick = { showQuickAccess = true },
-                content = { Icon(Icons.Default.Note, contentDescription = stringResource(R.string.quick_notes_title)) },
+                content = { Icon(Icons.AutoMirrored.Filled.Note, contentDescription = stringResource(R.string.quick_notes_title)) },
                 marginPx = fabMarginPx
             )
         }
@@ -619,7 +660,7 @@ private fun LayerSelectionDialog(
                     Text(stringResource(R.string.map_dark))
                 }
 
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
                 Text(
                     text = stringResource(R.string.map_note_aviation_charts),
