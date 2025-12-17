@@ -198,16 +198,19 @@ def tail_and_send(path: str, host: str, port: int, send_existing=False, once=Fal
     """Tail a file and send only new JSON lines as UDP datagrams (do not send existing lines)."""
     if not os.path.exists(path):
         raise FileNotFoundError(path)
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     
-    # For ECDH mode: create a UDP listener socket for handshake responses
-    handshake_sock = None
+    # For ECDH mode: create a UDP socket bound to port for both handshake and data
+    # For PSK mode: create unbound socket
     if session_mgr:
-        handshake_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        handshake_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        handshake_sock.bind(('0.0.0.0', port))  # Listen on same port for handshake
-        handshake_sock.settimeout(1.0)  # Non-blocking with timeout
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(('0.0.0.0', port))  # Bind to port so data comes from same port
+        sock.settimeout(1.0)  # Non-blocking with timeout
         logger.info(f"🔐 Listening for handshakes on port {port}")
+        handshake_sock = sock  # Use same socket for handshake and data
+    else:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        handshake_sock = None
 
     def open_for_tail(read_existing: bool = False):
         f = open(path, 'r', encoding='utf-8', errors='ignore')
@@ -339,8 +342,7 @@ def tail_and_send(path: str, host: str, port: int, send_existing=False, once=Fal
         except Exception:
             pass
         sock.close()
-        if handshake_sock:
-            handshake_sock.close()
+        # handshake_sock is same as sock in ECDH mode, don't close twice
 
 
 # New feature: repeat the last line every X seconds
@@ -349,16 +351,19 @@ def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=Fals
     """Send the last line of the file as a UDP datagram every <interval> seconds."""
     if not os.path.exists(path):
         raise FileNotFoundError(path)
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     
-    # For ECDH mode: create a UDP listener socket for handshake responses
-    handshake_sock = None
+    # For ECDH mode: create a UDP socket bound to port for both handshake and data
+    # For PSK mode: create unbound socket
     if session_mgr:
-        handshake_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        handshake_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        handshake_sock.bind(('0.0.0.0', port))  # Listen on same port for handshake
-        handshake_sock.settimeout(0.1)  # Non-blocking with short timeout
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(('0.0.0.0', port))  # Bind to port so data comes from same port
+        sock.settimeout(0.1)  # Non-blocking with short timeout
         logger.info(f"🔐 Listening for handshakes on port {port}")
+        handshake_sock = sock  # Use same socket for handshake and data
+    else:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        handshake_sock = None
     
     try:
         last_sent = None
@@ -484,8 +489,7 @@ def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=Fals
                 print(f"Error reading/sending: {e}", file=sys.stderr)
     finally:
         sock.close()
-        if handshake_sock:
-            handshake_sock.close()
+        # handshake_sock is same as sock in ECDH mode, don't close twice
 
 
 def main(argv=None):
