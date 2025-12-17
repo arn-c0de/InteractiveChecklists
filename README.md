@@ -159,7 +159,7 @@ For larger or breaking changes, please open an issue first to discuss design and
 
 ## Roadmap
 
-Planned features and long-term improvements are tracked in the [FUTURE_PLANS](docs/FUTURE_PLANS.md) document.
+Planned features and long-term improvements are tracked in the [Roadmap](docs/planning/roadmap.md) document.
 
 
 ## Support & Contact
