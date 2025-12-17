@@ -83,10 +83,13 @@ Planned enhancements include additional telemetry (speed, vertical speed, fuel, 
 ## Screenshots
 
 <p align="center">
-		<img src="images/1.0.6_FileExplorer.png" alt="File explorer - list of files and folders" width="360" />
-		<img src="images/1.0.6_MD-Viewer.png" alt="Markdown viewer showing interactive checklists" width="360" />
-		<img src="images/1.0.6_Pdf-Viewer.png" alt="PDF viewer with annotation tools" width="360" />
-		<img src="images/1.0.6_Notes.png" alt="QuickNotes bottom sheet and editor" width="360" />
+		<img src="images/FileExplorer.png" alt="File explorer - list of files and folders" width="360" />
+		<img src="images/md_viewer.png" alt="Markdown viewer showing interactive checklists" width="360" />
+		<img src="images/pdf_viewer.png" alt="PDF viewer with annotation tools" width="360" />
+		<img src="images/quick_notes.png" alt="QuickNotes bottom sheet and editor" width="360" />
+		<img src="images/map_viewer.png" alt="Aviation map viewer with terrain" width="360" />
+		<img src="images/datapad.png" alt="DataPad live telemetry panel" width="360" />
+		<img src="images/settings_menu.png" alt="Settings and preferences" width="360" />
 </p>
 
 
