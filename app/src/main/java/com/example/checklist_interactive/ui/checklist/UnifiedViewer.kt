@@ -58,7 +58,15 @@ fun UnifiedViewer(
                         "" // Return empty on error
                     }
                 }
-                val parsedChecklist = remember(markdownContent) { MarkdownChecklistParser().parse(assetPath, markdownContent) }
+                val parsedChecklist = remember(markdownContent) {
+                    MarkdownChecklistParser().parse(
+                        id = assetPath,
+                        markdown = markdownContent,
+                        context = context,
+                        defaultSectionTitle = context.getString(R.string.parser_default_general),
+                        defaultChecklistTitle = context.getString(R.string.parser_default_checklist)
+                    )
+                }
                 val viewModel: ChecklistViewModel = viewModel(key = assetPath, factory = ChecklistViewModelFactory(checklistRepository, parsedChecklist))
                 val checklistState by viewModel.checklistState.collectAsState()
                 MarkdownViewer(
@@ -174,7 +182,7 @@ fun UnifiedViewerScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Unsupported file format: .$fileExtension\nSupported: .md, .markdown",
+                        text = stringResource(R.string.viewer_unsupported_format_md_pdf, fileExtension),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.error,
                         textAlign = TextAlign.Center

@@ -63,6 +63,7 @@ fun DataPadPopup(
     var showSettingsDialog by remember { mutableStateOf(false) }
     
     // Calculate time since last update
+    val context = LocalContext.current
     var timeSinceUpdate by remember { mutableStateOf("--") }
     LaunchedEffect(lastUpdateTime) {
         while (true) {
@@ -70,9 +71,9 @@ fun DataPadPopup(
             timeSinceUpdate = if (lastUpdate != null) {
                 val seconds = (System.currentTimeMillis() - lastUpdate) / 1000
                 when {
-                    seconds < 60 -> "${seconds}s ago"
-                    seconds < 3600 -> "${seconds / 60}m ago"
-                    else -> "${seconds / 3600}h ago"
+                    seconds < 60 -> context.getString(R.string.datapad_time_seconds_ago, seconds)
+                    seconds < 3600 -> context.getString(R.string.datapad_time_minutes_ago, seconds / 60)
+                    else -> context.getString(R.string.datapad_time_hours_ago, seconds / 3600)
                 }
             } else {
                 "--"
@@ -80,8 +81,6 @@ fun DataPadPopup(
             kotlinx.coroutines.delay(1000)
         }
     }
-
-    val context = LocalContext.current
 
     // Persistable sheet fraction and pinned state (like QuickAccessSheet)
     val prefs = context.getSharedPreferences("datapad_prefs", Context.MODE_PRIVATE)
@@ -458,24 +457,44 @@ private fun FlightDataDisplay(data: FlightData?) {
             DataRow(stringResource(R.string.datapad_group), data?.group ?: stringResource(R.string.datapad_not_available))
         }
 
-        // Environment
-        DataSection(title = stringResource(R.string.datapad_environment)) {
-            data?.environment?.let { env ->
-                DataRow(stringResource(R.string.datapad_temperature), env.temperature?.let { String.format("%.1f", it) + "°C (${String.format("%.1f", celsiusToFahrenheit(it))}°F)" } ?: stringResource(R.string.datapad_not_available))
-                DataRow(stringResource(R.string.datapad_pressure), env.pressure?.let { String.format("%.1f", it) + " hPa (${String.format("%.2f", hpaToInHg(it))} inHg)" } ?: stringResource(R.string.datapad_not_available))
-                DataRow(stringResource(R.string.datapad_wind_speed), env.windSpeed?.let { String.format("%.1f", it) + " m/s (${String.format("%.1f", mpsToKts(it))} kt)" } ?: stringResource(R.string.datapad_not_available))
-                DataRow(stringResource(R.string.datapad_wind_direction), env.windDirection?.let { String.format("%.1f", it) + "°" } ?: stringResource(R.string.datapad_not_available))
-                env.visibility?.let { vis ->
-                    DataRow(stringResource(R.string.datapad_visibility), String.format("%.0f", vis) + " m (${String.format("%.1f", metersToNm(vis))} nm)")
+        // Environment + Position side-by-side
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(modifier = Modifier.weight(1f)) {
+                DataSection(title = stringResource(R.string.datapad_environment)) {
+                    data?.environment?.let { env ->
+                        DataRow(stringResource(R.string.datapad_temperature), env.temperature?.let { String.format("%.1f", it) + "°C (${String.format("%.1f", celsiusToFahrenheit(it))}°F)" } ?: stringResource(R.string.datapad_not_available))
+                        DataRow(stringResource(R.string.datapad_pressure), env.pressure?.let { String.format("%.1f", it) + " hPa (${String.format("%.2f", hpaToInHg(it))} inHg)" } ?: stringResource(R.string.datapad_not_available))
+                        DataRow(stringResource(R.string.datapad_wind_speed), env.windSpeed?.let { String.format("%.1f", it) + " m/s (${String.format("%.1f", mpsToKts(it))} kt)" } ?: stringResource(R.string.datapad_not_available))
+                        DataRow(stringResource(R.string.datapad_wind_direction), env.windDirection?.let { String.format("%.1f", it) + "°" } ?: stringResource(R.string.datapad_not_available))
+                        env.visibility?.let { vis ->
+                            DataRow(stringResource(R.string.datapad_visibility), String.format("%.0f", vis) + " m (${String.format("%.1f", metersToNm(vis))} nm)")
+                        }
+                        env.clouds?.let { clouds ->
+                            DataRow(stringResource(R.string.datapad_clouds), clouds)
+                        }
+                    } ?: run {
+                        DataRow(stringResource(R.string.datapad_temperature), stringResource(R.string.datapad_not_available))
+                        DataRow(stringResource(R.string.datapad_pressure), stringResource(R.string.datapad_not_available))
+                        DataRow(stringResource(R.string.datapad_wind_speed), stringResource(R.string.datapad_not_available))
+                        DataRow(stringResource(R.string.datapad_wind_direction), stringResource(R.string.datapad_not_available))
+                    }
                 }
-                env.clouds?.let { clouds ->
-                    DataRow(stringResource(R.string.datapad_clouds), clouds)
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                DataSection(title = stringResource(R.string.datapad_section_position)) {
+                    DataRow(stringResource(R.string.datapad_field_latitude), data?.latitude?.let { String.format("%.6f", it) } ?: stringResource(R.string.datapad_not_available))
+                    DataRow(stringResource(R.string.datapad_field_longitude), data?.longitude?.let { String.format("%.6f", it) } ?: stringResource(R.string.datapad_not_available))
+                    data?.position?.let { pos ->
+                        DataRow(stringResource(R.string.datapad_field_x), String.format("%.2f", pos.x))
+                        DataRow(stringResource(R.string.datapad_field_y), String.format("%.2f", pos.y))
+                        DataRow(stringResource(R.string.datapad_field_z), String.format("%.2f", pos.z))
+                    } ?: run {
+                        DataRow(stringResource(R.string.datapad_field_x), stringResource(R.string.datapad_not_available))
+                        DataRow(stringResource(R.string.datapad_field_y), stringResource(R.string.datapad_not_available))
+                        DataRow(stringResource(R.string.datapad_field_z), stringResource(R.string.datapad_not_available))
+                    }
                 }
-            } ?: run {
-                DataRow(stringResource(R.string.datapad_temperature), stringResource(R.string.datapad_not_available))
-                DataRow(stringResource(R.string.datapad_pressure), stringResource(R.string.datapad_not_available))
-                DataRow(stringResource(R.string.datapad_wind_speed), stringResource(R.string.datapad_not_available))
-                DataRow(stringResource(R.string.datapad_wind_direction), stringResource(R.string.datapad_not_available))
             }
         }
 
@@ -693,22 +712,7 @@ private fun FlightDataDisplay(data: FlightData?) {
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
 
-        // Position (full width)
-        DataSection(title = stringResource(R.string.datapad_section_position)) {
-            DataRow(stringResource(R.string.datapad_field_latitude), data?.latitude?.let { String.format("%.6f", it) } ?: stringResource(R.string.datapad_not_available))
-            DataRow(stringResource(R.string.datapad_field_longitude), data?.longitude?.let { String.format("%.6f", it) } ?: stringResource(R.string.datapad_not_available))
-            data?.position?.let { pos ->
-                DataRow(stringResource(R.string.datapad_field_x), String.format("%.2f", pos.x))
-                DataRow(stringResource(R.string.datapad_field_y), String.format("%.2f", pos.y))
-                DataRow(stringResource(R.string.datapad_field_z), String.format("%.2f", pos.z))
-            } ?: run {
-                DataRow(stringResource(R.string.datapad_field_x), stringResource(R.string.datapad_not_available))
-                DataRow(stringResource(R.string.datapad_field_y), stringResource(R.string.datapad_not_available))
-                DataRow(stringResource(R.string.datapad_field_z), stringResource(R.string.datapad_not_available))
-            }
-        }
 
         // Additional Info
         DataSection(title = stringResource(R.string.datapad_section_additional_info)) {

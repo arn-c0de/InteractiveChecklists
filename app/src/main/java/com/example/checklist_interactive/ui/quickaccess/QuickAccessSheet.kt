@@ -929,9 +929,11 @@ fun QuickAccessSheet(
                                 modifier = Modifier.width(140.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            FilterChip(selected = com1Mode == "FM", onClick = { com1Mode = "FM" }, label = { Text(stringResource(R.string.quick_notes_fm)) })
+                            val comFmLabel = stringResource(R.string.quick_notes_fm)
+                            val comAmLabel = stringResource(R.string.quick_notes_am)
+                            FilterChip(selected = com1Mode == "FM", onClick = { com1Mode = "FM" }, label = { Text(comFmLabel) })
                             Spacer(modifier = Modifier.width(4.dp))
-                            FilterChip(selected = com1Mode == "AM", onClick = { com1Mode = "AM" }, label = { Text(stringResource(R.string.quick_notes_am)) })
+                            FilterChip(selected = com1Mode == "AM", onClick = { com1Mode = "AM" }, label = { Text(comAmLabel) })
                         }
 
                         // COM2 column
@@ -945,9 +947,11 @@ fun QuickAccessSheet(
                                 modifier = Modifier.width(140.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            FilterChip(selected = com2Mode == "FM", onClick = { com2Mode = "FM" }, label = { Text(stringResource(R.string.quick_notes_fm)) })
+                            val comFmLabel2 = stringResource(R.string.quick_notes_fm)
+                            val comAmLabel2 = stringResource(R.string.quick_notes_am)
+                            FilterChip(selected = com2Mode == "FM", onClick = { com2Mode = "FM" }, label = { Text(comFmLabel2) })
                             Spacer(modifier = Modifier.width(4.dp))
-                            FilterChip(selected = com2Mode == "AM", onClick = { com2Mode = "AM" }, label = { Text(stringResource(R.string.quick_notes_am)) })
+                            FilterChip(selected = com2Mode == "AM", onClick = { com2Mode = "AM" }, label = { Text(comAmLabel2) })
                         }
 
                         // no manual save/load buttons (auto-save/auto-load enabled)
@@ -1445,8 +1449,11 @@ fun QuickAccessSheet(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         val keyboardType = when (quickInputMode) {
-                            "coord", "freq", "number", "fluglage" -> KeyboardType.Number
-                            "time" -> KeyboardType.Number
+                            stringResource(R.string.quick_notes_field_coordinates),
+                            stringResource(R.string.quick_notes_field_frequency),
+                            stringResource(R.string.quick_notes_field_numbers),
+                            stringResource(R.string.quick_notes_field_flight_state) -> KeyboardType.Number
+                            stringResource(R.string.quick_notes_field_time) -> KeyboardType.Number
                             else -> KeyboardType.Text
                         }
 
@@ -1681,11 +1688,11 @@ fun QuickAccessSheet(
                                 },
                             placeholder = {
                                 Text(when (quickInputMode) {
-                                    "coord" -> stringResource(R.string.quick_notes_coord_placeholder)
-                                    "freq" -> stringResource(R.string.quick_notes_freq_placeholder)
-                                    "time" -> stringResource(R.string.quick_notes_time_placeholder)
-                                    "number" -> stringResource(R.string.quick_notes_numbers_placeholder)
-                                    "fluglage" -> stringResource(R.string.quick_notes_flight_placeholder)
+                                    stringResource(R.string.quick_notes_field_coordinates) -> stringResource(R.string.quick_notes_coord_placeholder)
+                                    stringResource(R.string.quick_notes_field_frequency) -> stringResource(R.string.quick_notes_freq_placeholder)
+                                    stringResource(R.string.quick_notes_field_time) -> stringResource(R.string.quick_notes_time_placeholder)
+                                    stringResource(R.string.quick_notes_field_numbers) -> stringResource(R.string.quick_notes_numbers_placeholder)
+                                    stringResource(R.string.quick_notes_field_flight_state) -> stringResource(R.string.quick_notes_flight_placeholder)
                                     else -> stringResource(R.string.quick_notes_text_placeholder)
                                 })
                             },

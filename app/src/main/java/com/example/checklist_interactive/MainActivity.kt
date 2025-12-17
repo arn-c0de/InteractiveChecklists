@@ -643,6 +643,6 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
 @Composable
 fun GreetingPreview() {
     ChecklistInteractiveTheme {
-        Greeting("Android")
+        Greeting(stringResource(R.string.greeting_default_name))
     }
 }

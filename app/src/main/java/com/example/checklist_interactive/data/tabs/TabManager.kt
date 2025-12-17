@@ -3,6 +3,7 @@ package com.example.checklist_interactive.data.tabs
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
+import com.example.checklist_interactive.R
 import com.example.checklist_interactive.data.files.FileInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -148,7 +149,7 @@ class TabManager(private val context: Context) {
             // Create synthetic FileInfo for map tab
             val mapFileInfo = FileInfo(
                 name = "aviation_map",
-                displayName = "Aviation Map",
+                displayName = context.getString(R.string.aviation_map_tab_title),
                 path = MAP_TAB_PATH,
                 category = "maps",
                 size = 0,
@@ -387,7 +388,7 @@ class TabManager(private val context: Context) {
                 // Recreate map tab
                 val mapFileInfo = FileInfo(
                     name = "aviation_map",
-                    displayName = "Aviation Map",
+                    displayName = context.getString(R.string.aviation_map_tab_title),
                     path = MAP_TAB_PATH,
                     category = "maps",
                     size = 0,

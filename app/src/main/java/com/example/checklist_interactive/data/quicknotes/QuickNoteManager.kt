@@ -105,7 +105,7 @@ class QuickNoteManager(private val context: Context) {
 
     private val _flightInfoExpanded = MutableStateFlow(false)
     val flightInfoExpanded: StateFlow<Boolean> = _flightInfoExpanded.asStateFlow()
-    private val _flightStatus = MutableStateFlow("Idle")
+    private val _flightStatus = MutableStateFlow(context.getString(com.example.checklist_interactive.R.string.flight_status_idle))
     val flightStatus: StateFlow<String> = _flightStatus.asStateFlow()
 
     init {
@@ -161,7 +161,7 @@ class QuickNoteManager(private val context: Context) {
             _com2.value = prefs.getString(COM2_KEY, "") ?: ""
             _com2Mode.value = prefs.getString(COM2_MODE_KEY, "FM") ?: "FM"
             _flightInfoExpanded.value = prefs.getBoolean(FLIGHT_INFO_EXPANDED_KEY, false)
-            _flightStatus.value = prefs.getString(FLIGHT_STATUS_KEY, "Idle") ?: "Idle"
+            _flightStatus.value = prefs.getString(FLIGHT_STATUS_KEY, context.getString(com.example.checklist_interactive.R.string.flight_status_idle)) ?: context.getString(com.example.checklist_interactive.R.string.flight_status_idle)
         }
     }
 
@@ -218,7 +218,7 @@ class QuickNoteManager(private val context: Context) {
                 // No old data, create a default note
                 val defaultNote = QuickNote(
                     id = "note_${System.currentTimeMillis()}",
-                    title = "My Notes",
+                    title = context.getString(com.example.checklist_interactive.R.string.quick_notes_default_title),
                     content = ""
                 )
                 repository.insertNote(defaultNote)
@@ -259,7 +259,7 @@ class QuickNoteManager(private val context: Context) {
         if (oldContent != null) {
             val note = QuickNote(
                 id = "note_${System.currentTimeMillis()}",
-                title = "Notes",
+                title = context.getString(com.example.checklist_interactive.R.string.quick_notes_default_title_notes),
                 content = oldContent,
                 linkedDocuments = emptyList()
             )
@@ -382,7 +382,7 @@ class QuickNoteManager(private val context: Context) {
             com1Mode = prefs.getString(COM1_MODE_KEY, "FM") ?: "FM",
             com2 = prefs.getString(COM2_KEY, "") ?: "",
             com2Mode = prefs.getString(COM2_MODE_KEY, "FM") ?: "FM",
-            flightStatus = prefs.getString(FLIGHT_STATUS_KEY, "Idle") ?: "Idle"
+            flightStatus = prefs.getString(FLIGHT_STATUS_KEY, context.getString(com.example.checklist_interactive.R.string.flight_status_idle)) ?: context.getString(com.example.checklist_interactive.R.string.flight_status_idle)
         )
     }
 
@@ -473,7 +473,7 @@ class QuickNoteManager(private val context: Context) {
     /**
      * Add a new note
      */
-    fun addNote(title: String = "New Note", content: String = "", setActive: Boolean = true): String {
+    fun addNote(title: String = context.getString(com.example.checklist_interactive.R.string.quick_notes_new_note_title), content: String = "", setActive: Boolean = true): String {
         val id = "note_${System.currentTimeMillis()}"
         scope.launch {
             try {

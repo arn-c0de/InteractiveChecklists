@@ -59,7 +59,7 @@ fun FlightMiniStatusBar(noteManager: QuickNoteManager, onClick: (() -> Unit)? = 
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text(text = (callsign.ifBlank { "-" }), style = MaterialTheme.typography.labelSmall)
+        Text(text = (callsign.ifBlank { stringResource(R.string.common_placeholder_dash) }), style = MaterialTheme.typography.labelSmall)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(text = stringResource(R.string.quick_notes_status_label) + ":", style = MaterialTheme.typography.labelSmall)
             FlightStatusDropdown(
@@ -68,12 +68,12 @@ fun FlightMiniStatusBar(noteManager: QuickNoteManager, onClick: (() -> Unit)? = 
                 compact = true
             )
         }
-        Text(text = stringResource(R.string.quick_notes_com1_label) + ": ${com1.ifBlank { "-" }.replace(',', '.')} ${com1Mode}", style = MaterialTheme.typography.labelSmall)
-        Text(text = stringResource(R.string.quick_notes_com2_label) + ": ${com2.ifBlank { "-" }.replace(',', '.')} ${com2Mode}", style = MaterialTheme.typography.labelSmall)
+        Text(text = stringResource(R.string.quick_notes_com1_label) + ": ${com1.ifBlank { stringResource(R.string.common_placeholder_dash) }.replace(',', '.')} ${com1Mode}", style = MaterialTheme.typography.labelSmall)
+        Text(text = stringResource(R.string.quick_notes_com2_label) + ": ${com2.ifBlank { stringResource(R.string.common_placeholder_dash) }.replace(',', '.')} ${com2Mode}", style = MaterialTheme.typography.labelSmall)
         Spacer(modifier = Modifier.weight(1f))
 
         // Live clock (HH:mm:ss)
-        val formatter = DateTimeFormatter.ofPattern("HH:mm:ss")
+        val formatter = DateTimeFormatter.ofPattern(stringResource(R.string.format_time_hh_mm_ss))
         var timeText by remember { mutableStateOf(LocalTime.now().format(formatter)) }
         LaunchedEffect(Unit) {
             while (true) {

@@ -246,7 +246,17 @@ fun TagFilterBar(
 
         // Display tags in 3 vertical columns so more tags are visible at once.
         // Important tags are shown first according to preferred order.
-        val preferredOrder = listOf("startup", "start", "navigation", "landing", "combat", "takeoff", "taxi", "preflight", "postflight")
+        val preferredOrder = listOf(
+    stringResource(R.string.tag_startup),
+    stringResource(R.string.tag_start),
+    stringResource(R.string.tag_navigation),
+    stringResource(R.string.tag_landing),
+    stringResource(R.string.tag_combat),
+    stringResource(R.string.tag_takeoff),
+    stringResource(R.string.tag_taxi),
+    stringResource(R.string.tag_preflight),
+    stringResource(R.string.tag_postflight)
+)
         val ordered = (preferredOrder + availableTags).map { it.lowercase() }.distinct()
         val normalizedAvailable = availableTags.map { it.lowercase() }.toSet()
         val filteredOrdered = ordered.filter { normalizedAvailable.contains(it) }
@@ -312,7 +322,7 @@ fun TagChips(
                     onClick = { },
                     label = { 
                         Text(
-                            text = "+${tags.size - maxVisible}",
+                            text = stringResource(R.string.tag_more_count, tags.size - maxVisible),
                             style = MaterialTheme.typography.labelSmall
                         )
                     },
