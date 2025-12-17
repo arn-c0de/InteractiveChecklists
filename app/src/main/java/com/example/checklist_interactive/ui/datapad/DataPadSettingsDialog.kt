@@ -40,12 +40,16 @@ fun DataPadSettingsDialog(
     val currentPort by manager.udpPort.collectAsState()
     val currentBindIp by manager.bindIp.collectAsState()
     val currentKey by manager.preSharedKey.collectAsState()
+    val useEcdh by manager.useEcdh.collectAsState()
+    val deviceName by manager.deviceName.collectAsState()
     
     var portText by remember { mutableStateOf(currentPort.toString()) }
     var bindIpText by remember { mutableStateOf(currentBindIp) }
     var keyText by remember { mutableStateOf(currentKey) }
+    var deviceNameText by remember { mutableStateOf(deviceName) }
     var showKeyWarning by remember { mutableStateOf(false) }
     var keyVisible by remember { mutableStateOf(false) }
+    var useEcdhLocal by remember { mutableStateOf(useEcdh) }
 
     Dialog(onDismissRequest = onDismiss) {
         // Try to hide the system UI inside the dialog window
@@ -146,6 +150,91 @@ fun DataPadSettingsDialog(
                 
                 Divider()
                 
+                // ECDH Handshake Mode Toggle
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (useEcdhLocal) 
+                            MaterialTheme.colorScheme.primaryContainer 
+                        else 
+                            MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "ECDH Handshake Mode",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = if (useEcdhLocal) 
+                                    MaterialTheme.colorScheme.onPrimaryContainer 
+                                else 
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = if (useEcdhLocal)
+                                    "Secure session-based encryption (Recommended)"
+                                else
+                                    "Using legacy PSK mode",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (useEcdhLocal) 
+                                    MaterialTheme.colorScheme.onPrimaryContainer 
+                                else 
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = useEcdhLocal,
+                            onCheckedChange = { useEcdhLocal = it }
+                        )
+                    }
+                }
+                
+                // Device Name (only shown in ECDH mode)
+                if (useEcdhLocal) {
+                    OutlinedTextField(
+                        value = deviceNameText,
+                        onValueChange = { deviceNameText = it },
+                        label = { Text("Device Name") },
+                        placeholder = { Text("Android Tablet") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        supportingText = {
+                            Text("Used to identify this device during handshake")
+                        }
+                    )
+                    
+                    // Show Device ID
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "Device ID (derived from key)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Text(
+                                text = manager.getDeviceId(),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+                }
+                
+                Divider()
+                
                 // UDP Port Setting
                 OutlinedTextField(
                     value = portText,
@@ -180,7 +269,7 @@ fun DataPadSettingsDialog(
                         keyText = it
                         showKeyWarning = it.length != 32 && it.isNotEmpty()
                     },
-                    label = { Text(stringResource(R.string.datapad_settings_psk)) },
+                    label = { Text(stringResource(R.string.datapad_settings_psk) + if (useEcdhLocal) " (for handshake)" else "") },
                     placeholder = { Text(stringResource(R.string.datapad_settings_psk_placeholder)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -201,7 +290,12 @@ fun DataPadSettingsDialog(
                                 color = MaterialTheme.colorScheme.error
                             )
                         } else {
-                            Text(stringResource(R.string.datapad_settings_psk_hint))
+                            Text(
+                                if (useEcdhLocal)
+                                    "PSK used only for handshake encryption, data uses session key"
+                                else
+                                    stringResource(R.string.datapad_settings_psk_hint)
+                            )
                         }
                     }
                 )
@@ -270,8 +364,15 @@ fun DataPadSettingsDialog(
                             
                             if (keyText.length == 32 || keyText.isEmpty()) {
                                 manager.updatePreSharedKey(keyText)
-                                onDismiss()
                             }
+                            
+                            // Update ECDH mode and device name
+                            manager.setUseEcdh(useEcdhLocal)
+                            if (deviceNameText.isNotBlank()) {
+                                manager.updateDeviceName(deviceNameText.trim())
+                            }
+                            
+                            onDismiss()
                         },
                         enabled = !showKeyWarning
                     ) {
@@ -290,21 +391,33 @@ fun DataPadSettingsDialog(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
-                            text = stringResource(R.string.datapad_configuration_tips_label),
+                            text = if (useEcdhLocal) "ECDH Mode Information" else stringResource(R.string.datapad_configuration_tips_label),
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                         Text(
-                            text = stringResource(R.string.datapad_configuration_tips_text),
+                            text = if (useEcdhLocal)
+                                "• Device must be added to authorized_devices.json on DCS server\n• Handshake establishes session key automatically\n• Session key changes each connection (Forward Secrecy)\n• PSK only protects handshake, not data"
+                            else
+                                stringResource(R.string.datapad_configuration_tips_text),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = stringResource(R.string.datapad_security_note),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
+                        if (useEcdhLocal) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "⚠️ ECDH requires Python server update (see docs/technical/ECDH_HANDSHAKE_PROPOSAL.md)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        } else {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = stringResource(R.string.datapad_security_note),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
                     }
                 }
             }
