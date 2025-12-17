@@ -225,21 +225,8 @@ class ECDHClient:
             sock.sendto(encrypted_confirm, (target_ip, target_port))
             logger.info(f"📤 Sent KeyConfirm ({len(encrypted_confirm)} bytes)")
             
-            # Step 5: Receive Ready confirmation
-            response, addr = sock.recvfrom(4096)
-            decrypted = self._decrypt_message(response)
-            if not decrypted:
-                logger.error("❌ Failed to decrypt Ready response")
-                return False
-            
-            ready_msg = json.loads(decrypted.decode('utf-8'))
-            if ready_msg.get('status') == 'ready':
-                logger.info("✅ Session confirmed by server")
-            else:
-                logger.error(f"❌ Unexpected ready status: {ready_msg}")
-                return False
-            
-            # Create session
+            # Create session IMMEDIATELY after sending KeyConfirm
+            # The DCS server doesn't send a separate "Ready" message - it starts sending encrypted data right away
             self.session = ECDHSession(
                 session_id=session_id,
                 session_key=session_key,

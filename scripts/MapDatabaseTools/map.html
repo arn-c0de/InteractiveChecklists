@@ -13,6 +13,13 @@
         #status { position: absolute; top: 10px; left: 10px; z-index: 1000; 
                   background: rgba(255,255,255,0.9); padding: 5px 10px; 
                   border-radius: 3px; font-size: 12px; display: none; }
+        /* Map hamburger control */
+        #map-controls { position: absolute; top: 10px; right: 10px; z-index: 1100; }
+        #map-controls #map-menu-btn { background: rgba(255,255,255,0.9); border: none; padding: 6px 8px; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        #map-controls #map-menu { margin-top: 6px; background: rgba(255,255,255,0.95); border-radius: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); overflow: hidden; }
+        #map-controls #map-menu.hidden { display: none; }
+        #map-controls #map-menu button { display: block; width: 160px; padding: 8px 12px; border: none; background: transparent; text-align: left; cursor: pointer; }
+        #map-controls #map-menu button:hover { background: rgba(0,0,0,0.06); }
     </style>
 </head>
 <body>
@@ -42,19 +49,79 @@
                 
                 var map = L.map('map', { zoomControl: true }).setView([48.0, 11.0], 6);
 
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 19,
-                    attribution: '© OpenStreetMap contributors'
-                }).addTo(map);
+                // Define base tile layers
+                var baseLayers = {
+                    'normal': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        maxZoom: 19,
+                        attribution: '© OpenStreetMap contributors'
+                    }),
+                    'dark': L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
+                        maxZoom: 19,
+                        attribution: '© CartoDB'
+                    }),
+                    'topo': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                        maxZoom: 17,
+                        attribution: '© OpenTopoMap (CC-BY-SA)'
+                    }),
+                    'satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                        maxZoom: 19,
+                        attribution: '© ESRI World Imagery'
+                    })
+                };
+
+                // Add default layer
+                var currentLayerName = 'normal';
+                var currentLayer = baseLayers[currentLayerName];
+                currentLayer.addTo(map);
 
                 statusEl.textContent = 'Map loaded successfully';
                 statusEl.style.display = 'block';
                 statusEl.style.background = 'rgba(0,255,0,0.7)';
                 setTimeout(function() { statusEl.style.display = 'none'; }, 2000);
 
+                // Add map controls for layer switching
+                var controlsContainer = document.createElement('div');
+                controlsContainer.id = 'map-controls';
+                controlsContainer.innerHTML = '<button id="map-menu-btn" title="Map layers">☰</button>' +
+                    '<div id="map-menu" class="hidden">' +
+                    '<button data-layer="normal">Normal</button>' +
+                    '<button data-layer="dark">Dark</button>' +
+                    '<button data-layer="topo">Topographic</button>' +
+                    '<button data-layer="satellite">Satellite</button>' +
+                    '</div>';
+                document.body.appendChild(controlsContainer);
+
+                // Simple menu interactions
+                var menuBtn = document.getElementById('map-menu-btn');
+                var menu = document.getElementById('map-menu');
+                menuBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    menu.classList.toggle('hidden');
+                });
+                // Close when clicking outside
+                document.addEventListener('click', function() { menu.classList.add('hidden'); });
+
+                // Handle layer change clicks
+                menu.querySelectorAll('button[data-layer]').forEach(function(b) {
+                    b.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        var layer = b.getAttribute('data-layer');
+                        setMapLayer(layer);
+                        menu.classList.add('hidden');
+                    });
+                });
+
                 var aircraftMarker = null;
                 var markersLayer = L.layerGroup().addTo(map);
                 var locationMarkers = {};
+                var bordersLayer = L.layerGroup().addTo(map);
+                var borderPolygons = {};
+                
+                // Border drawing state
+                var isDrawingBorder = false;
+                var drawingPoints = [];
+                var drawingMarkers = [];
+                var drawingLines = [];
 
                 window.setMarker = function(lat, lon, heading, center) {
                     try {
@@ -62,7 +129,7 @@
                         var lonnum = Number(lon);
                         var head = Number(heading) || 0;
                         var doCenter = (center === true || center === 'true');
-
+                        
                         if (!aircraftMarker) {
                             // Use default blue marker but rotated
                             aircraftMarker = L.marker([latnum, lonnum], { 
@@ -87,6 +154,23 @@
                         console.error('setMarker error', e);
                     }
                 };
+
+                // Expose a function to switch base layers programmatically
+                window.setMapLayer = function(layerName) {
+                    try {
+                        if (!baseLayers[layerName]) { console.warn('Unknown layer', layerName); return; }
+                        if (currentLayer) { map.removeLayer(currentLayer); }
+                        currentLayer = baseLayers[layerName];
+                        currentLayer.addTo(map);
+                        currentLayerName = layerName;
+                    } catch (e) {
+                        console.error('setMapLayer error', e);
+                    }
+                };
+
+                function setMapLayer(layerName) {
+                    window.setMapLayer(layerName);
+                }
                 
                 window.centerMap = function(lat, lon) {
                     try {
@@ -167,6 +251,205 @@
                         console.error('updateMarkers error', e);
                     }
                 };
+                
+                // Border drawing and display functions
+                window.startBorderDrawing = function() {
+                    isDrawingBorder = true;
+                    drawingPoints = [];
+                    clearDrawingMarkers();
+                    console.log('Border drawing mode activated');
+                };
+                
+                window.stopBorderDrawing = function() {
+                    isDrawingBorder = false;
+                    clearDrawingMarkers();
+                    console.log('Border drawing mode deactivated');
+                };
+                
+                function clearDrawingMarkers() {
+                    // Remove all drawing markers and lines
+                    drawingMarkers.forEach(function(marker) {
+                        map.removeLayer(marker);
+                    });
+                    drawingLines.forEach(function(line) {
+                        map.removeLayer(line);
+                    });
+                    drawingMarkers = [];
+                    drawingLines = [];
+                }
+                
+                window.addBorderPoint = function(lat, lon) {
+                    if (!isDrawingBorder) return;
+                    
+                    // Add point to list
+                    drawingPoints.push([lat, lon]);
+                    
+                    // Add marker with emoji
+                    var icon = L.divIcon({
+                        html: drawingPoints.length === 1 ? '📍' : '📌',
+                        className: 'border-point-marker',
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                    });
+                    
+                    var marker = L.marker([lat, lon], { icon: icon }).addTo(map);
+                    marker.bindPopup('Point ' + drawingPoints.length);
+                    drawingMarkers.push(marker);
+                    
+                    // If this is the first marker, add a click handler to allow closing by clicking it
+                    if (drawingMarkers.length === 1) {
+                        marker.on('click', function(e) {
+                            if (!isDrawingBorder) return;
+                            // Only allow closing when we have at least 3 points
+                            if (drawingPoints.length >= 3) {
+                                // Prevent popup from staying open
+                                try {
+                                    if (e && e.originalEvent && typeof e.originalEvent.stopImmediatePropagation === 'function') {
+                                        e.originalEvent.stopImmediatePropagation();
+                                    }
+                                } catch (ex) {}
+                                try { marker.closePopup(); } catch (ex) {}
+                                // Notify python that we want to close the polygon by pushing a closure event
+                                window.borderClickCallbacks.push({
+                                    lat: drawingPoints[0][0],
+                                    lon: drawingPoints[0][1],
+                                    shouldClose: true,
+                                    pointCount: drawingPoints.length
+                                });
+                            }
+                        });
+                    }
+                    
+                    // Draw line from previous point
+                    if (drawingPoints.length > 1) {
+                        var prevPoint = drawingPoints[drawingPoints.length - 2];
+                        var line = L.polyline([prevPoint, [lat, lon]], {
+                            color: '#FF6600',
+                            weight: 3,
+                            dashArray: '5, 10'
+                        }).addTo(map);
+                        drawingLines.push(line);
+                    }
+                    
+                    console.log('Added border point:', lat, lon, '(Total:', drawingPoints.length, ')');
+                };
+                
+                // Callback queue for border clicks
+                window.borderClickCallbacks = [];
+                
+                window.getBorderClicks = function() {
+                    var clicks = window.borderClickCallbacks.slice();
+                    window.borderClickCallbacks = [];
+                    return JSON.stringify(clicks);
+                };
+                
+                // Map click handler for border drawing
+                map.on('click', function(e) {
+                    if (isDrawingBorder) {
+                        var lat = e.latlng.lat;
+                        var lon = e.latlng.lng;
+                        
+                        // Check if clicked near first point (to close polygon)
+                        var shouldClose = false;
+                        if (drawingPoints.length >= 3) {
+                            var firstPoint = drawingPoints[0];
+                            var distance = Math.sqrt(
+                                Math.pow(lat - firstPoint[0], 2) + 
+                                Math.pow(lon - firstPoint[1], 2)
+                            );
+                            
+                            // If clicked within ~100m of first point, close polygon
+                            if (distance < 0.001) {
+                                console.log('Closing border polygon');
+                                shouldClose = true;
+                            }
+                        }
+                        
+                        window.addBorderPoint(lat, lon);
+                        
+                        // Notify Python of the click
+                        window.borderClickCallbacks.push({
+                            lat: lat,
+                            lon: lon,
+                            shouldClose: shouldClose,
+                            pointCount: drawingPoints.length
+                        });
+                    }
+                });
+                
+                window.updateBorders = function(bordersJson) {
+                    try {
+                        var borders = JSON.parse(bordersJson);
+                        
+                        // Clear existing borders
+                        bordersLayer.clearLayers();
+                        borderPolygons = {};
+                        
+                        // Add new borders
+                        borders.forEach(function(b) {
+                            try {
+                                if (!b.points || b.points.length < 3) {
+                                    console.warn('Invalid border (not enough points):', b);
+                                    return;
+                                }
+                                
+                                // Create polygon
+                                var polygon = L.polygon(b.points, {
+                                    color: b.color || '#FF0000',
+                                    weight: 3,
+                                    fillColor: b.color || '#FF0000',
+                                    fillOpacity: 0.1
+                                });
+                                
+                                // Build popup content
+                                var popupContent = '<div style="font-family: sans-serif;">';
+                                popupContent += '<h3 style="margin: 0 0 5px 0;">🗺️ ' + b.name + '</h3>';
+                                
+                                if (b.description) {
+                                    popupContent += '<p style="margin: 2px 0;">' + b.description + '</p>';
+                                }
+                                
+                                popupContent += '<p style="margin: 5px 0 0 0; font-size: 10px; color: #999;">';
+                                popupContent += b.points.length + ' boundary points';
+                                popupContent += '</p></div>';
+                                
+                                polygon.bindPopup(popupContent);
+                                
+                                bordersLayer.addLayer(polygon);
+                                borderPolygons[b.id] = polygon;
+                                
+                            } catch (e) {
+                                console.error('Error adding border:', e, b);
+                            }
+                        });
+                        
+                        console.log('Updated ' + borders.length + ' borders');
+                        
+                    } catch (e) {
+                        console.error('updateBorders error', e);
+                    }
+                };
+
+                // Draw a closing line/polygon for current drawing (visual feedback)
+                window.drawClosingLine = function(points) {
+                    try {
+                        if (!points || points.length < 2) return;
+                        var first = points[0];
+                        var last = points[points.length - 1];
+                        // Draw solid closing line
+                        var closeLine = L.polyline([last, first], { color: '#FF6600', weight: 4 }).addTo(map);
+                        // Draw temporary polygon fill to show closure
+                        var poly = L.polygon(points, { color: '#FF6600', weight: 3, fillColor: '#FF6600', fillOpacity: 0.12 }).addTo(map);
+                        // Remove after short delay (the saved border will be shown by updateBorders)
+                        setTimeout(function() {
+                            try { map.removeLayer(closeLine); } catch (e) {}
+                            try { map.removeLayer(poly); } catch (e) {}
+                        }, 900);
+                    } catch (e) {
+                        console.error('drawClosingLine error', e);
+                    }
+                };
+                
             } catch (e) {
                 statusEl.textContent = 'ERROR: ' + e.message;
                 statusEl.style.display = 'block';

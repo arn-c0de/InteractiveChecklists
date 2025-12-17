@@ -16,8 +16,9 @@ from PySide6.QtGui import QFont, QPalette, QColor
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings
 from network.datapad_receiver import DataPadReceiver, FlightData
-from core.markers_database import MarkersDatabase, Location
+from core.markers_database import MarkersDatabase, Location, Border
 from gui.location_manager import LocationManagerWidget
+from gui.border_manager import BorderManagerWidget
 from typing import Optional
 import json
 import os
@@ -357,7 +358,8 @@ class DataPadGUI(QMainWindow):
     def setup_ui(self):
         """Setup the user interface"""
         self.setWindowTitle("DCS DataPad - Live Flight Data & Tactical Markers")
-        self.setGeometry(100, 100, 1400, 900)
+        # Slightly smaller window for better assets visibility on smaller screens
+        self.setGeometry(100, 100, 1200, 780)
         
         # Main widget and split layout (left: 1/3 info, right: 2/3 map)
         main_widget = QWidget()
@@ -388,16 +390,38 @@ class DataPadGUI(QMainWindow):
         flight_data_layout.addWidget(scroll)
         left_splitter.addWidget(flight_data_container)
         
-        # Bottom: Location Manager panel
+        # Bottom: Unified Assets Manager (Markers & Borders) + hidden detailed panels
+        from gui.assets_manager import AssetsManagerWidget
+        self.assets_manager = AssetsManagerWidget(self.db)
+        self.assets_manager.asset_selected.connect(self.on_asset_selected)
+        self.assets_manager.asset_edited.connect(self.on_asset_changed)
+        self.assets_manager.asset_deleted.connect(self.on_asset_deleted)
+        self.assets_manager.draw_border_requested.connect(self.on_draw_border_requested)
+        left_splitter.addWidget(self.assets_manager)
+
+        # Keep detailed managers available (but placed in a collapsible area if needed)
+        bottom_splitter = QSplitter(Qt.Orientation.Vertical)
         self.location_manager = LocationManagerWidget(self.db)
         self.location_manager.location_selected.connect(self.on_location_selected)
         self.location_manager.location_added.connect(self.on_location_changed)
         self.location_manager.location_updated.connect(self.on_location_changed)
         self.location_manager.location_deleted.connect(self.on_location_changed)
-        left_splitter.addWidget(self.location_manager)
-        
-        # Set initial splitter sizes (60% flight data, 40% locations)
-        left_splitter.setSizes([600, 400])
+        bottom_splitter.addWidget(self.location_manager)
+
+        self.border_manager = BorderManagerWidget(self.db)
+        self.border_manager.border_selected.connect(self.on_border_selected)
+        self.border_manager.border_added.connect(self.on_border_changed)
+        self.border_manager.border_updated.connect(self.on_border_changed)
+        self.border_manager.border_deleted.connect(self.on_border_deleted)
+        self.border_manager.draw_border_requested.connect(self.on_draw_border_requested)
+        self.border_manager.finish_drawing_requested.connect(self.on_finish_drawing_requested)
+        bottom_splitter.addWidget(self.border_manager)
+
+        bottom_splitter.setSizes([300, 300])
+        left_splitter.addWidget(bottom_splitter)
+
+        # Set initial splitter sizes (more space for assets at bottom)
+        left_splitter.setSizes([450, 550])
 
         # Right column: embedded OSM map using Leaflet (map.html)
         self.webview = QWebEngineView()
@@ -422,8 +446,15 @@ class DataPadGUI(QMainWindow):
         # Initial "No Data" display
         self.show_no_data()
         
-        # Load markers on map after initial setup
+        # Load markers and borders on map after initial setup
         QTimer.singleShot(1000, self.refresh_map_markers)
+        QTimer.singleShot(1500, self.refresh_map_borders)
+        
+        # Setup map click handler for border drawing
+        if self.webview:
+            from PySide6.QtWebChannel import QWebChannel
+            # For now, we'll poll for border drawing clicks via JavaScript callbacks
+            # This is a simple implementation without WebChannel
         
     def create_header(self) -> QWidget:
         """Create header with connection status and controls"""
@@ -551,11 +582,220 @@ class DataPadGUI(QMainWindow):
                 self.webview.page().runJavaScript(js)
             except Exception:
                 pass
-    
+
+    def on_asset_selected(self, asset_tuple):
+        """Handle selection from AssetsManager (marker or border)"""
+        if not asset_tuple:
+            return
+        typ, obj = asset_tuple
+        if typ == "marker":
+            self.on_location_selected(obj)
+        elif typ == "border":
+            self.on_border_selected(obj)
+
+    def on_asset_changed(self, asset_tuple):
+        """Handle edited asset from AssetsManager - refresh relevant UI"""
+        if not asset_tuple:
+            return
+        typ, obj = asset_tuple
+        try:
+            if typ == "marker":
+                self.refresh_map_markers()
+            elif typ == "border":
+                self.refresh_map_borders()
+            # Keep unified list in sync
+            try:
+                self.assets_manager.refresh_list()
+            except Exception:
+                pass
+        except Exception as e:
+            print(f"Error handling asset change: {e}")
+
+    def on_asset_deleted(self, asset_tuple):
+        """Handle deleted asset from AssetsManager - refresh UI and lists"""
+        if not asset_tuple:
+            return
+        typ, obj = asset_tuple
+        try:
+            if typ == "marker":
+                self.refresh_map_markers()
+            elif typ == "border":
+                self.refresh_map_borders()
+            try:
+                self.assets_manager.refresh_list()
+            except Exception:
+                pass
+        except Exception as e:
+            print(f"Error handling asset delete: {e}")
+
     def on_location_changed(self, *args):
         """Handle location add/update/delete - refresh markers"""
         self.refresh_map_markers()
     
+    def on_border_selected(self, border: Border):
+        """Handle border selection - zoom to border on map"""
+        if self.webview and border and border.points:
+            # Calculate center of border
+            lats = [p[0] for p in border.points]
+            lons = [p[1] for p in border.points]
+            center_lat = sum(lats) / len(lats)
+            center_lon = sum(lons) / len(lons)
+            
+            # Center map on border
+            js = f"centerMap({center_lat:.6f}, {center_lon:.6f});"
+            try:
+                self.webview.page().runJavaScript(js)
+            except Exception:
+                pass
+    
+    def on_border_changed(self, *args):
+        """Handle border add/update - refresh borders"""
+        self.refresh_map_borders()
+        # Also refresh unified list
+        try:
+            self.assets_manager.refresh_list()
+        except Exception:
+            pass
+    
+    def on_border_deleted(self, border_id: int):
+        """Handle border deletion"""
+        # Special case: border_id == -1 means clear drawing mode
+        if border_id == -1:
+            self.stop_border_drawing()
+        else:
+            self.refresh_map_borders()
+    
+    def on_draw_border_requested(self):
+        """Start border drawing mode on map"""
+        if not self.webview:
+            return
+        
+        try:
+            # Activate drawing mode in map
+            js = "startBorderDrawing();"
+            self.webview.page().runJavaScript(js)
+            
+            # Start polling for clicks (simple implementation)
+            self.border_click_timer = QTimer()
+            self.border_click_timer.timeout.connect(self.poll_border_clicks)
+            self.border_click_timer.start(200)  # Poll every 200ms
+            
+        except Exception as e:
+            print(f"Error starting border drawing: {e}")
+
+    def on_finish_drawing_requested(self):
+        """User clicked Finish in Border Manager - draw closing line and finish"""
+        if not self.webview:
+            # If webview missing, just finish server-side
+            try:
+                self.border_manager.finish_drawing()
+            except Exception as e:
+                print(f"Error finishing border: {e}")
+            return
+        
+        try:
+            import json
+            points = self.border_manager.current_drawing_points
+            if not points or len(points) < 3:
+                QMessageBox.warning(self, "Invalid Border", "Border must have at least 3 points.")
+                return
+            # Ask map to draw closing line/polygon for visual feedback
+            pts_json = json.dumps(points)
+            js = f"drawClosingLine({pts_json});"
+            # Draw closing line briefly
+            self.webview.page().runJavaScript(js)
+            # Delay slightly to allow user to see closing line, then finalize
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(250, lambda: self._finalize_finish_drawing())
+        except Exception as e:
+            print(f"Error requesting map draw for finish: {e}")
+            # Fallback: just finish
+            try:
+                self.border_manager.finish_drawing()
+            except Exception as e:
+                print(f"Error finishing border: {e}")
+    
+    def stop_border_drawing(self):
+        """Stop border drawing mode"""
+        if hasattr(self, 'border_click_timer'):
+            self.border_click_timer.stop()
+        
+        if self.webview:
+            try:
+                js = "stopBorderDrawing();"
+                self.webview.page().runJavaScript(js)
+            except Exception:
+                pass
+    
+    def poll_border_clicks(self):
+        """Poll for border drawing clicks from map"""
+        if not self.border_manager.is_drawing:
+            if hasattr(self, 'border_click_timer'):
+                self.border_click_timer.stop()
+            return
+        
+        if not self.webview:
+            return
+        
+        try:
+            # Get clicks from JavaScript
+            self.webview.page().runJavaScript(
+                "getBorderClicks();",
+                self.process_border_clicks
+            )
+        except Exception as e:
+            print(f"Error polling border clicks: {e}")
+    
+    def process_border_clicks(self, clicks_json: str):
+        """Process border clicks received from map"""
+        if not clicks_json or clicks_json == "[]":
+            return
+        
+        try:
+            import json
+            clicks = json.loads(clicks_json)
+            
+            for click in clicks:
+                lat = click['lat']
+                lon = click['lon']
+                should_close = click.get('shouldClose', False)
+                
+                if should_close:
+                    # Close the polygon
+                    if self.border_manager.finish_drawing():
+                        self.stop_border_drawing()
+                else:
+                    # Add point to border manager
+                    self.border_manager.add_point(lat, lon)
+                    
+                    # Keep finish button state in sync
+                    try:
+                        self.border_manager.update_finish_button_state()
+                    except Exception:
+                        pass
+        except Exception as e:
+            print(f"Error processing border clicks: {e}")
+
+    def _finalize_finish_drawing(self):
+        """Called after JS draws closing line to finalize saving on Python side"""
+        try:
+            result = self.border_manager.finish_drawing()
+            if result:
+                # Clear drawing on map
+                self.stop_border_drawing()
+                # Ensure assets list updated
+                try:
+                    self.assets_manager.refresh_list()
+                except Exception:
+                    pass
+            else:
+                # Re-enable finish button if user cancelled the dialog
+                try:
+                    self.border_manager.finish_btn.setEnabled(True)
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"Error finalizing finish drawing: {e}")    
     def refresh_map_markers(self):
         """Load all markers from database and display on map"""
         if not self.webview:
@@ -605,6 +845,35 @@ class DataPadGUI(QMainWindow):
             
         except Exception as e:
             print(f"Error refreshing markers: {e}")
+    
+    def refresh_map_borders(self):
+        """Load all borders from database and display on map"""
+        if not self.webview:
+            return
+        
+        try:
+            import json
+            
+            borders = self.db.get_all_borders()
+            borders_data = []
+            
+            for border in borders:
+                border_info = {
+                    'id': border.id,
+                    'name': border.name,
+                    'points': border.points,
+                    'description': border.description or "",
+                    'color': border.color
+                }
+                borders_data.append(border_info)
+            
+            # Send to map as JSON
+            borders_json = json.dumps(borders_data).replace("'", "\\'")
+            js = f"updateBorders('{borders_json}');"
+            self.webview.page().runJavaScript(js)
+            
+        except Exception as e:
+            print(f"Error refreshing borders: {e}")
 
     def show_no_data(self):
         """Display 'No Data' message"""
@@ -635,9 +904,32 @@ class DataPadGUI(QMainWindow):
         self.add_data_row(aircraft_layout, 2, "Coalition:", data.coalition or "N/A")
         self.add_data_row(aircraft_layout, 3, "Group:", data.group or "N/A")
         aircraft_group.setLayout(aircraft_layout)
-        self.data_layout.addWidget(aircraft_group)
+        # Prepare Environment group to be placed next to Aircraft if available
+        env_group = None
+        if data.environment:
+            env_group = self.create_section("Environment")
+            env_layout = QGridLayout()
+            env = data.environment
+            if 'windDirection' in env:
+                self.add_data_row(env_layout, 0, "Wind Direction:", f"{env['windDirection']:.0f}°")
+            if 'windSpeed' in env:
+                self.add_data_row(env_layout, 1, "Wind Speed:", f"{env['windSpeed']:.1f} m/s")
+            if 'temperature' in env:
+                self.add_data_row(env_layout, 2, "Temperature:", f"{env['temperature']:.1f}°C ({self.celsius_to_fahrenheit(env['temperature']):.1f}°F)")
+            if 'pressure' in env:
+                self.add_data_row(env_layout, 3, "Pressure:", f"{env['pressure']:.1f} hPa ({self.hpa_to_inhg(env['pressure']):.2f} inHg)")
+            env_group.setLayout(env_layout)
         
-        # Flight Parameters Section
+        # Top row: Aircraft & Environment side-by-side (if Env present)
+        top_row = QWidget()
+        top_layout = QHBoxLayout(top_row)
+        top_layout.setContentsMargins(0,0,0,0)
+        top_layout.addWidget(aircraft_group, 2)
+        if env_group:
+            top_layout.addWidget(env_group, 1)
+        self.data_layout.addWidget(top_row)
+        
+        # Flight Parameters and Position side-by-side
         flight_group = self.create_section("Flight Parameters")
         flight_layout = QGridLayout()
         self.add_data_row(flight_layout, 0, "Altitude:", f"{data.altitude:.1f} m ({self.meters_to_feet(data.altitude):.0f} ft)")
@@ -653,17 +945,24 @@ class DataPadGUI(QMainWindow):
         if data.mach:
             self.add_data_row(flight_layout, 7, "Mach:", f"{data.mach:.2f}")
         flight_group.setLayout(flight_layout)
-        self.data_layout.addWidget(flight_group)
         
-        # Position Section
         position_group = self.create_section("Position")
         position_layout = QGridLayout()
         self.add_data_row(position_layout, 0, "Latitude:", f"{data.latitude:.6f}°")
         self.add_data_row(position_layout, 1, "Longitude:", f"{data.longitude:.6f}°")
         position_group.setLayout(position_layout)
-        self.data_layout.addWidget(position_group)
         
-        # Fuel Section
+        # Put flight and position side by side
+        side_row = QWidget()
+        side_layout = QHBoxLayout(side_row)
+        side_layout.setContentsMargins(0, 0, 0, 0)
+        side_layout.addWidget(flight_group, 2)
+        side_layout.addWidget(position_group, 1)
+        self.data_layout.addWidget(side_row)
+        
+        # Fuel Section (paired with AoA/G-Load when both exist)
+        fuel_group = None
+        aoa_group = None
         if data.fuel:
             fuel_group = self.create_section("Fuel")
             fuel_layout = QGridLayout()
@@ -677,9 +976,7 @@ class DataPadGUI(QMainWindow):
             if 'external' in fuel:
                 self.add_data_row(fuel_layout, 3, "External:", f"{fuel['external']:.0f} kg")
             fuel_group.setLayout(fuel_layout)
-            self.data_layout.addWidget(fuel_group)
         
-        # AoA & G-Load Section
         if data.angleOfAttack or data.gLoad:
             aoa_group = self.create_section("AoA & G-Load")
             aoa_layout = QGridLayout()
@@ -691,9 +988,23 @@ class DataPadGUI(QMainWindow):
                 if 'max' in data.gLoad:
                     self.add_data_row(aoa_layout, 2, "Max G:", f"{data.gLoad['max']:.2f}")
             aoa_group.setLayout(aoa_layout)
-            self.data_layout.addWidget(aoa_group)
         
-        # Engine Data Section
+        if fuel_group and aoa_group:
+            row = QWidget()
+            hl = QHBoxLayout(row)
+            hl.setContentsMargins(0,0,0,0)
+            hl.addWidget(fuel_group, 1)
+            hl.addWidget(aoa_group, 1)
+            self.data_layout.addWidget(row)
+        else:
+            if fuel_group:
+                self.data_layout.addWidget(fuel_group)
+            if aoa_group:
+                self.data_layout.addWidget(aoa_group)
+        
+        # Engine Data and Mechanical side-by-side when both exist
+        engine_group = None
+        mech_group = None
         if data.engines:
             engine_group = self.create_section("Engine Data")
             engine_layout = QGridLayout()
@@ -710,9 +1021,7 @@ class DataPadGUI(QMainWindow):
             if 'afterburner' in eng:
                 self.add_status_row(engine_layout, 3, "Afterburner:", eng['afterburner'])
             engine_group.setLayout(engine_layout)
-            self.data_layout.addWidget(engine_group)
         
-        # Mechanical Section (Gear, Flaps, etc.)
         if data.mechanical:
             mech_group = self.create_section("Mechanical")
             mech_layout = QGridLayout()
@@ -729,9 +1038,23 @@ class DataPadGUI(QMainWindow):
             if 'hook' in mech:
                 self.add_status_row(mech_layout, 3, "Hook:", mech['hook'])
             mech_group.setLayout(mech_layout)
-            self.data_layout.addWidget(mech_group)
         
-        # Weapons Section
+        if engine_group and mech_group:
+            row = QWidget()
+            hl = QHBoxLayout(row)
+            hl.setContentsMargins(0,0,0,0)
+            hl.addWidget(engine_group, 1)
+            hl.addWidget(mech_group, 1)
+            self.data_layout.addWidget(row)
+        else:
+            if engine_group:
+                self.data_layout.addWidget(engine_group)
+            if mech_group:
+                self.data_layout.addWidget(mech_group)
+        
+        # Weapons & Countermeasures (side-by-side if both present)
+        weapons_group = None
+        cm_group = None
         if data.weapons:
             weapons_group = self.create_section("Weapons")
             weapons_layout = QGridLayout()
@@ -743,9 +1066,7 @@ class DataPadGUI(QMainWindow):
             if 'totalCount' in wpn:
                 self.add_data_row(weapons_layout, 2, "Total Weapons:", str(wpn['totalCount']))
             weapons_group.setLayout(weapons_layout)
-            self.data_layout.addWidget(weapons_group)
-        
-        # Countermeasures Section
+
         if data.countermeasures:
             cm_group = self.create_section("Countermeasures")
             cm_layout = QGridLayout()
@@ -755,9 +1076,22 @@ class DataPadGUI(QMainWindow):
             if 'flareCount' in cm:
                 self.add_data_row(cm_layout, 1, "Flares:", str(cm['flareCount']))
             cm_group.setLayout(cm_layout)
-            self.data_layout.addWidget(cm_group)
-        
-        # RWR / Threats Section
+
+        if weapons_group and cm_group:
+            row = QWidget()
+            hl = QHBoxLayout(row)
+            hl.setContentsMargins(0,0,0,0)
+            hl.addWidget(weapons_group, 1)
+            hl.addWidget(cm_group, 1)
+            self.data_layout.addWidget(row)
+        else:
+            if weapons_group:
+                self.data_layout.addWidget(weapons_group)
+            if cm_group:
+                self.data_layout.addWidget(cm_group)
+
+        # RWR / Threats and Metadata side-by-side when both exist
+        rwr_group = None
         if data.rwr:
             rwr_group = self.create_section("RWR / Threats")
             rwr_layout = QGridLayout()
@@ -769,24 +1103,7 @@ class DataPadGUI(QMainWindow):
                     threat_info = f"{contact.get('type', 'Unknown')} @ {contact.get('bearing', 0):.0f}°"
                     self.add_data_row(rwr_layout, i+1, f"Contact {i+1}:", threat_info)
             rwr_group.setLayout(rwr_layout)
-            self.data_layout.addWidget(rwr_group)
-        
-        # Environment Section
-        if data.environment:
-            env_group = self.create_section("Environment")
-            env_layout = QGridLayout()
-            env = data.environment
-            if 'windDirection' in env:
-                self.add_data_row(env_layout, 0, "Wind Direction:", f"{env['windDirection']:.0f}°")
-            if 'windSpeed' in env:
-                self.add_data_row(env_layout, 1, "Wind Speed:", f"{env['windSpeed']:.1f} m/s")
-            if 'temperature' in env:
-                self.add_data_row(env_layout, 2, "Temperature:", f"{env['temperature']:.1f}°C ({self.celsius_to_fahrenheit(env['temperature']):.1f}°F)")
-            if 'pressure' in env:
-                self.add_data_row(env_layout, 3, "Pressure:", f"{env['pressure']:.1f} hPa ({self.hpa_to_inhg(env['pressure']):.2f} inHg)")
-            env_group.setLayout(env_layout)
-            self.data_layout.addWidget(env_group)
-        
+
         # Metadata Section
         meta_group = self.create_section("Additional Info")
         meta_layout = QGridLayout()
@@ -795,8 +1112,20 @@ class DataPadGUI(QMainWindow):
             self.add_data_row(meta_layout, 1, "Mission Time:", f"{data.missionTime:.1f}s")
         self.add_data_row(meta_layout, 2, "Timestamp:", data.timestamp)
         meta_group.setLayout(meta_layout)
-        self.data_layout.addWidget(meta_group)
-        
+
+        if rwr_group and meta_group:
+            row = QWidget()
+            hl = QHBoxLayout(row)
+            hl.setContentsMargins(0,0,0,0)
+            hl.addWidget(rwr_group, 1)
+            hl.addWidget(meta_group, 1)
+            self.data_layout.addWidget(row)
+        else:
+            if rwr_group:
+                self.data_layout.addWidget(rwr_group)
+            if meta_group:
+                self.data_layout.addWidget(meta_group)
+
         self.data_layout.addStretch()
     
     def create_section(self, title: str) -> QGroupBox:
@@ -805,14 +1134,15 @@ class DataPadGUI(QMainWindow):
         group.setStyleSheet("""
             QGroupBox {
                 font-weight: bold;
+                font-size: 9pt;
                 border: 1px solid #cccccc;
                 border-radius: 5px;
-                margin-top: 10px;
-                padding-top: 10px;
+                margin-top: 8px;
+                padding-top: 8px;
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
-                left: 10px;
+                left: 8px;
                 padding: 0 5px 0 5px;
             }
         """)
@@ -821,8 +1151,9 @@ class DataPadGUI(QMainWindow):
     def add_data_row(self, layout: QGridLayout, row: int, label: str, value: str):
         """Add a data row to the layout"""
         label_widget = QLabel(label)
-        label_widget.setStyleSheet("font-weight: bold;")
+        label_widget.setStyleSheet("font-weight: bold; font-size: 9pt;")
         value_widget = QLabel(str(value))
+        value_widget.setStyleSheet("font-size: 9pt;")
         layout.addWidget(label_widget, row, 0)
         layout.addWidget(value_widget, row, 1)
     
@@ -840,6 +1171,17 @@ class DataPadGUI(QMainWindow):
     # Unit conversion helpers
     def mps_to_knots(self, mps: float) -> float:
         return mps * 1.9438444924406
+
+    def add_status_row(self, layout: QGridLayout, row: int, label: str, active: bool):
+        """Add a status row with colored indicator"""
+        label_widget = QLabel(label)
+        label_widget.setStyleSheet("font-weight: bold; font-size: 9pt;")
+        status = "🟢 ON" if active else "⚫ OFF"
+        color = "green" if active else "gray"
+        value_widget = QLabel(status)
+        value_widget.setStyleSheet(f"color: {color}; font-size: 9pt;")
+        layout.addWidget(label_widget, row, 0)
+        layout.addWidget(value_widget, row, 1)
     
     def mps_to_fpm(self, mps: float) -> float:
         return mps * 196.850393701
