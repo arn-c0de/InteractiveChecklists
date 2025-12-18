@@ -32,6 +32,8 @@ InteractiveChecklists is an Android application for viewing and interacting with
 
 > **Note:** A preview APK for version 1.1 is planned. If you are not familiar with Android Studio or building apps from source, please wait for the official preview release to test the app.
 
+> **Current Development Focus (December 2025)**  
+> I am currently primarily working on the core infrastructure to enable secure data transfer between devices and DCS World. This includes finalizing the ECDH handshake implementation, preparing the groundwork for future squad mode (secure data sharing between multiple devices), and completing database integration and data formatting. These foundational changes are complex and time-intensive, which means progress on other areas—such as UI performance improvements, visual enhancements, and smaller features—is happening only on the side and at a slower pace. Thank you for your patience!
 
 **Table of Contents**
 
