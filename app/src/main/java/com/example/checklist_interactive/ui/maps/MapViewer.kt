@@ -621,7 +621,8 @@ fun MapViewer(
                                     else -> android.graphics.Color.parseColor("#9370DB")
                                 }
                                 
-                                // Create marker icon - try military symbol first
+                                // Create marker icon - try military symbol first, then icon field, then fallback
+                                var markerIcon: BitmapDrawable? = null
                                 try {
                                     // For military symbols, try to use the vector drawable icon
                                     if (marker.markerType == "tactical_military" && marker.symbolEntity.isNotEmpty()) {
@@ -630,7 +631,7 @@ fun MapViewer(
                                             val resName = "ic_mapicon_${'$'}{marker.symbolEntity}"
                                             val iconResId = context.resources.getIdentifier(resName, "drawable", context.packageName)
                                             if (iconResId != 0) {
-                                                val drawable = ContextCompat.getDrawable(context, iconResId)
+                                                val drawable = ContextCompat.getDrawable(context, iconResId)?.mutate()
                                                 drawable?.let { d ->
                                                     // Tint with affiliation color
                                                     val tintColor = when (marker.symbolAffiliation) {
@@ -645,10 +646,10 @@ fun MapViewer(
                                                     val canvas = android.graphics.Canvas(bitmap)
                                                     d.setBounds(0, 0, 64, 64)
                                                     d.draw(canvas)
-                                                    icon = BitmapDrawable(context.resources, bitmap)
+                                                    markerIcon = BitmapDrawable(context.resources, bitmap)
+                                                    Log.d(TAG, "Loaded military symbol icon for: ${'$'}{marker.symbolEntity}")
                                                 }
                                             } else {
-                                                // No drawable found for symbol entity; leave icon null so fallback applies
                                                 Log.d(TAG, "No map icon drawable for entity: ${'$'}{marker.symbolEntity}")
                                             }
                                         } catch (e: Exception) {
@@ -656,8 +657,29 @@ fun MapViewer(
                                         }
                                     }
                                     
+                                    // Try icon field if available (for airports etc.)
+                                    if (markerIcon == null && marker.icon.isNotEmpty()) {
+                                        try {
+                                            val iconResId = context.resources.getIdentifier(marker.icon, "drawable", context.packageName)
+                                            if (iconResId != 0) {
+                                                val drawable = ContextCompat.getDrawable(context, iconResId)?.mutate()
+                                                drawable?.let { d ->
+                                                    d.setTint(markerColor)
+                                                    val bitmap = android.graphics.Bitmap.createBitmap(64, 64, android.graphics.Bitmap.Config.ARGB_8888)
+                                                    val canvas = android.graphics.Canvas(bitmap)
+                                                    d.setBounds(0, 0, 64, 64)
+                                                    d.draw(canvas)
+                                                    markerIcon = BitmapDrawable(context.resources, bitmap)
+                                                    Log.d(TAG, "Loaded icon from icon field: ${'$'}{marker.icon}")
+                                                }
+                                            }
+                                        } catch (e: Exception) {
+                                            Log.e(TAG, "Failed to load icon from icon field: ${'$'}{marker.icon}", e)
+                                        }
+                                    }
+                                    
                                     // Fallback: create simple colored circle marker if no icon set
-                                    if (icon == null) {
+                                    if (markerIcon == null) {
                                         val bitmap = android.graphics.Bitmap.createBitmap(48, 48, android.graphics.Bitmap.Config.ARGB_8888)
                                         val canvas = android.graphics.Canvas(bitmap)
                                         val paint = android.graphics.Paint().apply {
@@ -673,9 +695,14 @@ fun MapViewer(
                                         }
                                         canvas.drawCircle(24f, 24f, 18f, paint)
                                         canvas.drawCircle(24f, 24f, 18f, strokePaint)
-                                        icon = BitmapDrawable(context.resources, bitmap)
+                                        markerIcon = BitmapDrawable(context.resources, bitmap)
+                                        Log.d(TAG, "Using fallback circle icon for: ${'$'}{marker.name} (type: ${'$'}{marker.markerType})")
                                     }
+                                    
+                                    // Set the icon
+                                    icon = markerIcon
                                 } catch (e: Exception) {
+                                    Log.e(TAG, "Failed to set marker icon for ${'$'}{marker.name}", e)
                                     // Use default marker
                                 }
                             }
@@ -1242,13 +1269,15 @@ fun MapViewer(
     // Military Symbol Picker Dialog
     if (showMilitarySymbolPicker) {
         MilitarySymbolPickerDialog(
-            onDismiss = { 
+            onDismiss = {
+                // Only close the dialog on dismiss; do not clear pending placement here
                 showMilitarySymbolPicker = false
-                pendingSymbolPlacement = null
             },
             onSymbolSelected = { symbol, affiliation ->
-                // Store selected symbol, wait for map click
+                // Store selected symbol and close dialog; user will tap map to place it
                 pendingSymbolPlacement = symbol to affiliation
+                Log.d(TAG, "Pending military symbol selected: ${symbol.name} (${affiliation.name})")
+                showMilitarySymbolPicker = false
             }
         )
     }
