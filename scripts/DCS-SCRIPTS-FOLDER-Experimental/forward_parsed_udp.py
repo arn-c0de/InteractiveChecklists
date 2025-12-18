@@ -71,7 +71,12 @@ def check_psk_security():
             sys.exit(1)
 
 def check_bind_security(bind_ip: str):
-    """Check if binding to all interfaces (0.0.0.0) and require confirmation"""
+    """Enhanced bind security check.
+
+    - Disallow 0.0.0.0 unconditionally.
+    - Warn (and require confirmation) for public IPs.
+    - Recommend using 127.0.0.1 for maximum safety.
+    """
     if bind_ip == '0.0.0.0':
         sys.stderr.write("\n" + "="*70 + "\n")
         sys.stderr.write("🚨 CRITICAL SECURITY WARNING: Binding to ALL network interfaces is BLOCKED!\n")
@@ -87,6 +92,31 @@ def check_bind_security(bind_ip: str):
         sys.stderr.write("="*70 + "\n")
         sys.stderr.write("\n❌ Aborted. Binding to 0.0.0.0 is forbidden for security reasons.\n")
         sys.exit(1)
+
+    # Try to determine if the provided bind_ip is a public IP address.
+    try:
+        import ipaddress
+        addr = ipaddress.ip_address(bind_ip)
+        if not (addr.is_private or addr.is_loopback):
+            sys.stderr.write("\n" + "="*70 + "\n")
+            sys.stderr.write(f"⚠️ WARNING: Binding to public IP {bind_ip}!\n")
+            sys.stderr.write("This may expose the handshake listener to the internet or other untrusted networks.\n")
+            sys.stderr.write("If you really intend to bind to this IP, type 'ACCEPT_PUBLIC' to continue.\n")
+            sys.stderr.write("="*70 + "\n")
+            try:
+                response = input("Type 'ACCEPT_PUBLIC' to continue: ")
+            except (EOFError, KeyboardInterrupt):
+                response = ''
+            if response.strip() != 'ACCEPT_PUBLIC':
+                sys.stderr.write("\n❌ Aborted. Binding to public IP not confirmed.\n")
+                sys.exit(1)
+    except Exception:
+        # Could not parse IP (e.g. hostname) — warn and proceed, but log warning
+        logger.warning(f"⚠️ Could not determine if bind IP {bind_ip} is public; ensure this is intended")
+
+    # Recommend localhost for maximum safety
+    if bind_ip != '127.0.0.1':
+        logger.warning(f"⚠️ Binding to {bind_ip} - consider using 127.0.0.1 for localhost only")
 
 # Global nonce counter for SERVER side (0x01 prefix)
 _nonce_counter = 0
@@ -111,6 +141,72 @@ _ip_bans = {}  # IP -> ban_until_timestamp
 
 # DoS protection: Message size limits
 _MAX_HANDSHAKE_MESSAGE_SIZE = 8192  # 8KB max for handshake messages (prevents large payload attacks)
+
+# Maximum UDP payload (protocol limit). Subtract AEAD overhead when encrypting
+# to ensure ciphertext fits into a single UDP datagram.
+_UDP_MAX_PAYLOAD = 65507
+_AES_GCM_OVERHEAD = 12 + 16  # nonce + tag
+# Conservative plaintext maximum so encrypted packet stays under UDP limit
+_MAX_DATA_MESSAGE_SIZE = _UDP_MAX_PAYLOAD - _AES_GCM_OVERHEAD
+
+
+def validate_data_message(data: bytes, encrypt: bool = True) -> bool:
+    """Validate data message size before sending.
+
+    Returns: True if the data is within allowed limits, False otherwise.
+    """
+    if encrypt:
+        allowed = _MAX_DATA_MESSAGE_SIZE
+    else:
+        allowed = _UDP_MAX_PAYLOAD
+
+    if len(data) > allowed:
+        logger.warning(f"⚠️ Oversized data message: {len(data)} bytes (max {allowed})")
+        return False
+    return True
+
+
+def safe_json_parse(data: bytes | str, max_size: int = 8192, max_depth: int = 6) -> dict | None:
+    """Safely parse JSON with size and depth limits.
+
+    - data can be bytes or str
+    - max_size bounds the length of the input in bytes
+    - max_depth bounds nesting depth to avoid JSON bombs
+
+    Returns the parsed dict/list or None on failure.
+    """
+    try:
+        # Normalize to bytes for size check
+        if isinstance(data, str):
+            b = data.encode('utf-8')
+        else:
+            b = data
+
+        if len(b) > max_size:
+            logger.warning(f"⚠️ JSON too large: {len(b)} > {max_size}")
+            return None
+
+        s = b.decode('utf-8', errors='strict')
+        obj = json.loads(s)
+
+        def _check_depth(o, depth=0):
+            if depth > max_depth:
+                raise ValueError('JSON nesting too deep')
+            if isinstance(o, dict):
+                for v in o.values():
+                    _check_depth(v, depth + 1)
+            elif isinstance(o, list):
+                for v in o:
+                    _check_depth(v, depth + 1)
+
+        _check_depth(obj, 0)
+        return obj
+    except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as e:
+        logger.warning(f"⚠️ Invalid JSON: {e}")
+        return None
+    except Exception as e:
+        logger.debug(f"Unexpected error in safe_json_parse: {e}")
+        return None
 
 def check_ip_banned(ip: str) -> bool:
     """Check if IP is currently banned.
@@ -257,6 +353,42 @@ def validate_handshake_message(data: bytes, addr: tuple) -> bool:
 
     return True
 
+
+# Safe JSON parsing helper to limit size and nesting depth
+def safe_json_parse(data: bytes | str, max_size: int = 8192, max_depth: int = 6) -> dict | None:
+    """Safely parse JSON with size and depth limits.
+
+    Returns a dict/list on success or None on failure.
+    """
+    try:
+        if isinstance(data, bytes):
+            if len(data) > max_size:
+                raise ValueError(f"JSON too large: {len(data)} > {max_size}")
+            s = data.decode('utf-8', errors='strict')
+        else:
+            s = str(data)
+            if len(s.encode('utf-8')) > max_size:
+                raise ValueError(f"JSON too large: {len(s)} > {max_size}")
+
+        obj = json.loads(s)
+
+        # Validate structure depth
+        def check_depth(o, depth=0):
+            if depth > max_depth:
+                raise ValueError("JSON nesting too deep")
+            if isinstance(o, dict):
+                for v in o.values():
+                    check_depth(v, depth + 1)
+            elif isinstance(o, list):
+                for v in o:
+                    check_depth(v, depth + 1)
+
+        check_depth(obj)
+        return obj
+    except (json.JSONDecodeError, ValueError, UnicodeDecodeError) as e:
+        logger.warning(f"⚠️ Invalid or unsafe JSON: {e}")
+        return None
+
 def generate_nonce_server() -> bytes:
     """Generate counter-based nonce for SERVER (prevents collision).
     Format: [sender_id:1][reserved:3][counter:8] = 12 bytes
@@ -341,6 +473,10 @@ def send_udp(payload: bytes, host: str, port: int, sock: socket.socket, encrypt:
         device_id: Device ID to send to (for ECDH mode, looks up active session)
     """
     try:
+        # Validate payload size before doing expensive encryption work
+        if not validate_data_message(payload, encrypt=bool(session_mgr or encrypt)):
+            return False
+
         if session_mgr and device_id:
             # ECDH mode: get session for device and encrypt with session key
             session_id = session_mgr.device_sessions.get(device_id)
@@ -442,8 +578,12 @@ def tail_and_send(path: str, host: str, port: int, send_existing=False, once=Fal
 
                     # Try to parse as handshake message (PLAINTEXT - no PSK encryption)
                     try:
-                        msg_str = data.decode('utf-8')
-                        msg = json.loads(msg_str)
+                        # Use safe parser with size and depth limits
+                        msg = safe_json_parse(data, max_size=_MAX_HANDSHAKE_MESSAGE_SIZE)
+                        if not msg:
+                            # Parsing failed or message too large
+                            continue
+
                         if 'type' in msg and msg['type'] == 'ClientHello':
                             logger.info(f"📥 Received ClientHello from {addr}")
                             response = session_mgr.handle_client_hello(msg, addr)
@@ -459,8 +599,9 @@ def tail_and_send(path: str, host: str, port: int, send_existing=False, once=Fal
                             handshake_sock.sendto(response_json, addr)
                             if response.get('status') == 'ready':
                                 logger.info(f"✅ Session established with device {msg.get('sessionId', 'unknown')[:8]}...")
-                    except (json.JSONDecodeError, UnicodeDecodeError, KeyError):
+                    except Exception as decode_err:
                         # Not a handshake message or malformed, ignore
+                        logger.debug(f"Failed to parse handshake: {decode_err}")
                         pass
                 except socket.timeout:
                     # No handshake message, continue
@@ -539,14 +680,17 @@ def tail_and_send(path: str, host: str, port: int, send_existing=False, once=Fal
                 if sent:
                     if show_env:
                         try:
-                            obj = json.loads(jsonpart)
-                            env = obj.get('environment', {})
-                            temp = obj.get('temperature', env.get('temperature'))
-                            pres = obj.get('pressure', env.get('pressure'))
-                            wind = env.get('wind') or {'speed': env.get('windSpeed'), 'direction': env.get('windDirection')}
-                            wspeed = wind.get('speed')
-                            wdir = wind.get('direction')
-                            print(f"{ts} SENT {host}:{port} temp={temp}C pres={pres} wind={wspeed}@{wdir}")
+                            parsed = safe_json_parse(jsonpart, max_size=_MAX_DATA_MESSAGE_SIZE)
+                            if parsed is not None:
+                                env = parsed.get('environment', {})
+                                temp = parsed.get('temperature', env.get('temperature'))
+                                pres = parsed.get('pressure', env.get('pressure'))
+                                wind = env.get('wind') or {'speed': env.get('windSpeed'), 'direction': env.get('windDirection')}
+                                wspeed = wind.get('speed')
+                                wdir = wind.get('direction')
+                                print(f"{ts} SENT {host}:{port} temp={temp}C pres={pres} wind={wspeed}@{wdir}")
+                            else:
+                                print(f"{ts} SENT {host}:{port} {jsonpart}")
                         except Exception:
                             print(f"{ts} SENT {host}:{port} {jsonpart}")
                     else:
@@ -607,10 +751,18 @@ def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=Fals
                         logger.debug(f"📦 Received {len(data)} bytes from {addr}")
 
                         # Handshake messages are sent in PLAINTEXT for proper ECDH
-                        msg_str = data.decode('utf-8')
-                        # SECURITY: Only log full message in debug mode to avoid exposing sensitive data
-                        logger.debug(f"📄 Full message: {msg_str}")
-                        msg = json.loads(msg_str)
+                        msg = safe_json_parse(data, max_size=_MAX_HANDSHAKE_MESSAGE_SIZE)
+                        if not msg:
+                            logger.debug("Failed to parse handshake message or message too large")
+                            continue
+
+                        # SECURITY: Avoid logging full message contents; show a short preview/truncated
+                        try:
+                            preview = json.dumps(msg)
+                            logger.debug(f"📄 Full message (truncated): {preview[:200]}")
+                        except Exception:
+                            logger.debug("📄 Full message: <unserializable>")
+
                         logger.info(f"📨 Received {msg.get('type', 'Unknown')} from {addr[0]}")
                         logger.debug(f"📊 Message keys: {list(msg.keys())}")
 
@@ -629,7 +781,7 @@ def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=Fals
                             handshake_sock.sendto(response_json, addr)
                             if response.get('status') == 'ready':
                                 logger.info(f"✅ Session established with device {msg.get('sessionId', 'unknown')[:8]}...")
-                    except (json.JSONDecodeError, UnicodeDecodeError, KeyError) as decode_err:
+                    except Exception as decode_err:
                         # Not a handshake message or malformed, ignore
                         logger.debug(f"Failed to parse handshake: {decode_err}")
                         pass
@@ -683,14 +835,17 @@ def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=Fals
                     if sent:
                         if show_env:
                             try:
-                                obj = json.loads(jsonpart)
-                                env = obj.get('environment', {})
-                                temp = obj.get('temperature', env.get('temperature'))
-                                pres = obj.get('pressure', env.get('pressure'))
-                                wind = env.get('wind') or {'speed': env.get('windSpeed'), 'direction': env.get('windDirection')}
-                                wspeed = wind.get('speed')
-                                wdir = wind.get('direction')
-                                print(f"{ts} REPEAT {host}:{port} temp={temp}C pres={pres} wind={wspeed}@{wdir}")
+                                parsed = safe_json_parse(jsonpart, max_size=_MAX_DATA_MESSAGE_SIZE)
+                                if parsed is not None:
+                                    env = parsed.get('environment', {})
+                                    temp = parsed.get('temperature', env.get('temperature'))
+                                    pres = parsed.get('pressure', env.get('pressure'))
+                                    wind = parsed.get('wind') or {'speed': env.get('windSpeed'), 'direction': env.get('windDirection')}
+                                    wspeed = wind.get('speed')
+                                    wdir = wind.get('direction')
+                                    print(f"{ts} REPEAT {host}:{port} temp={temp}C pres={pres} wind={wspeed}@{wdir}")
+                                else:
+                                    print(f"{ts} REPEAT {host}:{port} {jsonpart}")
                             except Exception:
                                 print(f"{ts} REPEAT {host}:{port} {jsonpart}")
                         else:
