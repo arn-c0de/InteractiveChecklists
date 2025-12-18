@@ -6,5 +6,6 @@ import kotlinx.serialization.Serializable
 data class SourceEntry(
     val name: String,
     val website: String? = null,
-    val license: String? = null
+    val license: String? = null,
+    val author: String? = null
 )
