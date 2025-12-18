@@ -98,7 +98,9 @@ class SessionData:
         # Counter for nonce generation (thread-safe)
         self._nonce_counter = 0
         self._nonce_lock = __import__('threading').Lock()
-        self._received_nonces = set()
+        from collections import deque
+        self._received_nonces = deque(maxlen=1000)  # Auto-evicts oldest
+        self._nonce_counter_min = 0  # Track minimum accepted counter
 
     def is_expired(self, timeout_seconds: int = 900) -> bool:
         """Check if session has expired (default 15 minutes - shorter for security)"""
@@ -109,11 +111,22 @@ class SessionData:
         self.last_activity = time.time()
 
     def generate_nonce(self) -> bytes:
-        """Generate counter-based nonce for this session (SERVER side, 0x01 prefix)"""
+        """Generate counter-based nonce for this session (SERVER side, 0x01 prefix) with exhaustion protection and rekey warning."""
         with self._nonce_lock:
             self._nonce_counter += 1
+
+            # Trigger re-key at 75% capacity (2^62 messages)
+            if self._nonce_counter >= (2**64 * 0.75):
+                logger.warning(f"⚠️ Nonce counter at 75% capacity for session {self.session_id[:8]}...")
+                # Signal to application layer that re-keying is needed
+                self._needs_rekey = True
+
             if self._nonce_counter >= 2**64:
-                raise RuntimeError(f"Nonce counter exhausted for session {self.session_id} - re-key required!")
+                logger.critical(f"🚨 Nonce counter exhausted for session {self.session_id[:8]}!")
+                # Instead of crashing, invalidate the session
+                self._is_valid = False
+                raise RuntimeError("Nonce exhausted - session invalidated")
+
             # Format: 0x01 (server) + 3 bytes reserved + 8 bytes counter
             return bytes([0x01, 0x00, 0x00, 0x00]) + self._nonce_counter.to_bytes(8, 'big')
 
@@ -122,6 +135,7 @@ class SessionData:
 
         Nonce format: [sender_id:1][reserved:3][counter:8]
         For messages coming from the client to the server, sender_id MUST be 0x00.
+        Uses a sliding window with automatic eviction for memory safety.
         """
         if len(nonce) != 12:
             return False
@@ -135,9 +149,13 @@ class SessionData:
         counter = int.from_bytes(nonce[4:12], 'big')
 
         with self._nonce_lock:
-            if counter in self._received_nonces:
-                logger.warning(f"⚠️ Replay attack detected in session {self.session_id[:8]}... ! Nonce counter: {counter}")
+            # Reject if too old (sliding window)
+            if counter < self._nonce_counter_min:
+                logger.warning(f"⚠️ Nonce too old: {counter} < {self._nonce_counter_min}")
+                return False
 
+            if counter in self._received_nonces:
+                logger.warning(f"⚠️ Replay attack: {counter}")
                 # SECURITY AUDIT: Log replay attack
                 get_audit_logger().log_event('replay_attack_detected', 'critical', {
                     'session_id': self.session_id[:8] + '...',
@@ -145,13 +163,14 @@ class SessionData:
                     'nonce_counter': counter,
                     'reason': 'Duplicate nonce counter detected'
                 })
-
                 return False
-            self._received_nonces.add(counter)
-            # Cleanup old nonces (reduced threshold from 10000 to 1000 for security)
-            if len(self._received_nonces) > 1000:
-                old_nonces = sorted(self._received_nonces)[:500]
-                self._received_nonces.difference_update(old_nonces)
+
+            self._received_nonces.append(counter)
+
+            # Update minimum periodically
+            if len(self._received_nonces) >= 1000:
+                self._nonce_counter_min = min(self._received_nonces)
+
         return True
 
 
@@ -201,6 +220,9 @@ class SessionManager:
         self.BLACKLIST_DURATION_BASE = 300.0  # 5 minutes base blacklist duration
         self.MAX_BLACKLIST_DURATION = 86400.0  # 24 hours max blacklist
 
+        # Persistent IP blacklist file (stored next to authorized_devices file)
+        self._blacklist_file = self.authorized_devices_path.with_name('ip_blacklist.json')
+
         # Generate server key pair (ephemeral, regenerated each run)
         self.server_private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
         self.server_public_key = self.server_private_key.public_key()
@@ -210,6 +232,12 @@ class SessionManager:
 
         # Load authorized devices (SECURITY: Only loaded once at startup)
         self.load_authorized_devices()
+
+        # Load persistent IP blacklist (if present)
+        try:
+            self._load_ip_blacklist()
+        except Exception as e:
+            logger.debug(f"Could not load IP blacklist: {e}")
 
         # Start periodic cleanup thread
         self._start_cleanup_thread()
@@ -335,52 +363,56 @@ class SessionManager:
         Uses cooldown to avoid excessive file system checks (checks at most once per minute).
         """
         try:
-            # Only check if we have a baseline hash
-            if self._whitelist_hash is None or self._whitelist_mtime is None:
-                return
+            # Acquire lock to avoid race conditions between concurrent checks and updates
+            with self._whitelist_lock:
+                # Only check if we have a baseline hash
+                if self._whitelist_hash is None or self._whitelist_mtime is None:
+                    return
 
-            # Cooldown: only check periodically to avoid excessive filesystem operations
-            current_time = time.time()
-            if current_time - self._whitelist_last_check < self._whitelist_check_interval:
-                return
+                # Cooldown: only check periodically to avoid excessive filesystem operations
+                current_time = time.time()
+                if current_time - self._whitelist_last_check < self._whitelist_check_interval:
+                    return
 
-            self._whitelist_last_check = current_time
+                # Update last-check timestamp while holding the lock so other threads
+                # won't repeat the expensive filesystem check concurrently
+                self._whitelist_last_check = current_time
 
-            # Get current file stats
-            file_stat = os.stat(self.authorized_devices_path)
-            current_mtime = file_stat.st_mtime
+                # Get current file stats
+                file_stat = os.stat(self.authorized_devices_path)
+                current_mtime = file_stat.st_mtime
 
-            # Quick check: has modification time changed?
-            if current_mtime != self._whitelist_mtime:
-                # File has been modified - compute hash to verify
-                with open(self.authorized_devices_path, 'rb') as f:
-                    file_content = f.read()
-                current_hash = hashlib.sha256(file_content).hexdigest()
+                # Quick check: has modification time changed?
+                if current_mtime != self._whitelist_mtime:
+                    # File has been modified - compute hash to verify
+                    with open(self.authorized_devices_path, 'rb') as f:
+                        file_content = f.read()
+                    current_hash = hashlib.sha256(file_content).hexdigest()
 
-                if current_hash != self._whitelist_hash:
-                    # File content has CHANGED - potential security issue!
-                    logger.critical(f"🚨 SECURITY ALERT: Whitelist file has been MODIFIED since loading!")
-                    logger.critical(f"   Original hash: {self._whitelist_hash[:16]}...")
-                    logger.critical(f"   Current hash:  {current_hash[:16]}...")
-                    logger.critical(f"   Original mtime: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self._whitelist_mtime))}")
-                    logger.critical(f"   Current mtime:  {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(current_mtime))}")
-                    logger.critical(f"   ⚠️  Changes will NOT take effect until server restart!")
-                    logger.critical(f"   ⚠️  If this change was unauthorized, investigate immediately!")
+                    if current_hash != self._whitelist_hash:
+                        # File content has CHANGED - potential security issue!
+                        logger.critical(f"🚨 SECURITY ALERT: Whitelist file has been MODIFIED since loading!")
+                        logger.critical(f"   Original hash: {self._whitelist_hash[:16]}...")
+                        logger.critical(f"   Current hash:  {current_hash[:16]}...")
+                        logger.critical(f"   Original mtime: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self._whitelist_mtime))}")
+                        logger.critical(f"   Current mtime:  {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(current_mtime))}")
+                        logger.critical(f"   ⚠️  Changes will NOT take effect until server restart!")
+                        logger.critical(f"   ⚠️  If this change was unauthorized, investigate immediately!")
 
-                    # SECURITY AUDIT: Log critical event
-                    get_audit_logger().log_event('whitelist_modified_after_load', 'critical', {
-                        'original_hash': self._whitelist_hash,
-                        'current_hash': current_hash,
-                        'original_mtime': self._whitelist_mtime,
-                        'current_mtime': current_mtime,
-                        'loaded_at': self._whitelist_load_time,
-                        'detected_at': time.time(),
-                        'action': 'Change detected but NOT applied - restart required'
-                    })
+                        # SECURITY AUDIT: Log critical event
+                        get_audit_logger().log_event('whitelist_modified_after_load', 'critical', {
+                            'original_hash': self._whitelist_hash,
+                            'current_hash': current_hash,
+                            'original_mtime': self._whitelist_mtime,
+                            'current_mtime': current_mtime,
+                            'loaded_at': self._whitelist_load_time,
+                            'detected_at': time.time(),
+                            'action': 'Change detected but NOT applied - restart required'
+                        })
 
-                    # Update our tracking to avoid repeated warnings (but don't reload!)
-                    self._whitelist_hash = current_hash
-                    self._whitelist_mtime = current_mtime
+                        # Update our tracking to avoid repeated warnings (but don't reload!)
+                        self._whitelist_hash = current_hash
+                        self._whitelist_mtime = current_mtime
 
         except FileNotFoundError:
             logger.critical(f"🚨 SECURITY ALERT: Whitelist file has been DELETED!")
@@ -391,19 +423,27 @@ class SessionManager:
         except Exception as e:
             logger.debug(f"Error checking whitelist integrity: {e}")
 
-    def reload_authorized_devices(self, force: bool = False) -> bool:
-        """Manually reload the authorized devices whitelist.
+    def _reload_authorized_devices_internal(self, force: bool = False, admin_token: str = None) -> bool:
+        """
+        Manually reload the authorized devices whitelist (INTERNAL - requires admin token).
 
-        SECURITY: This method provides a way for administrators to reload the whitelist
-        without restarting the server, but requires explicit action. Should only be called
-        via a secure administrative interface or signal handler.
+        SECURITY: This method should only be called via a secure administrative interface.
+        Requires a valid admin token (set in the ADMIN_RELOAD_TOKEN environment variable).
 
         Args:
             force: If True, reload even if file hasn't changed. If False, only reload if modified.
+            admin_token: The admin token for authentication.
 
         Returns:
             True if whitelist was reloaded, False otherwise.
         """
+        expected_token = os.environ.get('ADMIN_RELOAD_TOKEN')
+        if not expected_token or admin_token != expected_token:
+            logger.critical("🚨 Unauthorized whitelist reload attempt!")
+            get_audit_logger().log_event('unauthorized_reload_attempt', 'critical', {
+                'timestamp': time.time()
+            })
+            return False
         try:
             # Check if file has been modified
             file_stat = os.stat(self.authorized_devices_path)
@@ -437,8 +477,44 @@ class SessionManager:
             logger.error(f"❌ Failed to reload whitelist: {e}")
             return False
 
+    def _load_ip_blacklist(self):
+        """Load persisted IP blacklist from disk (only active bans are loaded)."""
+        try:
+            with self.rate_limit_lock:
+                if not self._blacklist_file.exists():
+                    return
+                with open(self._blacklist_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                now = time.time()
+                loaded = {}
+                for entry in data:
+                    try:
+                        ip, until, count = entry
+                        if float(until) > now:
+                            loaded[ip] = (float(until), int(count))
+                    except Exception:
+                        continue
+                self.ip_blacklist = loaded
+                if loaded:
+                    logger.info(f"🔒 Loaded {len(loaded)} active blacklisted IPs from {self._blacklist_file}")
+        except Exception as e:
+            logger.error(f"❌ Failed to load ip blacklist: {e}")
+
+    def _save_ip_blacklist(self):
+        """Persist current IP blacklist to disk (only active bans are saved)."""
+        try:
+            with self.rate_limit_lock:
+                data = [[ip, until, count] for ip, (until, count) in self.ip_blacklist.items() if float(until) > time.time()]
+                tmp = self._blacklist_file.with_suffix('.tmp')
+                with open(tmp, 'w', encoding='utf-8') as f:
+                    json.dump(data, f)
+                # Atomic replace
+                os.replace(str(tmp), str(self._blacklist_file))
+        except Exception as e:
+            logger.error(f"❌ Failed to save ip blacklist: {e}")
+
     def is_ip_blacklisted(self, ip_address: str) -> bool:
-        """Check if IP is blacklisted and add to blacklist if rate limit exceeded"""
+        """Check if IP is blacklisted and remove expired entries (persist changes)."""
         with self.rate_limit_lock:
             current_time = time.time()
 
@@ -449,12 +525,16 @@ class SessionManager:
                     logger.warning(f"🚫 IP {ip_address} is blacklisted until {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(blacklist_until))}")
                     return True
                 else:
-                    # Blacklist expired, remove entry
+                    # Blacklist expired, remove entry and persist change
                     del self.ip_blacklist[ip_address]
+                    try:
+                        self._save_ip_blacklist()
+                    except Exception as e:
+                        logger.debug(f"Failed to persist blacklist removal: {e}")
             return False
 
     def add_to_blacklist(self, ip_address: str):
-        """Add IP to blacklist with exponential backoff"""
+        """Add IP to blacklist with exponential backoff and persist to disk"""
         with self.rate_limit_lock:
             current_time = time.time()
 
@@ -481,6 +561,12 @@ class SessionManager:
                 'blacklist_duration_seconds': blacklist_duration,
                 'blacklist_until': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(blacklist_until))
             })
+
+            # Persist blacklist state to disk
+            try:
+                self._save_ip_blacklist()
+            except Exception as e:
+                logger.error(f"❌ Failed to persist ip blacklist: {e}")
 
     def is_rate_limited(self, ip_address: str) -> bool:
         """Check if IP address is rate limited for handshake attempts"""
@@ -568,6 +654,13 @@ class SessionManager:
             ]
             for ip in expired_blacklist:
                 del self.ip_blacklist[ip]
+
+            # Persist blacklist changes if any expired entries were removed
+            if expired_blacklist:
+                try:
+                    self._save_ip_blacklist()
+                except Exception as e:
+                    logger.debug(f"Failed to persist blacklist cleanup: {e}")
 
             if expired_ips or expired_devices or expired_blacklist:
                 logger.debug(f"🧹 Cleaned up {len(expired_ips)} IP limits, {len(expired_devices)} device limits, {len(expired_blacklist)} blacklist entries")
@@ -731,33 +824,25 @@ class SessionManager:
                 backend=default_backend()
             )
 
-            # SECURITY: Validate ECDH public key
-            if not isinstance(client_public_key, ec.EllipticCurvePublicKey):
-                logger.error(f"❌ Invalid key type for device {device_id[:8]}...")
-                return {
-                    "type": "Error",
-                    "error": "InvalidPublicKeyType",
-                    "message": "Public key must be an EC key",
-                    "timestamp": int(server_time)
-                }
+            # SECURITY: Validate ECDH public key properties
+            try:
+                if not isinstance(client_public_key, ec.EllipticCurvePublicKey):
+                    raise ValueError("Public key must be an EC key")
 
-            if not isinstance(client_public_key.curve, ec.SECP256R1):
-                logger.error(f"❌ Invalid curve for device {device_id[:8]}... - only SECP256R1 allowed")
-                return {
-                    "type": "Error",
-                    "error": "InvalidCurve",
-                    "message": "Only SECP256R1 curve is allowed",
-                    "timestamp": int(server_time)
-                }
+                if not isinstance(client_public_key.curve, ec.SECP256R1):
+                    raise ValueError("Only SECP256R1 curve is allowed")
 
-            # Validate public key is not point at infinity
-            public_numbers = client_public_key.public_numbers()
-            if public_numbers.x == 0 and public_numbers.y == 0:
-                logger.error(f"❌ Invalid public key (point at infinity) for device {device_id[:8]}...")
+                # Validate public key is not point at infinity
+                public_numbers = client_public_key.public_numbers()
+                if public_numbers.x == 0 and public_numbers.y == 0:
+                    raise ValueError("Point at infinity")
+
+            except Exception as e:
+                logger.error(f"❌ Invalid EC public key for device {device_id[:8]}...: {e}")
                 return {
                     "type": "Error",
                     "error": "InvalidPublicKey",
-                    "message": "Public key is invalid (point at infinity)",
+                    "message": f"Invalid EC public key: {e}",
                     "timestamp": int(server_time)
                 }
 
