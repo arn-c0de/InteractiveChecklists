@@ -2,6 +2,8 @@
 
 All relevant changes are summarized here by version.
 ## [1.0.13] - 2025-12-17
+### Patches
+- **Security patch:** forwarder communication (2025-12-18)
 
 
 ## [1.0.12] - 2025-12-17
