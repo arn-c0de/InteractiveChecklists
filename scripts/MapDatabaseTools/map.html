@@ -320,14 +320,22 @@
                     }
                 };
                 
-                window.updateMarkers = function(markersJson) {
+                window.updateMarkers = function(markers) {
                     try {
-                        var markers = JSON.parse(markersJson);
+                        // markers is already a JS object (no need to parse)
                         
                         // Clear existing markers
                         markersLayer.clearLayers();
                         locationMarkers = {};
-                        
+
+                        // Debug: show first marker icon keys/size
+                        if (markers.length > 0) {
+                            try {
+                                console.log('First marker icon keys:', markers[0] && markers[0].icon ? Object.keys(markers[0].icon) : 'none');
+                                console.log('First marker icon html length:', markers[0] && markers[0].icon && markers[0].icon.html ? markers[0].icon.html.length : 0);
+                            } catch (e) {}
+                        }
+
                         // Add new markers
                         markers.forEach(function(m) {
                             try {
@@ -341,10 +349,17 @@
                                 });
                                 
                                 var marker = L.marker([m.lat, m.lon], { icon: icon });
+
+                                // Track clicks on marker, make available to Python via getClickedMarker()
+                                marker.on('click', function() {
+                                    try { window._lastClickedMarker = m.id; } catch(e) {}
+                                });
                                 
-                                // Build popup content
+                                // Build popup content with Edit button
                                 var popupContent = '<div style="font-family: sans-serif;">';
                                 popupContent += '<h3 style="margin: 0 0 5px 0;">' + m.name + '</h3>';
+                                popupContent += '<div style="margin-top:6px;">';
+                                popupContent += '<button onclick="try{ window.requestEditMarker(' + m.id + '); }catch(e){}" style="padding:4px 8px;margin-right:6px;">✏️ Edit</button>';
                                 
                                 if (m.icao) {
                                     popupContent += '<p style="margin: 2px 0;"><b>ICAO:</b> ' + m.icao + '</p>';
@@ -382,6 +397,32 @@
                                 console.error('Error adding marker:', e, m);
                             }
                         });
+
+                        // Provide getters for Python to poll for marker interactions
+                        window.getClickedMarker = function() {
+                            try {
+                                var id = window._lastClickedMarker || null;
+                                window._lastClickedMarker = null;
+                                return JSON.stringify(id);
+                            } catch (e) {
+                                return JSON.stringify(null);
+                            }
+                        };
+
+                        window.requestEditMarker = function(id) {
+                            try { window._popupEditId = id; } catch (e) {}
+                        };
+
+                        window.getPopupEditRequest = function() {
+                            try {
+                                var id = window._popupEditId || null;
+                                window._popupEditId = null;
+                                return JSON.stringify(id);
+                            } catch (e) {
+                                return JSON.stringify(null);
+                            }
+                        };
+
                         
                         console.log('Updated ' + markers.length + ' markers');
                         
@@ -515,9 +556,9 @@
                     }
                 });
                 
-                window.updateBorders = function(bordersJson) {
+                window.updateBorders = function(borders) {
                     try {
-                        var borders = JSON.parse(bordersJson);
+                        // borders is already a JS object (no need to parse)
                         
                         // Clear existing borders
                         bordersLayer.clearLayers();

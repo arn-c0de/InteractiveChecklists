@@ -446,15 +446,16 @@ class DataPadGUI(QMainWindow):
         # Initial "No Data" display
         self.show_no_data()
         
-        # Load markers and borders on map after initial setup
-        QTimer.singleShot(1000, self.refresh_map_markers)
-        QTimer.singleShot(1500, self.refresh_map_borders)
-        
-        # Setup map click handler for border drawing
+        # Call marker/border refresh after the webview has loaded map.html
         if self.webview:
+            # Ensure we refresh only after page load (avoid calling updateMarkers before JS is defined)
+            self.webview.loadFinished.connect(self._on_map_load_finished)
             from PySide6.QtWebChannel import QWebChannel
             # For now, we'll poll for border drawing clicks via JavaScript callbacks
             # This is a simple implementation without WebChannel
+            # Start polling for marker clicks once map loaded
+            self._marker_click_timer = None
+            self._popup_edit_timer = None
         
     def create_header(self) -> QWidget:
         """Create header with connection status and controls"""
@@ -502,7 +503,64 @@ class DataPadGUI(QMainWindow):
         """Show settings dialog"""
         dialog = SettingsDialog(self.receiver, self)
         dialog.exec()
-        
+
+    def _on_map_load_finished(self, ok: bool):
+        """Called when map.html finished loading - schedule marker/border refreshes"""
+        if not ok:
+            print("Warning: map.html failed to load in webview")
+            return
+        # small delay to allow page scripts to initialize
+        QTimer.singleShot(200, self.refresh_map_markers)
+        QTimer.singleShot(400, self.refresh_map_borders)
+
+        # Start polling timers for marker clicks and popup edit requests
+        if self._marker_click_timer is None:
+            self._marker_click_timer = QTimer()
+            self._marker_click_timer.timeout.connect(self.poll_marker_clicks)
+            self._marker_click_timer.start(250)
+
+        if self._popup_edit_timer is None:
+            self._popup_edit_timer = QTimer()
+            self._popup_edit_timer.timeout.connect(self.poll_popup_edit_requests)
+            self._popup_edit_timer.start(500)
+
+    def _call_js_when_ready(self, func_name: str, js: str, result_callback=None, retries: int = 6, delay: int = 500):
+        """Call a JS function only when it's defined, retrying a few times if needed.
+
+        Args:
+            func_name: Name of the JS function to check (e.g., 'updateMarkers')
+            js: The JS expression/string to execute (e.g., "updateMarkers('...');")
+            result_callback: Optional Python callback to pass to runJavaScript
+            retries: Number of retry attempts
+            delay: Delay between retries in milliseconds
+        """
+        if not self.webview:
+            return
+
+        def _check_and_call(exists):
+            try:
+                if exists:
+                    if result_callback:
+                        self.webview.page().runJavaScript(js, result_callback)
+                    else:
+                        self.webview.page().runJavaScript(js)
+                    setattr(self, f"_{func_name}_js_retries", 0)
+                else:
+                    cnt = getattr(self, f"_{func_name}_js_retries", 0) + 1
+                    setattr(self, f"_{func_name}_js_retries", cnt)
+                    if cnt <= retries:
+                        # schedule another attempt
+                        QTimer.singleShot(delay, lambda: self._call_js_when_ready(func_name, js, result_callback, retries, delay))
+                    else:
+                        print(f"{func_name} not available after retries; skipping call")
+            except Exception as e:
+                print(f"Error executing JS for {func_name}: {e}")
+
+        # Ask the page whether the function exists
+        try:
+            self.webview.page().runJavaScript(f"typeof {func_name} === 'function'", _check_and_call)
+        except Exception as e:
+            print(f"Error checking for JS function {func_name}: {e}")        
     def toggle_receiver(self):
         """Toggle receiver on/off"""
         if self.receiver.running:
@@ -555,7 +613,7 @@ class DataPadGUI(QMainWindow):
         center_flag = 'true' if self.auto_center else 'false'
         js = f"setMarker({lat:.6f}, {lon:.6f}, {heading:.1f}, {center_flag});"
         try:
-            self.webview.page().runJavaScript(js)
+            self._call_js_when_ready('setMarker', js)
         except Exception:
             pass
 
@@ -566,10 +624,10 @@ class DataPadGUI(QMainWindow):
             return
         if fd.latitude == 0.0 and fd.longitude == 0.0:
             return
-        js = f"setMarker({fd.latitude:.6f}, {fd.longitude:.6f}, {fd.heading:.1f}, true);"
+        js = f"setMarker({fd.latitude:.6f}, {fd.longitude:.1f}, {fd.heading:.1f}, true);"
         try:
             if self.webview:
-                self.webview.page().runJavaScript(js)
+                self._call_js_when_ready('setMarker', js)
         except Exception:
             pass
     
@@ -579,7 +637,7 @@ class DataPadGUI(QMainWindow):
             # Center map on selected location
             js = f"centerMap({location.latitude:.6f}, {location.longitude:.6f});"
             try:
-                self.webview.page().runJavaScript(js)
+                self._call_js_when_ready('centerMap', js)
             except Exception:
                 pass
 
@@ -644,7 +702,7 @@ class DataPadGUI(QMainWindow):
             # Center map on border
             js = f"centerMap({center_lat:.6f}, {center_lon:.6f});"
             try:
-                self.webview.page().runJavaScript(js)
+                self._call_js_when_ready('centerMap', js)
             except Exception:
                 pass
     
@@ -673,7 +731,10 @@ class DataPadGUI(QMainWindow):
         try:
             # Activate drawing mode in map
             js = "startBorderDrawing();"
-            self.webview.page().runJavaScript(js)
+            try:
+                self._call_js_when_ready('startBorderDrawing', js)
+            except Exception as e:
+                print(f"Error starting border drawing (JS): {e}")
             
             # Start polling for clicks (simple implementation)
             self.border_click_timer = QTimer()
@@ -702,8 +763,11 @@ class DataPadGUI(QMainWindow):
             # Ask map to draw closing line/polygon for visual feedback
             pts_json = json.dumps(points)
             js = f"drawClosingLine({pts_json});"
-            # Draw closing line briefly
-            self.webview.page().runJavaScript(js)
+            # Draw closing line briefly (guarded)
+            try:
+                self._call_js_when_ready('drawClosingLine', js)
+            except Exception as e:
+                print(f"Error drawing closing line (JS): {e}")
             # Delay slightly to allow user to see closing line, then finalize
             from PySide6.QtCore import QTimer
             QTimer.singleShot(250, lambda: self._finalize_finish_drawing())
@@ -723,7 +787,10 @@ class DataPadGUI(QMainWindow):
         if self.webview:
             try:
                 js = "stopBorderDrawing();"
-                self.webview.page().runJavaScript(js)
+                try:
+                    self._call_js_when_ready('stopBorderDrawing', js)
+                except Exception:
+                    pass
             except Exception:
                 pass
     
@@ -738,13 +805,96 @@ class DataPadGUI(QMainWindow):
             return
         
         try:
-            # Get clicks from JavaScript
-            self.webview.page().runJavaScript(
-                "getBorderClicks();",
-                self.process_border_clicks
-            )
+            # Get clicks from JavaScript (guarded)
+            try:
+                self._call_js_when_ready('getBorderClicks', "getBorderClicks();", result_callback=self.process_border_clicks)
+            except Exception as e:
+                print(f"Error polling border clicks (JS): {e}")
         except Exception as e:
             print(f"Error polling border clicks: {e}")
+
+    def poll_marker_clicks(self):
+        """Poll for marker click events from the map"""
+        if not self.webview:
+            return
+        try:
+            try:
+                self._call_js_when_ready('getClickedMarker', "getClickedMarker();", result_callback=self.process_marker_click)
+            except Exception as e:
+                print(f"Error polling marker clicks (JS): {e}")
+        except Exception as e:
+            print(f"Error polling marker clicks: {e}")
+
+    def process_marker_click(self, id_json: str):
+        """Handle a marker click returned from JS (id as JSON string)"""
+        if not id_json:
+            return
+        try:
+            import json
+            marker_id = json.loads(id_json)
+            if not marker_id:
+                return
+            # Center map and select the location in the UI
+            try:
+                loc = self.db.get_location(marker_id)
+                if loc:
+                    # Center map on this location
+                    self.on_location_selected(loc)
+                    # Select it in the location manager list
+                    try:
+                        self.location_manager.select_location_by_id(marker_id)
+                    except Exception:
+                        pass
+            except Exception as e:
+                print(f"Error handling marker click: {e}")
+        except Exception:
+            pass
+
+    def poll_popup_edit_requests(self):
+        """Poll whether user clicked Edit in a popup (JS)"""
+        if not self.webview:
+            return
+        try:
+            try:
+                self._call_js_when_ready('getPopupEditRequest', "getPopupEditRequest();", result_callback=self.process_popup_edit_request)
+            except Exception as e:
+                print(f"Error polling popup edit requests (JS): {e}")
+        except Exception as e:
+            print(f"Error polling popup edit requests: {e}")
+
+    def process_popup_edit_request(self, id_json: str):
+        """Open edit dialog for marker requested via popup"""
+        if not id_json:
+            return
+        try:
+            import json
+            marker_id = json.loads(id_json)
+            if not marker_id:
+                return
+            try:
+                loc = self.db.get_location(marker_id)
+                if loc:
+                    # Open location edit dialog
+                    from gui.location_manager import LocationEditDialog
+                    dialog = LocationEditDialog(self.db, loc, None, self)
+                    if dialog.exec() == dialog.DialogCode.Accepted:
+                        try:
+                            success = self.db.update_location(loc)
+                            if success:
+                                # Refresh map and lists
+                                self.refresh_map_markers()
+                                try:
+                                    self.location_manager.refresh_list()
+                                except Exception:
+                                    pass
+                            else:
+                                print("Failed to update location from popup edit")
+                        except Exception as e:
+                            print(f"Error saving edited location: {e}")
+            except Exception as e:
+                print(f"Error opening edit dialog from popup: {e}")
+        except Exception:
+            pass
     
     def process_border_clicks(self, clicks_json: str):
         """Process border clicks received from map"""
@@ -809,13 +959,55 @@ class DataPadGUI(QMainWindow):
             markers_data = []
             
             for loc in locations:
-                # Get icon config
-                icon_config = TacticalMarkerStyle.get_leaflet_icon_config(
-                    loc.marker_type,
-                    loc.coalition or "",
-                    loc.tactical_symbol
-                )
-                
+                # Determine affiliation: prefer symbol_affiliation, fallback to coalition
+                aff = getattr(loc, 'symbol_affiliation', None) or (loc.coalition or "")
+                # Normalize legacy coalition names (BLUFOR/OPFOR/NEUTRAL)
+                if isinstance(aff, str) and aff.upper() in ("BLUFOR", "OPFOR", "NEUTRAL"):
+                    _map = {"BLUFOR": "friendly", "OPFOR": "hostile", "NEUTRAL": "neutral"}
+                    affiliation = _map.get(aff.upper(), aff.lower())
+                else:
+                    affiliation = aff.lower() if isinstance(aff, str) and aff else 'unknown'
+
+                # Prefer the new `symbol_entity`, then legacy `tactical_symbol` and `icon`
+                symbol_entity = getattr(loc, 'symbol_entity', None) or (loc.tactical_symbol or "")
+
+                # Try to get Android-compatible icon; if missing, fall back to a generic icon
+                try:
+                    if symbol_entity:
+                        icon_config = TacticalMarkerStyle.get_leaflet_icon_config(symbol_entity, affiliation)
+                    else:
+                        # No symbol specified - generic icon using affiliation color
+                        from core.marker_icons import get_affiliation_color
+                        color = get_affiliation_color(affiliation)
+                        icon_config = {'icon': 'info-sign', 'color': color, 'prefix': 'glyphicon'}
+                except Exception:
+                    # Symbol not available / failed to build - fallback to generic icon so marker is still visible
+                    from core.marker_icons import get_affiliation_color
+                    color = get_affiliation_color(affiliation)
+                    icon_config = {'icon': 'info-sign', 'color': color, 'prefix': 'glyphicon'}
+
+                # Ensure icon_config includes HTML fragment expected by map.html
+                if not isinstance(icon_config, dict):
+                    icon_config = {'icon': 'info-sign', 'color': '#FFFF80', 'prefix': 'glyphicon'}
+
+                if 'html' not in icon_config or not icon_config.get('html'):
+                    # construct simple colored square fallback
+                    color = icon_config.get('color', '#FFFF80')
+                    size = icon_config.get('iconSize', [28, 28])[0] if isinstance(icon_config.get('iconSize', None), list) else 28
+                    icon_config['html'] = f'<div style="width:{size}px;height:{size}px;background:{color};border-radius:4px;border:1px solid rgba(0,0,0,0.1)"></div>'
+                    icon_config['className'] = icon_config.get('className', 'custom-marker tactical-marker')
+                    icon_config['iconSize'] = icon_config.get('iconSize', [size, size])
+                    icon_config['iconAnchor'] = icon_config.get('iconAnchor', [size // 2, size // 2])
+                    icon_config['popupAnchor'] = icon_config.get('popupAnchor', [0, -size // 2])
+
+                # Debug: show keys and a short preview of html
+                try:
+                    print(f"Marker {loc.id} icon keys: {list(icon_config.keys())}; html_present={ 'html' in icon_config }")
+                    if 'html' in icon_config:
+                        print(f"Marker {loc.id} html preview: {str(icon_config['html'])[:80]}")
+                except Exception:
+                    pass
+
                 # Build marker info
                 marker_info = {
                     'id': loc.id,
@@ -825,7 +1017,7 @@ class DataPadGUI(QMainWindow):
                     'icon': icon_config,
                     'description': loc.description or "",
                     'type': loc.marker_type,
-                    'coalition': loc.coalition
+                    'coalition': affiliation
                 }
                 
                 # Add type-specific info
@@ -839,9 +1031,27 @@ class DataPadGUI(QMainWindow):
                 markers_data.append(marker_info)
             
             # Send to map as JSON
-            markers_json = json.dumps(markers_data).replace("'", "\\'")
-            js = f"updateMarkers('{markers_json}');"
-            self.webview.page().runJavaScript(js)
+            markers_json = json.dumps(markers_data)
+            print(f"Refreshing markers: {len(markers_data)} entries")
+
+            def _send_or_retry(exists):
+                if exists:
+                    # Pass JSON directly as JS object (no string wrapping to avoid escaping issues)
+                    js = f"updateMarkers({markers_json});"
+                    try:
+                        self.webview.page().runJavaScript(js)
+                    except Exception as e:
+                        print(f"Error executing updateMarkers JS: {e}")
+                    self._marker_js_retries = 0
+                else:
+                    self._marker_js_retries = getattr(self, '_marker_js_retries', 0) + 1
+                    if self._marker_js_retries <= 6:
+                        print(f"updateMarkers not defined yet; retrying ({self._marker_js_retries})")
+                        QTimer.singleShot(500, self.refresh_map_markers)
+                    else:
+                        print("updateMarkers not available after retries; skipping marker update")
+
+            self.webview.page().runJavaScript("typeof updateMarkers === 'function'", _send_or_retry)
             
         except Exception as e:
             print(f"Error refreshing markers: {e}")
@@ -867,10 +1077,26 @@ class DataPadGUI(QMainWindow):
                 }
                 borders_data.append(border_info)
             
-            # Send to map as JSON
-            borders_json = json.dumps(borders_data).replace("'", "\\'")
-            js = f"updateBorders('{borders_json}');"
-            self.webview.page().runJavaScript(js)
+            # Send to map as JSON (directly as JS object, no string wrapping)
+            borders_json = json.dumps(borders_data)
+
+            def _send_or_retry_b(exists):
+                if exists:
+                    js = f"updateBorders({borders_json});"
+                    try:
+                        self.webview.page().runJavaScript(js)
+                    except Exception as e:
+                        print(f"Error executing updateBorders JS: {e}")
+                    self._borders_js_retries = 0
+                else:
+                    self._borders_js_retries = getattr(self, '_borders_js_retries', 0) + 1
+                    if self._borders_js_retries <= 6:
+                        print(f"updateBorders not defined yet; retrying ({self._borders_js_retries})")
+                        QTimer.singleShot(500, self.refresh_map_borders)
+                    else:
+                        print("updateBorders not available after retries; skipping border update")
+
+            self.webview.page().runJavaScript("typeof updateBorders === 'function'", _send_or_retry_b)
             
         except Exception as e:
             print(f"Error refreshing borders: {e}")

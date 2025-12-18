@@ -675,7 +675,22 @@ class LocationManagerWidget(QWidget):
         
         # Update info label
         self.info_label.setText(f"{len(locations)} location(s)")
-    
+
+    def select_location_by_id(self, location_id: int):
+        """Select a location in the list by its database id and emit selection"""
+        for i in range(self.location_list.count()):
+            item = self.location_list.item(i)
+            data = item.data(Qt.ItemDataRole.UserRole)
+            if data and hasattr(data, 'id') and data.id == location_id:
+                self.location_list.setCurrentItem(item)
+                # Ensure visible
+                self.location_list.scrollToItem(item)
+                try:
+                    self.location_selected.emit(data)
+                except Exception:
+                    pass
+                return
+
     def on_item_clicked(self, item: QListWidgetItem):
         """Handle item click - emit signal with location"""
         location = item.data(Qt.ItemDataRole.UserRole)
