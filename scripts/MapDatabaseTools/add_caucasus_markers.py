@@ -31,12 +31,12 @@ def caucasus_samples():
             marker_type=MarkerType.AIRPORT.value,
             icao="UGTB",
             iata="TBS",
-            elevation_m=490.0,
-            runways=[Runway(name="13/31", length_m=3600, width_m=45, heading=130.0, surface="asphalt", ils=True)],
-            frequencies={"tower":118.1, "ground":121.9},
+            elevation_m=481.0,
+            runways=[Runway(name="13R/31L", length_m=3000, width_m=45, heading=136.54, surface="concrete", ils=True)],
+            frequencies={"tower":119.0, "tower_secondary":128.0, "ground":119.0, "approach":134.6, "atis":132.8, "apron":131.7},
             country="Georgia",
             tags=["airbase", "civilian"],
-            source="server.3rd-wing.net"
+            source="airnav.ge eAIP (UGTB)"
         ),
         Location(
             name="Zvartnots (Yerevan)",
@@ -45,12 +45,12 @@ def caucasus_samples():
             marker_type=MarkerType.AIRPORT.value,
             icao="UDYZ",
             iata="EVN",
-            elevation_m=862.0,
-            runways=[Runway(name="04/22", length_m=3500, width_m=45, heading=40.0, surface="asphalt", ils=True)],
-            frequencies={"tower":119.7},
+            elevation_m=864.5,
+            runways=[Runway(name="08/26", length_m=3850, width_m=56, heading=89.60, surface="asphalt/concrete", ils=True)],
+            frequencies={"approach":126.0, "tower":128.0, "ground":119.0, "atis":119.5},
             country="Armenia",
             tags=["airbase", "civilian"],
-            source="forum.dcs.world"
+            source="armats eAIP (UDYZ)"
         ),
         Location(
             name="Batumi Intl",
@@ -59,12 +59,12 @@ def caucasus_samples():
             marker_type=MarkerType.AIRPORT.value,
             icao="UGSB",
             iata="BUS",
-            elevation_m=8.0,
-            runways=[Runway(name="13/31", length_m=3200, width_m=45, heading=130.0, surface="asphalt")],
-            frequencies={"tower":118.5},
+            elevation_m=11.0,
+            runways=[Runway(name="12/30", length_m=2500, width_m=45, heading=130.89, surface="concrete/asphalt", ils=True)],
+            frequencies={"tower":118.6, "approach":124.425},
             country="Georgia",
             tags=["civilian"],
-            source="server.3rd-wing.net"
+            source="airnav.ge eAIP (UGSB)"
         ),
         Location(
             name="Soganlug (Yerevan East) - Test FARP",
@@ -77,7 +77,7 @@ def caucasus_samples():
             runways=None,
             country="Armenia",
             tags=["FARP", "military"],
-            source="server.3rd-wing.net"
+            source="local/community reports (no published eAIP)"
         ),
         # Russia / Kuban / North Caucasus
         Location(
@@ -87,11 +87,12 @@ def caucasus_samples():
             marker_type=MarkerType.AIRPORT.value,
             icao="URKA",
             iata="AAQ",
-            elevation_m=12.0,
+            elevation_m=53.0,
             runways=[Runway(name="06/24", length_m=2800, width_m=45, heading=60.0, surface="asphalt")],
+            frequencies={"approach":118.7, "tower":119.8},
             country="Russia",
             tags=["civilian"],
-            source="forum.dcs.world"
+            source="ourairports / aaqaero.ru"
         ),
         Location(
             name="Beslan",
@@ -100,11 +101,12 @@ def caucasus_samples():
             marker_type=MarkerType.AIRPORT.value,
             icao="URMO",
             iata="OGZ",
-            elevation_m=600.0,
+            elevation_m=510.0,
             runways=[Runway(name="10/28", length_m=3000, width_m=45, heading=100.0, surface="asphalt")],
+            frequencies={"tower":118.1, "radar":125.2, "transit":118.0},
             country="Russia",
             tags=["airbase", "civilian"],
-            source="forum.dcs.world"
+            source="mav.aero / OurAirports"
         ),
         Location(
             name="Gelendzhik",
@@ -113,11 +115,12 @@ def caucasus_samples():
             marker_type=MarkerType.AIRPORT.value,
             icao="URKG",
             iata="GDZ",
-            elevation_m=90.0,
-            runways=[Runway(name="06/24", length_m=3200, width_m=45, heading=60.0, surface="asphalt")],
+            elevation_m=30.0,
+            runways=[Runway(name="01/19", length_m=3100, width_m=45, heading=7.0, surface="hard", ils=True)],
+            frequencies={"atis":133.37, "atis_secondary":134.87, "tower":122.7, "tower_vyshka":121.0},
             country="Russia",
             tags=["civilian"],
-            source="forum.dcs.world"
+            source="GelAero / SkyVector / OurAirports"
         ),
         Location(
             name="Krasnodar – Pashkovsky",
@@ -126,11 +129,12 @@ def caucasus_samples():
             marker_type=MarkerType.AIRPORT.value,
             icao="URKK",
             iata="KRR",
-            elevation_m=10.0,
-            runways=[Runway(name="04/22", length_m=3600, width_m=60, heading=40.0, surface="asphalt", ils=True)],
+            elevation_m=36.0,
+            runways=[Runway(name="05R/23L", length_m=3000, width_m=45, heading=45.0, surface="hard", ils=True)],
+            frequencies={"approach":127.7, "approach_secondary":129.6, "atis":122.45, "tower":118.2, "tower_secondary":121.3, "ground":119.0},
             country="Russia",
             tags=["airbase", "civilian"],
-            source="forum.dcs.world"
+            source="SkyVector / OurAirports / krr.aero"
         ),
         Location(
             name="Krasnodar – Center",
@@ -141,7 +145,7 @@ def caucasus_samples():
             elevation_m=15.0,
             country="Russia",
             tags=["military"],
-            source="forum.dcs.world"
+            source="military/local sources (limited public data)"
         ),
         Location(
             name="Krymsk",
@@ -153,7 +157,7 @@ def caucasus_samples():
             runways=[Runway(name="09/27", length_m=3000, width_m=45, heading=90.0, surface="asphalt")],
             country="Russia",
             tags=["airbase"],
-            source="forum.dcs.world"
+            source="ourairports / forum.dcs.world"
         ),
         Location(
             name="Maykop – Khanskaya",
@@ -164,7 +168,7 @@ def caucasus_samples():
             elevation_m=70.0,
             country="Russia",
             tags=["military"],
-            source="dcsviper.gr"
+            source="limited public/military sources (e.g., dcsviper.gr)"
         ),
         Location(
             name="Mozdok (Mozdok Air Base)",
@@ -176,7 +180,7 @@ def caucasus_samples():
             elevation_m=1100.0,
             country="Russia",
             tags=["airbase"],
-            source="server.3rd-wing.net"
+            source="ourairports / server.3rd-wing.net"
         ),
         Location(
             name="Nalchik",
@@ -184,21 +188,27 @@ def caucasus_samples():
             longitude=43.6428,
             marker_type=MarkerType.AIRPORT.value,
             icao="URMN",
-            elevation_m=560.0,
+            iata="NAL",
+            elevation_m=445.0,
+            runways=[Runway(name="06/24", length_m=2200, width_m=42, heading=56.0, surface="asphalt")],
+            frequencies={"approach":"126.9 MHz", "tower":"118.3 MHz", "emergency":"121.50 MHz"},
             country="Russia",
             tags=["airbase", "civilian"],
-            source="server.3rd-wing.net"
+            source="OurAirports / SkyVector / Wikipedia"
         ),
         Location(
             name="Sukhumi – Babushara",
-            latitude=43.0316,
-            longitude=41.1603,
+            latitude=42.8582,
+            longitude=41.1281,
             marker_type=MarkerType.AIRPORT.value,
             icao="UGSS",
-            elevation_m=3.0,
+            iata="SUI",
+            elevation_m=20.0,
+            runways=[Runway(name="12/30", length_m=3640, width_m=52, heading=122.0, surface="asphalt")],
+            frequencies=None,
             country="Abkhazia",
-            tags=["airbase"],
-            source="server.3rd-wing.net"
+            tags=["civilian", "airbase"],
+            source="Sukhumaero / Wikipedia / PilotNav (DAFIF archive)"
         ),
         Location(
             name="Sochi – Adler",
@@ -207,11 +217,15 @@ def caucasus_samples():
             marker_type=MarkerType.AIRPORT.value,
             icao="URSS",
             iata="AER",
-            elevation_m=5.0,
-            runways=[Runway(name="06/24", length_m=3400, width_m=45, heading=60.0, surface="asphalt")],
+            elevation_m=27.0,
+            runways=[
+                Runway(name="02/20", length_m=2200, width_m=49, heading=29.0, surface="asphalt", ils=True),
+                Runway(name="06/24", length_m=2890, width_m=50, heading=65.0, surface="asphalt", ils=True)
+            ],
+            frequencies={"atis":"129.375 MHz", "approach":"118.8 MHz", "tower":"118.3 MHz", "ground":"119.0 MHz"},
             country="Russia",
             tags=["civilian"],
-            source="server.3rd-wing.net"
+            source="Wikipedia / PilotNav / OurAirports / aer.aero"
         ),
         # Additional Caucasus small/field airstrips
         Location(

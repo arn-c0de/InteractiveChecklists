@@ -80,7 +80,7 @@ def create_example_route(db: MarkersDatabase):
         print(f"  Total Distance: {route_data['total_distance_nm']:.1f} NM")
         print(f"\n  Waypoint Sequence:")
         for i, (loc, wp) in enumerate(route_data['waypoints']):
-            print(f"    {i+1}. {loc.name:25} @ {loc.latitude:.4f}, {loc.longitude:.4f}")
+            print(f"    {i+1}. {loc.name:25}")
             if wp.distance_nm and wp.heading_mag:
                 print(f"       → Next: {wp.distance_nm:.1f} NM on heading {wp.heading_mag:.0f}°")
 
@@ -126,17 +126,16 @@ def show_route(db: MarkersDatabase, route_id: int):
     print(f"Created: {route.created}")
     print(f"Modified: {route.modified}")
     
-    print(f"\n{'Seq':<5} {'Waypoint':<25} {'Position':<25} {'To Next':<20}")
-    print(f"{'-'*75}")
-    
+    print(f"\n{'Seq':<5} {'Waypoint':<25} {'To Next':<20}")
+    print(f"{'-'*55}")
+
     for i, (loc, wp) in enumerate(waypoints):
-        pos = f"{loc.latitude:.4f}, {loc.longitude:.4f}"
         if wp.distance_nm and wp.heading_mag:
             to_next = f"{wp.distance_nm:.1f} NM @ {wp.heading_mag:.0f}°"
         else:
             to_next = "(end)"
         
-        print(f"{i+1:<5} {loc.name:<25} {pos:<25} {to_next:<20}")
+        print(f"{i+1:<5} {loc.name:<25} {to_next:<20}")
     
     print(f"{'='*70}\n")
 

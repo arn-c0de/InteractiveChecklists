@@ -1163,6 +1163,6 @@ if __name__ == "__main__":
     # Display all locations
     print("\nAll locations:")
     for loc in db.get_all_locations():
-        print(f"  - {loc.name} ({loc.marker_type}) at {loc.latitude:.4f}, {loc.longitude:.4f}")
+        print(f"  - {loc.name} ({loc.marker_type})")
     
     db.close()
