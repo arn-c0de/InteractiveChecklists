@@ -1,655 +1,629 @@
-# Sicherheitsanalyse: DCS DataPad UDP-Forwarding System
+# Umfassende Sicherheitsanalyse
+## crypto_handshake.py & forward_parsed_udp.py
 
-**Analysierte Dateien:**
-- `forward_parsed_udp.py` (UDP-Forwarding mit AES-GCM-Verschlüsselung)
-- `crypto_handshake.py` (ECDH-Handshake und Session-Management)
-
-**Analysedatum:** 18. Dezember 2025
-
----
-
-## 🔴 KRITISCHE SICHERHEITSLÜCKEN
-
-
-### 2. **Fehlende Nonce-Validierung im Replay-Schutz** ✅ BEHOBEN
-**Schweregrad:** HOCH
-**Status:** ✅ Replay-Window von 10.000 auf 1.000 reduziert
-**Datei:** `forward_parsed_udp.py`, Zeile 106; `crypto_handshake.py`, Zeile 89
-
-**Problem:**
-- Die Nonce-Validierung prüft zwar auf Wiederholung, aber das Replay-Window ist sehr groß (10.000)
-- `_received_nonces` wächst unbegrenzt im Memory bis zum Cleanup
-- Ein Angreifer könnte alte Nonces innerhalb des Windows wiederverwenden
-- Bei hohem Traffic könnte der Memory-Verbrauch problematisch werden
-
-**Code-Schwachstelle:**
-```python
-_REPLAY_WINDOW = 10000  # sehr großes Fenster
-if counter in _received_nonces:  # Set kann sehr groß werden
-```
-
-**Empfehlung:**
-- Kleineres Replay-Window verwenden (z.B. 100-1000)
-- Sliding-Window-Algorithmus mit fixer Größe implementieren
-- Alte Nonces aggressiver entfernen
-- Memory-Limits setzen
+**Analysedatum:** 18. Dezember 2024  
+**Analyst:** Claude  
+**Kritikalität:** Hoch - Netzwerksicherheit & Kryptographie
 
 ---
 
-### 3. **Time-of-Check-Time-of-Use (TOCTOU) Race Condition** ✅ BEHOBEN
-**Schweregrad:** MITTEL-HOCH
-**Status:** ✅ Try/except statt exists()-Check verwendet
-**Datei:** `crypto_handshake.py`, Zeilen 139-171
+## Executive Summary
 
-**Problem:**
-```python
-def load_authorized_devices(self):
-    if not self.authorized_devices_path.exists():  # ← Check
-        logger.warning(f"⚠️ No authorized devices file found")
-        return
-    
-    with open(self.authorized_devices_path, 'r') as f:  # ← Use
-        data = json.load(f)
-```
+Die beiden analysierten Python-Skripte implementieren ein sicheres Kommunikationssystem für DCS (Digital Combat Simulator) mit ECDH-Schlüsselaustausch und AES-GCM-Verschlüsselung. Während die Implementierung grundsätzlich solide ist und moderne kryptographische Standards verwendet, wurden **15 kritische und hochgradige Sicherheitsprobleme** identifiziert.
 
-- Zwischen dem `exists()`-Check und dem `open()` kann die Datei gelöscht oder modifiziert werden
-- Könnte zu FileNotFoundError oder Injection führen
-
-**Empfehlung:**
-- Direkt `try/except` verwenden statt vorherigen Check:
-```python
-try:
-    with open(self.authorized_devices_path, 'r') as f:
-        data = json.load(f)
-except FileNotFoundError:
-    logger.warning("...")
-    self._create_empty_whitelist()
-```
+**Gesamtbewertung: 7/10** - Gut, aber mit kritischen Verbesserungspotenzialen
 
 ---
 
-### 4. **Unbegrenztes Wachstum von Session-Daten**
-**Schweregrad:** MITTEL  
-**Datei:** `crypto_handshake.py`, Zeilen 83-91
+## 🔴 KRITISCHE SICHERHEITSPROBLEME
 
-**Problem:**
-```python
-with self._nonce_lock:
-    if counter in self._received_nonces:
-        return False
-    self._received_nonces.add(counter)
-    # Cleanup nur wenn > 10000
-    if len(self._received_nonces) > 10000:
-        old_nonces = sorted(self._received_nonces)[:5000]
-        self._received_nonces.difference_update(old_nonces)
-```
-
-- Bei vielen parallelen Sessions können Nonce-Sets sehr groß werden
-- Cleanup erfolgt erst bei 10.000 Einträgen
-- `sorted()` auf großen Sets ist teuer (O(n log n))
-
-**Empfehlung:**
-- Häufigeren Cleanup durchführen
-- Effizientere Datenstruktur verwenden (z.B. Deque mit fixer Größe)
-- Memory-Limits pro Session setzen
-
----
-
-### 5. **Timestamp-Drift-Validierung zu großzügig** ✅ BEHOBEN
-**Schweregrad:** MITTEL
-**Status:** ✅ Von 5 Minuten auf 60 Sekunden reduziert
-**Datei:** `crypto_handshake.py`, Zeilen 268, 392
+### 1. **Default Pre-Shared Key in Produktion** (KRITISCH)
+**Datei:** `forward_parsed_udp.py` (Zeilen 45-49)  
+**Schweregrad:** 🔴 KRITISCH
 
 ```python
-MAX_TIME_DRIFT_MS = 300000  # 5 Minuten!
-time_diff = abs(server_time - client_timestamp)
-if time_diff > MAX_TIME_DRIFT_MS:
-    logger.warning(f"⚠️ Time drift too large: {time_diff/1000:.1f}s")
-    return {"type": "Error", ...}
+DEFAULT_PRE_SHARED_KEY = b'DCS_DataPad_Secret_Key_32BYTES!!'
+PRE_SHARED_KEY = DEFAULT_PRE_SHARED_KEY
 ```
 
 **Problem:**
-- 5 Minuten Zeittoleranz ist viel zu großzügig
-- Ermöglicht Replay-Angriffe mit alten ClientHello-Nachrichten
-- Angreifer könnte aufgezeichnete Handshakes bis zu 5 Minuten später wiederverwenden
+- Hardcodierter Default-PSK im Quellcode
+- Wenn Nutzer diesen nicht ändern, ist die Verschlüsselung wertlos
+- Der Key ist öffentlich im Repository sichtbar
 
-**Empfehlung:**
-- Reduzieren auf maximal 30-60 Sekunden
-- Nonce-basierter Schutz für Handshake-Nachrichten hinzufügen
-
----
-
-### 6. **Rate Limiting kann umgangen werden** ✅ BEHOBEN
-**Schweregrad:** MITTEL
-**Status:** ✅ Device-ID-basiertes Rate Limiting + IP-Blacklist mit Exponential Backoff
-**Datei:** `crypto_handshake.py`, Zeilen 120-131, 221-314, 405-432
-
-**Problem (vorher):**
-```python
-def check_rate_limit(self, client_ip: str) -> bool:
-    with self.rate_limit_lock:
-        if client_ip not in self.handshake_attempts:
-            self.handshake_attempts[client_ip] = (1, time.time())
-            return True
-```
-
-- Rate Limiting basierte nur auf IP-Adresse
-- Angreifer konnte IP-Adresse wechseln (IP-Spoofing bei UDP)
-- Keine Berücksichtigung von Device-IDs
-
-**Lösung (implementiert):**
-1. **Device-ID-basiertes Rate Limiting** (strenger als IP-basiert):
-   - `MAX_DEVICE_ATTEMPTS = 3` pro Minute (strenger als IP-Limit)
-   - Tracking von Violation-Count pro Device
-   - Funktioniert auch bei IP-Wechsel
-
-2. **IP-Blacklist mit Exponential Backoff**:
-   - Nach Rate-Limit-Verstößen wird IP geblacklisted
-   - Exponential Backoff: 5 min → 10 min → 20 min → ... bis 24h max
-   - Automatische Cleanup-Mechanismen
-
-3. **Dreistufige Prüfung** im Handshake:
-   - IP-Blacklist-Check (schnellster Reject)
-   - IP-Rate-Limiting (5 Versuche/Minute)
-   - Device-ID-Rate-Limiting (3 Versuche/Minute)
-
----
-
-### 7. **Potenzielle DoS-Anfälligkeit durch UDP-Flood** ✅ BEHOBEN
-**Schweregrad:** MITTEL-HOCH
-**Status:** ✅ Globales Message Rate Limiting + Buffer-Größe reduziert
-**Datei:** `forward_parsed_udp.py`, Zeilen 108-134, 314-317, 476-479
-
-**Problem (vorher):**
-```python
-while True:
-    # Check for handshakes
-    if session_mgr and handshake_sock:
-        try:
-            data, addr = handshake_sock.recvfrom(65535)  # Sehr großer Buffer
-            # Keine Rate Limiting
-```
-
-- Keine Begrenzung der Nachrichten pro Zeiteinheit
-- Große Buffer-Größe (65535 bytes)
-- Ein Angreifer konnte mit UDP-Flood den Service lahmlegen
-
-**Lösung (implementiert):**
-1. **Globales Message Rate Limiting**:
-   ```python
-   _MAX_MESSAGES_PER_SECOND = 100  # Global limit
-   _RATE_LIMIT_WINDOW_SECONDS = 1.0
-
-   def check_global_rate_limit() -> bool:
-       # Sliding window: remove old timestamps, check count, record new
-   ```
-   - Maximal 100 Handshake-Nachrichten pro Sekunde global
-   - Sliding Window Algorithmus für präzise Messung
-   - Automatisches Cleanup alter Timestamps
-
-2. **Buffer-Größe reduziert**:
-   - Von 65535 → 4096 bytes
-   - Verhindert Memory-Erschöpfung bei Flood
-
-3. **Integration in beiden Modi** (tail_and_send & repeat_last_line):
-   - Rate Limit wird VOR Message-Parsing geprüft
-   - Überschüssige Messages werden sofort gedroppt mit Warnung
-
----
-
-## 🟡 MITTLERE SICHERHEITSRISIKEN
-
-### 8. **Fehlende Input-Validierung bei JSON-Parsing** ✅ BEHOBEN
-**Schweregrad:** MITTEL
-**Status:** ✅ Vollständige Validierung für deviceId, publicKey, deviceName hinzugefügt
-**Datei:** `crypto_handshake.py`, Zeilen 258-319
-
-**Problem:**
-```python
-device_id = msg.get('deviceId')
-public_key_b64 = msg.get('publicKey')
-# Keine Validierung der Länge oder des Formats
-```
-
-- Keine Validierung der deviceId-Länge (könnte sehr lang sein)
-- publicKey wird nicht auf gültiges Base64 geprüft
-- Keine Prüfung auf bösartige Unicode-Zeichen
-- deviceName wird ungefiltert ins Log geschrieben (Log-Injection möglich)
+**Auswirkung:**
+- Komplette Kompromittierung der Verschlüsselung
+- Man-in-the-Middle-Angriffe möglich
+- Abhören aller Kommunikation
 
 **Empfehlung:**
 ```python
-# Längen-Validierung
-if not device_id or len(device_id) > 64:
-    return {"type": "Error", "error": "InvalidDeviceId"}
+# Option 1: Umgebungsvariable erzwingen
+PRE_SHARED_KEY = os.environ.get('DCS_PSK')
+if not PRE_SHARED_KEY:
+    raise RuntimeError("PSK must be set via DCS_PSK environment variable!")
 
-# Format-Validierung
-import re
-if not re.match(r'^[a-zA-Z0-9_-]+$', device_id):
-    return {"type": "Error", "error": "InvalidDeviceIdFormat"}
-
-# Base64-Validierung
-try:
-    decoded = self._base64_decode(public_key_b64)
-    if len(decoded) != 91:  # SECP256R1 public key size
-        raise ValueError("Invalid key size")
-except Exception:
-    return {"type": "Error", "error": "InvalidPublicKey"}
+# Option 2: Key-File mit sicheren Permissions
+def load_psk_from_file():
+    key_file = Path.home() / '.dcs' / 'psk.key'
+    if not key_file.exists():
+        # Generate new random key
+        key = os.urandom(32)
+        key_file.parent.mkdir(exist_ok=True)
+        key_file.write_bytes(key)
+        key_file.chmod(0o600)  # Owner read/write only
+    return key_file.read_bytes()
 ```
+
+**Mitigierung:**
+- Die `check_psk_security()` Funktion verlangt explizite Bestätigung (gut!)
+- Aber: User könnten dies ignorieren in Produktionsumgebungen
 
 ---
 
-### 9. **Exception Handling verschleiert Fehler** ✅ BEHOBEN
-**Schweregrad:** MITTEL
-**Status:** ✅ Spezifische Exceptions + Logging für unerwartete Fehler
-**Datei:** `forward_parsed_udp.py`, Zeilen 467-473, 304
+
+### 3. **Session Key Derivation ohne Client-Input** (HOCH)
+**Datei:** `crypto_handshake.py` (Zeilen 769-774)  
+**Schweregrad:** 🔴 HOCH
 
 ```python
-except (json.JSONDecodeError, UnicodeDecodeError, Exception) as decode_err:
-    # Not a handshake message, ignore
-    logger.debug(f"Failed to parse handshake: {decode_err}")
-    pass  # ← Schluckt alle Exceptions
+# Generate random salt for HKDF (32 bytes)
+salt = os.urandom(32)
+
+# Derive session key using HKDF-SHA256 with random salt
+session_key = self._derive_session_key(shared_secret, salt)
 ```
 
 **Problem:**
-- Zu breites Exception-Catching (inkl. generisches `Exception`)
-- Fehler werden nur geloggt aber nicht behandelt
-- Könnte echte Probleme verschleiern
-- Angreifer könnte gezielt malformed Packages senden
+- Nur der Server generiert den Salt
+- Client hat keinen Input in die Key-Derivation (außer seinem Public Key)
+- Bei kompromittiertem Server kann dieser alle Session Keys kontrollieren
 
-**Empfehlung:**
-- Nur spezifische Exceptions catchen
-- Kritische Fehler nicht ignorieren
-- Fehler-Metriken sammeln (z.B. Anzahl fehlgeschlagener Parses)
-
----
-
-### 10. **Unsichere Datei-Permissions** ✅ BEHOBEN
-**Schweregrad:** MITTEL
-**Status:** ✅ Datei wird mit 0600 Permissions erstellt
-**Datei:** `crypto_handshake.py`, Zeilen 194-206
-
-```python
-with open(self.authorized_devices_path, 'w') as f:
-    json.dump(template, f, indent=2)
-```
-
-**Problem:**
-- Keine expliziten Datei-Permissions gesetzt
-- Datei könnte mit weltlesbaren Permissions erstellt werden
-- Enthält sensible Geräteinformationen und Public Keys
+**Auswirkung:**
+- Reduzierte Forward Secrecy
+- Server-Kompromittierung ermöglicht Manipulation aller Sessions
 
 **Empfehlung:**
 ```python
-import os
-# Datei nur für Owner lesbar/schreibbar erstellen
-fd = os.open(path, os.O_CREAT | os.O_WRONLY, 0o600)
-with os.fdopen(fd, 'w') as f:
-    json.dump(template, f, indent=2)
+# Better: Include both client and server nonces/salts
+# 1. Client sends client_nonce in ClientHello
+# 2. Server generates server_salt
+# 3. Combined salt = client_nonce || server_salt
+
+def _derive_session_key(self, shared_secret: bytes, 
+                       client_nonce: bytes, server_salt: bytes) -> bytes:
+    combined_salt = client_nonce + server_salt
+    hkdf = HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=combined_salt,
+        info=b'DataPad-Session-Key-v1',  # Version info
+        backend=default_backend()
+    )
+    return hkdf.derive(shared_secret)
 ```
 
 ---
 
-### 11. **Keine Validierung der ECDH Public Keys** ✅ BEHOBEN
-**Schweregrad:** MITTEL
-**Status:** ✅ Vollständige Validierung (Curve, Point-at-Infinity, Key-Type)
-**Datei:** `crypto_handshake.py`, Zeilen 315-343
+
+
+
+---
+
+---
+
+### 7. **Memory Leak bei Nonce-Tracking** (HOCH)
+**Datei:** `crypto_handshake.py` (Zeilen 151-154)  
+**Schweregrad:** 🟠 HOCH
 
 ```python
-client_public_key = serialization.load_pem_public_key(
-    client_public_key_bytes,
-    backend=default_backend()
-)
+if len(self._received_nonces) > 1000:
+    old_nonces = sorted(self._received_nonces)[:500]
+    self._received_nonces.difference_update(old_nonces)
 ```
 
 **Problem:**
-- Keine Validierung, ob der Key zur erwarteten Kurve gehört (SECP256R1)
-- Keine Prüfung auf schwache oder invalide Keys
-- Keine Prüfung auf Point-at-Infinity
+- Set wächst unbegrenzt bis 1000 Einträge
+- **sorted()** auf einem Set ist O(n log n) - bei jedem 1000. Nonce!
+- Kann zu Performance-Problemen führen
+- Bei langen Sessions werden alte Nonces nie gelöscht
+
+**Auswirkung:**
+- Speicher-Verbrauch wächst kontinuierlich
+- Performance-Degradation bei langen Sessions
+- Potentielle DoS durch Memory Exhaustion
 
 **Empfehlung:**
 ```python
-# Nach dem Laden validieren:
-if not isinstance(client_public_key.curve, ec.SECP256R1):
-    raise ValueError("Invalid curve - only SECP256R1 allowed")
-
-# Public Key Validation
-public_numbers = client_public_key.public_numbers()
-if public_numbers.x == 0 and public_numbers.y == 0:
-    raise ValueError("Invalid public key: point at infinity")
-```
-
----
-
-## 🟢 NIEDRIGE SICHERHEITSRISIKEN / BEST PRACTICES
-
-### 12. **Logging enthält sensible Informationen** ✅ VERBESSERT
-**Schweregrad:** NIEDRIG-MITTEL
-**Status:** ✅ Sensible Daten nur in Debug-Modus, gekürzte IDs
-**Datei:** `forward_parsed_udp.py`, Zeilen 483-491
-
-**Problem (vorher):**
-- Vollständige Handshake-Messages wurden im INFO-Level geloggt
-- Potenzial für Exposition sensibler Daten
-
-**Lösung (implementiert):**
-1. **Log-Level-basierte Filterung**:
-   - Vollständige Messages nur in DEBUG-Level: `logger.debug(f"📄 Full message: {msg_str}")`
-   - INFO-Level zeigt nur Typ und IP: `logger.info(f"📨 Received {msg.get('type', 'Unknown')} from {addr[0]}")`
-
-2. **Durchgehend gekürzte IDs** (bereits vorher teilweise):
-   - Session-IDs: `[:8]...` (8 Zeichen)
-   - Device-IDs: `[:16]...` (16 Zeichen)
-   - Keine Keys oder Nonces in Produktion
-
-3. **Sanitized Device Names**:
-   - Längen-Limitierung auf 128 Zeichen
-   - Entfernung von Steuerzeichen und Newlines
-   - Verhindert Log-Injection
-
----
-
-### 13. **Keine Audit-Trail für Security-Events** ✅ BEHOBEN
-**Schweregrad:** NIEDRIG-MITTEL
-**Status:** ✅ Strukturiertes Security-Audit-Logging implementiert
-**Datei:** `crypto_handshake.py`, Zeilen 33-83, 311-317, 533-539, 631-638, 723-728, 140-147
-
-**Problem (vorher):**
-- Fehlgeschlagene Authentifizierungsversuche wurden nur geloggt
-- Keine strukturierte Speicherung von Security-Events
-- Erschwerte forensische Analyse nach Angriffen
-
-**Lösung (implementiert):**
-1. **SecurityAuditLogger Klasse**:
-   ```python
-   class SecurityAuditLogger:
-       def log_event(self, event_type: str, severity: str, details: dict):
-           # Logs in JSON Lines format to security_audit.jsonl
-   ```
-   - Strukturiertes JSON-Format für automatische Analyse
-   - Thread-safe mit Lock
-   - Sichere Datei-Permissions (0600)
-
-2. **Geloggte Security-Events**:
-   - `ip_blacklisted` (high): IP wurde geblacklisted
-   - `auth_failure_unauthorized` (high): Unauthorized Device-Versuch
-   - `session_established` (low): Erfolgreicher Handshake
-   - `hmac_verification_failed` (high): HMAC-Fehler (möglicher MITM)
-   - `replay_attack_detected` (critical): Replay-Angriff erkannt
-
-3. **Audit-Datei-Format** (security_audit.jsonl):
-   ```json
-   {"timestamp": 1234567890.123, "timestamp_iso": "2024-12-18T10:30:00Z",
-    "event_type": "auth_failure_unauthorized", "severity": "high",
-    "device_id": "abc123...", "ip": "192.168.1.100", "reason": "..."}
-   ```
-
----
-
-### 14. **Fehlende Integritätsprüfung der authorized_devices.json**
-**Schweregrad:** NIEDRIG  
-
-**Problem:**
-- Keine Prüfung ob die Datei manipuliert wurde
-- Kein Schutz gegen versehentliche Korruption
-
-**Empfehlung:**
-- Signatur oder Checksum für die Whitelist-Datei
-- Automatisches Backup vor Änderungen
-
----
-
-### 15. **Keine Perfect Forward Secrecy bei PSK-Modus**
-**Schweregrad:** NIEDRIG-MITTEL  
-
-**Problem:**
-- Im PSK-Modus wird derselbe Key für alle Nachrichten verwendet
-- Bei Kompromittierung können alle aufgezeichneten Nachrichten entschlüsselt werden
-
-**Empfehlung:**
-- PSK-Modus als deprecated markieren
-- Nutzer zum ECDH-Modus migrieren
-- Im PSK-Modus regelmäßige Key-Rotation erzwingen
-
----
-
-## 📊 ZUSAMMENFASSUNG
-
-### Kritische Findings: 7 (7 behoben ✅)
-1. Hardcodierter Default PSK ⚠️ (bleibt erstmal - durch ECDH-Modus umgehbar)
-2. Schwache Nonce-Validierung ✅
-3. TOCTOU Race Condition ✅
-4. Unbegrenztes Memory-Wachstum ✅
-5. Zu große Timestamp-Toleranz ✅
-6. Umgehbares Rate Limiting ✅ **NEU BEHOBEN**
-7. DoS-Anfälligkeit ✅ **NEU BEHOBEN**
-
-### Mittlere Findings: 6 (6 behoben ✅)
-8. Fehlende Input-Validierung ✅
-9. Zu breites Exception Handling ✅
-10. Unsichere Datei-Permissions ✅
-11. Fehlende ECDH Key-Validierung ✅
-12. Sensible Daten im Log ✅ **NEU BEHOBEN**
-13. Kein Audit-Trail ✅ **NEU BEHOBEN**
-
-### Niedrige Findings: 2
-14. Keine Integritätsprüfung (akzeptabel)
-15. Keine Forward Secrecy im PSK-Modus (ECDH-Modus empfohlen)
-
----
-
-## 🎯 PRIORITÄRE HANDLUNGSEMPFEHLUNGEN
-
-### ✅ ABGESCHLOSSEN (Stand: 18. Dezember 2025)
-
-**Kritische Fixes:**
-1. ⏱️ **Timestamp-Toleranz reduziert** - Von 5 Min auf 120 Sek ✅
-2. 🛡️ **Rate Limiting verstärkt** - Device-ID + IP-Blacklist + Exponential Backoff ✅
-3. 🚨 **DoS-Schutz implementiert** - Globales Message Rate Limiting (100/s) ✅
-4. 🔄 **Replay-Window verkleinert** - Von 10.000 auf 1.000 ✅
-
-**Wichtige Verbesserungen:**
-5. 🔐 **ECDH Key-Validierung** - Kurve, Point-at-Infinity, Key-Type ✅
-6. 📝 **Input-Validierung** - deviceId, publicKey, deviceName ✅
-7. 📁 **Sichere File-Permissions** - authorized_devices.json mit 0600 ✅
-8. 🧹 **Memory Management** - Cleanup für Nonces, Rate Limits, Sessions ✅
-9. 🔍 **Security Audit Trail** - Strukturiertes JSON-Logging ✅
-10. 🔒 **Logging Security** - Sensible Daten nur in Debug-Modus ✅
-
-### ⚠️ NOCH OFFEN (Optional/Best Practices)
-
-**Niedrige Priorität:**
-1. 🔒 **PSK-Default ändern** - Aktuell mit Warnung + ECDH-Alternative verfügbar
-2. 📋 **Whitelist-Integritätsprüfung** - Signatur/Checksum für authorized_devices.json
-3. 🔄 **Forward Secrecy im PSK-Modus** - ECDH-Modus wird empfohlen als Alternative
-
----
-
-## 🔧 CODE-VERBESSERUNGEN (Beispiele)
-
-### Fix 2: Sichere Nonce-Validierung
-```python
+# Use deque with maxlen for automatic eviction
 from collections import deque
 
-class NonceValidator:
-    def __init__(self, window_size=1000):
-        self.window_size = window_size
-        self.nonces = deque(maxlen=window_size)
-        self.highest = 0
-        self.lock = threading.Lock()
-    
-    def validate(self, counter: int) -> bool:
-        with self.lock:
-            # Reject if too old
-            if counter < self.highest - self.window_size:
+class SessionData:
+    def __init__(self, ...):
+        # ...
+        self._received_nonces = deque(maxlen=1000)  # Auto-evicts oldest
+        self._nonce_counter_min = 0  # Track minimum accepted counter
+
+    def validate_nonce(self, nonce: bytes, expected_sender: int = 0x00) -> bool:
+        # ...
+        counter = int.from_bytes(nonce[4:12], 'big')
+        
+        with self._nonce_lock:
+            # Reject if too old (sliding window)
+            if counter < self._nonce_counter_min:
+                logger.warning(f"⚠️ Nonce too old: {counter} < {self._nonce_counter_min}")
                 return False
-            # Reject if duplicate
-            if counter in self.nonces:
+            
+            if counter in self._received_nonces:
+                logger.warning(f"⚠️ Replay attack: {counter}")
                 return False
-            # Accept and update
-            self.nonces.append(counter)
-            if counter > self.highest:
-                self.highest = counter
-            return True
+            
+            self._received_nonces.append(counter)
+            
+            # Update minimum periodically
+            if len(self._received_nonces) >= 1000:
+                self._nonce_counter_min = min(self._received_nonces)
+        
+        return True
 ```
 
-### Fix 3: Input-Validierung
-```python
-import re
+---
 
-def validate_device_id(device_id: str) -> bool:
-    if not device_id or len(device_id) > 64:
+### 8. **Race Condition bei Whitelist-Integrity-Check** (MITTEL-HOCH)
+**Datei:** `crypto_handshake.py` (Zeilen 329-392)  
+**Schweregrad:** 🟠 MITTEL-HOCH
+
+```python
+def _check_whitelist_integrity(self):
+    # Cooldown check (ohne Lock!)
+    if current_time - self._whitelist_last_check < self._whitelist_check_interval:
+        return
+    
+    self._whitelist_last_check = current_time
+    # ... File-Checks
+```
+
+**Problem:**
+- `_whitelist_last_check` wird OHNE Lock aktualisiert
+- Race Condition zwischen Check und Update
+- Mehrere Threads könnten gleichzeitig die Integrity prüfen
+
+**Auswirkung:**
+- Mehrfache File-System-Zugriffe (Performance)
+- Inkonsistente Log-Ausgaben
+- Potentielle TOCTOU (Time-of-Check-Time-of-Use) Probleme
+
+**Empfehlung:**
+```python
+def _check_whitelist_integrity(self):
+    with self._whitelist_lock:  # Lock hinzufügen!
+        if self._whitelist_hash is None or self._whitelist_mtime is None:
+            return
+        
+        current_time = time.time()
+        if current_time - self._whitelist_last_check < self._whitelist_check_interval:
+            return
+        
+        self._whitelist_last_check = current_time
+        
+        # ... rest of integrity check
+```
+
+---
+
+### 9. **Schwache IP-Blacklist-Implementierung** (MITTEL)
+**Datei:** `crypto_handshake.py` (Zeilen 440-484)  
+**Schweregrad:** 🟡 MITTEL
+
+```python
+def is_ip_blacklisted(self, ip_address: str) -> bool:
+    with self.rate_limit_lock:
+        if ip_address in self.ip_blacklist:
+            blacklist_until, violation_count = self.ip_blacklist[ip_address]
+            if current_time < blacklist_until:
+                return True
+            else:
+                # Blacklist expired, remove entry
+                del self.ip_blacklist[ip_address]
         return False
-    # Nur alphanumerisch, Unterstrich, Bindestrich
-    if not re.match(r'^[a-zA-Z0-9_-]+$', device_id):
+```
+
+**Problem:**
+- Keine persistente Speicherung der Blacklist
+- Bei Neustart ist Blacklist leer
+- Angreifer können durch Server-Restart Bans umgehen
+
+**Auswirkung:**
+- Umgehung von IP-Bans durch Server-Restart
+- Keine langfristige Angreifer-Tracking
+
+**Empfehlung:**
+```python
+# Persist blacklist to disk
+def _load_blacklist(self):
+    blacklist_file = Path('ip_blacklist.json')
+    if blacklist_file.exists():
+        with open(blacklist_file) as f:
+            data = json.load(f)
+            self.ip_blacklist = {
+                ip: (until, count) 
+                for ip, until, count in data 
+                if until > time.time()  # Only load active bans
+            }
+
+def _save_blacklist(self):
+    blacklist_file = Path('ip_blacklist.json')
+    data = [
+        [ip, until, count] 
+        for ip, (until, count) in self.ip_blacklist.items()
+    ]
+    with open(blacklist_file, 'w') as f:
+        json.dump(data, f)
+```
+
+---
+
+### 10. **Fehlende Session-Timeout bei ECDH-Handshake** (MITTEL)
+**Datei:** `crypto_handshake.py` (Zeilen 575-840)  
+**Schweregrad:** 🟡 MITTEL
+
+**Problem:**
+- Session wird sofort nach ServerHello erstellt
+- Kein Timeout zwischen ServerHello und KeyConfirm
+- Ein Angreifer könnte viele Sessions öffnen ohne sie zu bestätigen
+
+**Auswirkung:**
+- Memory-Exhaustion durch unbestätigte Sessions
+- Denial of Service möglich
+
+**Empfehlung:**
+```python
+class SessionData:
+    def __init__(self, ...):
+        self.confirmed = False  # Add confirmation flag
+        self.created_at = time.time()
+
+def handle_key_confirm(self, message: dict) -> dict:
+    # ...
+    if session:
+        session.confirmed = True  # Mark as confirmed
+    # ...
+
+def cleanup_expired_sessions(self, max_age_seconds: int = 3600):
+    expired = []
+    for sid, session in self.sessions.items():
+        # Remove unconfirmed sessions after 60 seconds
+        if not session.confirmed and (time.time() - session.created_at > 60):
+            expired.append(sid)
+        # Remove inactive confirmed sessions
+        elif session.is_expired(max_age_seconds):
+            expired.append(sid)
+    # ...
+```
+
+---
+
+## 🟡 MITTLERE SICHERHEITSPROBLEME
+
+### 11. **Ungeschützte Audit-Logs** (MITTEL)
+**Datei:** `crypto_handshake.py` (Zeilen 34-84)  
+**Schweregrad:** 🟡 MITTEL
+
+```python
+def _ensure_secure_permissions(self):
+    if self.audit_file.exists():
+        try:
+            import stat
+            self.audit_file.chmod(stat.S_IRUSR | stat.S_IWUSR)  # 0o600
+        except Exception as e:
+            logger.warning(f"⚠️ Could not set secure permissions on audit file: {e}")
+```
+
+**Problem:**
+- Permissions werden nur gesetzt, wenn File existiert
+- Wenn File neu erstellt wird, könnten Default-Permissions unsicher sein
+- Exception wird nur gewarnt, nicht behandelt
+
+**Auswirkung:**
+- Audit-Logs könnten für andere User lesbar sein
+- Sensitive Security-Events exponiert
+
+**Empfehlung:**
+```python
+def log_event(self, event_type: str, severity: str, details: dict):
+    with self._lock:
+        try:
+            # Create file with secure permissions from the start
+            if not self.audit_file.exists():
+                self.audit_file.touch(mode=0o600)
+            
+            with open(self.audit_file, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(event) + '\n')
+            
+            # Verify permissions after write
+            current_mode = self.audit_file.stat().st_mode & 0o777
+            if current_mode != 0o600:
+                logger.error(f"❌ Audit log has insecure permissions: {oct(current_mode)}")
+        except Exception as e:
+            logger.error(f"❌ Failed to write security audit log: {e}")
+```
+
+---
+
+### 12. **Information Leakage in Error Messages** (NIEDRIG-MITTEL)
+**Datei:** `crypto_handshake.py` (Zeilen 708-712)  
+**Schweregrad:** 🟡 NIEDRIG-MITTEL
+
+```python
+return {
+    "type": "Error",
+    "error": "HandshakeFailed",
+    "message": f"Device {device_id[:16]}... is not authorized. Add to authorized_devices.json on server.",
+    "timestamp": int(server_time)
+}
+```
+
+**Problem:**
+- Error-Message verrät zu viel über Server-Konfiguration
+- "authorized_devices.json" ist interner Implementierungsdetail
+- Könnte Angreifer helfen, System besser zu verstehen
+
+**Auswirkung:**
+- Information Disclosure
+- Hilft Angreifern bei Reconnaissance
+
+**Empfehlung:**
+```python
+# Generic error message for clients
+return {
+    "type": "Error",
+    "error": "AuthorizationFailed",
+    "message": "Device is not authorized for this server.",
+    "timestamp": int(server_time)
+}
+
+# Detailed logging server-side
+logger.warning(f"❌ Unauthorized device: {device_id[:16]}...")
+logger.warning(f"   Add to {self.authorized_devices_path} to authorize")
+```
+
+---
+
+### 13. **UDP Packet Size Limits nicht durchgesetzt** (NIEDRIG)
+**Datei:** `forward_parsed_udp.py` (Zeilen 113)  
+**Schweregrad:** 🟡 NIEDRIG
+
+```python
+_MAX_HANDSHAKE_MESSAGE_SIZE = 8192  # 8KB max for handshake messages
+```
+
+**Problem:**
+- Limit gilt nur für Handshake-Messages
+- Keine Größenbeschränkung für Data-Packets
+- Kann zu Memory-Problemen führen
+
+**Empfehlung:**
+```python
+_MAX_HANDSHAKE_MESSAGE_SIZE = 8192
+_MAX_DATA_MESSAGE_SIZE = 65507  # Max UDP payload
+
+def validate_data_message(data: bytes) -> bool:
+    if len(data) > _MAX_DATA_MESSAGE_SIZE:
+        logger.warning(f"⚠️ Oversized data message: {len(data)} bytes")
         return False
     return True
-
-def validate_base64_public_key(public_key_b64: str) -> bool:
-    try:
-        decoded = base64.b64decode(public_key_b64)
-        # SECP256R1 uncompressed public key: 91 bytes (0x04 + x + y)
-        if len(decoded) != 91 or decoded[0] != 0x04:
-            return False
-        return True
-    except Exception:
-        return False
 ```
 
 ---
 
-## 📚 WEITERE EMPFEHLUNGEN
+### 14. **Fehlende Input-Validierung bei JSON** (NIEDRIG-MITTEL)
+**Datei:** `forward_parsed_udp.py` (Zeilen 445-446)  
+**Schweregrad:** 🟡 NIEDRIG-MITTEL
 
-### Security Hardening:
-- [ ] Penetration Testing durchführen
-- [ ] Code-Audit durch externe Security-Experten
-- [ ] Fuzzing der UDP-Endpoints
-- [ ] TLS/DTLS als zusätzliche Sicherheitsebene erwägen
+```python
+msg_str = data.decode('utf-8')
+msg = json.loads(msg_str)
+```
 
-### Monitoring & Alerting:
-- [ ] Metriken für fehlgeschlagene Authentifizierungen
-- [ ] Alerts bei Rate-Limit-Überschreitungen
-- [ ] Dashboard für aktive Sessions
-- [ ] Automatische Benachrichtigung bei unautorisierten Zugriffen
+**Problem:**
+- Keine Validierung der JSON-Struktur vor dem Parsing
+- Keine Limits auf JSON-Tiefe oder Komplexität
+- JSON-Bomb-Angriffe möglich
 
-### Dokumentation:
-- [ ] Security-Best-Practices dokumentieren
-- [ ] Threat-Model erstellen
-- [ ] Incident-Response-Plan
-- [ ] Sichere Deployment-Anleitung
+**Empfehlung:**
+```python
+import json
 
----
-
-## 🆕 NEUE SICHERHEITSVERBESSERUNGEN (18. Dezember 2025)
-
-### 1. Verbessertes Rate Limiting (Issue #6) ✅
-
-**Implementierung:**
-- **Drei-Schichten-Schutz:**
-  1. IP-Blacklist mit Exponential Backoff (5min → 10min → 20min → ... → 24h)
-  2. IP-basiertes Rate Limiting (5 Versuche/Minute)
-  3. Device-ID-basiertes Rate Limiting (3 Versuche/Minute, strenger)
-
-- **Code-Änderungen:**
-  - `crypto_handshake.py:120-131`: Neue Datenstrukturen für Blacklist und Device-Rate-Limits
-  - `crypto_handshake.py:221-314`: Implementierung der Blacklist-Logik
-  - `crypto_handshake.py:405-432`: Integration in Handshake-Handler
-  - `crypto_handshake.py:316-346`: Erweitertes Cleanup für alle Strukturen
-
-**Sicherheitsgewinn:**
-- ✅ Verhindert IP-Spoofing-Angriffe durch Device-ID-Tracking
-- ✅ Exponential Backoff macht Brute-Force-Angriffe unwirtschaftlich
-- ✅ Automatisches Memory-Management verhindert Leaks
-
-### 2. DoS-Schutz durch globales Message Rate Limiting (Issue #7) ✅
-
-**Implementierung:**
-- **Globales Sliding-Window-Rate-Limiting:**
-  - Maximal 100 Handshake-Messages pro Sekunde global
-  - Sliding Window für präzise Messung
-  - Automatisches Cleanup alter Timestamps
-
-- **Code-Änderungen:**
-  - `forward_parsed_udp.py:108-134`: Globale Rate-Limit-Variablen und Check-Funktion
-  - `forward_parsed_udp.py:314-317`: Integration in `tail_and_send`
-  - `forward_parsed_udp.py:476-479`: Integration in `repeat_last_line`
-  - Buffer-Größe reduziert: 65535 → 4096 bytes
-
-**Sicherheitsgewinn:**
-- ✅ Verhindert UDP-Flood-DoS-Angriffe
-- ✅ Schützt CPU und Memory vor Überlastung
-- ✅ Legitime Clients werden nicht beeinträchtigt (100/s ist sehr hoch)
-
-### 3. Strukturiertes Security Audit Logging (Issue #13) ✅
-
-**Implementierung:**
-- **SecurityAuditLogger Klasse:**
-  - JSON Lines Format für maschinelle Verarbeitung
-  - Thread-safe Logging
-  - Sichere File-Permissions (0600)
-  - ISO-8601 Timestamps
-
-- **Geloggte Events:**
-  - `ip_blacklisted` (high): IP-Sperrung mit Dauer
-  - `auth_failure_unauthorized` (high): Unauthorized Device
-  - `session_established` (low): Erfolgreicher Handshake
-  - `hmac_verification_failed` (high): HMAC-Fehler
-  - `replay_attack_detected` (critical): Replay-Angriff
-
-- **Code-Änderungen:**
-  - `crypto_handshake.py:33-83`: SecurityAuditLogger-Klasse
-  - Integration an 6 kritischen Stellen im Code
-
-**Sicherheitsgewinn:**
-- ✅ Forensische Analyse nach Angriffen möglich
-- ✅ Automatische Monitoring-Integration möglich
-- ✅ Strukturierte Daten für SIEM-Systeme
-
-### 4. Verbesserte Logging-Sicherheit (Issue #12) ✅
-
-**Implementierung:**
-- **Log-Level-basierte Filterung:**
-  - Vollständige Messages nur in DEBUG: `logger.debug(...)`
-  - Production (INFO) zeigt nur Typ und IP
-  - Gekürzte IDs überall (Session: 8 chars, Device: 16 chars)
-
-- **Code-Änderungen:**
-  - `forward_parsed_udp.py:483-491`: Reduziertes Logging in Production
-
-**Sicherheitsgewinn:**
-- ✅ Keine Exposition sensibler Daten in Production-Logs
-- ✅ Debug-Informationen weiterhin verfügbar wenn benötigt
-- ✅ Log-Injection durch sanitized Device-Names verhindert
+def safe_json_parse(data: bytes, max_size: int = 8192) -> dict:
+    """Safely parse JSON with size and structure validation."""
+    if len(data) > max_size:
+        raise ValueError(f"JSON too large: {len(data)} > {max_size}")
+    
+    try:
+        msg_str = data.decode('utf-8', errors='strict')
+        # Use json.JSONDecoder with check_circular=True (default)
+        msg = json.loads(msg_str)
+        
+        # Validate structure depth
+        def check_depth(obj, max_depth=5, current=0):
+            if current > max_depth:
+                raise ValueError("JSON nesting too deep")
+            if isinstance(obj, dict):
+                for v in obj.values():
+                    check_depth(v, max_depth, current+1)
+            elif isinstance(obj, list):
+                for v in obj:
+                    check_depth(v, max_depth, current+1)
+        
+        check_depth(msg)
+        return msg
+        
+    except (json.JSONDecodeError, ValueError, UnicodeDecodeError) as e:
+        logger.warning(f"⚠️ Invalid JSON: {e}")
+        return None
+```
 
 ---
 
-## 📊 FINALER SICHERHEITSSTATUS
+### 15. **Bind to 0.0.0.0 nur durch User-Bestätigung blockiert** (MITTEL)
+**Datei:** `forward_parsed_udp.py` (Zeilen 73-89)  
+**Schweregrad:** 🟡 MITTEL
 
-### Sicherheitsniveau: **HOCH** 🟢
+```python
+def check_bind_security(bind_ip: str):
+    if bind_ip == '0.0.0.0':
+        # ... Warnung und Exit
+        sys.exit(1)
+```
 
-**Alle kritischen und mittleren Sicherheitslücken wurden behoben!**
+**Problem:**
+- Hardcoded-Check nur für '0.0.0.0'
+- Nutzer könnten andere unsichere Bindings verwenden (z.B. Public IP)
+- Kein Check auf VPN-Interfaces
 
-| Kategorie | Anzahl | Behoben | Offen |
-|-----------|--------|---------|-------|
-| **🔴 Kritisch** | 7 | 7 ✅ | 0 |
-| **🟡 Mittel** | 6 | 6 ✅ | 0 |
-| **🟢 Niedrig** | 2 | 0 | 2 (akzeptabel) |
-| **GESAMT** | 15 | 13 | 2 |
+**Empfehlung:**
+```python
+import netifaces
 
-### Verbleibende Punkte (niedrige Priorität):
-1. **Whitelist-Integritätsprüfung** - Nice-to-have, aber nicht kritisch
-2. **Forward Secrecy im PSK-Modus** - ECDH-Modus ist bessere Alternative
-
-### Empfehlung:
-✅ **Das System ist produktionsbereit** mit folgenden Empfehlungen:
-- ECDH-Modus verwenden statt PSK (bereits verfügbar)
-- Regelmäßiges Review der `security_audit.jsonl`
-- Monitoring für `replay_attack_detected` und `ip_blacklisted` Events
-- Firewall-Regeln als zusätzliche Schutzebene
+def check_bind_security(bind_ip: str):
+    """Enhanced bind security check."""
+    
+    # Block 0.0.0.0
+    if bind_ip == '0.0.0.0':
+        sys.stderr.write("❌ Binding to 0.0.0.0 is forbidden!\n")
+        sys.exit(1)
+    
+    # Check if IP is a public address
+    import ipaddress
+    try:
+        addr = ipaddress.ip_address(bind_ip)
+        if not addr.is_private and not addr.is_loopback:
+            sys.stderr.write(f"⚠️ WARNING: Binding to public IP {bind_ip}!\n")
+            response = input("Type 'ACCEPT_PUBLIC' to continue: ")
+            if response.strip() != 'ACCEPT_PUBLIC':
+                sys.exit(1)
+    except ValueError:
+        pass  # Not a valid IP, will fail later
+    
+    # Recommend localhost for maximum security
+    if bind_ip != '127.0.0.1':
+        logger.warning(f"⚠️ Binding to {bind_ip} - consider using 127.0.0.1 for localhost only")
+```
 
 ---
 
-**Analyseende**
+## ✅ POSITIVE SICHERHEITSASPEKTE
 
-*Diese Analyse wurde mit bestem Wissen und Gewissen erstellt und alle identifizierten kritischen und mittleren Sicherheitslücken wurden behoben. Für zusätzliche Sicherheit werden umfassende Security-Audits und Penetration-Tests empfohlen.*
+Die Implementierung zeigt auch viele **gute Sicherheitspraktiken**:
 
-**Letzte Aktualisierung:** 18. Dezember 2025
+### Kryptographie
+1. ✅ **Moderne Kryptographie:** ECDH mit SECP256R1, AES-256-GCM
+2. ✅ **HKDF für Key Derivation:** Statt direkter Nutzung des Shared Secrets
+3. ✅ **Authenticated Encryption:** AES-GCM bietet Confidentiality + Integrity
+4. ✅ **Separate Nonces:** Client (0x00) und Server (0x01) verwenden unterschiedliche Prefixe
+5. ✅ **Counter-basierte Nonces:** Vermeidet Nonce-Reuse-Probleme
+
+### Rate Limiting & DoS Protection
+6. ✅ **Mehrschichtige Rate Limits:** Global, per-IP, per-Device
+7. ✅ **Exponential Backoff:** Bei Blacklisting
+8. ✅ **Message Size Limits:** Verhindert Buffer-Overflow-ähnliche Angriffe
+9. ✅ **IP Blacklisting:** Temporäre Bans bei Missbrauch
+
+### Logging & Auditing
+10. ✅ **Strukturiertes Security Audit Log:** JSON-Format für SIEM-Integration
+11. ✅ **Detailliertes Event-Logging:** Alle sicherheitsrelevanten Events werden geloggt
+12. ✅ **Severity Levels:** Kritische Events werden markiert
+
+### Session Management
+13. ✅ **Session Timeout:** 15 Minuten Inaktivität
+14. ✅ **Replay Protection:** Nonce-Tracking verhindert Replays
+15. ✅ **Mutual Authentication:** ServerHMAC und ClientHMAC
+
+### Whitelist Security
+16. ✅ **File Integrity Monitoring:** SHA-256 Hash-Tracking
+17. ✅ **No Auto-Reload:** Verhindert Privilege Escalation (gut!)
+18. ✅ **Public Key Binding:** Device ID ist an Public Key gebunden
+
+---
+
+## 🔧 EMPFOHLENE MASSNAHMEN (Priorisiert)
+
+### SOFORT (P0 - Kritisch)
+1. **Default PSK entfernen:** Erzwinge Key-Generation oder Umgebungsvariable
+2. **Curve-Validierung verbessern:** Explizite On-Curve-Checks
+3. **Reload-Funktion absichern:** Admin-Token oder komplett entfernen
+
+### KURZFRISTIG (P1 - Hoch, innerhalb 1 Woche)
+4. **Client-Nonce in HKDF:** Mehr Forward Secrecy
+5. **Nonce Re-Keying:** Automatisches Re-Keying bei 75% Erschöpfung
+6. **Memory Leak fixen:** Deque statt Set für Nonce-Tracking
+7. **Timestamp-Window reduzieren:** Von 120s auf 30s
+
+### MITTELFRISTIG (P2 - Mittel, innerhalb 1 Monat)
+8. **Persistent Blacklist:** Auf Disk speichern
+9. **Session Confirmation Timeout:** Cleanup unbestätigter Sessions
+10. **Audit Log Hardening:** Permissions explizit setzen bei Erstellung
+11. **Error Message Sanitization:** Weniger Implementierungsdetails
+
+### LANGFRISTIG (P3 - Niedrig, Nice-to-Have)
+12. **Enhanced JSON Validation:** Depth-Limits, Size-Limits
+13. **Bind Security Enhancement:** Check auf Public IPs
+14. **Data Message Size Limits:** Auch für Non-Handshake-Pakete
+15. **TLS für Handshake:** Zusätzliche Encryption-Layer
+
+---
+
+## 📊 RISIKO-MATRIX
+
+| Schweregrad | Anzahl | Kritischste Issues |
+|-------------|--------|-------------------|
+| 🔴 KRITISCH | 5 | Default PSK, Curve-Validierung, Privilege Escalation |
+| 🟠 HOCH | 5 | Timestamp, Memory Leak, Race Condition |
+| 🟡 MITTEL | 5 | Blacklist, Audit Logs, Info Leakage |
+
+**Gesamt-Risiko-Score:** 7.2/10 (Hoch)
+
+---
+
+## 🎯 ZUSAMMENFASSUNG & EMPFEHLUNG
+
+Die Implementierung zeigt ein **solides Verständnis moderner Kryptographie** und viele **gute Security-Praktiken**. Die Entwickler haben sich offensichtlich Gedanken über DoS-Protection, Rate Limiting und Audit-Logging gemacht.
+
+**ABER:** Es gibt einige **kritische Schwachstellen**, besonders:
+- Der Default-PSK in Produktion
+- Fehlende Curve-Validierung bei ECDH
+- Die reload_authorized_devices() Funktion ohne Authentication
+
+**Empfehlung:**
+1. **Sofort:** Die 5 kritischen Issues (P0) beheben
+2. **Diese Woche:** Die 5 hohen Issues (P1) addressieren
+3. **Diesen Monat:** Die mittleren Issues (P2) angehen
+4. **Optional:** Nice-to-Haves (P3) bei Zeit
+
+Mit diesen Fixes würde die Sicherheitsbewertung von **7/10 auf 9/10** steigen.
+
+---
+
+## 📝 WEITERE EMPFEHLUNGEN
+
+### Security Testing
+- **Penetration Testing:** Externe Security-Audit durchführen
+- **Fuzzing:** Handshake-Protocol mit AFL oder libFuzzer testen
+- **Static Analysis:** Bandit, Semgrep für Python
+
+### Dokumentation
+- **Threat Model:** Dokumentieren welche Angriffe abgewehrt werden sollen
+- **Security Guidelines:** Für Nutzer (wie PSK sicher konfigurieren)
+- **Incident Response:** Plan für kompromittierte Keys/Sessions
+
+### Monitoring
+- **Alert auf kritische Events:** Z.B. Whitelist-Modifikation
+- **Metrics Dashboard:** Rate-Limit-Hits, Blacklist-Größe
+- **Log Aggregation:** Zentrales SIEM für Security-Logs
+
+---
+
+**Bericht erstellt am:** 18. Dezember 2024  
+**Version:** 1.0  
+**Vertraulichkeit:** Intern
+
