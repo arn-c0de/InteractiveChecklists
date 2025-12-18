@@ -217,8 +217,23 @@ class DataPadManager(private val context: Context) {
 
                 // Log network info
                 val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
-                val activeNetwork = cm.activeNetworkInfo
-                udpLogD("Active network: ${activeNetwork?.typeName}, connected: ${activeNetwork?.isConnected}")
+                // Use NetworkCapabilities on modern APIs to avoid deprecated NetworkInfo
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                    val activeNet = cm.activeNetwork
+                    val nc = cm.getNetworkCapabilities(activeNet)
+                    val connected = nc != null && nc.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                    val transport = when {
+                        nc?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) == true -> "WIFI"
+                        nc?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "CELLULAR"
+                        nc?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) == true -> "ETHERNET"
+                        nc?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_BLUETOOTH) == true -> "BLUETOOTH"
+                        else -> "UNKNOWN"
+                    }
+                    udpLogD("Active network: $transport, connected: $connected")
+                } else {
+                    val activeNetwork = cm.activeNetworkInfo
+                    udpLogD("Active network: ${activeNetwork?.typeName}, connected: ${activeNetwork?.isConnected}")
+                }
 
                 udpLogD("Socket local address: ${udpSocket?.localAddress?.hostAddress}")
                 udpLogD("Socket local port: ${udpSocket?.localPort}")
@@ -541,11 +556,15 @@ class DataPadManager(private val context: Context) {
                 udpLogD("📤 Sent ClientHello to ${serverAddress.hostAddress}")
                 
                 // Step 2: Wait for ServerHello
-                val serverHelloDeferred = CompletableDeferred<ServerHello>()
-                pendingHandshakeResponses["ServerHello"] = serverHelloDeferred as CompletableDeferred<HandshakeMessage>
-                
-                val serverHello = withTimeout(HANDSHAKE_TIMEOUT_MS) {
+                val serverHelloDeferred = CompletableDeferred<HandshakeMessage>()
+                pendingHandshakeResponses["ServerHello"] = serverHelloDeferred
+
+                val serverHelloMsg = withTimeout(HANDSHAKE_TIMEOUT_MS) {
                     serverHelloDeferred.await()
+                }
+                val serverHello = serverHelloMsg as? ServerHello ?: run {
+                    udpLogE("Unexpected handshake response type: ${'$'}{serverHelloMsg::class.simpleName}")
+                    return@withLock false
                 }
             
             if (!serverHello.authorized) {
@@ -612,11 +631,15 @@ class DataPadManager(private val context: Context) {
             udpLogD("📤 Sent KeyConfirm")
 
             // Step 5: Wait for Ack (still encrypted with PSK)
-            val ackDeferred = CompletableDeferred<Ack>()
-            pendingHandshakeResponses["Ack"] = ackDeferred as CompletableDeferred<HandshakeMessage>
+            val ackDeferred = CompletableDeferred<HandshakeMessage>()
+            pendingHandshakeResponses["Ack"] = ackDeferred
 
-            val ack = withTimeout(HANDSHAKE_TIMEOUT_MS) {
+            val ackMsg = withTimeout(HANDSHAKE_TIMEOUT_MS) {
                 ackDeferred.await()
+            }
+            val ack = ackMsg as? Ack ?: run {
+                udpLogE("Unexpected handshake response type: ${'$'}{ackMsg::class.simpleName}")
+                return@withLock false
             }
 
             if (ack.status != "ready") {
