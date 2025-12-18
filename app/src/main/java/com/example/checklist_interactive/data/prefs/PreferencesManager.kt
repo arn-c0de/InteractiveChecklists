@@ -48,6 +48,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_MAP_OVERLAY_COMPASS = "map_overlay_compass"
         private const val KEY_MAP_OVERLAY_RINGS = "map_overlay_rings"
         private const val KEY_MAP_OVERLAY_RINGS_MAX_NM = "map_overlay_rings_max_nm"
+        private const val KEY_MAP_OVERLAY_MGRS_GRID = "map_overlay_mgrs_grid"
 
         // Application language preference (ISO code, e.g., "en", "de")
         private const val KEY_APP_LANGUAGE = "app_language"
@@ -384,6 +385,14 @@ class PreferencesManager(context: Context) {
 
     fun getMapOverlayRangeRingsMaxNm(): Int {
         return prefs.getInt(KEY_MAP_OVERLAY_RINGS_MAX_NM, 5)
+    }
+
+    fun setMapOverlayMgrsGridEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_MAP_OVERLAY_MGRS_GRID, enabled).apply()
+    }
+
+    fun isMapOverlayMgrsGridEnabled(): Boolean {
+        return prefs.getBoolean(KEY_MAP_OVERLAY_MGRS_GRID, false)
     }
 
     /**

@@ -82,9 +82,11 @@ fun MapViewer(
     var compassEnabled by remember { mutableStateOf(prefsManager.isMapOverlayCompassEnabled()) }
     var rangeRingsEnabled by remember { mutableStateOf(prefsManager.isMapOverlayRangeRingsEnabled()) }
     var rangeRingsMaxNm by remember { mutableStateOf(prefsManager.getMapOverlayRangeRingsMaxNm()) }
+    var mgrsGridEnabled by remember { mutableStateOf(prefsManager.isMapOverlayMgrsGridEnabled()) }
     var compassOverlay by remember { mutableStateOf<org.osmdroid.views.overlay.Overlay?>(null) }
     var headingSpeedLineOverlay by remember { mutableStateOf<org.osmdroid.views.overlay.Overlay?>(null) }
     var rangeRingsOverlay by remember { mutableStateOf<org.osmdroid.views.overlay.Overlay?>(null) }
+    var mgrsGridOverlay by remember { mutableStateOf<org.osmdroid.views.overlay.Overlay?>(null) }
     var showQuickAccess by remember { mutableStateOf(false) }
     var showDataPad by remember { mutableStateOf(false) }
     var showMarkerRouteManagement by remember { mutableStateOf(false) }
@@ -1044,6 +1046,7 @@ fun MapViewer(
             compassEnabled = compassEnabled,
             rangeRingsEnabled = rangeRingsEnabled,
             rangeRingsMaxNm = rangeRingsMaxNm,
+            mgrsGridEnabled = mgrsGridEnabled,
             onDismiss = { showOverlayDialog = false },
             onToggleCompass = { enabled ->
                 compassEnabled = enabled
@@ -1097,6 +1100,20 @@ fun MapViewer(
                 (rangeRingsOverlay as? RangeRingsOverlay)?.let { rr ->
                     rr.maxNm = nm
                     mapView?.invalidate()
+                }
+            },
+            onToggleMgrsGrid = { enabled ->
+                mgrsGridEnabled = enabled
+                prefsManager.setMapOverlayMgrsGridEnabled(enabled)
+                mapView?.let { mv ->
+                    mgrsGridOverlay?.let { mv.overlays.remove(it) }
+                    mgrsGridOverlay = null
+                    if (enabled) {
+                        val mg = MgrsGridOverlay()
+                        mv.overlays.add(mg)
+                        mgrsGridOverlay = mg
+                    }
+                    mv.invalidate()
                 }
             }
         )
@@ -1301,10 +1318,12 @@ private fun OverlaySelectionDialog(
     compassEnabled: Boolean,
     rangeRingsEnabled: Boolean,
     rangeRingsMaxNm: Int,
+    mgrsGridEnabled: Boolean,
     onDismiss: () -> Unit,
     onToggleCompass: (Boolean) -> Unit,
     onToggleRangeRings: (Boolean) -> Unit,
-    onChangeRangeRingsMaxNm: (Int) -> Unit
+    onChangeRangeRingsMaxNm: (Int) -> Unit,
+    onToggleMgrsGrid: (Boolean) -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1340,6 +1359,14 @@ private fun OverlaySelectionDialog(
                         )
                         Text(stringResource(R.string.map_range_rings_max_description), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                }
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Column {
+                        Text("MGRS Grid", style = MaterialTheme.typography.bodyMedium)
+                        Text("Military Grid Reference System overlay", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = mgrsGridEnabled, onCheckedChange = onToggleMgrsGrid)
                 }
             }
         },
@@ -1682,25 +1709,123 @@ private class RangeRingsOverlay : org.osmdroid.views.overlay.Overlay() {
             val headingLabel = "${headingNorm}°"
             val headingPaint = Paint(textPaint).apply { color = android.graphics.Color.YELLOW; textSize = textPaint.textSize + 2f }
             // Draw a highlighted radial for heading
-            val headLine = Paint().apply { isAntiAlias = true; color = android.graphics.Color.YELLOW; strokeWidth = 4f }
-            canvas?.drawLine(centerPt.x.toFloat(), centerPt.y.toFloat(), hx, hy, headLine)
-            // arrowhead on radial end (short)
-            val ah = 10f
-            val left = Math.toRadians((headingNorm - 140).toDouble())
-            val right = Math.toRadians((headingNorm + 140).toDouble())
-            val ax1 = hx + (Math.sin(left) * ah).toFloat()
-            val ay1 = hy + (-Math.cos(left) * ah).toFloat()
-            val ax2 = hx + (Math.sin(right) * ah).toFloat()
-            val ay2 = hy + (-Math.cos(right) * ah).toFloat()
-            canvas?.drawLine(hx, hy, ax1, ay1, headLine)
-            canvas?.drawLine(hx, hy, ax2, ay2, headLine)
-            // Draw label with small shadow
-            val headingPaintText = Paint(headingPaint).apply { style = Paint.Style.FILL }
-            canvas?.drawText(headingLabel, hx + 6f, hy - 6f, Paint(headingPaintText).apply { color = android.graphics.Color.argb(0xCC, 0, 0, 0) })
-            canvas?.drawText(headingLabel, hx + 6f, hy - 6f, headingPaint)
-            // debug
-            try { android.util.Log.d("RangeRingsOverlay", "speedKts=$speedKts scaleFactor=$scaleFactor headingRadius=$headingRadius outerRadiusPx=$outerRadiusPx") } catch (_: Throwable) {}
+            val headingLinePaint = Paint(paint).apply { color = android.graphics.Color.YELLOW; strokeWidth = 4f }
+            canvas?.drawLine(centerPt.x.toFloat(), centerPt.y.toFloat(), hx, hy, headingLinePaint)
+
+            // Draw heading label
+            canvas?.drawText(headingLabel, hx, hy - 6f, headingPaint)
         }
+    }
+}
+
+/**
+ * MGRS Grid overlay: draws Military Grid Reference System grid lines in red with transparency
+ */
+private class MgrsGridOverlay : org.osmdroid.views.overlay.Overlay() {
+    private val gridPaint = Paint().apply {
+        color = android.graphics.Color.argb(128, 255, 0, 0) // Red with 50% transparency
+        strokeWidth = 2f
+        style = Paint.Style.STROKE
+        isAntiAlias = true
+    }
+    private val textPaint = Paint().apply {
+        color = android.graphics.Color.argb(200, 255, 0, 0) // Red with 78% transparency
+        textSize = 24f
+        isAntiAlias = true
+        textAlign = Paint.Align.CENTER
+    }
+    private val bgPaint = Paint().apply {
+        color = android.graphics.Color.argb(180, 0, 0, 0) // Black background for text
+        style = Paint.Style.FILL
+    }
+
+    override fun draw(canvas: android.graphics.Canvas?, mapView: org.osmdroid.views.MapView?, shadow: Boolean) {
+        if (canvas == null || mapView == null || shadow) return
+
+        val projection = mapView.projection
+        val boundingBox = projection.boundingBox
+
+        // Calculate grid spacing based on zoom level
+        val zoom = mapView.zoomLevelDouble
+        val gridSpacing = when {
+            zoom >= 15 -> 0.001 // ~100m
+            zoom >= 13 -> 0.01  // ~1km
+            zoom >= 10 -> 0.1   // ~10km
+            else -> 1.0         // ~100km
+        }
+
+        // Draw vertical lines (longitude)
+        var lon = Math.floor(boundingBox.lonWest / gridSpacing) * gridSpacing
+        while (lon <= boundingBox.lonEast) {
+            val topPoint = projection.toPixels(GeoPoint(boundingBox.latNorth, lon), null)
+            val bottomPoint = projection.toPixels(GeoPoint(boundingBox.latSouth, lon), null)
+            canvas?.drawLine(
+                topPoint.x.toFloat(),
+                topPoint.y.toFloat(),
+                bottomPoint.x.toFloat(),
+                bottomPoint.y.toFloat(),
+                gridPaint
+            )
+
+            // Draw label at top
+            val label = formatMgrsCoordinate(lon, true)
+            val textX = topPoint.x.toFloat()
+            val textY = topPoint.y.toFloat() + 30f
+            val textBounds = android.graphics.Rect()
+            textPaint.getTextBounds(label, 0, label.length, textBounds)
+            canvas?.drawRect(
+                textX - textBounds.width() / 2f - 4f,
+                textY - textBounds.height() - 4f,
+                textX + textBounds.width() / 2f + 4f,
+                textY + 4f,
+                bgPaint
+            )
+            canvas?.drawText(label, textX, textY, textPaint)
+
+            lon += gridSpacing
+        }
+
+        // Draw horizontal lines (latitude)
+        var lat = Math.floor(boundingBox.latSouth / gridSpacing) * gridSpacing
+        while (lat <= boundingBox.latNorth) {
+            val leftPoint = projection.toPixels(GeoPoint(lat, boundingBox.lonWest), null)
+            val rightPoint = projection.toPixels(GeoPoint(lat, boundingBox.lonEast), null)
+            canvas?.drawLine(
+                leftPoint.x.toFloat(),
+                leftPoint.y.toFloat(),
+                rightPoint.x.toFloat(),
+                rightPoint.y.toFloat(),
+                gridPaint
+            )
+
+            // Draw label at left
+            val label = formatMgrsCoordinate(lat, false)
+            val textX = leftPoint.x.toFloat() + 50f
+            val textY = leftPoint.y.toFloat()
+            val textBounds = android.graphics.Rect()
+            textPaint.getTextBounds(label, 0, label.length, textBounds)
+            canvas?.drawRect(
+                textX - textBounds.width() / 2f - 4f,
+                textY - textBounds.height() / 2f - 4f,
+                textX + textBounds.width() / 2f + 4f,
+                textY + textBounds.height() / 2f + 4f,
+                bgPaint
+            )
+            canvas?.drawText(label, textX, textY + textBounds.height() / 2f, textPaint)
+
+            lat += gridSpacing
+        }
+    }
+    
+    private fun formatMgrsCoordinate(value: Double, isLongitude: Boolean): String {
+        val degrees = Math.abs(value).toInt()
+        val minutes = ((Math.abs(value) - degrees) * 60).toInt()
+        val direction = if (isLongitude) {
+            if (value >= 0) "E" else "W"
+        } else {
+            if (value >= 0) "N" else "S"
+        }
+        return String.format("%d\u00b0%02d'%s", degrees, minutes, direction)
     }
 }
 
