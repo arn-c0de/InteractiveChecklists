@@ -232,10 +232,19 @@
     <string name="map_select_layer">Wählen Sie eine Kartenebene:</string>
     <string name="map_note_aviation_charts">Hinweis: Luftfahrt-Karten erfordern zusätzliche Konfiguration. Siehe docs/technical/AVIATION_MAPS.md</string>
     <string name="map_aviation_map">Luftfahrtkarte</string>
+    <string name="map_overlays">Karten-Overlays</string>
+    <string name="map_overlays_dialog_title">Karten-Overlays</string>
+    <string name="map_compass">Kompass</string>
+    <string name="map_compass_description">Zeigt eine HDG-Anzeige zentriert auf dem Flugzeug (Grad)</string>
+    <string name="map_range_rings">Entfernungsringe</string>
+    <string name="map_range_rings_description">Kreisringe (1/2/5 NM und skaliert) zur groben Entfernungsabschätzung</string>
+    <string name="map_range_rings_max_label">Max. Reichweite: %1$d NM</string>
+    <string name="map_range_rings_max_description">Maximaler Radius der Entfernungsringe (Seemeilen). Schiebe, um die Anzahl/Weite der Ringe zu erhöhen (1..500 NM).</string>
     <string name="map_auto_centering_active">🎯 Autozentrierung (antippen zum Deaktivieren)</string>
     <string name="map_auto_centering_off">Autozentrierung AUS (antippen zum Aktivieren)</string>
     <string name="map_tip_lock_screen">Tipp: Sperre antippen, um die Karte zu betrachten</string>
     <string name="marker_snippet_fmt">Alt: %1$dft | Spd: %2$dkt | Hdg: %3$d°</string>
+    <string name="marker_pilot_fmt">Pilot: %1$s</string>
 
     
     

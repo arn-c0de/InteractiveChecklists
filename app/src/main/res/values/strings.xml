@@ -317,7 +317,16 @@
     <string name="map_aviation_charts_note">Note: Aviation sectional charts require additional configuration. See docs/technical/AVIATION_MAPS.md</string>
     <string name="map_note_aviation_charts">Note: Aviation sectional charts require additional configuration. See docs/technical/AVIATION_MAPS.md</string>
     <string name="map_aviation_map">Aviation Map</string>
+    <string name="map_overlays">Map overlays</string>
+    <string name="map_overlays_dialog_title">Map overlays</string>
+    <string name="map_compass">Compass</string>
+    <string name="map_compass_description">Shows a heading indicator centered on the aircraft (degrees)</string>
+    <string name="map_range_rings">Range rings</string>
+    <string name="map_range_rings_description">Concentric distance rings (1/2/5 NM and scaled) to estimate distances</string>
+    <string name="map_range_rings_max_label">Max range: %1$d NM</string>
+    <string name="map_range_rings_max_description">Maximum radius for range rings (nautical miles). Slide to increase number/extent of rings (1..500 NM).</string>
     <string name="marker_snippet_fmt">Alt: %1$d ft | Speed: %2$d kts | Hdg: %3$d°</string>
+    <string name="marker_pilot_fmt">Pilot: %1$s</string>
 
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <!-- DATAPAD -->

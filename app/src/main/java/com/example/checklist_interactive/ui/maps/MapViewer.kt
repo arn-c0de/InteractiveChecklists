@@ -22,6 +22,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import android.util.Log
 import android.view.MotionEvent
+import android.graphics.Point
+import android.graphics.Paint
 import com.example.checklist_interactive.R
 import com.example.checklist_interactive.ui.datapad.LocalDataPadManager
 import com.example.checklist_interactive.ui.datapad.DataPadPopup
@@ -70,6 +72,12 @@ fun MapViewer(
     val savedZoom = remember { prefsManager.getMapZoom() }
     var autoCenter by remember { mutableStateOf(if (savedCenter != null) prefsManager.isMapAutoCenterEnabled() else true) }
     var showLayerDialog by remember { mutableStateOf(false) }
+    var showOverlayDialog by remember { mutableStateOf(false) }
+    var compassEnabled by remember { mutableStateOf(prefsManager.isMapOverlayCompassEnabled()) }
+    var rangeRingsEnabled by remember { mutableStateOf(prefsManager.isMapOverlayRangeRingsEnabled()) }
+    var rangeRingsMaxNm by remember { mutableStateOf(prefsManager.getMapOverlayRangeRingsMaxNm()) }
+    var compassOverlay by remember { mutableStateOf<org.osmdroid.views.overlay.Overlay?>(null) }
+    var rangeRingsOverlay by remember { mutableStateOf<org.osmdroid.views.overlay.Overlay?>(null) }
     var showQuickAccess by remember { mutableStateOf(false) }
     var showDataPad by remember { mutableStateOf(false) }
 
@@ -133,10 +141,12 @@ fun MapViewer(
                 // use center anchor so rotation pivots around icon center
                 marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
 
-                // Update marker rotation based on heading
-                val heading = data.heading.toFloat()
+                // Use raw datapad heading for the player marker (keep previous behavior)
+                val rawHeading = data.heading.toFloat()
+                // Convert raw heading to degrees for overlays/labels
+                val headingDeg = Math.toDegrees(rawHeading.toDouble()).toFloat()
                 // flip by 180° because the icon is oriented opposite the heading
-                marker.rotation = (heading + 180f) % 360f
+                marker.rotation = (rawHeading + 180f) % 360f
                 try {
                     val color = if (isDarkTheme) android.graphics.Color.WHITE else android.graphics.Color.BLACK
                     // rely on Marker.rotation for rotation; use unrotated bitmap
@@ -149,7 +159,12 @@ fun MapViewer(
                 // Update marker snippet with altitude and speed
                 val altFt = (data.altitude * 3.28084).toInt()
                 val speedKts = (data.groundSpeed ?: 0.0) * 1.9438
-                marker.snippet = context.getString(R.string.marker_snippet_fmt, altFt, speedKts.toInt(), data.heading.toInt())
+                val baseSnippet = context.getString(R.string.marker_snippet_fmt, altFt, speedKts.toInt(), Math.toDegrees(data.heading).toInt())
+                marker.snippet = if (data.unitName.isNotBlank()) {
+                    baseSnippet + "\n\n" + context.getString(R.string.marker_pilot_fmt, data.unitName)
+                } else {
+                    baseSnippet
+                }
                 marker.title = data.aircraft
 
                 // Auto-center map on position if enabled
@@ -159,6 +174,22 @@ fun MapViewer(
                     map.controller.animateTo(newPosition)
                 } else {
                     Log.d(TAG, "Auto-center is disabled, not animating")
+                }
+
+                // Update overlays (compass heading + centers, range rings center)
+                try {
+                    // compass overlay
+                    (compassOverlay as? CompassOverlay)?.let { co ->
+                        co.center = GeoPoint(lat, lon)
+                        co.heading = headingDeg
+                    }
+                    // range rings center
+                    (rangeRingsOverlay as? RangeRingsOverlay)?.let { rr ->
+                        rr.center = GeoPoint(lat, lon)
+                        rr.heading = headingDeg
+                    }
+                } catch (e: Exception) {
+                    // ignore
                 }
 
                 map.invalidate()
@@ -378,6 +409,17 @@ fun MapViewer(
                     contentDescription = stringResource(R.string.map_layers)
                 )
             }
+
+            // Overlay selection button (compass, range rings)
+            FloatingActionButton(
+                onClick = { showOverlayDialog = true },
+                containerColor = MaterialTheme.colorScheme.secondaryContainer
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Flight,
+                    contentDescription = stringResource(R.string.map_overlays)
+                )
+            }
             
             // Screen lock button - prevents tab swipe gestures
             FloatingActionButton(
@@ -541,6 +583,26 @@ fun MapViewer(
                 Log.d(TAG, "Applied pending center: ${gp.latitude},${gp.longitude}")
                 pendingCenter.value = null
             }
+
+            // Apply persisted overlay preferences immediately (if not already present)
+            mapView?.let { mv ->
+                if (compassEnabled && compassOverlay == null) {
+                    val co = CompassOverlay()
+                    flightData?.let { d -> if (d.latitude != 0.0 && d.longitude != 0.0) co.center = GeoPoint(d.latitude, d.longitude) }
+                    flightData?.let { d -> co.heading = Math.toDegrees(d.heading).toFloat() }
+                    mv.overlays.add(co)
+                    compassOverlay = co
+                }
+                if (rangeRingsEnabled && rangeRingsOverlay == null) {
+                    val rr = RangeRingsOverlay()
+                    rr.maxNm = rangeRingsMaxNm
+                    rr.heading = flightData?.heading?.let { Math.toDegrees(it).toFloat() } ?: 0f
+                    flightData?.let { d -> if (d.latitude != 0.0 && d.longitude != 0.0) rr.center = GeoPoint(d.latitude, d.longitude) }
+                    mv.overlays.add(rr)
+                    rangeRingsOverlay = rr
+                }
+                mv.invalidate()
+            }
         }
 
         // This is a simplified approach - in production you'd listen to map scroll events continuously
@@ -568,6 +630,59 @@ fun MapViewer(
             }
         )
     }
+
+    // Overlay selection dialog
+    if (showOverlayDialog) {
+        OverlaySelectionDialog(
+            compassEnabled = compassEnabled,
+            rangeRingsEnabled = rangeRingsEnabled,
+            rangeRingsMaxNm = rangeRingsMaxNm,
+            onDismiss = { showOverlayDialog = false },
+            onToggleCompass = { enabled ->
+                compassEnabled = enabled
+                prefsManager.setMapOverlayCompassEnabled(enabled)
+                // apply immediately
+                mapView?.let { mv ->
+                    // remove existing compass
+                    compassOverlay?.let { mv.overlays.remove(it) }
+                    compassOverlay = null
+                    if (enabled) {
+                        val co = CompassOverlay()
+                        flightData?.let { d -> if (d.latitude != 0.0 && d.longitude != 0.0) co.center = GeoPoint(d.latitude, d.longitude) }
+                        flightData?.let { d -> co.heading = Math.toDegrees(d.heading).toFloat() }
+                        mv.overlays.add(co)
+                        compassOverlay = co
+                    }
+                    mv.invalidate()
+                }
+            },
+            onToggleRangeRings = { enabled ->
+                rangeRingsEnabled = enabled
+                prefsManager.setMapOverlayRangeRingsEnabled(enabled)
+                mapView?.let { mv ->
+                    rangeRingsOverlay?.let { mv.overlays.remove(it) }
+                    rangeRingsOverlay = null
+                    if (enabled) {
+                        val rr = RangeRingsOverlay()
+                        rr.maxNm = rangeRingsMaxNm
+                        rr.heading = flightData?.heading?.let { Math.toDegrees(it).toFloat() } ?: 0f
+                        flightData?.let { d -> if (d.latitude != 0.0 && d.longitude != 0.0) rr.center = GeoPoint(d.latitude, d.longitude) }
+                        mv.overlays.add(rr)
+                        rangeRingsOverlay = rr
+                    }
+                    mv.invalidate()
+                }
+            },
+            onChangeRangeRingsMaxNm = { nm ->
+                rangeRingsMaxNm = nm
+                prefsManager.setMapOverlayRangeRingsMaxNm(nm)
+                (rangeRingsOverlay as? RangeRingsOverlay)?.let { rr ->
+                    rr.maxNm = nm
+                    mapView?.invalidate()
+                }
+            }
+        )
+    }
     
     // Quick Access Bottom Sheet
     if (showQuickAccess && quickNoteManager != null) {
@@ -591,6 +706,12 @@ fun MapViewer(
                     prefsManager.setMapCenter(center.latitude, center.longitude)
                     prefsManager.setMapZoom(mv.zoomLevelDouble)
                     prefsManager.setMapAutoCenter(autoCenter)
+                    // persist overlay preferences and remove overlays
+                    prefsManager.setMapOverlayCompassEnabled(compassEnabled)
+                    prefsManager.setMapOverlayRangeRingsEnabled(rangeRingsEnabled)
+                    prefsManager.setMapOverlayRangeRingsMaxNm(rangeRingsMaxNm)
+                    try { compassOverlay?.let { mv.overlays.remove(it) } } catch (_: Exception) {}
+                    try { rangeRingsOverlay?.let { mv.overlays.remove(it) } } catch (_: Exception) {}
                     // tile source id is persisted when the user explicitly selects a layer via the dialog.
                 }
             } catch (e: Exception) {
@@ -677,3 +798,293 @@ private fun LayerSelectionDialog(
         }
     )
 }
+
+/**
+ * Dialog for selecting overlays (compass, range rings)
+ */
+@Composable
+private fun OverlaySelectionDialog(
+    compassEnabled: Boolean,
+    rangeRingsEnabled: Boolean,
+    rangeRingsMaxNm: Int,
+    onDismiss: () -> Unit,
+    onToggleCompass: (Boolean) -> Unit,
+    onToggleRangeRings: (Boolean) -> Unit,
+    onChangeRangeRingsMaxNm: (Int) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.map_overlays_dialog_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Column {
+                        Text(stringResource(R.string.map_compass), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.map_compass_description), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = compassEnabled, onCheckedChange = onToggleCompass)
+                }
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Column {
+                        Text(stringResource(R.string.map_range_rings), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.map_range_rings_description), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = rangeRingsEnabled, onCheckedChange = onToggleRangeRings)
+                }
+
+                if (rangeRingsEnabled) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(stringResource(R.string.map_range_rings_max_label, rangeRingsMaxNm), style = MaterialTheme.typography.bodySmall)
+                        Slider(
+                            value = rangeRingsMaxNm.toFloat(),
+                            onValueChange = { onChangeRangeRingsMaxNm(it.toInt()) },
+                            valueRange = 1f..500f,
+                            steps = 499,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text(stringResource(R.string.map_range_rings_max_description), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
+        }
+    )
+}
+
+/**
+ * Simple compass overlay drawn centered on given GeoPoint and displaying heading degrees
+ */
+private class CompassOverlay : org.osmdroid.views.overlay.Overlay() {
+    var center: GeoPoint? = null
+    var heading: Float = 0f
+    private val paint = Paint().apply {
+        isAntiAlias = true
+        // more transparent red for a subtler compass
+        color = android.graphics.Color.argb(0x66, 0xFF, 0x44, 0x44)
+        strokeWidth = 3f
+        style = Paint.Style.STROKE
+    }
+    private val textPaint = Paint().apply {
+        isAntiAlias = true
+        // slightly translucent labels
+        color = android.graphics.Color.argb(0xCC, 0xFF, 0xFF, 0xFF)
+        textSize = 32f
+    }
+
+    override fun draw(canvas: android.graphics.Canvas?, mapView: org.osmdroid.views.MapView?, shadow: Boolean) {
+        if (shadow) return
+        val mv = mapView ?: return
+        val c = center ?: return
+        val proj = mv.projection
+        val centerPt = Point()
+        proj.toPixels(c, centerPt)
+
+        // Radius relative to view size (increased to make the compass much larger)
+        val length = (minOf(mv.width, mv.height) * 0.25f)
+
+        // outer circle
+        val circlePaint = Paint(paint).apply { style = Paint.Style.STROKE; strokeWidth = paint.strokeWidth }
+        canvas?.drawCircle(centerPt.x.toFloat(), centerPt.y.toFloat(), length, circlePaint)
+
+        // Cardinal radial lines and labels (N, O, S, W)
+        val cardinals = listOf(0, 90, 180, 270)
+        val labelMap = mapOf(0 to "N", 90 to "O", 180 to "S", 270 to "W")
+        for (angle in cardinals) {
+            val rad = Math.toRadians(angle.toDouble())
+            val dx = (Math.sin(rad) * length).toFloat()
+            val dy = (-Math.cos(rad) * length).toFloat()
+            // full line across the circle
+            canvas?.drawLine(centerPt.x - dx, centerPt.y - dy, centerPt.x + dx, centerPt.y + dy, paint)
+            // label slightly beyond the ring
+            val lx = centerPt.x + (dx * 1.08f)
+            val ly = centerPt.y + (dy * 1.08f) - (textPaint.textSize / 2)
+            canvas?.drawText(labelMap[angle] ?: "", lx, ly, textPaint)
+        }
+
+        // Degree ticks around outer ring (every 30°, label every 60°)
+        val tickPaint = Paint().apply { isAntiAlias = true; color = android.graphics.Color.WHITE; strokeWidth = 2f }
+        val labelSize = Paint(textPaint).apply { textSize = 18f }
+        for (a in 0 until 360 step 30) {
+            val rad = Math.toRadians(a.toDouble())
+            val dx = (Math.sin(rad) * length).toFloat()
+            val dy = (-Math.cos(rad) * length).toFloat()
+            val innerX = centerPt.x + (dx * 0.95f)
+            val innerY = centerPt.y + (dy * 0.95f)
+            val outerX = centerPt.x + dx
+            val outerY = centerPt.y + dy
+            canvas?.drawLine(innerX, innerY, outerX, outerY, tickPaint)
+            if (a % 60 == 0) {
+                val lx = centerPt.x + (dx * 1.12f) - (labelSize.measureText("$a°") / 2)
+                val ly = centerPt.y + (dy * 1.12f) + (labelSize.textSize / 2)
+                canvas?.drawText("$a°", lx, ly, labelSize)
+            }
+        }
+
+        // Heading arrow and highlighted heading label (flight direction)
+        val headingNorm = (((heading % 360) + 360) % 360).toInt()
+        val radH = Math.toRadians(headingNorm.toDouble())
+        val dxH = (Math.sin(radH) * length).toFloat()
+        val dyH = (-Math.cos(radH) * length).toFloat()
+        // Draw a highlighted heading line and small arrowhead
+        val headingPaint = Paint().apply { isAntiAlias = true; color = android.graphics.Color.YELLOW; strokeWidth = 5f }
+        canvas?.drawLine(centerPt.x.toFloat(), centerPt.y.toFloat(), centerPt.x + dxH, centerPt.y + dyH, headingPaint)
+        // simple arrowhead
+        val ah = 12f
+        val left = Math.toRadians((headingNorm - 140).toDouble())
+        val right = Math.toRadians((headingNorm + 140).toDouble())
+        val ax1 = centerPt.x + (Math.sin(left) * ah).toFloat() + dxH
+        val ay1 = centerPt.y + (-Math.cos(left) * ah).toFloat() + dyH
+        val ax2 = centerPt.x + (Math.sin(right) * ah).toFloat() + dxH
+        val ay2 = centerPt.y + (-Math.cos(right) * ah).toFloat() + dyH
+        canvas?.drawLine(centerPt.x + dxH, centerPt.y + dyH, ax1, ay1, headingPaint)
+        canvas?.drawLine(centerPt.x + dxH, centerPt.y + dyH, ax2, ay2, headingPaint)
+        // Label with heading
+        val label = "HDG ${headingNorm}°"
+        val labelX = centerPt.x + dxH + 10f
+        val labelY = centerPt.y + dyH - 10f
+        val headingTextPaint = Paint(textPaint).apply { color = android.graphics.Color.YELLOW; textSize = textPaint.textSize + 4f }
+        // Draw shadow for readability
+        headingTextPaint.style = Paint.Style.FILL
+        canvas?.drawText(label, labelX + 2f, labelY + 2f, Paint(headingTextPaint).apply { color = android.graphics.Color.argb(0xCC, 0, 0, 0) })
+        canvas?.drawText(label, labelX, labelY, headingTextPaint)
+    }
+}
+
+/**
+ * Range rings overlay: concentric circles around center to estimate distances (1,2,5 NM)
+ */
+private class RangeRingsOverlay : org.osmdroid.views.overlay.Overlay() {
+    var center: GeoPoint? = null
+    // current heading (used to place exact heading label on outermost ring)
+    var heading: Float = 0f
+    // max radius in NM; default 5
+    var maxNm: Int = 5
+    private val paint = Paint().apply {
+        isAntiAlias = true
+        color = android.graphics.Color.argb(0x99, 0x22, 0x88, 0xFF)
+        strokeWidth = 2f
+        style = Paint.Style.STROKE
+    }
+    private val textPaint = Paint().apply {
+        isAntiAlias = true
+        color = android.graphics.Color.WHITE
+        textSize = 22f
+    }
+
+    private fun generateDistancesMeters(): List<Double> {
+        // Generate sequence 1,2,5,10,20,50,100,200,... up to maxNm
+        val bases = listOf(1, 2, 5)
+        val resultNm = mutableListOf<Int>()
+        var multiplier = 1
+        while (true) {
+            var addedAny = false
+            for (b in bases) {
+                val nm = b * multiplier
+                if (nm <= maxNm) {
+                    resultNm.add(nm)
+                    addedAny = true
+                }
+            }
+            if (!addedAny) break
+            multiplier *= 10
+        }
+        // ensure unique and sorted
+        val finalNm = resultNm.distinct().sorted()
+        return finalNm.map { it * 1852.0 }
+    }
+
+    override fun draw(canvas: android.graphics.Canvas?, mapView: org.osmdroid.views.MapView?, shadow: Boolean) {
+        if (shadow) return
+        val mv = mapView ?: return
+        val c = center ?: return
+        val proj = mv.projection
+        val centerPt = Point()
+        proj.toPixels(c, centerPt)
+
+        val latRad = Math.toRadians(c.latitude)
+
+        val distances = generateDistancesMeters()
+
+        var outerRadiusPx = 0f
+        distances.forEachIndexed { idx, meters ->
+            // convert meters to degrees longitude delta at this latitude
+            val deltaLon = meters / (111319.9 * Math.cos(latRad))
+            val edge = GeoPoint(c.latitude, c.longitude + deltaLon)
+            val edgePt = Point()
+            proj.toPixels(edge, edgePt)
+            val radiusPx = kotlin.math.hypot((edgePt.x - centerPt.x).toDouble(), (edgePt.y - centerPt.y).toDouble()).toFloat()
+            canvas?.drawCircle(centerPt.x.toFloat(), centerPt.y.toFloat(), radiusPx, paint)
+            // label at rightmost point
+            val nm = (meters / 1852.0).toInt()
+            val label = "%d NM".format(nm)
+            canvas?.drawText(label, centerPt.x + radiusPx + 6f, centerPt.y.toFloat() - 6f - (idx * 18), textPaint)
+            if (idx == distances.lastIndex) outerRadiusPx = radiusPx
+        }
+
+        if (outerRadiusPx > 0f) {
+            // Draw cardinal radial lines through the outermost ring and label them
+            val cardinals = listOf(0, 90, 180, 270)
+            val labelMap = mapOf(0 to "N", 90 to "O", 180 to "S", 270 to "W")
+            val tickPaint = Paint().apply { isAntiAlias = true; color = android.graphics.Color.argb(0xCC, 0xFF, 0xFF, 0xFF); strokeWidth = 2f }
+            val smallText = Paint(textPaint).apply { textSize = 18f }
+
+            for (angle in cardinals) {
+                val rad = Math.toRadians(angle.toDouble())
+                val dx = (Math.sin(rad) * outerRadiusPx).toFloat()
+                val dy = (-Math.cos(rad) * outerRadiusPx).toFloat()
+                canvas?.drawLine(centerPt.x - dx, centerPt.y - dy, centerPt.x + dx, centerPt.y + dy, tickPaint)
+                val lx = centerPt.x + (dx * 1.05f) - (smallText.measureText(labelMap[angle] ?: "") / 2)
+                val ly = centerPt.y + (dy * 1.05f) + (smallText.textSize / 2)
+                canvas?.drawText(labelMap[angle] ?: "", lx, ly, smallText)
+            }
+
+            // Degree ticks around outer ring (every 30°, label every 60°)
+            for (a in 0 until 360 step 30) {
+                val rad = Math.toRadians(a.toDouble())
+                val dx = (Math.sin(rad) * outerRadiusPx).toFloat()
+                val dy = (-Math.cos(rad) * outerRadiusPx).toFloat()
+                val innerX = centerPt.x + (dx * 0.97f)
+                val innerY = centerPt.y + (dy * 0.97f)
+                val outerX = centerPt.x + dx
+                val outerY = centerPt.y + dy
+                canvas?.drawLine(innerX, innerY, outerX, outerY, tickPaint)
+                if (a % 60 == 0) {
+                    val lab = "$a°"
+                    val lx = centerPt.x + (dx * 1.08f) - (smallText.measureText(lab) / 2)
+                    val ly = centerPt.y + (dy * 1.08f) + (smallText.textSize / 2)
+                    canvas?.drawText(lab, lx, ly, smallText)
+                }
+            }
+
+            // Draw exact heading label and heading radial line on the outermost ring (e.g., "305°")
+            val headingNorm = (((heading % 360) + 360) % 360).toInt()
+            val hRad = Math.toRadians(headingNorm.toDouble())
+            val hx = centerPt.x + (Math.sin(hRad) * outerRadiusPx).toFloat()
+            val hy = centerPt.y + (-Math.cos(hRad) * outerRadiusPx).toFloat()
+            val headingLabel = "${headingNorm}°"
+            val headingPaint = Paint(textPaint).apply { color = android.graphics.Color.YELLOW; textSize = textPaint.textSize + 2f }
+            // Draw a highlighted radial for heading
+            val headLine = Paint().apply { isAntiAlias = true; color = android.graphics.Color.YELLOW; strokeWidth = 4f }
+            canvas?.drawLine(centerPt.x.toFloat(), centerPt.y.toFloat(), hx, hy, headLine)
+            // arrowhead on outer ring
+            val ah = 10f
+            val left = Math.toRadians((headingNorm - 140).toDouble())
+            val right = Math.toRadians((headingNorm + 140).toDouble())
+            val ax1 = hx + (Math.sin(left) * ah).toFloat()
+            val ay1 = hy + (-Math.cos(left) * ah).toFloat()
+            val ax2 = hx + (Math.sin(right) * ah).toFloat()
+            val ay2 = hy + (-Math.cos(right) * ah).toFloat()
+            canvas?.drawLine(hx, hy, ax1, ay1, headLine)
+            canvas?.drawLine(hx, hy, ax2, ay2, headLine)
+            // Draw label with small shadow
+            val headingPaintText = Paint(headingPaint).apply { style = Paint.Style.FILL }
+            canvas?.drawText(headingLabel, hx + 6f, hy - 6f, Paint(headingPaintText).apply { color = android.graphics.Color.argb(0xCC, 0, 0, 0) })
+            canvas?.drawText(headingLabel, hx + 6f, hy - 6f, headingPaint)
+        }
+    }
+}
+
