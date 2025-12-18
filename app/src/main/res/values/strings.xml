@@ -50,6 +50,7 @@
     <string name="file_single">File</string>
     <string name="file_plural">Files</string>
     <string name="file_open">Open file</string>
+    <string name="open_internal_viewer">Open internal viewer</string>
     <string name="file_open_folders">Open folders</string>
     <string name="file_unsupported_format">Unsupported file format: .%1$s\nSupported: .md, .markdown</string>
 

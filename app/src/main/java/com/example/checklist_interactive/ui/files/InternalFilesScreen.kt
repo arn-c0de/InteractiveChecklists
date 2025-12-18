@@ -205,24 +205,31 @@ fun InternalFilesScreen(
         val allFiles = rawGroupedFiles.values.flatten().distinctBy { it.path }
         val enrichedAll = withContext(Dispatchers.IO) { fileManager.enrichWithTags(allFiles) }
         val newEnrichedMap = enrichedAll.associateBy { it.path }
-        val newGrouped = rawGroupedFiles.mapValues { (_, files) ->
-            val enrichedFiles = files.map { newEnrichedMap[it.path] ?: it }
-            if (selectedTagFilters.isEmpty()) {
-                enrichedFiles
-            } else if (tagFilterMode == "all") {
-                enrichedFiles.filter { file -> selectedTagFilters.all { tag -> file.tags.contains(tag) } }
-            } else {
-                enrichedFiles.filter { file -> file.tags.any { tag -> selectedTagFilters.contains(tag) } }
-            }
-        }.filterValues { it.isNotEmpty() }
+
+        // Perform grouping and filtering off the main thread to avoid UI jank
+        val newGrouped = withContext(Dispatchers.Default) {
+            rawGroupedFiles.mapValues { (_, files) ->
+                val enrichedFiles = files.map { newEnrichedMap[it.path] ?: it }
+                if (selectedTagFilters.isEmpty()) {
+                    enrichedFiles
+                } else if (tagFilterMode == "all") {
+                    enrichedFiles.filter { file -> selectedTagFilters.all { tag -> file.tags.contains(tag) } }
+                } else {
+                    enrichedFiles.filter { file -> file.tags.any { tag -> selectedTagFilters.contains(tag) } }
+                }
+            }.filterValues { it.isNotEmpty() }
+        }
+
+        // Update state on the main thread
         enrichedFileMap = newEnrichedMap
-        android.util.Log.i("InternalFiles", "refreshFilesWithTags: enriched ${enrichedFileMap.size} files, grouped ${newGrouped.size} categories")
+        android.util.Log.i("InternalFiles", "refreshFilesWithTags: enriched ${enrichedFileMap.size} files, grouped ${newGrouped.size}")
         if (newGrouped != groupedFiles) groupedFiles = newGrouped
-        
+
         val rawTree = withContext(Dispatchers.IO) {
             fileManager.getFolderTree().map { node -> filterAircraftChildren(node, assetAircraftsLower, prefsManager) }
         }
-        val newTree = withContext(Dispatchers.IO) { rawTree.map { node -> enrichNodeWithTags(node, enrichedFileMap, selectedTagFilters, tagFilterMode) } }
+        // Enrich the tree off the main thread as well
+        val newTree = withContext(Dispatchers.Default) { rawTree.map { node -> enrichNodeWithTags(node, newEnrichedMap, selectedTagFilters, tagFilterMode) } }
         if (newTree != folderTree) folderTree = newTree
         android.util.Log.i("InternalFiles", "refreshFilesWithTags: tree nodes ${folderTree.size}")
         android.util.Log.i("InternalFiles", "refreshFilesWithTags: done")
@@ -241,7 +248,9 @@ fun InternalFilesScreen(
     
     // Initial load of files (async)
     LaunchedEffect(Unit) {
-        isLoadingFiles = true
+        // Only show spinner if we have no existing data (makes switching back faster)
+        val showSpinner = folderTree.isEmpty()
+        isLoadingFiles = showSpinner
         // Ensure tag manager is initialized on IO thread first
         withContext(Dispatchers.IO) {
             try {
@@ -619,11 +628,12 @@ fun InternalFilesScreen(
                     }
                 }
                 
-                // Show folder tree once (it contains all categories and nested folders)
-                item {
-                    Column {
-                        FolderTree(
-                            nodes = folderTree,
+                // Render folder tree lazily (improves performance for large trees)
+                // Emit folder nodes, files and children as separate lazy items so only visible content is composed
+                if (folderTree.isNotEmpty()) {
+                    folderTree.forEach { rootNode ->
+                        addFolderNodeItems(
+                            node = rootNode,
                             expanded = expandedCategories,
                             onToggleExpanded = { key, newState ->
                                 expandedCategories[key] = newState
@@ -633,11 +643,13 @@ fun InternalFilesScreen(
                             onDelete = { file ->
                                 fileToDelete = file
                                 showDeleteConfirm = true
-                            },                            onEditTags = { file ->
+                            },
+                            onEditTags = { file ->
                                 fileToEditTags = file
                                 showTagEditor = true
-                            },                            level = 0
-                            , isGridView = isGridView
+                            },
+                            level = 0,
+                            isGridView = isGridView
                         )
                     }
                 }
@@ -954,8 +966,11 @@ fun InternalFilesScreen(
 
     // When parent changes refreshTrigger, update contents
     LaunchedEffect(refreshTrigger) {
+        // Small delay to avoid blocking navigation animation when returning to this screen
+        kotlinx.coroutines.delay(120L)
         refreshFilesWithTags()
-        shortcuts = shortcutManager.loadShortcuts()
+        // Load shortcuts on IO dispatcher to avoid blocking the UI
+        shortcuts = withContext(Dispatchers.IO) { shortcutManager.loadShortcuts() }
     }
 
     // Listen for preference changes and update filtering when visible aircrafts change
@@ -1077,7 +1092,7 @@ private fun FolderNodeItem(
 ) {
     val key = node.relativePath
     val isExpanded = expanded[key] ?: true
-    val fileCount = countFiles(node)
+    val fileCount = remember(node) { countFiles(node) }
 
     Surface(
         modifier = Modifier
@@ -1160,6 +1175,121 @@ private fun FolderNodeItem(
         // Recurse into children nodes
         node.children.forEach { child ->
             FolderNodeItem(
+                node = child,
+                expanded = expanded,
+                onToggleExpanded = onToggleExpanded,
+                onFileOpen = onFileOpen,
+                onDelete = onDelete,
+                onEditTags = onEditTags,
+                level = level + 1,
+                isGridView = isGridView
+            )
+        }
+    }
+}
+
+// Helper to render folder tree into the top-level LazyColumn as separate items
+private fun androidx.compose.foundation.lazy.LazyListScope.addFolderNodeItems(
+    node: com.example.checklist_interactive.data.files.InternalFileManager.FolderNode,
+    expanded: MutableMap<String, Boolean>,
+    onToggleExpanded: (String, Boolean) -> Unit,
+    onFileOpen: (com.example.checklist_interactive.data.files.FileInfo) -> Unit,
+    onDelete: (com.example.checklist_interactive.data.files.FileInfo) -> Unit,
+    onEditTags: (com.example.checklist_interactive.data.files.FileInfo) -> Unit,
+    level: Int,
+    isGridView: Boolean
+) {
+    val key = node.relativePath
+
+    // Node header
+    item(key = "node_header:$key") {
+        val isExpanded = expanded[key] ?: true
+        val fileCount = androidx.compose.runtime.remember(node) { countFiles(node) }
+
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onToggleExpanded(key, !isExpanded) },
+            color = MaterialTheme.colorScheme.surfaceVariant
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Spacer(modifier = Modifier.width((level * 12).dp))
+                Icon(
+                    Icons.Default.Folder,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                androidx.compose.material3.Text(
+                    text = node.name.replace('_', ' '),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                val localContext = androidx.compose.ui.platform.LocalContext.current
+                androidx.compose.material3.Text(
+                    text = "$fileCount ${if (fileCount == 1) localContext.getString(com.example.checklist_interactive.R.string.file) else localContext.getString(com.example.checklist_interactive.R.string.files)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                IconButton(onClick = { onToggleExpanded(key, !isExpanded) }) {
+                    Icon(
+                        if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = if (isExpanded) localContext.getString(com.example.checklist_interactive.R.string.collapse) else localContext.getString(com.example.checklist_interactive.R.string.expand)
+                    )
+                }
+            }
+        }
+    }
+
+    // Files (lazy) and children
+    val isExpandedNow = expanded[key] ?: true
+    if (isExpandedNow) {
+        if (isGridView) {
+            val columns = 3
+            val rows = node.files.chunked(columns)
+            rows.forEachIndexed { rowIndex, rowFiles ->
+                item(key = "node_files_row:${key}:$rowIndex") {
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        rowFiles.forEach { file ->
+                            Box(modifier = Modifier
+                                .weight(1f)
+                                .padding(8.dp)) {
+                                FileGridItem(
+                                    file = file,
+                                    onClick = { onFileOpen(file) },
+                                    onDelete = { onDelete(file) },
+                                    onEditTags = { onEditTags(file) }
+                                )
+                            }
+                        }
+                        if (rowFiles.size < columns) {
+                            repeat(columns - rowFiles.size) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            items(node.files, key = { it.path }) { file ->
+                FileListItem(
+                    file = file,
+                    onClick = { onFileOpen(file) },
+                    onDelete = { onDelete(file) },
+                    onEditTags = { onEditTags(file) }
+                )
+            }
+        }
+
+        node.children.forEach { child ->
+            addFolderNodeItems(
                 node = child,
                 expanded = expanded,
                 onToggleExpanded = onToggleExpanded,

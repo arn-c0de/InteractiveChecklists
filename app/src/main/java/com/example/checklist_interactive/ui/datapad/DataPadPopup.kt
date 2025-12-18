@@ -42,6 +42,8 @@ import androidx.compose.ui.platform.LocalDensity
 import com.example.checklist_interactive.data.datapad.FlightData
 import com.example.checklist_interactive.R
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 /**
@@ -54,34 +56,45 @@ fun DataPadPopup(
     modifier: Modifier = Modifier
 ) {
     val manager = LocalDataPadManager.current
-    val flightData by manager.flightData.collectAsState()
-    val isConnected by manager.isConnected.collectAsState()
-    val lastUpdateTime by manager.lastUpdateTime.collectAsState()
-    val deviceIpAddress by manager.deviceIpAddress.collectAsState()
-    val udpPort by manager.udpPort.collectAsState()
-    val isEnabled by manager.isEnabled.collectAsState()
-    
-    var showSettingsDialog by remember { mutableStateOf(false) }
-    
-    // Calculate time since last update
     val context = LocalContext.current
-    var timeSinceUpdate by remember { mutableStateOf("--") }
-    LaunchedEffect(lastUpdateTime) {
-        while (true) {
-            val lastUpdate = lastUpdateTime
-            timeSinceUpdate = if (lastUpdate != null) {
-                val seconds = (System.currentTimeMillis() - lastUpdate) / 1000
-                when {
-                    seconds < 60 -> context.getString(R.string.datapad_time_seconds_ago, seconds)
-                    seconds < 3600 -> context.getString(R.string.datapad_time_minutes_ago, seconds / 60)
-                    else -> context.getString(R.string.datapad_time_hours_ago, seconds / 3600)
-                }
-            } else {
-                "--"
-            }
-            kotlinx.coroutines.delay(1000)
+
+    // Deferred state loading to prevent blocking sheet opening
+    var isLoading by remember { mutableStateOf(true) }
+    var flightData by remember { mutableStateOf<FlightData?>(null) }
+    var isConnected by remember { mutableStateOf(false) }
+    var lastUpdateTime by remember { mutableStateOf<Long?>(null) }
+    var deviceIpAddress by remember { mutableStateOf("Unknown") }
+    var udpPort by remember { mutableStateOf(5010) }
+    var isEnabled by remember { mutableStateOf(false) }
+
+    // Load states asynchronously on background thread
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                flightData = manager.flightData.first()
+                isConnected = manager.isConnected.first()
+                lastUpdateTime = manager.lastUpdateTime.first()
+                deviceIpAddress = manager.deviceIpAddress.first()
+                udpPort = manager.udpPort.first()
+                isEnabled = manager.isEnabled.first()
+            } catch (_: Exception) {}
+        }
+        isLoading = false
+    }
+
+    // Keep live updates after initial load
+    LaunchedEffect(isLoading) {
+        if (!isLoading) {
+            launch { manager.flightData.collect { flightData = it } }
+            launch { manager.isConnected.collect { isConnected = it } }
+            launch { manager.lastUpdateTime.collect { lastUpdateTime = it } }
+            launch { manager.deviceIpAddress.collect { deviceIpAddress = it } }
+            launch { manager.udpPort.collect { udpPort = it } }
+            launch { manager.isEnabled.collect { isEnabled = it } }
         }
     }
+
+    var showSettingsDialog by remember { mutableStateOf(false) }
 
     // Persistable sheet fraction and pinned state (like QuickAccessSheet)
     val prefs = context.getSharedPreferences("datapad_prefs", Context.MODE_PRIVATE)
@@ -150,11 +163,11 @@ fun DataPadPopup(
             }
         }
 
-        // Keep applying every 100ms to override ModalBottomSheet's behavior only while the sheet is visible
+        // Keep applying occasionally to override ModalBottomSheet's behavior only while the sheet is visible
         if (sheetState.isVisible) {
             while (isActive && sheetState.isVisible) {
                 hideSystemUI()
-                kotlinx.coroutines.delay(100L)
+                kotlinx.coroutines.delay(750L) // less frequent → lighter on main thread
             }
         }
     }
@@ -227,7 +240,7 @@ fun DataPadPopup(
                 val dialogController = dialogWindow?.let { WindowCompat.getInsetsController(it, dialogView) }
                 while (isActive && sheetState.isVisible) {
                     dialogController?.hide(WindowInsetsCompat.Type.systemBars())
-                    kotlinx.coroutines.delay(100L)
+                    kotlinx.coroutines.delay(750L) // less frequent → lighter on main thread
                 }
             }
         }
@@ -281,44 +294,63 @@ fun DataPadPopup(
                 )
             }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp)
-            ) {
-                // Header
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            // Show skeleton loader during initial data fetch
+            if (isLoading) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
+                    androidx.compose.material3.CircularProgressIndicator()
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = stringResource(R.string.datapad_title),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
+                        text = stringResource(com.example.checklist_interactive.R.string.loading),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Row {
-                        FilledTonalIconButton(
-                            onClick = { showOpacitySlider = !showOpacitySlider },
-                            modifier = Modifier.padding(end = 4.dp)
-                        ) {
-                            Text(
-                                text = "${(sheetOpacity * 100).toInt()}%",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
+                }
+            } else {
+                // Main content (loaded)
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp)
+                ) {
+                    // Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(R.string.datapad_title),
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Row {
+                            FilledTonalIconButton(
+                                onClick = { showOpacitySlider = !showOpacitySlider },
+                                modifier = Modifier.padding(end = 4.dp)
+                            ) {
+                                Text(
+                                    text = "${(sheetOpacity * 100).toInt()}%",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
 
-                        IconButton(onClick = { showSettingsDialog = true }) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = stringResource(R.string.cd_settings),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
+                            IconButton(onClick = { showSettingsDialog = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = stringResource(R.string.cd_settings),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
                     }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                 AnimatedVisibility(visible = showOpacitySlider) {
                     Column(
@@ -344,7 +376,7 @@ fun DataPadPopup(
                 val isRunning by manager.isRunning.collectAsState()
                 ConnectionStatusCard(
                     isConnected = isConnected,
-                    timeSinceUpdate = timeSinceUpdate,
+                    lastUpdateTime = lastUpdateTime,
                     deviceIpAddress = deviceIpAddress,
                     udpPort = udpPort,
                     isRunning = isRunning,
@@ -362,7 +394,8 @@ fun DataPadPopup(
                 ) {
                     FlightDataDisplay(flightData)
                 }
-            }
+            } // end main content column
+            } // end if-else isLoading
         }
     }
     
@@ -377,12 +410,33 @@ fun DataPadPopup(
 @Composable
 private fun ConnectionStatusCard(
     isConnected: Boolean,
-    timeSinceUpdate: String,
+    lastUpdateTime: Long?,
     deviceIpAddress: String,
     udpPort: Int,
     isRunning: Boolean,
     onToggleEnabled: () -> Unit
 ) {
+    // Keep the time-since-update localized to this composable so only it recomposes
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var timeSinceUpdate by remember { mutableStateOf("--") }
+    LaunchedEffect(lastUpdateTime) {
+        // Single-running ticker while visible; updates only local text state
+        while (true) {
+            val lastUpdate = lastUpdateTime
+            timeSinceUpdate = if (lastUpdate != null) {
+                val seconds = (System.currentTimeMillis() - lastUpdate) / 1000
+                when {
+                    seconds < 60 -> context.getString(com.example.checklist_interactive.R.string.datapad_time_seconds_ago, seconds)
+                    seconds < 3600 -> context.getString(com.example.checklist_interactive.R.string.datapad_time_minutes_ago, seconds / 60)
+                    else -> context.getString(com.example.checklist_interactive.R.string.datapad_time_hours_ago, seconds / 3600)
+                }
+            } else {
+                "--"
+            }
+            kotlinx.coroutines.delay(1000)
+        }
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(

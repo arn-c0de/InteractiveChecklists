@@ -83,6 +83,7 @@ import android.view.View
 import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
 import java.net.URLDecoder
@@ -274,6 +275,9 @@ fun QuickAccessSheet(
     val view = LocalView.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
+    // Track loading state: show skeleton until data ready (prevents 3-5s blank wait)
+    var isLoading by remember { mutableStateOf(true) }
+
     // Force immersive fullscreen mode continuously while bottom sheet is shown
     LaunchedEffect(sheetState.currentValue) {
         val activity = view.context as? android.app.Activity
@@ -311,31 +315,64 @@ fun QuickAccessSheet(
             }
         }
 
-        // Keep applying every 100ms to override ModalBottomSheet's behavior only while the sheet is visible
+        // Keep applying occasionally to override ModalBottomSheet's behavior only while the sheet is visible
         if (sheetState.isVisible) {
             while (isActive && sheetState.isVisible) {
                 hideSystemUI()
-                delay(100L)
+                delay(750L) // less frequent → lighter on main thread
             }
         }
     }
 
-    // State flows
-    val notes by noteManager.notesSummary.collectAsState()
-    val activeNoteId by noteManager.activeNoteId.collectAsState()
+    // State flows - deferred loading to avoid blocking sheet opening
+    var notes by remember { mutableStateOf<List<com.example.checklist_interactive.data.quicknotes.QuickNote>>(emptyList()) }
+    var activeNoteId by remember { mutableStateOf<String?>(null) }
+    var savedNote by remember { mutableStateOf("") }
+    var callsignFlow by remember { mutableStateOf("") }
+    var com1Flow by remember { mutableStateOf("") }
+    var com1ModeFlow by remember { mutableStateOf("FM") }
+    var com2Flow by remember { mutableStateOf("") }
+    var com2ModeFlow by remember { mutableStateOf("FM") }
+    var flightStatusFlow by remember { mutableStateOf("") }
 
-    // Get content for active note (reactive to activeNoteId changes)
-    val savedNote by noteManager.noteContent.collectAsState()
+    // Load data asynchronously to prevent blocking sheet opening
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                // Fetch initial values on IO thread (sequential is fine for short warm-up)
+                notes = noteManager.notesSummary.first()
+                activeNoteId = noteManager.activeNoteId.first()
+                savedNote = noteManager.noteContent.first()
+                callsignFlow = noteManager.callsign.first()
+                com1Flow = noteManager.com1.first()
+                com1ModeFlow = noteManager.com1Mode.first()
+                com2Flow = noteManager.com2.first()
+                com2ModeFlow = noteManager.com2Mode.first()
+                flightStatusFlow = noteManager.flightStatus.first()
+            } catch (_: Exception) {}
+        }
+        // Mark loaded after initial fetch completes
+        isLoading = false
+    }
+
+    // Keep live updates after initial load (lightweight)
+    LaunchedEffect(isLoading) {
+        if (!isLoading) {
+            launch { noteManager.notesSummary.collect { notes = it } }
+            launch { noteManager.activeNoteId.collect { activeNoteId = it } }
+            launch { noteManager.noteContent.collect { savedNote = it } }
+            launch { noteManager.callsign.collect { callsignFlow = it } }
+            launch { noteManager.com1.collect { com1Flow = it } }
+            launch { noteManager.com1Mode.collect { com1ModeFlow = it } }
+            launch { noteManager.com2.collect { com2Flow = it } }
+            launch { noteManager.com2Mode.collect { com2ModeFlow = it } }
+            launch { noteManager.flightStatus.collect { flightStatusFlow = it } }
+        }
+    }
 
     // Local UI state
     var currentNote by remember { mutableStateOf("") }
     // Radio toolbar state
-    val callsignFlow by noteManager.callsign.collectAsState()
-    val com1Flow by noteManager.com1.collectAsState()
-    val com1ModeFlow by noteManager.com1Mode.collectAsState()
-    val com2Flow by noteManager.com2.collectAsState()
-    val com2ModeFlow by noteManager.com2Mode.collectAsState()
-    val flightStatusFlow by noteManager.flightStatus.collectAsState()
     var callsign by remember { mutableStateOf("") }
     var com1 by remember { mutableStateOf("") }
     var com1Mode by remember { mutableStateOf("FM") }
@@ -733,33 +770,50 @@ fun QuickAccessSheet(
                 )
             }
 
-            Column(modifier = Modifier.fillMaxSize()) {
-            // Header with title and actions
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-                    .padding(top = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
+            // Show skeleton loader during initial data fetch (prevents blank wait)
+            if (isLoading) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.Article,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(32.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
+                    androidx.compose.material3.CircularProgressIndicator()
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = stringResource(R.string.quick_notes_title),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
+                        text = stringResource(R.string.loading),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+            } else {
+                // Main content (loaded)
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // Header with title and actions
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp)
+                            .padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Article,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(32.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = stringResource(R.string.quick_notes_title),
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
 
                 Row {
                     // Transparency button
@@ -1069,7 +1123,8 @@ fun QuickAccessSheet(
                         val displayNote = expandCallsignPlaceholder(currentNote, callsign)
                         
                         Box(modifier = Modifier.fillMaxWidth()) {
-                            // Editable text field (background layer) with visual transformation
+                            // Memoize visual transformation and overlay building to avoid recomputation on unrelated recompositions
+                            val visualTrans = remember(currentNote) { LinksVisualTransformation(currentNote) }
                             OutlinedTextField(
                                 value = currentNote,
                                 onValueChange = {
@@ -1093,61 +1148,68 @@ fun QuickAccessSheet(
                                     focusedBorderColor = Color.Transparent,
                                     unfocusedBorderColor = Color.Transparent
                                 ),
-                                visualTransformation = LinksVisualTransformation(currentNote)
+                                visualTransformation = visualTrans
                             )
-                            
+
                             // Clickable links overlay (foreground layer)
                             // Build overlay using the transformed text structure (with pin emoji replaced)
-                            val (transformedText, _) = buildTransformedStringAndRanges(displayNote)
-                            val overlayString = buildAnnotatedString {
-                                val regex = Regex("\\[([^]]+)]\\(internal://open\\?file=([^)&]+)(?:&page=(\\d+))?\\)")
-                                var transformedIndex = 0
-                                var originalIndex = 0
-                                
-                                regex.findAll(displayNote).forEach { match ->
-                                    val range = match.range
-                                    // Add spacing for text before this link
-                                    if (range.first > originalIndex) {
-                                        val beforeText = displayNote.substring(originalIndex, range.first)
-                                        append(beforeText)
-                                        transformedIndex += beforeText.length
+                            val overlayState = remember(displayNote) {
+                                val (transformedText, _) = buildTransformedStringAndRanges(displayNote)
+
+                                val overlayString = buildAnnotatedString {
+                                    val regex = Regex("\\[([^]]+)]\\(internal://open\\?file=([^)&]+)(?:&page=(\\d+))?\\)")
+                                    var transformedIndex = 0
+                                    var originalIndex = 0
+
+                                    regex.findAll(displayNote).forEach { match ->
+                                        val range = match.range
+                                        // Add spacing for text before this link
+                                        if (range.first > originalIndex) {
+                                            val beforeText = displayNote.substring(originalIndex, range.first)
+                                            append(beforeText)
+                                            transformedIndex += beforeText.length
+                                        }
+
+                                        // Add single space where pin emoji is (TextField shows emoji, overlay shows space + link)
+                                        append(" ")
+                                        transformedIndex += 1
+
+                                        // Add clickable link label right after the space
+                                        val label = match.groups[1]?.value ?: ""
+                                        val fileEnc = match.groups[2]?.value ?: ""
+                                        val page = match.groups[3]?.value ?: ""
+                                        val annotationValue = "$fileEnc|$page"
+                                        val start = length
+                                        append(label)
+                                        val end = length
+                                        addStringAnnotation(
+                                            tag = "OPEN_LINK",
+                                            annotation = annotationValue,
+                                            start = start,
+                                            end = end
+                                        )
+                                        addStyle(
+                                            SpanStyle(
+                                                color = Color(0xFF0066CC),
+                                                textDecoration = TextDecoration.Underline
+                                            ),
+                                            start,
+                                            end
+                                        )
+                                        originalIndex = range.last + 1
                                     }
-                                    
-                                    // Add single space where pin emoji is (TextField shows emoji, overlay shows space + link)
-                                    append(" ")
-                                    transformedIndex += 1
-                                    
-                                    // Add clickable link label right after the space
-                                    val label = match.groups[1]?.value ?: ""
-                                    val fileEnc = match.groups[2]?.value ?: ""
-                                    val page = match.groups[3]?.value ?: ""
-                                    val annotationValue = "$fileEnc|$page"
-                                    val start = length
-                                    append(label)
-                                    val end = length
-                                    addStringAnnotation(
-                                        tag = "OPEN_LINK",
-                                        annotation = annotationValue,
-                                        start = start,
-                                        end = end
-                                    )
-                                    addStyle(
-                                        SpanStyle(
-                                            color = Color(0xFF0066CC),
-                                            textDecoration = TextDecoration.Underline
-                                        ),
-                                        start,
-                                        end
-                                    )
-                                    originalIndex = range.last + 1
+
+                                    // Add remaining text after last link
+                                    if (originalIndex < displayNote.length) {
+                                        append(displayNote.substring(originalIndex))
+                                    }
                                 }
-                                
-                                // Add remaining text after last link
-                                if (originalIndex < displayNote.length) {
-                                    append(displayNote.substring(originalIndex))
-                                }
+
+                                transformedText to overlayString
                             }
-                            
+
+                            val overlayString = overlayState.second
+
                             if (overlayString.text.trim().isNotEmpty()) {
                                 Box(
                                     modifier = Modifier
@@ -1990,7 +2052,8 @@ fun QuickAccessSheet(
                     }
                 }
             }
-            }
+            } // end main content
+            } // end if-else isLoading
         }
     }
 }
