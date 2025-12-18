@@ -1,6 +1,8 @@
 # Changelog
 
 All relevant changes are summarized here by version.
+## [1.0.14] - 2025-12-18
+
 ## [1.0.13] - 2025-12-17
 ### Added
 - **Map improvements:** marker popups, route info, marker rotation, and map tools; Python MapDatabaseTools integration so the app and tools can share the same DB.
