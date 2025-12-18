@@ -121,10 +121,11 @@ def check_bind_security(bind_ip: str):
 # Global nonce counter for SERVER side (0x01 prefix)
 _nonce_counter = 0
 _nonce_lock = __import__('threading').Lock()
-_received_nonces = set()
-# Highest counter observed from clients and sliding window for replay protection
-_highest_counter = 0
+
+# Per-client nonce state for PSK mode (prevents multi-client conflicts)
+_client_nonce_states = {}  # (ip, port) -> {'seen': set(), 'highest': int, 'last_activity': float}
 _REPLAY_WINDOW = 1000  # keep recent counters within this window (reduced from 10000 for security)
+_CLIENT_TIMEOUT = 600  # Remove inactive clients after 10 minutes
 
 # DoS protection: Global message rate limiting
 _message_timestamps = []  # List of timestamps for received messages
@@ -390,12 +391,17 @@ def generate_nonce_server() -> bytes:
         # Format: 0x01 (server) + 3 bytes reserved + 8 bytes counter
         return bytes([0x01, 0x00, 0x00, 0x00]) + _nonce_counter.to_bytes(8, 'big')
 
-def validate_nonce_server(nonce: bytes) -> bool:
-    """Validate received nonce to prevent replay attacks.
+def validate_nonce_server(nonce: bytes, client_addr: tuple = None) -> bool:
+    """Validate received nonce to prevent replay attacks with per-client state.
 
     Additional checks added:
       - ensure nonce prefix indicates a CLIENT message (0x00)
       - sliding-window replay protection with bounded memory
+      - per-client state to prevent multi-client conflicts
+
+    Args:
+        nonce: 12-byte nonce to validate
+        client_addr: (IP, port) tuple to identify client. If None, uses global state (legacy)
 
     Returns True if nonce is valid (not replayed), False otherwise.
     """
@@ -411,29 +417,66 @@ def validate_nonce_server(nonce: bytes) -> bool:
     counter = int.from_bytes(nonce[4:12], 'big')
 
     with _nonce_lock:
-        global _highest_counter
+        # Get or create client-specific state
+        if client_addr is None:
+            # Legacy mode: use global state
+            client_addr = ("global", 0)
+        
+        if client_addr not in _client_nonce_states:
+            _client_nonce_states[client_addr] = {
+                'seen': set(),
+                'highest': 0,
+                'last_activity': __import__('time').time()
+            }
+            logger.debug(f"Created nonce state for new client {client_addr}")
+        
+        client_state = _client_nonce_states[client_addr]
+        
         # Reject counters that are far in the past (stale)
-        if _highest_counter and counter <= (_highest_counter - _REPLAY_WINDOW):
-            logger.warning(f"⚠️ Stale nonce detected (too old): {counter} (highest: {_highest_counter})")
+        if client_state['highest'] and counter <= (client_state['highest'] - _REPLAY_WINDOW):
+            logger.warning(f"⚠️ Stale nonce from {client_addr}: counter {counter} (highest: {client_state['highest']})")
             return False
 
         # Replay detection
-        if counter in _received_nonces:
-            logger.warning(f"⚠️ Replay attack detected! Nonce counter: {counter}")
+        if counter in client_state['seen']:
+            logger.warning(f"⚠️ Replay attack detected from {client_addr}! Nonce counter: {counter}")
             return False
 
         # Accept and record
-        _received_nonces.add(counter)
-        if counter > _highest_counter:
-            _highest_counter = counter
+        client_state['seen'].add(counter)
+        if counter > client_state['highest']:
+            client_state['highest'] = counter
+        
+        # Update activity timestamp
+        client_state['last_activity'] = __import__('time').time()
 
         # Cleanup old nonces to prevent memory leak (keep window)
-        min_allowed = max(0, _highest_counter - _REPLAY_WINDOW)
-        old_nonces = [n for n in _received_nonces if n < min_allowed]
+        min_allowed = max(0, client_state['highest'] - _REPLAY_WINDOW)
+        old_nonces = [n for n in client_state['seen'] if n < min_allowed]
         for n in old_nonces:
-            _received_nonces.remove(n)
+            client_state['seen'].remove(n)
 
     return True
+
+def cleanup_inactive_clients_nonce():
+    """Remove inactive client nonce states to prevent memory leaks.
+    
+    Should be called periodically (e.g., every few minutes).
+    """
+    with _nonce_lock:
+        current_time = __import__('time').time()
+        inactive_clients = []
+        
+        for addr, state in _client_nonce_states.items():
+            if current_time - state['last_activity'] > _CLIENT_TIMEOUT:
+                inactive_clients.append(addr)
+        
+        for addr in inactive_clients:
+            del _client_nonce_states[addr]
+            logger.debug(f"Cleaned up inactive client nonce state: {addr}")
+        
+        if inactive_clients:
+            logger.info(f"Removed {len(inactive_clients)} inactive client(s) from nonce manager")
 
 def encrypt_payload(data: bytes, key: bytes = PRE_SHARED_KEY) -> bytes:
     """Encrypt data using AES-GCM with counter-based nonce (prevents collision).

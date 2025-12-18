@@ -21,6 +21,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.CompositionLocalProvider
 import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
+import com.example.checklist_interactive.ui.datapad.LocalDataPadManager
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.res.stringResource
 import com.example.checklist_interactive.R
 
@@ -59,6 +65,30 @@ fun FlightMiniStatusBar(noteManager: QuickNoteManager, onClick: (() -> Unit)? = 
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        // DataPad connection status indicator: green = connected, yellow = enabled but not connected, red = disabled
+        val dataPadManager = LocalDataPadManager.current
+        val dpConnected by dataPadManager.isConnected.collectAsState()
+        val dpEnabled by dataPadManager.isEnabled.collectAsState()
+        val indicatorColor = when {
+            dpConnected -> Color(0xFF4CAF50) // green
+            dpEnabled -> Color(0xFFFFC107) // amber/yellow
+            else -> Color(0xFFF44336) // red
+        }
+
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(indicatorColor)
+                .semantics { contentDescription = when {
+                    dpConnected -> "DataPad verbunden"
+                    dpEnabled -> "DataPad aktiviert, aber nicht verbunden"
+                    else -> "DataPad deaktiviert"
+                } }
+        )
+
+        Spacer(modifier = Modifier.width(6.dp))
+
         Text(text = (callsign.ifBlank { stringResource(R.string.common_placeholder_dash) }), style = MaterialTheme.typography.labelSmall)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(text = stringResource(R.string.quick_notes_status_label) + ":", style = MaterialTheme.typography.labelSmall)

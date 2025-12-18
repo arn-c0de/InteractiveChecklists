@@ -252,6 +252,7 @@ class DataPadReceiver:
         self.running = False
         self.receive_thread: Optional[threading.Thread] = None
         self.handshake_thread: Optional[threading.Thread] = None
+        self.cleanup_thread: Optional[threading.Thread] = None
         
         self.flight_data: Optional[FlightData] = None
         self.last_update_time: Optional[float] = None
@@ -284,11 +285,15 @@ class DataPadReceiver:
             except Exception as e:
                 print(f"Error in connection callback: {e}")
     
-    def decrypt_payload(self, encrypted_data: bytes) -> Optional[bytes]:
+    def decrypt_payload(self, encrypted_data: bytes, sender_addr: tuple = None) -> Optional[bytes]:
         """
         Decrypt AES-GCM encrypted data (for DATA packets, not handshake)
         Format: nonce (12 bytes) + ciphertext + tag (16 bytes)
         Note: Handshake messages are sent in PLAINTEXT
+        
+        Args:
+            encrypted_data: Encrypted payload
+            sender_addr: (IP, port) tuple of sender for per-client nonce validation
         """
         try:
             # Use ECDH session key if available
@@ -303,7 +308,8 @@ class DataPadReceiver:
             # Extract nonce (first 12 bytes)
             nonce = encrypted_data[:12]
             # Validate nonce prefix and sliding window (server should be sender 0x01)
-            if not default_gcm_nonce_manager.validate_nonce(nonce, expected_sender=0x01):
+            # Pass sender_addr for per-client nonce tracking (prevents multi-client conflicts)
+            if not default_gcm_nonce_manager.validate_nonce(nonce, expected_sender=0x01, client_addr=sender_addr):
                 print("Rejected message due to invalid or replayed nonce")
                 return None
 
@@ -346,6 +352,10 @@ class DataPadReceiver:
         
         self.receive_thread = threading.Thread(target=self._receive_loop, daemon=True)
         self.receive_thread.start()
+        
+        # Start cleanup thread for inactive client nonce states
+        self.cleanup_thread = threading.Thread(target=self._cleanup_loop, daemon=True)
+        self.cleanup_thread.start()
         if self.show_sensitive:
             print(f"DataPad receiver started on {self.bind_ip}:{self.port}")
             print(f"Local IP: {self.get_local_ip()}")
@@ -364,9 +374,21 @@ class DataPadReceiver:
             self.receive_thread.join(timeout=2.0)
         if self.handshake_thread:
             self.handshake_thread.join(timeout=2.0)
+        if self.cleanup_thread:
+            self.cleanup_thread.join(timeout=2.0)
         self.is_connected = False
         self._notify_connection_callbacks()
         print("DataPad receiver stopped")
+    
+    def _cleanup_loop(self):
+        """Periodically cleanup inactive client nonce states (runs in separate thread)"""
+        while self.running:
+            try:
+                time.sleep(60)  # Cleanup every minute
+                if self.running:  # Check again after sleep
+                    default_gcm_nonce_manager.cleanup_inactive_clients()
+            except Exception as e:
+                logging.error(f"Error in cleanup loop: {e}")
     
     def _perform_handshake(self):
         """Perform ECDH handshake with sender (runs in separate thread)"""
@@ -463,8 +485,8 @@ class DataPadReceiver:
                     else:
                         print(f"Received {len(data)} bytes")
                     
-                    # Try to decrypt
-                    decrypted_data = self.decrypt_payload(data)
+                    # Try to decrypt (pass sender address for per-client nonce tracking)
+                    decrypted_data = self.decrypt_payload(data, sender_addr=addr)
                     
                     if decrypted_data:
                         # Parse JSON
