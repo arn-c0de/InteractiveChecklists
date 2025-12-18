@@ -37,17 +37,29 @@ class SecurityAuditLogger:
     def __init__(self, audit_file: str = "security_audit.jsonl"):
         self.audit_file = Path(audit_file)
         self._lock = __import__('threading').Lock()
+        # Encryption fallback: if secure permissions cannot be enforced, logs
+        # will be encrypted using a key from AUDIT_LOG_KEY environment variable
+        # (base64). These are set by _ensure_secure_permissions().
+        self._encryption_enabled = False
+        self._audit_key = None
         self._ensure_secure_permissions()
 
     def _ensure_secure_permissions(self):
-        """Ensure audit file exists and has secure permissions (best-effort).
+        """Ensure audit file exists and has secure permissions.
 
-        Notes:
-        - Attempt to create the file with owner-only permissions when missing.
-        - On platforms where POSIX permissions aren't meaningful (e.g., Windows) this is
-          best-effort and errors are logged. We avoid silently proceeding if permission
-          setting repeatedly fails.
+        Behavior (strict/fail-safe):
+        1. Try POSIX-style 0o600 permissions.
+        2. If that fails on Windows, attempt to set ACLs via `icacls` (best-effort).
+        3. If permissions cannot be made secure, require an encryption key via
+           the `AUDIT_LOG_KEY` environment variable (base64, 32 bytes) and enable
+           on-disk encryption for audit entries.
+        4. If neither permissions nor a valid key are available, raise RuntimeError
+           to abort startup (fail-safe).
         """
+        import base64
+        import getpass
+        import subprocess
+
         try:
             # Ensure parent directory exists
             self.audit_file.parent.mkdir(parents=True, exist_ok=True)
@@ -64,17 +76,65 @@ class SecurityAuditLogger:
                         self.audit_file.touch()
                     except Exception as e:
                         logger.error(f"❌ Failed to create audit file: {e}")
-                        return
+                        raise RuntimeError("Could not create audit log file")
 
-            # Attempt to set secure permissions (best-effort)
+            # Try to set POSIX permissions (0o600)
             try:
                 import stat
                 self.audit_file.chmod(stat.S_IRUSR | stat.S_IWUSR)  # 0o600
-            except Exception as e:
-                # Log as error because audit logs are sensitive
-                logger.error(f"❌ Could not set secure permissions on audit file: {e}")
+                # Verify
+                try:
+                    current_mode = self.audit_file.stat().st_mode & 0o777
+                    if current_mode == 0o600:
+                        self._encryption_enabled = False
+                        self._audit_key = None
+                        return
+                except Exception:
+                    # If we cannot stat, continue to other attempts
+                    pass
+            except Exception as posix_err:
+                logger.debug(f"POSIX chmod failed: {posix_err}")
+
+            # If on Windows, attempt to set ACLs using icacls (best-effort)
+            if os.name == 'nt':
+                try:
+                    user = getpass.getuser()
+                    # Remove inheritance and grant read/write to current user only
+                    subprocess.run([
+                        'icacls', str(self.audit_file), '/inheritance:r', '/grant:r', f'{user}:(R,W)'
+                    ], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    # Verify by checking that file exists (icacls success assumed)
+                    logger.info(f"✅ Applied Windows ACLs for audit file: {self.audit_file}")
+                    self._encryption_enabled = False
+                    self._audit_key = None
+                    return
+                except Exception as win_err:
+                    logger.debug(f"Windows ACL setting (icacls) failed: {win_err}")
+
+            # If we reached here, permissions were not made secure — attempt encryption fallback
+            key_b64 = os.environ.get('AUDIT_LOG_KEY') or os.environ.get('AUDIT_LOG_ENCRYPT_KEY')
+            if key_b64:
+                try:
+                    key = base64.b64decode(key_b64)
+                    if len(key) not in (16, 24, 32):
+                        raise ValueError("Invalid key length")
+                    # Use AES-GCM - require 16/24/32; prefer 32
+                    self._audit_key = key
+                    self._encryption_enabled = True
+                    logger.warning("⚠️ Audit log permissions could not be enforced; encrypting audit log using AUDIT_LOG_KEY")
+                    return
+                except Exception as e:
+                    logger.error(f"❌ Provided AUDIT_LOG_KEY is invalid: {e}")
+
+            # Nothing worked — fail-safe: abort startup
+            logger.critical("🚨 SECURITY: Could not secure audit log file and no valid AUDIT_LOG_KEY provided — aborting")
+            raise RuntimeError("Insecure audit log configuration: secure permissions not set and no valid encryption key")
         except Exception as e:
+            # Bubble up RuntimeError for caller to stop startup, log others
+            if isinstance(e, RuntimeError):
+                raise
             logger.error(f"❌ Unexpected error ensuring audit file permissions: {e}")
+            raise RuntimeError("Failed to ensure audit log security")
 
     def log_event(self, event_type: str, severity: str, details: dict):
         """Log a security event in JSON format
@@ -94,7 +154,7 @@ class SecurityAuditLogger:
 
         with self._lock:
             try:
-                # Ensure file exists with secure permissions before writing
+                # Ensure file exists with secure permissions or create it
                 if not self.audit_file.exists():
                     try:
                         # Try to create with 0600 mode
@@ -105,14 +165,33 @@ class SecurityAuditLogger:
                         # Best-effort fallback
                         self.audit_file.touch()
 
-                # Append the event
-                with open(self.audit_file, 'a', encoding='utf-8') as f:
-                    f.write(json.dumps(event) + '\n')
+                # Prepare payload
+                line = None
+                if getattr(self, '_encryption_enabled', False) and self._audit_key is not None:
+                    try:
+                        # Encrypt JSON payload using AES-GCM
+                        plaintext = json.dumps(event).encode('utf-8')
+                        aesgcm = AESGCM(self._audit_key)
+                        nonce = os.urandom(12)
+                        ct = aesgcm.encrypt(nonce, plaintext, None)
+                        import base64
+                        payload_b64 = base64.b64encode(nonce + ct).decode('ascii')
+                        line = json.dumps({'encrypted': True, 'payload': payload_b64}) + '\n'
+                    except Exception as e:
+                        logger.error(f"❌ Failed to encrypt audit event: {e}")
+                        # As a last resort, fail-safe: do not write plaintext sensitive events
+                        return
+                else:
+                    line = json.dumps(event) + '\n'
 
-                # Verify permissions after write
+                # Append the event (encrypted or plaintext)
+                with open(self.audit_file, 'a', encoding='utf-8') as f:
+                    f.write(line)
+
+                # Verify permissions after write (best-effort)
                 try:
                     current_mode = self.audit_file.stat().st_mode & 0o777
-                    if current_mode != (0o600):
+                    if current_mode != (0o600) and not getattr(self, '_encryption_enabled', False):
                         logger.error(f"❌ Audit log has insecure permissions: {oct(current_mode)}")
                 except Exception as e:
                     logger.debug(f"Could not verify audit file permissions: {e}")
@@ -149,9 +228,16 @@ class SessionData:
         # Counter for nonce generation (thread-safe)
         self._nonce_counter = 0
         self._nonce_lock = __import__('threading').Lock()
-        from collections import deque
-        self._received_nonces = deque(maxlen=1000)  # Auto-evicts oldest
+        # Improved nonce replay tracking: map counter -> timestamp
+        # Use a large sliding window and time-based eviction to avoid replay.
+        self._received_nonces = {}  # type: Dict[int, float]
+        # Configurable window parameters (sized for security/performance tradeoff)
+        self._NONCE_MAX_ENTRIES = 100_000  # Sliding window capacity (recommended)
+        self._NONCE_RETENTION_SECONDS = 3600.0  # Evict nonces older than 1 hour
         self._nonce_counter_min = 0  # Track minimum accepted counter
+        # Session validity / rekey signaling
+        self._needs_rekey = False
+        self._is_valid = True
 
     def is_expired(self, timeout_seconds: int = 900) -> bool:
         """Check if session has expired (default 15 minutes - shorter for security)"""
@@ -164,6 +250,9 @@ class SessionData:
     def generate_nonce(self) -> bytes:
         """Generate counter-based nonce for this session (SERVER side, 0x01 prefix) with exhaustion protection and rekey warning."""
         with self._nonce_lock:
+            if not self._is_valid:
+                raise RuntimeError("Session invalid")
+
             self._nonce_counter += 1
 
             # Trigger re-key at 75% capacity (2^62 messages)
@@ -174,9 +263,17 @@ class SessionData:
 
             if self._nonce_counter >= 2**64:
                 logger.critical(f"🚨 Nonce counter exhausted for session {self.session_id[:8]}!")
-                # Instead of crashing, invalidate the session
+                # Invalidate the session immediately (fail-safe)
                 self._is_valid = False
                 raise RuntimeError("Nonce exhausted - session invalidated")
+
+            # Additional protection: if the server-side counter grows suspiciously high
+            # relative to observed client counters, warn and mark for rekey.
+            # (This helps detect potential counter wrap/abuse.)
+            if self._nonce_counter >= (2**64 * 0.9):
+                logger.critical(f"🚨 Nonce counter dangerously high for session {self.session_id[:8]} - invalidating to be safe")
+                self._is_valid = False
+                raise RuntimeError("Nonce counter dangerously high - session invalidated")
 
             # Format: 0x01 (server) + 3 bytes reserved + 8 bytes counter
             return bytes([0x01, 0x00, 0x00, 0x00]) + self._nonce_counter.to_bytes(8, 'big')
@@ -200,11 +297,19 @@ class SessionData:
         counter = int.from_bytes(nonce[4:12], 'big')
 
         with self._nonce_lock:
-            # Reject if too old (sliding window)
+            current_time = time.time()
+
+            # Reject if session already invalidated
+            if not getattr(self, '_is_valid', True):
+                logger.warning(f"⚠️ Rejecting nonce for invalid session {self.session_id[:8]}...")
+                return False
+
+            # Reject if too old (sliding window lower bound)
             if counter < self._nonce_counter_min:
                 logger.warning(f"⚠️ Nonce too old: {counter} < {self._nonce_counter_min}")
                 return False
 
+            # Check for duplicate (replay)
             if counter in self._received_nonces:
                 logger.warning(f"⚠️ Replay attack: {counter}")
                 # SECURITY AUDIT: Log replay attack
@@ -216,11 +321,38 @@ class SessionData:
                 })
                 return False
 
-            self._received_nonces.append(counter)
+            # Accept and record timestamp
+            self._received_nonces[counter] = current_time
 
-            # Update minimum periodically
-            if len(self._received_nonces) >= 1000:
-                self._nonce_counter_min = min(self._received_nonces)
+            # Evict old entries by age first (keeps window bounded for long-running sessions)
+            if self._NONCE_RETENTION_SECONDS is not None:
+                cutoff = current_time - self._NONCE_RETENTION_SECONDS
+                # Iterate keys and remove old ones (avoid changing dict size during iteration)
+                old = [k for k, t in self._received_nonces.items() if t < cutoff]
+                for k in old:
+                    del self._received_nonces[k]
+
+            # If we still exceed capacity, we consider this a potential abuse condition
+            if len(self._received_nonces) > self._NONCE_MAX_ENTRIES:
+                # SECURITY: Do not silently evict — invalidate session to force rekey
+                logger.critical(f"🚨 Nonce replay window exceeded for session {self.session_id[:8]}: {len(self._received_nonces)} entries (max {self._NONCE_MAX_ENTRIES})")
+                get_audit_logger().log_event('nonce_window_exceeded', 'high', {
+                    'session_id': self.session_id[:8] + '...',
+                    'device_id': self.device_id[:16] + '...',
+                    'observed_count': len(self._received_nonces),
+                    'nonce_window_max': self._NONCE_MAX_ENTRIES
+                })
+                # Invalidate session as fail-safe
+                self._is_valid = False
+                return False
+
+            # Update minimum accepted counter for quick rejection
+            if self._received_nonces:
+                try:
+                    self._nonce_counter_min = min(self._received_nonces)
+                except Exception:
+                    # Fall back to a conservative behavior
+                    self._nonce_counter_min = 0
 
         return True
 
