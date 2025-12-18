@@ -58,6 +58,10 @@ data class LocationEntity(
     @ColumnInfo(name = "symbol_modifier", defaultValue = "''")
     val symbolModifier: String = "",  // Additional symbol modifiers (JSON)
     
+    // Static marker flag (for non-moving entities like airports, installations)
+    @ColumnInfo(name = "is_static", defaultValue = "0")
+    val isStatic: Int = 0,  // 0=dynamic/mobile, 1=static/fixed
+    
     // Airport fields
     val icao: String? = null,
     val iata: String? = null,

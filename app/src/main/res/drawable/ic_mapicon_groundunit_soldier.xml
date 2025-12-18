@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="600"
+    android:viewportHeight="600">
+
+    <!-- Background circle -->
+    <path
+        android:fillColor="#FFFF80"
+        android:pathData="M300,50 A250,250 0 1,0 299.999,50 Z"/>
+
+    <!-- Circle frame -->
+    <path
+        android:strokeColor="#000000"
+        android:strokeWidth="10"
+        android:fillColor="#00000000"
+        android:pathData="M300,50 A250,250 0 1,0 299.999,50 Z"/>
+
+    <!-- Ground soldier (simple figure) -->
+    <!-- head -->
+    <path android:fillColor="#000000" android:pathData="M300,220m-24,0a24,24,0,1,1,48,0a24,24,0,1,1,-48,0"/>
+    <!-- torso -->
+    <path android:strokeColor="#000000" android:strokeWidth="12" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M300,244v64"/>
+    <!-- arms -->
+    <path android:strokeColor="#000000" android:strokeWidth="12" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M260,292h80"/>
+    <!-- legs -->
+    <path android:strokeColor="#000000" android:strokeWidth="12" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M300,308l-30,64"/>
+    <path android:strokeColor="#000000" android:strokeWidth="12" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M300,308l30,64"/>
+</vector>
