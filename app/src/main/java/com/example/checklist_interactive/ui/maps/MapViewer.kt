@@ -86,6 +86,11 @@ fun MapViewer(
     var showDataPad by remember { mutableStateOf(false) }
     var showMarkerRouteManagement by remember { mutableStateOf(false) }
     var showRouteCreation by remember { mutableStateOf(false) }
+    
+    // Store last valid player position to prevent reset during recompositions
+    var lastValidPlayerPosition by remember { mutableStateOf<GeoPoint?>(null) }
+    // Store last processed timestamp to prevent accepting old/cached data
+    var lastProcessedTimestamp by remember { mutableStateOf<String?>(null) }
 
     // Selected location for marker details in management sheet
     var selectedLocation by remember { mutableStateOf<com.example.checklist_interactive.data.tactical.LocationEntity?>(null) }
@@ -173,10 +178,36 @@ fun MapViewer(
             val lat = data.latitude
             val lon = data.longitude
 
-            Log.d(TAG, "Position data: lat=$lat, lon=$lon")
+            Log.d(TAG, "Position data: lat=$lat, lon=$lon, timestamp=${data.timestamp}")
+
+            // Validate timestamp to prevent old/cached data from resetting position
+            val currentTimestamp = data.timestamp
+            // local stable copy to avoid smart-cast / delegated-property issues
+            val lastTs = lastProcessedTimestamp
+            if (currentTimestamp != null && lastTs != null) {
+                try {
+                    val curInst = java.time.Instant.parse(currentTimestamp)
+                    val lastInst = java.time.Instant.parse(lastTs)
+                    if (!curInst.isAfter(lastInst)) {
+                        Log.w(TAG, "⚠️ REJECTED OLD DATA: timestamp=$currentTimestamp (last=$lastTs) - preventing position reset!")
+                        return@LaunchedEffect
+                    }
+                } catch (e: Exception) {
+                    // Fallback to lexicographic comparison for ISO-8601; works for same-format timestamps
+                    if (currentTimestamp <= lastTs) {
+                        Log.w(TAG, "⚠️ REJECTED OLD DATA (fallback compare): timestamp=$currentTimestamp (last=$lastTs) - preventing position reset!")
+                        return@LaunchedEffect
+                    }
+                }
+            }
 
             if (lat != 0.0 && lon != 0.0) {
+                // Update last processed timestamp if available
+                if (currentTimestamp != null) lastProcessedTimestamp = currentTimestamp
                 val newPosition = GeoPoint(lat, lon)
+                Log.d(TAG, "✅ Accepted data with timestamp=$currentTimestamp")
+                // Store as last valid position to prevent reset
+                lastValidPlayerPosition = newPosition
                 marker.position = newPosition
                 // use center anchor so rotation pivots around icon center
                 marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
@@ -185,11 +216,12 @@ fun MapViewer(
                 val rawHeading = data.heading.toFloat()
                 // Convert raw heading to degrees for overlays/labels
                 val headingDeg = Math.toDegrees(rawHeading.toDouble()).toFloat()
-                // Adjust rotation: apply rotationOffset so marker is corrected for icon orientation
-                val rotationOffset = 90f // 90° correction (adjusted left by 45°)
-                val computedRotation = (headingDeg + rotationOffset) % 360f
+                // Adjust rotation: apply rotationOffset and invert sign so marker rotates in same direction as heading
+                // Add +45° right tuning so icon aligns with heading
+                val rotationOffset = 135f // 90° + 45° right tuning
+                val computedRotation = (rotationOffset - headingDeg + 360f) % 360f
                 marker.rotation = computedRotation
-                Log.d(TAG, "headingDeg=$headingDeg rotationOffset=$rotationOffset computedRotation=$computedRotation")
+                Log.d(TAG, "headingDeg=$headingDeg rotationOffset=$rotationOffset computedRotation=$computedRotation (inverted sign)")
                 try {
                     val color = if (isDarkTheme) android.graphics.Color.WHITE else android.graphics.Color.BLACK
                     // rely on Marker.rotation for rotation; use unrotated bitmap
@@ -256,8 +288,9 @@ fun MapViewer(
     val fabSizePx = with(density) { 56.dp.roundToPx() }
     val fabMarginPx = with(density) { 12.dp.roundToPx() }
 
-    // Determine initial center/zoom: prefer saved values, fall back to latest flightData, then default
-    val initialCenter: GeoPoint? = savedCenter?.let { GeoPoint(it.first, it.second) }
+    // Determine initial center/zoom: prefer last valid player position, then saved values, fall back to latest flightData, then default
+    val initialCenter: GeoPoint? = lastValidPlayerPosition
+        ?: savedCenter?.let { GeoPoint(it.first, it.second) }
         ?: flightData?.let { if (it.latitude != 0.0 && it.longitude != 0.0) GeoPoint(it.latitude, it.longitude) else null }
     val initialZoom: Double = savedZoom ?: 8.0
 
@@ -296,7 +329,12 @@ fun MapViewer(
 
                     // Set initial view using saved or fallback values (no animation)
                     controller.setZoom(initialZoom)
-                    if (initialCenter != null) controller.setCenter(initialCenter) else controller.setCenter(GeoPoint(48.0, 11.0))
+                    // Only set initial center if we don't have a last valid player position (prevents reset)
+                    if (lastValidPlayerPosition == null && initialCenter != null) {
+                        controller.setCenter(initialCenter)
+                    } else if (lastValidPlayerPosition == null) {
+                        controller.setCenter(GeoPoint(48.0, 11.0))
+                    }
 
                     // Create position marker
                     val marker = Marker(this).apply {
@@ -304,6 +342,8 @@ fun MapViewer(
                         snippet = context.getString(R.string.map_waiting_for_data)
                         // anchor center for correct rotation and pivot
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                        // Use last valid position if available, prevents reset
+                        lastValidPlayerPosition?.let { position = it }
 
                         // initial plane icon
                         try {
@@ -653,7 +693,7 @@ fun MapViewer(
             }
         }
 
-        // Flight data HUD (top-center) - shows Altitude, Speed, Pitch, Bank, Mach live from DataPad
+        // Flight data HUD (bottom-left) - shows Altitude, Speed, Pitch, Bank, Mach live from DataPad
         if (datapadEnabled && flightData != null) {
             val fd = flightData!!
             val altFt = (fd.altitude * 3.28084).toInt()
@@ -665,16 +705,17 @@ fun MapViewer(
 
             Surface(
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 8.dp)
-                    .padding(horizontal = 12.dp),
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                    .align(Alignment.BottomStart)
+                    // leave extra bottom padding so it doesn't overlap bottom-center connection/HUD and FABs
+                    .padding(start = 12.dp, bottom = 88.dp)
+                    .padding(horizontal = 8.dp),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
                 shape = MaterialTheme.shapes.small
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(text = "ALT ${altFt} ft", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
 
