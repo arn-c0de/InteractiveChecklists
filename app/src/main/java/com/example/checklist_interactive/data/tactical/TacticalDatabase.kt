@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import java.io.File
 
 /**
@@ -15,21 +17,174 @@ import java.io.File
         LocationEntity::class,
         BorderEntity::class,
         RouteEntity::class,
-        RouteWaypointEntity::class
+        RouteWaypointEntity::class,
+        RunwayEntity::class,
+        ServiceEntity::class,
+        MediaEntity::class,
+        TagEntity::class,
+        LocationTagCrossRef::class,
+        NavaidEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 abstract class TacticalDatabase : RoomDatabase() {
     abstract fun locationDao(): LocationDao
     abstract fun borderDao(): BorderDao
     abstract fun routeDao(): RouteDao
+    abstract fun runwayDao(): RunwayDao
+    abstract fun serviceDao(): ServiceDao
+    abstract fun mediaDao(): MediaDao
+    abstract fun tagDao(): TagDao
+    abstract fun navaidDao(): NavaidDao
     
     companion object {
         @Volatile
         private var INSTANCE: TacticalDatabase? = null
         
         private const val DATABASE_NAME = "map_data.db"
+        
+        /**
+         * Migration from v1 to v2: Add extended schema (runways, services, media, tags, navaids)
+         */
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Add new columns to locations
+                db.execSQL("ALTER TABLE locations ADD COLUMN elevation_ft INTEGER DEFAULT 0")
+                db.execSQL("ALTER TABLE locations ADD COLUMN country TEXT")
+                db.execSQL("ALTER TABLE locations ADD COLUMN region TEXT")
+                db.execSQL("ALTER TABLE locations ADD COLUMN timezone TEXT")
+                db.execSQL("ALTER TABLE locations ADD COLUMN source TEXT")
+                db.execSQL("ALTER TABLE locations ADD COLUMN verified INTEGER DEFAULT 0")
+                db.execSQL("ALTER TABLE locations ADD COLUMN last_verified_at TEXT")
+                db.execSQL("ALTER TABLE locations ADD COLUMN created_at TEXT")
+                db.execSQL("ALTER TABLE locations ADD COLUMN updated_at TEXT")
+                db.execSQL("ALTER TABLE locations ADD COLUMN deleted_at TEXT")
+                db.execSQL("ALTER TABLE locations ADD COLUMN geom TEXT")
+                db.execSQL("ALTER TABLE locations ADD COLUMN elevation_source TEXT")
+                db.execSQL("ALTER TABLE locations ADD COLUMN elevation_accuracy_m REAL")
+                
+                // Backfill elevation_ft from elevation_m
+                db.execSQL("UPDATE locations SET elevation_ft = ROUND(COALESCE(elevation_m, 0) * 3.28084)")
+                
+                // Backfill audit timestamps
+                db.execSQL("UPDATE locations SET created_at = created WHERE created IS NOT NULL")
+                db.execSQL("UPDATE locations SET updated_at = modified WHERE modified IS NOT NULL")
+                
+                // Create runways table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS runways (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        location_id INTEGER NOT NULL,
+                        name TEXT NOT NULL,
+                        length_m INTEGER,
+                        length_ft INTEGER,
+                        width_m INTEGER,
+                        width_ft INTEGER,
+                        surface TEXT,
+                        heading_deg REAL,
+                        ils_frequency TEXT,
+                        has_lighting INTEGER NOT NULL DEFAULT 0,
+                        touchdown_start_lat REAL,
+                        touchdown_start_lon REAL,
+                        touchdown_end_lat REAL,
+                        touchdown_end_lon REAL,
+                        notes TEXT,
+                        FOREIGN KEY(location_id) REFERENCES locations(id) ON DELETE CASCADE
+                    )
+                """)
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_runways_location ON runways(location_id)")
+                
+                // Create services table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS services (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        location_id INTEGER NOT NULL,
+                        service_type TEXT NOT NULL,
+                        available INTEGER NOT NULL DEFAULT 1,
+                        details TEXT,
+                        FOREIGN KEY(location_id) REFERENCES locations(id) ON DELETE CASCADE
+                    )
+                """)
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_services_location ON services(location_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_services_type ON services(service_type)")
+                
+                // Create media table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS media (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        location_id INTEGER NOT NULL,
+                        uri TEXT NOT NULL,
+                        caption TEXT,
+                        media_type TEXT,
+                        is_primary INTEGER NOT NULL DEFAULT 0,
+                        created_at TEXT,
+                        FOREIGN KEY(location_id) REFERENCES locations(id) ON DELETE CASCADE
+                    )
+                """)
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_media_location ON media(location_id)")
+                
+                // Create tags table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS tags (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL UNIQUE
+                    )
+                """)
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name)")
+                
+                // Create location_tags join table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS location_tags (
+                        location_id INTEGER NOT NULL,
+                        tag_id INTEGER NOT NULL,
+                        PRIMARY KEY(location_id, tag_id),
+                        FOREIGN KEY(location_id) REFERENCES locations(id) ON DELETE CASCADE,
+                        FOREIGN KEY(tag_id) REFERENCES tags(id) ON DELETE CASCADE
+                    )
+                """)
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_location_tags_location ON location_tags(location_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_location_tags_tag ON location_tags(tag_id)")
+                
+                // Create navaids table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS navaids (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        location_id INTEGER,
+                        name TEXT NOT NULL,
+                        type TEXT NOT NULL,
+                        ident TEXT,
+                        frequency TEXT,
+                        latitude REAL NOT NULL,
+                        longitude REAL NOT NULL,
+                        elevation_m REAL,
+                        range_nm REAL,
+                        bearing_deg REAL,
+                        notes TEXT,
+                        FOREIGN KEY(location_id) REFERENCES locations(id) ON DELETE SET NULL
+                    )
+                """)
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_navaids_location ON navaids(location_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_navaids_type ON navaids(type)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_navaids_ident ON navaids(ident)")
+                
+                // Create new indices on locations
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_locations_icao ON locations(icao)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_locations_country ON locations(country)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_locations_verified ON locations(verified)")
+                
+                // Insert sample tags
+                db.execSQL("INSERT OR IGNORE INTO tags (name) VALUES ('airbase')")
+                db.execSQL("INSERT OR IGNORE INTO tags (name) VALUES ('civilian')")
+                db.execSQL("INSERT OR IGNORE INTO tags (name) VALUES ('military')")
+                db.execSQL("INSERT OR IGNORE INTO tags (name) VALUES ('FARP')")
+                db.execSQL("INSERT OR IGNORE INTO tags (name) VALUES ('landmark')")
+                db.execSQL("INSERT OR IGNORE INTO tags (name) VALUES ('town')")
+                db.execSQL("INSERT OR IGNORE INTO tags (name) VALUES ('danger_zone')")
+                db.execSQL("INSERT OR IGNORE INTO tags (name) VALUES ('refuel_point')")
+                db.execSQL("INSERT OR IGNORE INTO tags (name) VALUES ('training_area')")
+            }
+        }
         
         /**
          * Get database instance
@@ -45,6 +200,59 @@ abstract class TacticalDatabase : RoomDatabase() {
                     createInternalDatabase(context)
                 }
                 INSTANCE = instance
+
+                // Backfill legacy runways JSON from `locations.runways` into the separate `runways` table
+                // This runs in a background thread and only executes if the `runways` table is empty.
+                Thread {
+                    try {
+                        val sqlite = instance.openHelper.writableDatabase
+                        // Check if runways table already contains rows
+                        var runwaysCount = 0
+                        val cntCursor = sqlite.query("SELECT COUNT(*) FROM runways", emptyArray())
+                        if (cntCursor.moveToFirst()) runwaysCount = cntCursor.getInt(0)
+                        cntCursor.close()
+
+                        if (runwaysCount == 0) {
+                            val cursor = sqlite.query("SELECT id, runways FROM locations WHERE runways IS NOT NULL AND runways != ''", emptyArray())
+                            try {
+                                while (cursor.moveToNext()) {
+                                    val locId = cursor.getInt(0)
+                                    val runwaysJson = cursor.getString(1)
+                                    if (runwaysJson.isNullOrEmpty()) continue
+                                    try {
+                                        val arr = org.json.JSONArray(runwaysJson)
+                                        for (i in 0 until arr.length()) {
+                                            val obj = arr.getJSONObject(i)
+                                            val name = if (obj.has("name")) obj.optString("name") else ""
+                                            val lengthM = if (obj.has("length_m") && !obj.isNull("length_m")) obj.optInt("length_m") else if (obj.has("length") && !obj.isNull("length")) obj.optInt("length") else null
+                                            val widthM = if (obj.has("width_m") && !obj.isNull("width_m")) obj.optInt("width_m") else null
+                                            val surface = if (obj.has("surface")) obj.optString("surface") else null
+                                            val heading = if (obj.has("heading") && !obj.isNull("heading")) obj.optDouble("heading") else null
+                                            val ils = if (obj.has("ils")) obj.optBoolean("ils", false) else false
+                                            val hasLighting = if (obj.has("has_lighting") && !obj.isNull("has_lighting")) if (obj.optBoolean("has_lighting", false)) 1 else 0 else 0
+                                            val notes = if (ils) "ILS" else if (obj.has("notes")) obj.optString("notes") else null
+
+                                            val insertSql = "INSERT INTO runways (location_id, name, length_m, width_m, surface, heading_deg, ils_frequency, has_lighting, notes) VALUES (?,?,?,?,?,?,?,?,?)"
+                                            val args: Array<Any?> = arrayOf(locId, name, lengthM, widthM, surface, heading, null, if (ils) 1 else hasLighting, notes)
+                                            try {
+                                                sqlite.execSQL(insertSql, args)
+                                            } catch (_: Exception) {
+                                                // ignore single-row insert failures
+                                            }
+                                        }
+                                    } catch (_: Exception) {
+                                        // ignore malformed per-row JSON
+                                    }
+                                }
+                            } finally {
+                                cursor.close()
+                            }
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.w("TacticalDatabase", "Failed to backfill legacy runways: ${'$'}e")
+                    }
+                }.start()
+
                 instance
             }
         }
@@ -61,6 +269,7 @@ abstract class TacticalDatabase : RoomDatabase() {
                 DATABASE_NAME
             )
                 .createFromAsset("databases/$DATABASE_NAME")
+                .addMigrations(MIGRATION_1_2)
                 .fallbackToDestructiveMigration()
                 .build()
         }
@@ -78,6 +287,7 @@ abstract class TacticalDatabase : RoomDatabase() {
                 TacticalDatabase::class.java,
                 dbFile.absolutePath
             )
+                .addMigrations(MIGRATION_1_2)
                 .fallbackToDestructiveMigration()
                 .build()
         }

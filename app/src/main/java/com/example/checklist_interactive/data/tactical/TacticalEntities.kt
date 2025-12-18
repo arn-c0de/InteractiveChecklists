@@ -11,7 +11,10 @@ import androidx.room.*
         Index(value = ["marker_type"]),
         Index(value = ["coalition"]),
         Index(value = ["latitude", "longitude"]),
-        Index(value = ["name"])
+        Index(value = ["name"]),
+        Index(value = ["icao"]),
+        Index(value = ["country"]),
+        Index(value = ["verified"])
     ]
 )
 data class LocationEntity(
@@ -30,7 +33,10 @@ data class LocationEntity(
     @ColumnInfo(name = "tactical_symbol")
     val tacticalSymbol: String? = null,
     
+    @ColumnInfo(defaultValue = "'default'")
     val icon: String = "default",
+    
+    @ColumnInfo(defaultValue = "''")
     val description: String = "",
     
     // Airport fields
@@ -40,8 +46,11 @@ data class LocationEntity(
     @ColumnInfo(name = "elevation_m")
     val elevationM: Double? = null,
     
+    @ColumnInfo(name = "elevation_ft", defaultValue = "0")
+    val elevationFt: Int? = null,
+    
     val frequencies: String? = null,  // JSON
-    val runways: String? = null,  // JSON
+    val runways: String? = null,  // JSON (deprecated - use runways table)
     
     // Tactical fields
     @ColumnInfo(name = "threat_level")
@@ -52,11 +61,268 @@ data class LocationEntity(
     
     val strength: Int? = null,
     
-    // Metadata
-    val created: String,
-    val modified: String,
-    val tags: String? = null,  // JSON
-    val metadata: String? = null  // JSON
+    // Geography & admin
+    val country: String? = null,
+    val region: String? = null,
+    val timezone: String? = null,  // IANA timezone
+    
+    // Source & verification
+    val source: String? = null,
+    
+    @ColumnInfo(defaultValue = "0")
+    val verified: Int? = 0,  // 0=no, 1=yes
+    
+    @ColumnInfo(name = "last_verified_at")
+    val lastVerifiedAt: String? = null,
+    
+    // Geometry (GeoJSON for complex shapes)
+    val geom: String? = null,
+    
+    // Elevation details
+    @ColumnInfo(name = "elevation_source")
+    val elevationSource: String? = null,
+    
+    @ColumnInfo(name = "elevation_accuracy_m")
+    val elevationAccuracyM: Double? = null,
+    
+    // Metadata (legacy, kept for compatibility)
+    val created: String = "",
+    val modified: String = "",
+    val tags: String? = null,  // JSON (deprecated - use tags table)
+    val metadata: String? = null,  // JSON
+    
+    // Audit fields (new)
+    @ColumnInfo(name = "created_at")
+    val createdAt: String? = null,
+    
+    @ColumnInfo(name = "updated_at")
+    val updatedAt: String? = null,
+    
+    @ColumnInfo(name = "deleted_at")
+    val deletedAt: String? = null  // Soft delete
+)
+
+/**
+ * Runway entity - airport runway details
+ */
+@Entity(
+    tableName = "runways",
+    foreignKeys = [
+        ForeignKey(
+            entity = LocationEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["location_id"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index(value = ["location_id"])]
+)
+data class RunwayEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Int? = 0,
+    
+    @ColumnInfo(name = "location_id")
+    val locationId: Int,
+    
+    val name: String,  // e.g., "09/27", "RWY 13L"
+    
+    @ColumnInfo(name = "length_m")
+    val lengthM: Int? = null,
+    
+    @ColumnInfo(name = "length_ft")
+    val lengthFt: Int? = null,
+    
+    @ColumnInfo(name = "width_m")
+    val widthM: Int? = null,
+    
+    @ColumnInfo(name = "width_ft")
+    val widthFt: Int? = null,
+    
+    val surface: String? = null,  // concrete, asphalt, grass, dirt
+    
+    @ColumnInfo(name = "heading_deg")
+    val headingDeg: Double? = null,
+    
+    @ColumnInfo(name = "ils_frequency")
+    val ilsFrequency: String? = null,
+    
+    @ColumnInfo(name = "has_lighting", defaultValue = "0")
+    val hasLighting: Int? = 0,  // 0=no, 1=yes
+    
+    @ColumnInfo(name = "touchdown_start_lat")
+    val touchdownStartLat: Double? = null,
+    
+    @ColumnInfo(name = "touchdown_start_lon")
+    val touchdownStartLon: Double? = null,
+    
+    @ColumnInfo(name = "touchdown_end_lat")
+    val touchdownEndLat: Double? = null,
+    
+    @ColumnInfo(name = "touchdown_end_lon")
+    val touchdownEndLon: Double? = null,
+    
+    val notes: String? = null
+)
+
+/**
+ * Service entity - airport/location services (fuel, maintenance, etc.)
+ */
+@Entity(
+    tableName = "services",
+    foreignKeys = [
+        ForeignKey(
+            entity = LocationEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["location_id"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index(value = ["location_id"]),
+        Index(value = ["service_type"])
+    ]
+)
+data class ServiceEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Int? = 0,
+    
+    @ColumnInfo(name = "location_id")
+    val locationId: Int,
+    
+    @ColumnInfo(name = "service_type")
+    val serviceType: String,  // fuel, maintenance, arming, etc.
+    
+    @ColumnInfo(defaultValue = "1")
+    val available: Int? = 1,  // 0=unavailable, 1=available
+    val details: String? = null  // JSON details
+)
+
+/**
+ * Media entity - images, diagrams, PDFs
+ */
+@Entity(
+    tableName = "media",
+    foreignKeys = [
+        ForeignKey(
+            entity = LocationEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["location_id"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index(value = ["location_id"])]
+)
+data class MediaEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Int? = 0,
+    
+    @ColumnInfo(name = "location_id")
+    val locationId: Int,
+    
+    val uri: String,
+    val caption: String? = null,
+    
+    @ColumnInfo(name = "media_type")
+    val mediaType: String? = null,  // image, diagram, pdf, video
+    
+    @ColumnInfo(name = "is_primary", defaultValue = "0")
+    val isPrimary: Int? = 0,  // 0=no, 1=primary
+    
+    @ColumnInfo(name = "created_at")
+    val createdAt: String? = null
+)
+
+/**
+ * Tag entity - flexible categorization
+ */
+@Entity(
+    tableName = "tags",
+    indices = [Index(value = ["name"], unique = true)]
+)
+data class TagEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Int = 0,
+    
+    val name: String  // e.g., "airbase", "FARP", "civilian"
+)
+
+/**
+ * Location-Tag join entity (many-to-many)
+ */
+@Entity(
+    tableName = "location_tags",
+    primaryKeys = ["location_id", "tag_id"],
+    foreignKeys = [
+        ForeignKey(
+            entity = LocationEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["location_id"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = TagEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["tag_id"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index(value = ["location_id"]),
+        Index(value = ["tag_id"])
+    ]
+)
+data class LocationTagCrossRef(
+    @ColumnInfo(name = "location_id")
+    val locationId: Int,
+    
+    @ColumnInfo(name = "tag_id")
+    val tagId: Int
+)
+
+/**
+ * Navaid entity - VOR, NDB, ILS, TACAN, DME
+ */
+@Entity(
+    tableName = "navaids",
+    foreignKeys = [
+        ForeignKey(
+            entity = LocationEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["location_id"],
+            onDelete = ForeignKey.SET_NULL
+        )
+    ],
+    indices = [
+        Index(value = ["location_id"]),
+        Index(value = ["type"]),
+        Index(value = ["ident"])
+    ]
+)
+data class NavaidEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Int = 0,
+    
+    @ColumnInfo(name = "location_id")
+    val locationId: Int? = null,  // Optional link to location
+    
+    val name: String,
+    val type: String,  // VOR, NDB, ILS, TACAN, DME, VORTAC
+    val ident: String? = null,  // 3-letter identifier
+    val frequency: String? = null,
+    
+    val latitude: Double,
+    val longitude: Double,
+    
+    @ColumnInfo(name = "elevation_m")
+    val elevationM: Double? = null,
+    
+    @ColumnInfo(name = "range_nm")
+    val rangeNm: Double? = null,
+    
+    @ColumnInfo(name = "bearing_deg")
+    val bearingDeg: Double? = null,
+    
+    val notes: String? = null
 )
 
 /**

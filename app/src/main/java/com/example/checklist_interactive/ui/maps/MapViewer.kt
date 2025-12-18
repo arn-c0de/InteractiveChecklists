@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
@@ -52,6 +53,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
  * - Smooth position updates
  * - Map controls (center, zoom, layers)
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapViewer(
     modifier: Modifier = Modifier,
@@ -84,9 +86,15 @@ fun MapViewer(
     var showMarkerRouteManagement by remember { mutableStateOf(false) }
     var showRouteCreation by remember { mutableStateOf(false) }
 
+    // Selected location for custom popup
+    var selectedLocation by remember { mutableStateOf<com.example.checklist_interactive.data.tactical.LocationEntity?>(null) }
+    var selectedRunways by remember { mutableStateOf<List<com.example.checklist_interactive.data.tactical.RunwayEntity>>(emptyList()) }
+    var showLocationSheet by remember { mutableStateOf(false) }
+
     // Create a coroutine scope for state updates from listeners
     val scope = rememberCoroutineScope()
     
+    // Initialize tactical database and repositories
     // Initialize tactical database and repositories
     val tacticalDb = remember { 
         com.example.checklist_interactive.data.tactical.TacticalDatabase.getInstance(context, useExternalPath = false)
@@ -102,6 +110,18 @@ fun MapViewer(
     }
     val routeCreationViewModel = remember {
         RouteCreationViewModel(routeRepository, locationRepository)
+    }
+
+    // Load runways for the selected location from the DB
+    LaunchedEffect(selectedLocation?.id) {
+        val locId = selectedLocation?.id
+        if (locId != null) {
+            tacticalDb.runwayDao().getRunwaysByLocation(locId).collect { list ->
+                selectedRunways = list
+            }
+        } else {
+            selectedRunways = emptyList()
+        }
     }
 
     // Track last programmatic map movement to avoid treating it as a user scroll
@@ -425,8 +445,28 @@ fun MapViewer(
                                     // Use default marker
                                 }
                             }
-                            
+
+
+
                             mv.overlays.add(osmMarker)
+
+                            // Attach click listener to marker (outside apply to avoid receiver resolution issues)
+                            osmMarker.setOnMarkerClickListener(object : org.osmdroid.views.overlay.Marker.OnMarkerClickListener {
+                                override fun onMarkerClick(markerView: org.osmdroid.views.overlay.Marker?, mapView: org.osmdroid.views.MapView?): Boolean {
+                                    selectedLocation = marker
+                                    showLocationSheet = true
+
+                                    (context as? android.app.Activity)?.runOnUiThread {
+                                        lastProgrammaticMove.value = System.currentTimeMillis()
+                                        try {
+                                            markerView?.let { mv2 -> mapView?.controller?.animateTo(mv2.position) }
+                                            mapView?.invalidate()
+                                        } catch (_: Exception) {}
+                                    }
+
+                                    return true
+                                }
+                            })
                         }
                         
                         mv.invalidate()
@@ -853,6 +893,32 @@ fun MapViewer(
             onWaypointClick = { location ->
                 // Center map on waypoint
                 mapView?.controller?.animateTo(GeoPoint(location.latitude, location.longitude))
+            }
+        )
+    }
+
+    // Custom location popup (reusable composable in MapMarkerPopup.kt)
+    if (showLocationSheet && selectedLocation != null) {
+        MapMarkerPopup(
+            location = selectedLocation!!,
+            runways = selectedRunways,
+            onClose = {
+                showLocationSheet = false
+                selectedLocation = null
+            },
+            onManage = {
+                showLocationSheet = false
+                selectedLocation = null
+                showMarkerRouteManagement = true
+            },
+            onRunwayClick = { rw ->
+                // center on runway touchdown if available
+                val lat = rw.touchdownStartLat ?: rw.touchdownEndLat ?: selectedLocation!!.latitude
+                val lon = rw.touchdownStartLon ?: rw.touchdownEndLon ?: selectedLocation!!.longitude
+                (context as? android.app.Activity)?.runOnUiThread {
+                    mapView?.controller?.animateTo(GeoPoint(lat, lon))
+                    mapView?.invalidate()
+                }
             }
         )
     }
