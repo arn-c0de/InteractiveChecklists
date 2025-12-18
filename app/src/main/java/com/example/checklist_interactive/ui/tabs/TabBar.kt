@@ -57,6 +57,7 @@ fun TabBar(
     onTabSelected: (Int) -> Unit,
     onTabClosed: (Int) -> Unit,
     onNewTab: () -> Unit,
+    onInternalFileViewerOpen: () -> Unit = {},
     onTabsReordered: (fromIndex: Int, toIndex: Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
@@ -76,12 +77,28 @@ fun TabBar(
             // Scrollable tabs (include New Tab button inside so it sits beside last tab)
             // Use LazyRow so items can report drag gestures and be reordered
             val scope = rememberCoroutineScope()
+
+            // Fixed small button on the very left to open the internal file viewer ✅
+            IconButton(
+                onClick = onInternalFileViewerOpen,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Description,
+                    contentDescription = stringResource(R.string.open_internal_viewer),
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Spacer(modifier = Modifier.width(4.dp))
+
             if (tabs.isEmpty()) {
                 Text(
                     text = stringResource(R.string.tab_no_tabs),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 8.dp)
+                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                 )
             } else {
                 // Shared drag state for reorder behavior
@@ -304,6 +321,7 @@ fun TabbedDocumentViewer(
     onTabChanged: (Int) -> Unit,
     onTabClosed: (Int) -> Unit,
     onNewTab: () -> Unit,
+    onInternalFileViewerOpen: () -> Unit = {},
     onTabsReordered: (fromIndex: Int, toIndex: Int) -> Unit = { _, _ -> },
     isScreenLocked: Boolean = false,
     modifier: Modifier = Modifier,
@@ -317,7 +335,21 @@ fun TabbedDocumentViewer(
     // Sync pager state with active tab index
     LaunchedEffect(activeTabIndex, tabs.size) {
         if (tabs.isNotEmpty() && activeTabIndex != pagerState.currentPage && activeTabIndex in 0 until tabs.size) {
-            pagerState.animateScrollToPage(activeTabIndex)
+            // Avoid heavy animations when switching to resource-intensive tabs (Map/PDF) or when many tabs exist
+            val targetTab = tabs.getOrNull(activeTabIndex)
+            val isHeavy = when (targetTab?.content) {
+                is TabManager.TabContent.MapTab -> true
+                is TabManager.TabContent.DocumentTab -> targetTab.fileInfo.extension.lowercase() == "pdf"
+                else -> false
+            }
+            val tooManyTabs = tabs.size > 6
+            if (isHeavy || tooManyTabs) {
+                // Immediate scroll avoids animation jank while heavy composables initialize
+                pagerState.scrollToPage(activeTabIndex)
+            } else {
+                // Keep nice animation for light-weight tabs
+                pagerState.animateScrollToPage(activeTabIndex)
+            }
         }
     }
 
@@ -360,6 +392,21 @@ fun TabbedDocumentViewer(
             }
         } else {
             // Horizontal pager for content
+            // Maintain a small set of 'loaded' pages (current and neighbors) to defer heavy composables
+            val loadedPages = remember { androidx.compose.runtime.mutableStateListOf<Int>() }
+
+            // Ensure current page and neighbors are marked for loading
+            LaunchedEffect(pagerState.currentPage, tabs.size) {
+                val cur = pagerState.currentPage
+                val toLoad = listOf(cur - 1, cur, cur + 1).filter { it in 0 until tabs.size }
+                toLoad.forEach { idx -> if (!loadedPages.contains(idx)) loadedPages.add(idx) }
+
+                // Optionally pre-load a bit further when there are few tabs
+                if (tabs.size <= 4) {
+                    (0 until tabs.size).forEach { i -> if (!loadedPages.contains(i)) loadedPages.add(i) }
+                }
+            }
+
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier
@@ -370,7 +417,33 @@ fun TabbedDocumentViewer(
             ) { pageIndex ->
                 val tab = tabs.getOrNull(pageIndex)
                 if (tab != null) {
-                    content(tab)
+                    if (loadedPages.contains(pageIndex)) {
+                        // Compose the actual heavy content only when page is marked loaded
+                        content(tab)
+                    } else {
+                        // Lightweight placeholder keeps the pager responsive
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(top = 40.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                androidx.compose.material3.CircularProgressIndicator()
+                                Spacer(modifier = Modifier.height(8.dp))
+                                androidx.compose.material3.Text(
+                                    text = androidx.compose.ui.res.stringResource(com.example.checklist_interactive.R.string.loading),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        // Kick off loading of this page after a short delay so quick swipes still feel smooth
+                        LaunchedEffect(pageIndex) {
+                            kotlinx.coroutines.delay(120L)
+                            if (!loadedPages.contains(pageIndex)) loadedPages.add(pageIndex)
+                        }
+                    }
                 }
             }
         }
@@ -382,6 +455,7 @@ fun TabbedDocumentViewer(
             onTabSelected = onTabChanged,
             onTabClosed = onTabClosed,
             onNewTab = onNewTab,
+            onInternalFileViewerOpen = onInternalFileViewerOpen,
             onTabsReordered = onTabsReordered,
             modifier = Modifier
                 .fillMaxWidth()

@@ -37,6 +37,8 @@ class DataPadManager(private val context: Context) {
         private const val KEY_ENABLED = "enabled"
         private const val KEY_USE_ECDH = "use_ecdh"
         private const val KEY_DEVICE_NAME = "device_name"
+        // Persist last transient reception state (true if receiver was running when app exited)
+        private const val KEY_LAST_RUNNING = "last_running"
         
         // Default Pre-Shared Key (32 bytes for AES-256)
         private const val DEFAULT_PRE_SHARED_KEY = "DCS_DataPad_Secret_Key_32BYTES!!"
@@ -94,7 +96,8 @@ class DataPadManager(private val context: Context) {
     val isEnabled: StateFlow<Boolean> = _isEnabled.asStateFlow()
 
     // Runtime running state (separate from persisted enabled setting)
-    private val _isRunning = MutableStateFlow(false)
+    // Initialize from persisted last-running preference so reception-off can persist across restarts
+    private val _isRunning = MutableStateFlow(prefs.getBoolean(KEY_LAST_RUNNING, false))
     val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
     
     private val _lastUpdateTime = MutableStateFlow<Long?>(null)
@@ -128,6 +131,24 @@ class DataPadManager(private val context: Context) {
     private var receiveJob: Job? = null
     private var handshakeJob: Job? = null
     private var isStarted = false
+
+    // Restore last transient running state if the user had reception running previously
+    init {
+        val lastRunning = prefs.getBoolean(KEY_LAST_RUNNING, false)
+        val enabled = prefs.getBoolean(KEY_ENABLED, false)
+        udpLogD("Init: KEY_LAST_RUNNING=$lastRunning, KEY_ENABLED=$enabled")
+        // Only auto-start if the user both previously had reception running AND the Settings-enabled flag is set.
+        // This avoids unexpected auto-start when reception was transiently on but the user expects it to remain off.
+        if (lastRunning && enabled) {
+            udpLogD("Restoring running receiver on init")
+            scope.launch {
+                startInternal(ignoreEnabledCheck = true)
+            }
+        } else {
+            // Ensure runtime state matches persisted preference
+            _isRunning.value = false
+        }
+    }
     
     // ECDH components
     private val keyManager = KeyManager(context)
@@ -380,6 +401,8 @@ class DataPadManager(private val context: Context) {
      * Stop listening for UDP packets
      */
     fun stop() {
+        // Set isRunning to false FIRST so UI updates immediately
+        _isRunning.value = false
         isStarted = false
         receiveJob?.cancel()
         receiveJob = null
@@ -390,8 +413,7 @@ class DataPadManager(private val context: Context) {
         udpSocket = null
         _isConnected.value = false
         _handshakeStatus.value = null
-        _isRunning.value = false
-        udpLogD("UDP socket closed")
+        udpLogD("UDP socket closed, isRunning=$_isRunning")
     }
 
     /**
@@ -400,6 +422,8 @@ class DataPadManager(private val context: Context) {
      * while leaving the Settings 'enabled' preference untouched.
      */
     fun connect() {
+        // Persist that user started reception so it can be restored on next app launch
+        prefs.edit().putBoolean(KEY_LAST_RUNNING, true).apply()
         startInternal(ignoreEnabledCheck = true)
     }
 
@@ -407,6 +431,8 @@ class DataPadManager(private val context: Context) {
      * Disconnect (stop) the receiver transiently without changing persisted settings.
      */
     fun disconnect() {
+        // Persist that user stopped reception so it remains off after restart
+        prefs.edit().putBoolean(KEY_LAST_RUNNING, false).apply()
         stop()
     }
 
@@ -459,6 +485,10 @@ class DataPadManager(private val context: Context) {
     fun setEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_ENABLED, enabled).apply()
         _isEnabled.value = enabled
+        if (!enabled) {
+            // When explicitly disabling via settings, also clear the last-running flag
+            prefs.edit().putBoolean(KEY_LAST_RUNNING, false).apply()
+        }
         if (enabled) start() else stop()
     }
 

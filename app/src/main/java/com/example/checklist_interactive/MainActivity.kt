@@ -487,7 +487,8 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onTabsReordered = { from, to ->
                                     tabManager.moveTab(from, to)
-                                }
+                                },
+                                onInternalFileViewerOpen = { showFileList = true }
                             ) { tabInfo ->
                                 // Render appropriate viewer based on tab content type
                                 when (tabInfo.content) {
