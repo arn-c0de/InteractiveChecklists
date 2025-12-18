@@ -877,6 +877,8 @@ class DataPadGUI(QMainWindow):
                     # Open location edit dialog
                     from gui.location_manager import LocationEditDialog
                     dialog = LocationEditDialog(self.db, loc, None, self)
+                    # Connect coordinate picking signal
+                    dialog.pick_coordinates_requested.connect(lambda: self.start_coordinate_picking(dialog))
                     if dialog.exec() == dialog.DialogCode.Accepted:
                         try:
                             success = self.db.update_location(loc)
@@ -945,7 +947,87 @@ class DataPadGUI(QMainWindow):
                 except Exception:
                     pass
         except Exception as e:
-            print(f"Error finalizing finish drawing: {e}")    
+            print(f"Error finalizing finish drawing: {e}")
+
+    def start_coordinate_picking(self, dialog):
+        """Start coordinate picking mode for a dialog"""
+        if not self.webview:
+            return
+
+        try:
+            # Store reference to the dialog
+            self.coordinate_pick_dialog = dialog
+
+            # Activate coordinate picking mode in map
+            js = "startCoordinatePicking();"
+            try:
+                self._call_js_when_ready('startCoordinatePicking', js)
+            except Exception as e:
+                print(f"Error starting coordinate picking (JS): {e}")
+
+            # Start polling for picked coordinates
+            self.coordinate_pick_timer = QTimer()
+            self.coordinate_pick_timer.timeout.connect(self.poll_picked_coordinate)
+            self.coordinate_pick_timer.start(200)  # Poll every 200ms
+
+        except Exception as e:
+            print(f"Error starting coordinate picking: {e}")
+
+    def poll_picked_coordinate(self):
+        """Poll for picked coordinate from map"""
+        if not hasattr(self, 'coordinate_pick_dialog') or not self.coordinate_pick_dialog:
+            if hasattr(self, 'coordinate_pick_timer'):
+                self.coordinate_pick_timer.stop()
+            return
+
+        if not self.webview:
+            return
+
+        try:
+            # Get picked coordinate from JavaScript
+            try:
+                self._call_js_when_ready('getPickedCoordinate', "getPickedCoordinate();", result_callback=self.process_picked_coordinate)
+            except Exception as e:
+                print(f"Error polling picked coordinate (JS): {e}")
+        except Exception as e:
+            print(f"Error polling picked coordinate: {e}")
+
+    def process_picked_coordinate(self, coord_json: str):
+        """Process picked coordinate from map"""
+        if not coord_json:
+            return
+
+        try:
+            import json
+            coord = json.loads(coord_json)
+            if not coord:
+                return
+
+            lat = coord['lat']
+            lon = coord['lon']
+
+            print(f"Coordinate picked: {lat:.6f}, {lon:.6f}")
+
+            # Stop polling
+            if hasattr(self, 'coordinate_pick_timer'):
+                self.coordinate_pick_timer.stop()
+
+            # Stop coordinate picking mode in map
+            if self.webview:
+                try:
+                    js = "stopCoordinatePicking();"
+                    self._call_js_when_ready('stopCoordinatePicking', js)
+                except Exception:
+                    pass
+
+            # Pass coordinates to dialog
+            if hasattr(self, 'coordinate_pick_dialog') and self.coordinate_pick_dialog:
+                self.coordinate_pick_dialog.set_coordinates(lat, lon)
+                self.coordinate_pick_dialog = None
+
+        except Exception as e:
+            print(f"Error processing picked coordinate: {e}")
+
     def refresh_map_markers(self):
         """Load all markers from database and display on map"""
         if not self.webview:

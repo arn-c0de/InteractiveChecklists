@@ -173,6 +173,9 @@ class Location:
     symbol_color: str = "#FFFF80"  # Background color based on affiliation
     symbol_modifier: str = ""  # Additional symbol modifiers (JSON)
     
+    # Static marker flag (for non-moving entities like airports, installations)
+    is_static: int = 0  # 0=dynamic/mobile, 1=static/fixed
+    
     # Airport-specific
     icao: Optional[str] = None
     iata: Optional[str] = None
@@ -305,6 +308,17 @@ class MarkersDatabase:
                 tactical_symbol TEXT,
                 icon TEXT NOT NULL DEFAULT 'default',
                 description TEXT NOT NULL DEFAULT '',
+                
+                -- Military symbol fields
+                symbol_set TEXT NOT NULL DEFAULT '',
+                symbol_entity TEXT NOT NULL DEFAULT '',
+                symbol_size TEXT NOT NULL DEFAULT '',
+                symbol_affiliation TEXT NOT NULL DEFAULT 'unknown',
+                symbol_color TEXT NOT NULL DEFAULT '#FFFF80',
+                symbol_modifier TEXT NOT NULL DEFAULT '',
+                
+                -- Static marker flag
+                is_static INTEGER NOT NULL DEFAULT 0,
                 
                 -- Airport fields
                 icao TEXT,

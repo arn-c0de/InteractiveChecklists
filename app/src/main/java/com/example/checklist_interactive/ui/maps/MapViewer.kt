@@ -475,7 +475,7 @@ fun MapViewer(
                                                 symbolEntity = symbol.symbolEntity,
                                                 symbolAffiliation = affiliation.name.lowercase(),
                                                 symbolColor = String.format("#%06X", (0xFFFFFF and affiliation.color.hashCode())),
-                                                icon = symbol.id,
+                                                icon = "ic_mapicon_${symbol.id}",
                                                 description = "Military symbol: ${symbol.name}"
                                             )
                                             
@@ -621,70 +621,130 @@ fun MapViewer(
                                     else -> android.graphics.Color.parseColor("#9370DB")
                                 }
                                 
-                                // Create marker icon - try military symbol first, then icon field, then fallback
+                                // Create marker icon - priority: symbolEntity > airport default > icon field > NO FALLBACK
                                 var markerIcon: BitmapDrawable? = null
                                 try {
-                                    // For military symbols, try to use the vector drawable icon
-                                    if (marker.markerType == "tactical_military" && marker.symbolEntity.isNotEmpty()) {
+                                    // 1. Try symbolEntity first (for ALL markers with symbolEntity set)
+                                    if (markerIcon == null && marker.symbolEntity.isNotEmpty()) {
                                         try {
                                             // Dynamic drawable lookup by resource name (ic_mapicon_<entity>)
-                                            val resName = "ic_mapicon_${'$'}{marker.symbolEntity}"
+                                            val resName = "ic_mapicon_${marker.symbolEntity}"
                                             val iconResId = context.resources.getIdentifier(resName, "drawable", context.packageName)
                                             if (iconResId != 0) {
                                                 val drawable = ContextCompat.getDrawable(context, iconResId)?.mutate()
                                                 drawable?.let { d ->
-                                                    // Tint with affiliation color
-                                                    val tintColor = when (marker.symbolAffiliation) {
-                                                        "friendly" -> android.graphics.Color.parseColor("#00A8FF")
-                                                        "hostile" -> android.graphics.Color.parseColor("#FF4444")
-                                                        "neutral" -> android.graphics.Color.parseColor("#00FF00")
-                                                        else -> android.graphics.Color.parseColor("#FFFF80")
+                                                    // Apply affiliation color to the icon
+                                                    val affiliationColor = when (marker.symbolAffiliation.lowercase()) {
+                                                        "friendly" -> android.graphics.Color.parseColor("#00A8FF")  // Blue
+                                                        "hostile" -> android.graphics.Color.parseColor("#FF4444")    // Red
+                                                        "neutral" -> android.graphics.Color.parseColor("#00FF00")    // Green
+                                                        "unknown" -> android.graphics.Color.parseColor("#FFFF80")    // Yellow
+                                                        else -> {
+                                                            // Try to parse symbolColor if available
+                                                            try {
+                                                                if (marker.symbolColor.isNotEmpty()) {
+                                                                    android.graphics.Color.parseColor(marker.symbolColor)
+                                                                } else {
+                                                                    android.graphics.Color.parseColor("#FFFF80") // Default yellow
+                                                                }
+                                                            } catch (e: Exception) {
+                                                                android.graphics.Color.parseColor("#FFFF80") // Default yellow
+                                                            }
+                                                        }
                                                     }
-                                                    d.setTint(tintColor)
-
+                                                    
+                                                    // Create bitmap and apply color filter to colorize the fill
                                                     val bitmap = android.graphics.Bitmap.createBitmap(64, 64, android.graphics.Bitmap.Config.ARGB_8888)
                                                     val canvas = android.graphics.Canvas(bitmap)
                                                     d.setBounds(0, 0, 64, 64)
+                                                    
+                                                    // Apply ColorFilter to replace the fill color with affiliation color
+                                                    val colorFilter = android.graphics.PorterDuffColorFilter(
+                                                        affiliationColor,
+                                                        android.graphics.PorterDuff.Mode.SRC_ATOP
+                                                    )
+                                                    d.colorFilter = colorFilter
+                                                    
                                                     d.draw(canvas)
                                                     markerIcon = BitmapDrawable(context.resources, bitmap)
-                                                    Log.d(TAG, "Loaded military symbol icon for: ${'$'}{marker.symbolEntity}")
+                                                    Log.d(TAG, "Loaded icon for symbolEntity: ${marker.symbolEntity} with affiliation ${marker.symbolAffiliation} (color=${String.format("#%06X", 0xFFFFFF and affiliationColor)})")
                                                 }
                                             } else {
-                                                Log.d(TAG, "No map icon drawable for entity: ${'$'}{marker.symbolEntity}")
+                                                Log.w(TAG, "No drawable found for symbolEntity: ${marker.symbolEntity} (tried resName=$resName)")
                                             }
                                         } catch (e: Exception) {
-                                            Log.e(TAG, "Failed to load military symbol icon", e)
+                                            Log.e(TAG, "Failed to load symbolEntity icon: ${marker.symbolEntity}", e)
                                         }
                                     }
                                     
-                                    // Try icon field if available (for airports etc.)
-                                    if (markerIcon == null && marker.icon.isNotEmpty()) {
+                                    // 2. For airports, use static airport icon if no symbolEntity icon was loaded
+                                    if (markerIcon == null && marker.markerType == "airport") {
                                         try {
-                                            val iconResId = context.resources.getIdentifier(marker.icon, "drawable", context.packageName)
+                                            val iconResId = context.resources.getIdentifier("ic_mapicon_static_airport", "drawable", context.packageName)
                                             if (iconResId != 0) {
                                                 val drawable = ContextCompat.getDrawable(context, iconResId)?.mutate()
                                                 drawable?.let { d ->
-                                                    d.setTint(markerColor)
                                                     val bitmap = android.graphics.Bitmap.createBitmap(64, 64, android.graphics.Bitmap.Config.ARGB_8888)
                                                     val canvas = android.graphics.Canvas(bitmap)
                                                     d.setBounds(0, 0, 64, 64)
                                                     d.draw(canvas)
                                                     markerIcon = BitmapDrawable(context.resources, bitmap)
-                                                    Log.d(TAG, "Loaded icon from icon field: ${'$'}{marker.icon}")
+                                                    Log.d(TAG, "Loaded default airport icon for: ${marker.name}")
                                                 }
                                             }
                                         } catch (e: Exception) {
-                                            Log.e(TAG, "Failed to load icon from icon field: ${'$'}{marker.icon}", e)
+                                            Log.e(TAG, "Failed to load airport icon", e)
                                         }
                                     }
                                     
-                                    // Fallback: create simple colored circle marker if no icon set
+                                    // 3. Try icon field if available (for custom icons) - add ic_mapicon_ prefix if not present
+                                    if (markerIcon == null && marker.icon.isNotEmpty() && marker.icon != "default") {
+                                        try {
+                                            // Try with ic_mapicon_ prefix first if not already present
+                                            val iconName = if (marker.icon.startsWith("ic_mapicon_")) marker.icon else "ic_mapicon_${marker.icon}"
+                                            val iconResId = context.resources.getIdentifier(iconName, "drawable", context.packageName)
+                                            if (iconResId != 0) {
+                                                val drawable = ContextCompat.getDrawable(context, iconResId)?.mutate()
+                                                drawable?.let { d ->
+                                                    // Don't use setTint() - render the icon as-is with its original colors
+                                                    val bitmap = android.graphics.Bitmap.createBitmap(64, 64, android.graphics.Bitmap.Config.ARGB_8888)
+                                                    val canvas = android.graphics.Canvas(bitmap)
+                                                    d.setBounds(0, 0, 64, 64)
+                                                    d.draw(canvas)
+                                                    markerIcon = BitmapDrawable(context.resources, bitmap)
+                                                    Log.d(TAG, "Loaded icon from icon field: ${marker.icon} (resolved to $iconName, resId=$iconResId)")
+                                                }
+                                            } else {
+                                                // Try without prefix as fallback
+                                                val iconResId2 = context.resources.getIdentifier(marker.icon, "drawable", context.packageName)
+                                                if (iconResId2 != 0) {
+                                                    val drawable = ContextCompat.getDrawable(context, iconResId2)?.mutate()
+                                                    drawable?.let { d ->
+                                                        val bitmap = android.graphics.Bitmap.createBitmap(64, 64, android.graphics.Bitmap.Config.ARGB_8888)
+                                                        val canvas = android.graphics.Canvas(bitmap)
+                                                        d.setBounds(0, 0, 64, 64)
+                                                        d.draw(canvas)
+                                                        markerIcon = BitmapDrawable(context.resources, bitmap)
+                                                        Log.d(TAG, "Loaded icon from icon field (no prefix): ${marker.icon} (resId=$iconResId2)")
+                                                    }
+                                                } else {
+                                                    Log.w(TAG, "No drawable found for icon field: ${marker.icon} (tried $iconName and ${marker.icon})")
+                                                }
+                                            }
+                                        } catch (e: Exception) {
+                                            Log.e(TAG, "Failed to load icon from icon field: ${marker.icon}", e)
+                                        }
+                                    }
+                                    
+                                    // NO FALLBACK - if icon is not found, show error
                                     if (markerIcon == null) {
+                                        Log.e(TAG, "FAILED TO LOAD ICON for marker: ${marker.name} (type=${marker.markerType}, symbolEntity=${marker.symbolEntity}, icon=${marker.icon})")
+                                        // Create red error marker to make it obvious
                                         val bitmap = android.graphics.Bitmap.createBitmap(48, 48, android.graphics.Bitmap.Config.ARGB_8888)
                                         val canvas = android.graphics.Canvas(bitmap)
                                         val paint = android.graphics.Paint().apply {
                                             isAntiAlias = true
-                                            color = markerColor
+                                            color = android.graphics.Color.RED
                                             style = android.graphics.Paint.Style.FILL
                                         }
                                         val strokePaint = android.graphics.Paint().apply {
@@ -695,14 +755,22 @@ fun MapViewer(
                                         }
                                         canvas.drawCircle(24f, 24f, 18f, paint)
                                         canvas.drawCircle(24f, 24f, 18f, strokePaint)
+                                        // Draw X in the middle
+                                        val xPaint = android.graphics.Paint().apply {
+                                            isAntiAlias = true
+                                            color = android.graphics.Color.WHITE
+                                            style = android.graphics.Paint.Style.STROKE
+                                            strokeWidth = 3f
+                                        }
+                                        canvas.drawLine(12f, 12f, 36f, 36f, xPaint)
+                                        canvas.drawLine(36f, 12f, 12f, 36f, xPaint)
                                         markerIcon = BitmapDrawable(context.resources, bitmap)
-                                        Log.d(TAG, "Using fallback circle icon for: ${'$'}{marker.name} (type: ${'$'}{marker.markerType})")
                                     }
                                     
                                     // Set the icon
                                     icon = markerIcon
                                 } catch (e: Exception) {
-                                    Log.e(TAG, "Failed to set marker icon for ${'$'}{marker.name}", e)
+                                    Log.e(TAG, "Failed to set marker icon for ${marker.name}", e)
                                     // Use default marker
                                 }
                             }

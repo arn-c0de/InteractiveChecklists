@@ -4,9 +4,21 @@
     android:height="24dp"
     android:viewportWidth="600"
     android:viewportHeight="135">
-    
-    <!-- Squad/Detachment Symbol (single dot) -->
+
+    <!-- Background circle -->
+    <path
+        android:fillColor="#FFFF80"
+        android:pathData="M300,7.5 A60,60 0 1,0 299.999,7.5 Z"/>
+
+    <!-- Circle frame -->
+    <path
+        android:strokeColor="#000000"
+        android:strokeWidth="8"
+        android:fillColor="#00000000"
+        android:pathData="M300,7.5 A60,60 0 1,0 299.999,7.5 Z"/>
+
+    <!-- Squad/Detachment Symbol (single centered dot) -->
     <path
         android:fillColor="#000000"
-        android:pathData="M300,-60m-32,0a32,32,0,1,1,64,0a32,32,0,1,1,-64,0"/>
+        android:pathData="M300,67.5m-28,0a28,28,0,1,1,56,0a28,28,0,1,1,-56,0"/>
 </vector>

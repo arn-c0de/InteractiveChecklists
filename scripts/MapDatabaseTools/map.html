@@ -628,7 +628,104 @@
                         console.error('drawClosingLine error', e);
                     }
                 };
-                
+
+                // Coordinate picking state
+                var isPickingCoordinate = false;
+                var pickedCoordinate = null;
+                var coordinatePickMarker = null;
+
+                window.startCoordinatePicking = function() {
+                    try {
+                        console.log('Starting coordinate picking mode');
+                        isPickingCoordinate = true;
+                        pickedCoordinate = null;
+
+                        // Change cursor to crosshair
+                        map.getContainer().style.cursor = 'crosshair';
+
+                        // Clear any previous marker
+                        if (coordinatePickMarker) {
+                            map.removeLayer(coordinatePickMarker);
+                            coordinatePickMarker = null;
+                        }
+                    } catch (e) {
+                        console.error('startCoordinatePicking error', e);
+                    }
+                };
+
+                window.stopCoordinatePicking = function() {
+                    try {
+                        console.log('Stopping coordinate picking mode');
+                        isPickingCoordinate = false;
+
+                        // Reset cursor
+                        map.getContainer().style.cursor = '';
+
+                        // Remove marker
+                        if (coordinatePickMarker) {
+                            map.removeLayer(coordinatePickMarker);
+                            coordinatePickMarker = null;
+                        }
+                    } catch (e) {
+                        console.error('stopCoordinatePicking error', e);
+                    }
+                };
+
+                window.getPickedCoordinate = function() {
+                    try {
+                        if (!pickedCoordinate) {
+                            return null;
+                        }
+                        var coord = pickedCoordinate;
+                        pickedCoordinate = null; // Clear after retrieval
+                        return JSON.stringify(coord);
+                    } catch (e) {
+                        console.error('getPickedCoordinate error', e);
+                        return null;
+                    }
+                };
+
+                // Enhanced map click handler for both border drawing and coordinate picking
+                var originalClickHandler = map._events.click;
+                map.on('click', function(e) {
+                    // Coordinate picking takes priority
+                    if (isPickingCoordinate) {
+                        var lat = e.latlng.lat;
+                        var lon = e.latlng.lng;
+
+                        console.log('Coordinate picked:', lat, lon);
+
+                        // Store the picked coordinate
+                        pickedCoordinate = { lat: lat, lon: lon };
+
+                        // Place a temporary marker to show the selected location
+                        if (coordinatePickMarker) {
+                            map.removeLayer(coordinatePickMarker);
+                        }
+
+                        var icon = L.divIcon({
+                            html: '📍',
+                            className: 'coordinate-pick-marker',
+                            iconSize: [32, 32],
+                            iconAnchor: [16, 32]
+                        });
+
+                        coordinatePickMarker = L.marker([lat, lon], { icon: icon }).addTo(map);
+                        coordinatePickMarker.bindPopup('Selected: ' + lat.toFixed(6) + ', ' + lon.toFixed(6)).openPopup();
+
+                        // Auto-stop picking mode after selection
+                        setTimeout(function() {
+                            stopCoordinatePicking();
+                        }, 500);
+
+                        // Prevent event from bubbling to border drawing
+                        if (e.originalEvent) {
+                            e.originalEvent.stopImmediatePropagation();
+                        }
+                        return;
+                    }
+                });
+
             } catch (e) {
                 statusEl.textContent = 'ERROR: ' + e.message;
                 statusEl.style.display = 'block';

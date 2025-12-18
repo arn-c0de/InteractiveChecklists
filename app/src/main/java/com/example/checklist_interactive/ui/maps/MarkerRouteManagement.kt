@@ -930,6 +930,9 @@ fun LocationEditDialog(
     var symbolAffiliation by remember { mutableStateOf(location.symbolAffiliation) }
     var symbolColor by remember { mutableStateOf(location.symbolColor) }
     
+    // Static marker flag
+    var isStatic by remember { mutableStateOf(location.isStatic == 1) }
+    
     // Airport fields
     var icao by remember { mutableStateOf(location.icao ?: "") }
     var iata by remember { mutableStateOf(location.iata ?: "") }
@@ -1096,6 +1099,21 @@ fun LocationEditDialog(
                         modifier = Modifier.fillMaxWidth()
                     )
                     
+                    // Static marker checkbox
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = isStatic,
+                            onCheckedChange = { isStatic = it }
+                        )
+                        Text(
+                            text = "Static Marker (Airport, Installation, etc.)",
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
+                    
                     HorizontalDivider()
                     
                     // Airport section
@@ -1248,6 +1266,7 @@ fun LocationEditDialog(
                                 symbolSize = symbolSize,
                                 symbolAffiliation = symbolAffiliation,
                                 symbolColor = symbolColor,
+                                isStatic = if (isStatic) 1 else 0,
                                 icao = icao.takeIf { it.isNotBlank() },
                                 iata = iata.takeIf { it.isNotBlank() },
                                 elevationM = elevationM.toDoubleOrNull(),

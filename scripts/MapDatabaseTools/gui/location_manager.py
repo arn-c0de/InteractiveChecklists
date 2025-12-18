@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QListWidget,
     QListWidgetItem, QLabel, QLineEdit, QComboBox, QDialog, QFormLayout,
     QTextEdit, QDoubleSpinBox, QSpinBox, QGroupBox, QMessageBox,
-    QInputDialog, QMenu
+    QInputDialog, QMenu, QCheckBox
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QColor, QAction
@@ -91,18 +91,21 @@ class RunwayEditDialog(QDialog):
 
 class LocationEditDialog(QDialog):
     """Dialog for adding/editing locations"""
-    
-    def __init__(self, db: MarkersDatabase, location: Optional[Location] = None, 
+
+    # Signal to request coordinate picking from map
+    pick_coordinates_requested = Signal()
+
+    def __init__(self, db: MarkersDatabase, location: Optional[Location] = None,
                  prefill_coords: tuple = None, parent=None):
         super().__init__(parent)
         self.db = db
         self.location = location or Location()
         self.runways: List[Runway] = list(location.runways) if location and location.runways else []
-        
+
         # Prefill coordinates if provided (e.g., from map click)
         if prefill_coords and not location:
             self.location.latitude, self.location.longitude = prefill_coords
-        
+
         self.setWindowTitle("Edit Location" if location else "Add Location")
         self.setMinimumWidth(500)
         self.setup_ui()
@@ -116,7 +119,7 @@ class LocationEditDialog(QDialog):
         
         self.name_edit = QLineEdit(self.location.name)
         basic_layout.addRow("Name:*", self.name_edit)
-        
+
         coord_layout = QHBoxLayout()
         self.lat_spin = QDoubleSpinBox()
         self.lat_spin.setRange(-90, 90)
@@ -124,13 +127,21 @@ class LocationEditDialog(QDialog):
         self.lat_spin.setValue(self.location.latitude)
         coord_layout.addWidget(QLabel("Lat:"))
         coord_layout.addWidget(self.lat_spin)
-        
+
         self.lon_spin = QDoubleSpinBox()
         self.lon_spin.setRange(-180, 180)
         self.lon_spin.setDecimals(6)
         self.lon_spin.setValue(self.location.longitude)
         coord_layout.addWidget(QLabel("Lon:"))
         coord_layout.addWidget(self.lon_spin)
+
+        # Add pin button to pick coordinates from map
+        self.pin_btn = QPushButton("📍")
+        self.pin_btn.setToolTip("Pick coordinates from map")
+        self.pin_btn.setMaximumWidth(40)
+        self.pin_btn.clicked.connect(self.on_pick_coordinates)
+        coord_layout.addWidget(self.pin_btn)
+
         basic_layout.addRow("Coordinates:*", coord_layout)
         
         self.type_combo = QComboBox()
@@ -155,6 +166,11 @@ class LocationEditDialog(QDialog):
         if self.location.description:
             self.desc_edit.setPlainText(self.location.description)
         basic_layout.addRow("Description:", self.desc_edit)
+        
+        # Static marker checkbox
+        self.is_static_check = QCheckBox("Static Marker (Airport, Installation, etc.)")
+        self.is_static_check.setChecked(self.location.is_static == 1)
+        basic_layout.addRow("", self.is_static_check)
         
         basic_group.setLayout(basic_layout)
         layout.addWidget(basic_group)
@@ -438,7 +454,21 @@ class LocationEditDialog(QDialog):
             if rwy.ils:
                 item_text += " (ILS)"
             self.runway_list.addItem(item_text)
-    
+
+    def on_pick_coordinates(self):
+        """Handle pin button click - request coordinate picking from map"""
+        # Hide dialog temporarily
+        self.hide()
+        # Emit signal to parent to start coordinate picking
+        self.pick_coordinates_requested.emit()
+
+    def set_coordinates(self, lat: float, lon: float):
+        """Set coordinates from map click"""
+        self.lat_spin.setValue(lat)
+        self.lon_spin.setValue(lon)
+        # Show dialog again
+        self.show()
+
     def save_location(self):
         """Validate and save location"""
         # Validate required fields
@@ -468,6 +498,7 @@ class LocationEditDialog(QDialog):
             self.location.symbol_entity = selected_symbol
         
         self.location.description = self.desc_edit.toPlainText()
+        self.location.is_static = 1 if self.is_static_check.isChecked() else 0
         
         # Airport fields
         if self.airport_group.isVisible():
@@ -700,6 +731,9 @@ class LocationManagerWidget(QWidget):
     def add_location(self):
         """Add a new location"""
         dialog = LocationEditDialog(self.db, parent=self)
+        # Connect coordinate picking signal if parent supports it
+        if hasattr(self.parent(), 'start_coordinate_picking'):
+            dialog.pick_coordinates_requested.connect(lambda: self.parent().start_coordinate_picking(dialog))
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.refresh_list()
             self.location_added.emit(dialog.location)
@@ -711,6 +745,9 @@ class LocationManagerWidget(QWidget):
             location = current_item.data(Qt.ItemDataRole.UserRole)
             if location:
                 dialog = LocationEditDialog(self.db, location, parent=self)
+                # Connect coordinate picking signal if parent supports it
+                if hasattr(self.parent(), 'start_coordinate_picking'):
+                    dialog.pick_coordinates_requested.connect(lambda: self.parent().start_coordinate_picking(dialog))
                 if dialog.exec() == QDialog.DialogCode.Accepted:
                     self.refresh_list()
                     self.location_updated.emit(dialog.location)

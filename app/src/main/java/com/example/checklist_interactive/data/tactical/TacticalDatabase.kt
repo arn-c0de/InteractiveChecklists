@@ -25,7 +25,7 @@ import java.io.File
         LocationTagCrossRef::class,
         NavaidEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class TacticalDatabase : RoomDatabase() {
@@ -198,6 +198,15 @@ abstract class TacticalDatabase : RoomDatabase() {
             }
         }
         
+        // Migration from v3 to v4: add is_static column for static markers (airports, installations)
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE locations ADD COLUMN is_static INTEGER NOT NULL DEFAULT 0")
+                // Mark airports as static automatically
+                db.execSQL("UPDATE locations SET is_static = 1 WHERE marker_type = 'airport'")
+            }
+        }
+        
         /**
          * Get database instance
          * 
@@ -281,7 +290,7 @@ abstract class TacticalDatabase : RoomDatabase() {
                 DATABASE_NAME
             )
                 .createFromAsset("databases/$DATABASE_NAME")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .fallbackToDestructiveMigration()
                 .build()
         }
@@ -299,7 +308,7 @@ abstract class TacticalDatabase : RoomDatabase() {
                 TacticalDatabase::class.java,
                 dbFile.absolutePath
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .fallbackToDestructiveMigration()
                 .build()
         }
