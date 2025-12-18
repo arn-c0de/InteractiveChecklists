@@ -40,13 +40,41 @@ class SecurityAuditLogger:
         self._ensure_secure_permissions()
 
     def _ensure_secure_permissions(self):
-        """Ensure audit file has secure permissions"""
-        if self.audit_file.exists():
+        """Ensure audit file exists and has secure permissions (best-effort).
+
+        Notes:
+        - Attempt to create the file with owner-only permissions when missing.
+        - On platforms where POSIX permissions aren't meaningful (e.g., Windows) this is
+          best-effort and errors are logged. We avoid silently proceeding if permission
+          setting repeatedly fails.
+        """
+        try:
+            # Ensure parent directory exists
+            self.audit_file.parent.mkdir(parents=True, exist_ok=True)
+
+            # If file does not exist, create it with secure permissions if possible
+            if not self.audit_file.exists():
+                try:
+                    import stat
+                    fd = os.open(str(self.audit_file), os.O_CREAT | os.O_WRONLY, stat.S_IRUSR | stat.S_IWUSR)
+                    os.close(fd)
+                except Exception:
+                    # Fallback to touch if os.open with mode fails (platform differences)
+                    try:
+                        self.audit_file.touch()
+                    except Exception as e:
+                        logger.error(f"❌ Failed to create audit file: {e}")
+                        return
+
+            # Attempt to set secure permissions (best-effort)
             try:
                 import stat
                 self.audit_file.chmod(stat.S_IRUSR | stat.S_IWUSR)  # 0o600
             except Exception as e:
-                logger.warning(f"⚠️ Could not set secure permissions on audit file: {e}")
+                # Log as error because audit logs are sensitive
+                logger.error(f"❌ Could not set secure permissions on audit file: {e}")
+        except Exception as e:
+            logger.error(f"❌ Unexpected error ensuring audit file permissions: {e}")
 
     def log_event(self, event_type: str, severity: str, details: dict):
         """Log a security event in JSON format
@@ -66,8 +94,28 @@ class SecurityAuditLogger:
 
         with self._lock:
             try:
+                # Ensure file exists with secure permissions before writing
+                if not self.audit_file.exists():
+                    try:
+                        # Try to create with 0600 mode
+                        import stat
+                        fd = os.open(str(self.audit_file), os.O_CREAT | os.O_WRONLY, stat.S_IRUSR | stat.S_IWUSR)
+                        os.close(fd)
+                    except Exception:
+                        # Best-effort fallback
+                        self.audit_file.touch()
+
+                # Append the event
                 with open(self.audit_file, 'a', encoding='utf-8') as f:
                     f.write(json.dumps(event) + '\n')
+
+                # Verify permissions after write
+                try:
+                    current_mode = self.audit_file.stat().st_mode & 0o777
+                    if current_mode != (0o600):
+                        logger.error(f"❌ Audit log has insecure permissions: {oct(current_mode)}")
+                except Exception as e:
+                    logger.debug(f"Could not verify audit file permissions: {e}")
             except Exception as e:
                 logger.error(f"❌ Failed to write security audit log: {e}")
 
@@ -95,6 +143,9 @@ class SessionData:
         self.aircraft = aircraft
         self.created_at = time.time()
         self.last_activity = time.time()
+        # Whether the client completed KeyConfirm for this session
+        self.confirmed = False
+        self.confirmed_at = None
         # Counter for nonce generation (thread-safe)
         self._nonce_counter = 0
         self._nonce_lock = __import__('threading').Lock()
@@ -797,10 +848,11 @@ class SessionManager:
                     'reason': 'Device not in whitelist'
                 })
 
+                # Return a generic error message to clients to avoid leaking internal details
                 return {
                     "type": "Error",
-                    "error": "HandshakeFailed",
-                    "message": f"Device {device_id[:16]}... is not authorized. Add to authorized_devices.json on server.",
+                    "error": "AuthorizationFailed",
+                    "message": "Device is not authorized for this server.",
                     "timestamp": int(server_time)
                 }
 
@@ -987,6 +1039,14 @@ class SessionManager:
             
             logger.info(f"✅ HMAC verified for session {session_id[:8]}...")
             session.update_activity()
+
+            # Mark session as confirmed and record confirmation time
+            session.confirmed = True
+            session.confirmed_at = time.time()
+            get_audit_logger().log_event('session_confirmed', 'low', {
+                'session_id': session_id[:8] + '...',
+                'device_id': session.device_id[:16] + '...'
+            })
             
             return {
                 "type": "Ack",
@@ -1006,16 +1066,46 @@ class SessionManager:
             }
     
     def get_session_by_id(self, session_id: str) -> Optional[SessionData]:
-        """Get session by ID, returns None if not found or expired"""
+        """Get session by ID, returns None if not found, unconfirmed, or expired.
+
+        Unconfirmed sessions are not usable for encryption and will be removed
+        after a short timeout to avoid resource exhaustion by unauthenticated clients.
+        """
         session = self.sessions.get(session_id)
-        if session and not session.is_expired():
+        if not session:
+            return None
+
+        # Protect against unconfirmed sessions being used for encryption
+        UNCONFIRMED_TIMEOUT = 60  # seconds
+        if not getattr(session, 'confirmed', False):
+            # If unconfirmed and expired, remove it
+            if time.time() - session.created_at > UNCONFIRMED_TIMEOUT:
+                # Remove mapping
+                if session.device_id in self.device_sessions and self.device_sessions[session.device_id] == session_id:
+                    del self.device_sessions[session.device_id]
+                del self.sessions[session_id]
+                logger.info(f"🗑️ Removed unconfirmed session due to timeout: {session_id[:8]}...")
+                get_audit_logger().log_event('unconfirmed_session_removed', 'medium', {
+                    'session_id': session_id[:8] + '...',
+                    'device_id': session.device_id[:16] + '...',
+                    'age_seconds': int(time.time() - session.created_at)
+                })
+                return None
+            # Not yet confirmed but still within timeout — not usable
+            logger.debug(f"⏳ Session {session_id[:8]}... not yet confirmed")
+            return None
+
+        # Confirmed session — check expiry as before
+        if not session.is_expired():
             session.update_activity()
             return session
-        elif session:
+        else:
             # Clean up expired session
+            if session.device_id in self.device_sessions and self.device_sessions[session.device_id] == session_id:
+                del self.device_sessions[session.device_id]
             del self.sessions[session_id]
             logger.info(f"🗑️ Removed expired session: {session_id[:8]}...")
-        return None
+            return None
     
     def encrypt_with_session(self, data: bytes, session_id: str) -> Optional[bytes]:
         """Encrypt data with session key using counter-based nonce"""
@@ -1052,20 +1142,37 @@ class SessionManager:
             logger.error(f"❌ Decryption failed: {e}")
             return None
     
-    def cleanup_expired_sessions(self, max_age_seconds: int = 3600):
-        """Remove expired sessions and rate limit entries"""
-        expired = [
-            sid for sid, session in self.sessions.items()
-            if session.is_expired(max_age_seconds)
-        ]
+    def cleanup_expired_sessions(self, max_age_seconds: int = 3600, unconfirmed_timeout_seconds: int = 60):
+        """Remove expired sessions and rate limit entries.
+
+        Unconfirmed sessions older than `unconfirmed_timeout_seconds` are removed to
+        prevent memory exhaustion from unconfirmed handshakes.
+        """
+        expired = []
+        now = time.time()
+        for sid, session in list(self.sessions.items()):
+            # Remove unconfirmed sessions older than timeout
+            if not getattr(session, 'confirmed', False) and (now - session.created_at > unconfirmed_timeout_seconds):
+                expired.append(sid)
+                logger.info(f"🗑️ Unconfirmed session expired: {sid[:8]}... (age {int(now - session.created_at)}s)")
+                get_audit_logger().log_event('unconfirmed_session_removed', 'medium', {
+                    'session_id': sid[:8] + '...',
+                    'device_id': session.device_id[:16] + '...',
+                    'age_seconds': int(now - session.created_at)
+                })
+            elif session.is_expired(max_age_seconds):
+                expired.append(sid)
+
         for sid in expired:
-            session = self.sessions[sid]
+            session = self.sessions.get(sid)
+            if not session:
+                continue
             # Remove from device mapping
             if session.device_id in self.device_sessions:
                 if self.device_sessions[session.device_id] == sid:
                     del self.device_sessions[session.device_id]
             del self.sessions[sid]
-            logger.info(f"🗑️ Cleaned up expired session: {sid[:8]}...")
+            logger.info(f"🗑️ Cleaned up session: {sid[:8]}...")
 
         # Also cleanup rate limits
         self.cleanup_rate_limits()
