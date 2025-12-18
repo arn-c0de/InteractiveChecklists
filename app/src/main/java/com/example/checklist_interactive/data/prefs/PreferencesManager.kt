@@ -45,6 +45,9 @@ class PreferencesManager(context: Context) {
         private const val KEY_MAP_AUTO_CENTER = "map_auto_center"
         // Persisted map tile source id (e.g. "MAPNIK", "OpenTopo", "USGS_SAT", "CartoDB.DarkMatter")
         private const val KEY_MAP_TILE_SOURCE = "map_tile_source"
+        private const val KEY_MAP_OVERLAY_COMPASS = "map_overlay_compass"
+        private const val KEY_MAP_OVERLAY_RINGS = "map_overlay_rings"
+        private const val KEY_MAP_OVERLAY_RINGS_MAX_NM = "map_overlay_rings_max_nm"
 
         // Application language preference (ISO code, e.g., "en", "de")
         private const val KEY_APP_LANGUAGE = "app_language"
@@ -354,6 +357,33 @@ class PreferencesManager(context: Context) {
 
     fun getMapTileSourceId(): String? {
         return prefs.getString(KEY_MAP_TILE_SOURCE, null)
+    }
+
+    /**
+     * Map overlay preferences: compass and range rings
+     */
+    fun setMapOverlayCompassEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_MAP_OVERLAY_COMPASS, enabled).apply()
+    }
+
+    fun isMapOverlayCompassEnabled(): Boolean {
+        return prefs.getBoolean(KEY_MAP_OVERLAY_COMPASS, false)
+    }
+
+    fun setMapOverlayRangeRingsEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_MAP_OVERLAY_RINGS, enabled).apply()
+    }
+
+    fun isMapOverlayRangeRingsEnabled(): Boolean {
+        return prefs.getBoolean(KEY_MAP_OVERLAY_RINGS, false)
+    }
+
+    fun setMapOverlayRangeRingsMaxNm(nm: Int) {
+        prefs.edit().putInt(KEY_MAP_OVERLAY_RINGS_MAX_NM, nm.coerceAtLeast(1)).apply()
+    }
+
+    fun getMapOverlayRangeRingsMaxNm(): Int {
+        return prefs.getInt(KEY_MAP_OVERLAY_RINGS_MAX_NM, 5)
     }
 
     /**
