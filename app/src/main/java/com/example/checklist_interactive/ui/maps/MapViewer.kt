@@ -60,6 +60,7 @@ fun MapViewer(
     val quickNoteManager = LocalQuickNoteManager.current
     val flightData by dataPadManager.flightData.collectAsState()
     val isConnected by dataPadManager.isConnected.collectAsState()
+    val datapadEnabled by dataPadManager.isEnabled.collectAsState()
 
     var mapView by remember { mutableStateOf<MapView?>(null) }
     var positionMarker by remember { mutableStateOf<Marker?>(null) }
@@ -394,8 +395,8 @@ fun MapViewer(
             }
         }
         
-        // Connection status indicator
-        if (!isConnected) {
+        // Connection status indicator (only show when DataPad enabled)
+        if (datapadEnabled && !isConnected) {
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -410,7 +411,7 @@ fun MapViewer(
                     style = MaterialTheme.typography.bodySmall
                 )
             }
-        } else if (flightData?.latitude == 0.0 || flightData?.longitude == 0.0) {
+        } else if (datapadEnabled && (flightData?.latitude == 0.0 || flightData?.longitude == 0.0)) {
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -511,6 +512,9 @@ fun MapViewer(
             )
         }
 
+        val datapadManager = LocalDataPadManager.current
+        val datapadEnabled by datapadManager.isEnabled.collectAsState()
+
         DraggableFab(
             name = "map_datapad_fab",
             prefsManager = prefsManager,
@@ -519,8 +523,9 @@ fun MapViewer(
             fabSizePx = fabSizePx,
             defaultX = 0.85f,
             defaultY = 0.85f,
-            visible = true,
-            onClick = { showDataPad = true },
+            visible = datapadEnabled,
+            onClick = { if (datapadEnabled) showDataPad = true },
+
             content = { Icon(Icons.Default.Flight, contentDescription = stringResource(R.string.datapad_title)) },
             marginPx = fabMarginPx
         )
@@ -577,7 +582,7 @@ fun MapViewer(
         )
     }
     // DataPad Popup
-    if (showDataPad) {
+    if (showDataPad && datapadEnabled) {
         DataPadPopup(onDismiss = { showDataPad = false })
     }
     

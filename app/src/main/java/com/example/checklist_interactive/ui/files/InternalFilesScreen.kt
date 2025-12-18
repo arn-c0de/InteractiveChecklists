@@ -161,6 +161,8 @@ fun InternalFilesScreen(
     // Quick Access state
     var showQuickAccess by remember { mutableStateOf(false) }
     var showDataPad by remember { mutableStateOf(false) }
+    val datapadManager = LocalDataPadManager.current
+    val datapadEnabled by datapadManager.isEnabled.collectAsState()
     // Search state
     var showSearchDialog by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -648,6 +650,9 @@ fun InternalFilesScreen(
             val screenHeightPx = with(LocalDensity.current) { configuration.screenHeightDp.dp.roundToPx() }
             val fabSizePx = with(LocalDensity.current) { 56.dp.roundToPx() }
 
+            val datapadManager = LocalDataPadManager.current
+            val datapadEnabled by datapadManager.isEnabled.collectAsState()
+
             DraggableFab(
                 name = "datapad",
                 prefsManager = prefsManager,
@@ -657,8 +662,9 @@ fun InternalFilesScreen(
                 // Slightly left of quick_access and aligned vertically
                 defaultX = 0.92f,
                 defaultY = 0.9f,
-                visible = true,
-                onClick = { showDataPad = true },
+                visible = datapadEnabled,
+                onClick = { if (datapadEnabled) showDataPad = true },
+
                 containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                 contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
                 content = {
@@ -933,7 +939,7 @@ fun InternalFilesScreen(
     }
 
     // DataPad Popup
-    if (showDataPad) {
+    if (showDataPad && datapadEnabled) {
         DataPadPopup(onDismiss = { showDataPad = false })
     }
 

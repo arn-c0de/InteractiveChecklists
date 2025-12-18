@@ -335,6 +335,8 @@
 • Leave Bind IP empty to listen on all interfaces
 • Default port: 5010</string>
 
+    <string name="datapad_settings_description">Enable or disable DataPad. When disabled the app will not listen for UDP telemetry and DataPad UI controls will be hidden.</string>
+
     <!-- ECDH / Device settings -->
     <string name="datapad_ecdh_title">ECDH Handshake Mode</string>
     <string name="datapad_ecdh_description_secure">Secure session-based encryption (Recommended)</string>

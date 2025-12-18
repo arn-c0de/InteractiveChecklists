@@ -92,6 +92,10 @@ class DataPadManager(private val context: Context) {
     // Whether the UDP receiver is enabled (persisted)
     private val _isEnabled = MutableStateFlow(prefs.getBoolean(KEY_ENABLED, false))
     val isEnabled: StateFlow<Boolean> = _isEnabled.asStateFlow()
+
+    // Runtime running state (separate from persisted enabled setting)
+    private val _isRunning = MutableStateFlow(false)
+    val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
     
     private val _lastUpdateTime = MutableStateFlow<Long?>(null)
     val lastUpdateTime: StateFlow<Long?> = _lastUpdateTime.asStateFlow()
@@ -122,6 +126,7 @@ class DataPadManager(private val context: Context) {
     
     private var udpSocket: DatagramSocket? = null
     private var receiveJob: Job? = null
+    private var handshakeJob: Job? = null
     private var isStarted = false
     
     // ECDH components
@@ -167,21 +172,26 @@ class DataPadManager(private val context: Context) {
     /**
      * Start listening for UDP packets on the configured port
      */
-    fun start() {
+    /**
+     * Internal start helper. If ignoreEnabledCheck==true this will start the receiver
+     * regardless of the persisted "enabled" preference (used for a transient connect).
+     */
+    private fun startInternal(ignoreEnabledCheck: Boolean = false) {
         if (isStarted) return
-        if (!_isEnabled.value) {
+        if (!ignoreEnabledCheck && !_isEnabled.value) {
             // Receiver is disabled by user - do not start
             udpLogD("Start requested but receiver is disabled")
             return
         }
         isStarted = true
-        
+        _isRunning.value = true
+
         receiveJob = scope.launch {
             try {
                 // Initialize socket FIRST (needed for handshake)
                 val port = _udpPort.value
                 val bindAddress = _bindIp.value
-                
+
                 udpSocket = if (bindAddress.isNotEmpty()) {
                     DatagramSocket(port, java.net.InetAddress.getByName(bindAddress))
                 } else {
@@ -192,7 +202,7 @@ class DataPadManager(private val context: Context) {
                     broadcast = true
                 }
                 udpLogD("UDP socket opened on ${if (bindAddress.isNotEmpty()) bindAddress else "0.0.0.0"}:$port")
-                
+
                 // Initialize encryption provider based on mode
                 encryptionProvider = if (_useEcdh.value) {
                     null // Will be set after handshake
@@ -204,22 +214,37 @@ class DataPadManager(private val context: Context) {
                 val deviceIp = getLocalIpAddress()
                 _deviceIpAddress.value = deviceIp
                 udpLogD("Device IP address: $deviceIp")
-                
+
                 // Log network info
                 val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
                 val activeNetwork = cm.activeNetworkInfo
                 udpLogD("Active network: ${activeNetwork?.typeName}, connected: ${activeNetwork?.isConnected}")
-                
+
                 udpLogD("Socket local address: ${udpSocket?.localAddress?.hostAddress}")
                 udpLogD("Socket local port: ${udpSocket?.localPort}")
                 udpLogD("Waiting for UDP packets on ${if (_bindIp.value.isNotEmpty()) _bindIp.value else deviceIp}:${_udpPort.value}...")
 
                 // If ECDH mode, perform handshake in background (concurrently with receive loop)
                 if (_useEcdh.value) {
-                    scope.launch {
+                    // Launch handshake and keep a reference so it can be cancelled if user disables receiver
+                    handshakeJob = scope.launch {
                         try {
+                            // Abort early if receiver was disabled while scheduling
+                            if (!_isEnabled.value && !ignoreEnabledCheck) {
+                                udpLogD("Handshake aborted: receiver disabled")
+                                return@launch
+                            }
+
                             _handshakeStatus.value = "Initiating handshake..."
                             val success = performHandshake()
+
+                            if (!_isEnabled.value && !ignoreEnabledCheck) {
+                                // If user disabled receiver during handshake, ensure we stop and clear state
+                                udpLogD("Handshake aborted after running: receiver disabled")
+                                stop()
+                                return@launch
+                            }
+
                             if (!success) {
                                 _handshakeStatus.value = "Handshake failed"
                                 udpLogE("Handshake failed, stopping")
@@ -231,13 +256,16 @@ class DataPadManager(private val context: Context) {
                             _handshakeStatus.value = "Handshake error: ${e.message}"
                             udpLogE("Handshake error: ${e.message}", e)
                             stop()
+                        } finally {
+                            // Clear reference when done
+                            handshakeJob = null
                         }
                     }
                 }
 
                 val buffer = ByteArray(BUFFER_SIZE)
                 val packet = DatagramPacket(buffer, buffer.size)
-                
+
                 while (isActive) {
                     try {
                         udpSocket?.receive(packet)
@@ -310,7 +338,7 @@ class DataPadManager(private val context: Context) {
                             // SECURITY: Decryption failed - REJECT packet (no plaintext fallback!)
                             udpLogE("❌ Failed to decrypt packet - rejecting (encryption enforced)")
                         }
-                        
+
                     } catch (e: SocketTimeoutException) {
                         // Timeout is normal, check connection status
                         val lastUpdate = _lastUpdateTime.value
@@ -340,10 +368,31 @@ class DataPadManager(private val context: Context) {
         isStarted = false
         receiveJob?.cancel()
         receiveJob = null
+        // Cancel any in-progress handshake job as well
+        handshakeJob?.cancel()
+        handshakeJob = null
         udpSocket?.close()
         udpSocket = null
         _isConnected.value = false
+        _handshakeStatus.value = null
+        _isRunning.value = false
         udpLogD("UDP socket closed")
+    }
+
+    /**
+     * Connect (start) the receiver transiently without changing persisted settings.
+     * This is used by the in-popup power button to start/stop the reception session
+     * while leaving the Settings 'enabled' preference untouched.
+     */
+    fun connect() {
+        startInternal(ignoreEnabledCheck = true)
+    }
+
+    /**
+     * Disconnect (stop) the receiver transiently without changing persisted settings.
+     */
+    fun disconnect() {
+        stop()
     }
 
     /**
@@ -439,6 +488,13 @@ class DataPadManager(private val context: Context) {
     private fun restart() {
         stop()
         start()
+    }
+
+    /**
+     * Public start wrapper to honor persisted enabled pref by default
+     */
+    fun start() {
+        startInternal(ignoreEnabledCheck = false)
     }
     
     // ========== ECDH Handshake Methods ==========

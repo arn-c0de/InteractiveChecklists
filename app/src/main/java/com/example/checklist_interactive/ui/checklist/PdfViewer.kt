@@ -191,6 +191,8 @@ fun PdfViewer(
     val outlineExtractor = remember { PdfOutlineExtractor(context) }
     var showQuickAccess by remember { mutableStateOf(false) }
     var showDataPad by remember { mutableStateOf(false) }
+    val datapadManager = LocalDataPadManager.current
+    val datapadEnabled by datapadManager.isEnabled.collectAsState()
     val prefsManager = remember { PreferencesManager(context) }
     var showToolbar by remember { mutableStateOf(prefsManager.isPdfToolbarVisible()) }
 
@@ -1544,6 +1546,8 @@ fun PdfViewer(
                     }
 
                     // DataPad FAB (left of Quick Access)
+                    val datapadManager = LocalDataPadManager.current
+                    val datapadEnabled by datapadManager.isEnabled.collectAsState()
                     DraggableFab(
                         name = "datapad",
                         prefsManager = prefsManager,
@@ -1553,8 +1557,9 @@ fun PdfViewer(
                         // Place slightly left of quick_access and aligned vertically
                         defaultX = 0.92f,
                         defaultY = 0.9f,
-                        visible = true,
-                        onClick = { showDataPad = true },
+                        visible = datapadEnabled,
+                        onClick = { if (datapadEnabled) showDataPad = true },
+
                         content = { Icon(Icons.Default.Flight, contentDescription = stringResource(R.string.datapad_title)) }
                     )
 
@@ -1753,7 +1758,7 @@ fun PdfViewer(
     }
 
     // DataPad Popup
-    if (showDataPad) {
+    if (showDataPad && datapadEnabled) {
         DataPadPopup(onDismiss = { showDataPad = false })
     }
 
