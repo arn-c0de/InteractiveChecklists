@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg
+   xmlns="http://www.w3.org/2000/svg"
+   id="NATO_Symbol"
+   height="600"
+   width="600">
+  <path
+     id="Solid_Fill"
+     d="m152.5,152.5 a147.5,147.5 0 1 1 295,0 a147.5,147.5 0 1 1 0,295 a147.5,147.5 0 1 1 -295,0 a147.5,147.5 0 1 1 0,-295z"
+     style="fill:#ffff80;stroke:none" />
+  <g
+     id="ICON"
+	 transform="translate(0 100)">
+  <path
+     id="UAV"
+     d="m 300,180 -177,-77 v -9 l 177,34 177,-34 v 9 z"
+     style="fill:#000000;stroke:#000000;stroke-width:1" />
+  </g>
+  <path
+     id="Frame"
+     d="m152.5,152.5 a147.5,147.5 0 1 1 295,0 a147.5,147.5 0 1 1 0,295 a147.5,147.5 0 1 1 -295,0 a147.5,147.5 0 1 1 0,-295z"
+     style="fill:none;stroke:#000000;stroke-width:10;stroke-linejoin:miter;stroke-miterlimit:4" />
+</svg>

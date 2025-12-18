@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   version="1.1"
+   width="600"
+   height="400"
+   id="NATO Map Symbol">
+    <g
+     style="stroke-width:10;stroke-miterlimit:4;stroke-dasharray:none"
+     id="RADAR"
+     transform="rotate(-40,320.49556,188.99203)">
+  <path
+       style="fill:none;stroke:#010101;stroke-width:10;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       id="path3787-1-8"
+       d="m 351.16871,306.24181 -55.65084,-0.91778 c -15.61325,-0.25749 -31.22457,-3.10544 -45.65085,-9.08222 -14.42628,-5.97677 -27.65826,-14.82017 -38.69839,-25.86349 -11.04013,-11.04331 -19.87971,-24.27786 -25.85231,-38.70586 -5.97261,-14.42801 -9.07354,-30.03812 -9.06902,-45.65348 -0.005,-15.61536 3.09641,-31.22547 9.06902,-45.65348 5.9726,-14.428 14.81218,-27.66255 25.85231,-38.70586 11.04013,-11.043323 24.27211,-19.88672 38.69839,-25.863494 14.42628,-5.976775 30.03549,-9.088014 45.65085,-9.08222 l 37.65084,0.01397" />
+  <path
+       style="fill:none;stroke:#000000;stroke-width:10;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       id="path3759"
+       d="M 177.31875,170.40588 H 328.9089 l -42.41743,43.80816 H 423.4789" />
+  </g>
+  <path
+     id="Friendly Frame"
+     d="M 5,5 H 595 V 395 H 5 Z"
+     style="fill:none;stroke:#0000ff;stroke-width:10;stroke-linecap:round;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
+</svg>

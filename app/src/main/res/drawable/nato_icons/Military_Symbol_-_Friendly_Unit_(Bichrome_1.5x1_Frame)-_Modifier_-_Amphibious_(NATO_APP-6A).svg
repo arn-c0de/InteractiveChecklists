@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   version="1.1"
+   width="600"
+   height="400"
+   id="NATO Map Symbol">
+  <path
+     d="m 4.7397284,231.0427 c 35.9343216,0 37.8712156,-62.0854 73.8055346,-62.0854 35.934317,0 37.880207,61.44969 73.805507,62.0854 v 0 c 35.93432,0 37.87119,-62.0854 73.80552,-62.0854 35.93431,0 37.87119,62.0854 73.80551,62.0854 35.93431,0 37.8712,-62.0854 73.80551,-62.0854 35.93432,0 37.8712,62.0854 73.8055,62.0854 35.93433,0 37.87123,-62.0854 73.80555,-62.0854 35.93431,0 37.88019,61.44969 73.8055,62.0854"
+     style="fill:none;stroke:#000000;stroke-width:10;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+     id="Wave" />
+  <path
+     id="Friendly Frame"
+     d="M 5,5 H 595 V 395 H 5 Z"
+     style="fill:none;stroke:#0000ff;stroke-width:10;stroke-linecap:round;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
+</svg>
