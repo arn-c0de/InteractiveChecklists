@@ -20,6 +20,10 @@
         #map-controls #map-menu.hidden { display: none; }
         #map-controls #map-menu button { display: block; width: 160px; padding: 8px 12px; border: none; background: transparent; text-align: left; cursor: pointer; }
         #map-controls #map-menu button:hover { background: rgba(0,0,0,0.06); }
+        #map-controls #map-menu .menu-divider { border-top: 1px solid rgba(0,0,0,0.1); margin: 4px 0; }
+        #map-controls #map-menu label { display: block; width: 160px; padding: 8px 12px; cursor: pointer; user-select: none; }
+        #map-controls #map-menu label:hover { background: rgba(0,0,0,0.06); }
+        #map-controls #map-menu input[type="checkbox"] { margin-right: 8px; }
     </style>
 </head>
 <body>
@@ -88,6 +92,8 @@
                     '<button data-layer="dark">Dark</button>' +
                     '<button data-layer="topo">Topographic</button>' +
                     '<button data-layer="satellite">Satellite</button>' +
+                    '<div class="menu-divider"></div>' +
+                    '<label><input type="checkbox" id="mgrs-toggle"> MGRS Grid</label>' +
                     '</div>';
                 document.body.appendChild(controlsContainer);
 
@@ -111,11 +117,143 @@
                     });
                 });
 
+                // MGRS Grid overlay implementation
+                var MgrsGridOverlay = L.GridLayer.extend({
+                    createTile: function(coords) {
+                        var tile = document.createElement('canvas');
+                        var tileSize = this.getTileSize();
+                        tile.width = tileSize.x;
+                        tile.height = tileSize.y;
+                        
+                        var ctx = tile.getContext('2d');
+                        this.drawGrid(ctx, coords, tileSize);
+                        
+                        return tile;
+                    },
+                    
+                    drawGrid: function(ctx, coords, tileSize) {
+                        var zoom = this._map.getZoom();
+                        
+                        // Calculate grid spacing based on zoom
+                        var gridSpacing;
+                        if (zoom >= 15) gridSpacing = 0.001; // ~100m
+                        else if (zoom >= 13) gridSpacing = 0.01; // ~1km
+                        else if (zoom >= 10) gridSpacing = 0.1; // ~10km
+                        else gridSpacing = 1.0; // ~100km
+                        
+                        var nwPoint = coords.scaleBy(tileSize);
+                        var sePoint = nwPoint.add(tileSize);
+                        
+                        var nw = this._map.unproject(nwPoint, coords.z);
+                        var se = this._map.unproject(sePoint, coords.z);
+                        
+                        // Red with transparency
+                        ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
+                        ctx.lineWidth = 2;
+                        ctx.font = '12px Arial';
+                        ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
+                        
+                        // Draw vertical lines (longitude)
+                        var lon = Math.floor(nw.lng / gridSpacing) * gridSpacing;
+                        while (lon <= se.lng) {
+                            var topPx = this._map.project(L.latLng(nw.lat, lon), coords.z);
+                            var bottomPx = this._map.project(L.latLng(se.lat, lon), coords.z);
+                            
+                            var x = topPx.x - nwPoint.x;
+                            var y1 = topPx.y - nwPoint.y;
+                            var y2 = bottomPx.y - nwPoint.y;
+                            
+                            if (x >= 0 && x <= tileSize.x) {
+                                ctx.beginPath();
+                                ctx.moveTo(x, Math.max(0, y1));
+                                ctx.lineTo(x, Math.min(tileSize.y, y2));
+                                ctx.stroke();
+                                
+                                // Label
+                                if (y1 < 20 && y1 > -20) {
+                                    var label = this.formatCoord(lon, true);
+                                    ctx.fillText(label, x + 2, 15);
+                                }
+                            }
+                            
+                            lon += gridSpacing;
+                        }
+                        
+                        // Draw horizontal lines (latitude)
+                        var lat = Math.floor(se.lat / gridSpacing) * gridSpacing;
+                        while (lat <= nw.lat) {
+                            var leftPx = this._map.project(L.latLng(lat, nw.lng), coords.z);
+                            var rightPx = this._map.project(L.latLng(lat, se.lng), coords.z);
+                            
+                            var y = leftPx.y - nwPoint.y;
+                            var x1 = leftPx.x - nwPoint.x;
+                            var x2 = rightPx.x - nwPoint.x;
+                            
+                            if (y >= 0 && y <= tileSize.y) {
+                                ctx.beginPath();
+                                ctx.moveTo(Math.max(0, x1), y);
+                                ctx.lineTo(Math.min(tileSize.x, x2), y);
+                                ctx.stroke();
+                                
+                                // Label
+                                if (x1 < 50 && x1 > -50) {
+                                    var label = this.formatCoord(lat, false);
+                                    ctx.fillText(label, 5, y - 2);
+                                }
+                            }
+                            
+                            lat += gridSpacing;
+                        }
+                    },
+                    
+                    formatCoord: function(value, isLon) {
+                        var deg = Math.floor(Math.abs(value));
+                        var min = Math.floor((Math.abs(value) - deg) * 60);
+                        var dir = isLon ? (value >= 0 ? 'E' : 'W') : (value >= 0 ? 'N' : 'S');
+                        return deg + '°' + (min < 10 ? '0' : '') + min + "'" + dir;
+                    }
+                });
+
+                // MGRS toggle handler
+                var mgrsToggle = document.getElementById('mgrs-toggle');
+                
+                // Load saved state from localStorage
+                var mgrsEnabled = localStorage.getItem('mgrs_grid_enabled') === 'true';
+                mgrsToggle.checked = mgrsEnabled;
+                
+                // Apply initial state
+                if (mgrsEnabled) {
+                    mgrsGridLayer = new MgrsGridOverlay({ opacity: 1.0 });
+                    mgrsGridLayer.addTo(map);
+                }
+                
+                mgrsToggle.addEventListener('change', function(e) {
+                    e.stopPropagation();
+                    var enabled = mgrsToggle.checked;
+                    
+                    // Save state
+                    localStorage.setItem('mgrs_grid_enabled', enabled.toString());
+                    
+                    if (enabled) {
+                        if (mgrsGridLayer) {
+                            map.removeLayer(mgrsGridLayer);
+                        }
+                        mgrsGridLayer = new MgrsGridOverlay({ opacity: 1.0 });
+                        mgrsGridLayer.addTo(map);
+                    } else {
+                        if (mgrsGridLayer) {
+                            map.removeLayer(mgrsGridLayer);
+                            mgrsGridLayer = null;
+                        }
+                    }
+                });
+
                 var aircraftMarker = null;
                 var markersLayer = L.layerGroup().addTo(map);
                 var locationMarkers = {};
                 var bordersLayer = L.layerGroup().addTo(map);
                 var borderPolygons = {};
+                var mgrsGridLayer = null;
                 
                 // Border drawing state
                 var isDrawingBorder = false;
