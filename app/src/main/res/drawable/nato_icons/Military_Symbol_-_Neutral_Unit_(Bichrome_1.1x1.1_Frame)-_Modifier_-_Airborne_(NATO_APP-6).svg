@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   version="1.1"
+   width="600"
+   height="440"
+   id="NATO Map Symbol">
+  <g
+     id="ICON"
+	 transform="translate(0 20)">
+  <path
+     id="ABN"
+     d="m 184.38444,356.7218 c 0,0 34.41086,-31.99987 68.95575,-30.86118 39.3232,1.29621 46.49508,40.79953 46.49508,40.79953 0,0 6.23863,-39.4259 46.49509,-40.79953 40.25646,-1.37362 68.95575,30.86118 68.95575,30.86118"
+     style="fill:none;stroke:#000000;stroke-width:10;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
+  </g>
+  <path
+     id="Neutral Frame"
+     style="opacity:1;fill:none;fill-opacity:1;stroke:#00af00;stroke-width:10;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+     d="M 85,5 H 515 V 435 H 85 Z" />
+</svg>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   version="1.1"
+   width="600"
+   height="600"
+   id="NATO Map Symbol">
+  <g
+     id="ICON"
+	 transform="translate(0 100)">
+  <path
+     id="Wave" 
+     d="m 35.010357,168.71301 c 32.250066,0 33.988374,62.57398 66.238443,62.57398 32.25006,0 33.99644,-61.93328 66.23841,-62.57398 v 0 c 32.25007,0 33.98836,62.57398 66.23843,62.57398 32.25006,0 33.98834,-62.57398 66.23841,-62.57398 32.25006,0 33.98838,62.57398 66.23843,62.57398 32.25006,0 33.98835,-62.57398 66.2384,-62.57398 32.25008,0 33.9884,62.57398 66.23845,62.57398 32.25006,0 33.99644,-61.93328 66.23842,-62.57398"
+     style="fill:none;stroke:#000000;stroke-width:10;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"/>
+  </g>
+  <path
+     id="Hostile Frame"
+     style="fill:none;stroke:#ff0000;stroke-width:10;stroke-linecap:round;stroke-linejoin:miter;stroke-miterlimit:1.5;stroke-dasharray:none;stroke-opacity:1"
+     d="M 7,300 300,7 593,300 300,593 Z" />
+</svg>

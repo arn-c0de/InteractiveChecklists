@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns="http://www.w3.org/2000/svg"
+   id="NATO Map Symbol"
+   height="135"
+   width="600"
+   viewBox="0 -135 600 135">
+  <circle
+     r="32"
+     cy="-60"
+     cx="300"
+     id="Detachment"
+     style="fill:#000000;stroke:none" />
+</svg>

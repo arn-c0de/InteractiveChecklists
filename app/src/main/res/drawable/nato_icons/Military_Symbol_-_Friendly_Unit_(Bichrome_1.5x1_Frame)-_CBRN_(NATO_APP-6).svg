@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   version="1.1"
+   width="600"
+   height="400"
+   id="NATO Map Symbol">
+    <g
+     id="g3848"
+     transform="translate(4.4688976,13.980981)">
+  <path
+       style="fill:none;stroke:#000000;stroke-width:17.39164543;stroke-linecap:round;stroke-linejoin:round"
+       id="path2001"
+       d="m 232.18607,156.61705 c 10.26147,-11.82621 0.18615,-33.31792 -22.4775,-47.96925 -22.66947,-14.657115 -49.39931,-16.956496 -59.66078,-5.1245 -10.25565,11.82621 -0.18615,33.31792 22.48332,47.96925 22.66365,14.65134 49.39349,16.95072 59.65496,5.1245 z M 191.11693,99.768025 C 277.35631,134.23564 365.7015,277.3288 365.7015,277.3288" />
+  <path
+       style="fill:none;stroke:#000000;stroke-width:17.39164543;stroke-linecap:round;stroke-linejoin:round;stroke-opacity:1"
+       id="path2003"
+       d="m 358.87215,155.39226 c -10.26146,-11.82622 -0.18615,-33.31792 22.4775,-47.97504 22.66947,-14.651331 49.39932,-16.944935 59.66078,-5.1245 10.26147,11.82622 0.19779,33.31792 -22.48331,47.97504 -22.66947,14.65711 -49.3935,16.95649 -59.65497,5.1245 z M 399.93548,98.543229 C 313.6961,133.01662 225.36254,276.09822 225.36254,276.09822" />
+  <path
+       style="fill:#000000;fill-opacity:1;stroke:none"
+       id="path3828"
+       transform="rotate(27.294547,208.53741,122.46767)"
+       d="m 238.24175,137.36484 a 41.544636,27.95895 0 1 1 -83.08927,0 41.544636,27.95895 0 1 1 83.08927,0 z" />
+  <path
+       style="fill:#000000;fill-opacity:1;stroke:none"
+       id="path3828-1"
+       transform="matrix(-0.88866088,0.45856499,0.45856499,0.88866088,512.28874,-81.204934)"
+       d="m 238.24175,137.36484 a 41.544636,27.95895 0 1 1 -83.08927,0 41.544636,27.95895 0 1 1 83.08927,0 z" />
+  </g>
+  <path
+     id="Friendly Frame"
+     d="M 5,5 H 595 V 395 H 5 Z"
+     style="fill:none;stroke:#0000ff;stroke-width:10;stroke-linecap:round;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
+</svg>
