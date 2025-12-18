@@ -27,6 +27,7 @@ import com.example.checklist_interactive.ui.checklist.MarkdownViewer
 import com.example.checklist_interactive.ui.checklist.PdfViewer
 import com.example.checklist_interactive.ui.quickaccess.QuickAccessSheet
 import com.example.checklist_interactive.ui.datapad.DataPadPopup
+import com.example.checklist_interactive.ui.datapad.LocalDataPadManager
 import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
 
 import androidx.compose.material.icons.filled.Refresh
@@ -175,6 +176,8 @@ fun InternalFileViewer(
             var expandAllSections by remember { mutableStateOf(prefsManager.areMarkdownSectionsExpandedByDefault()) }
             var showQuickAccess by remember { mutableStateOf(false) }
             var showDataPad by remember { mutableStateOf(false) }
+            val datapadManager = LocalDataPadManager.current
+            val datapadEnabled by datapadManager.isEnabled.collectAsState()
             var resetTrigger by remember { mutableStateOf(0) }
 
             Scaffold(
@@ -278,6 +281,8 @@ fun InternalFileViewer(
                     // DataPad FAB for internal markdown viewer
                     val datapadPos = prefsManager.getPdfViewerFabPosition("datapad", 0.75f, 0.9f)
                     android.util.Log.d("InternalFileViewer", "datapad saved pos: x=${datapadPos.first}, y=${datapadPos.second}")
+                    val datapadManager = LocalDataPadManager.current
+                    val datapadEnabled by datapadManager.isEnabled.collectAsState()
                     DraggableFab(
                         name = "datapad",
                         prefsManager = prefsManager,
@@ -286,16 +291,17 @@ fun InternalFileViewer(
                         fabSizePx = fabSizePx,
                         defaultX = 0.75f,
                         defaultY = 0.9f,
-                        visible = true,
+                        visible = datapadEnabled,
                         onClick = {
                             android.util.Log.d("InternalFileViewer", "DataPad FAB clicked")
-                            showDataPad = true
+                            if (datapadEnabled) showDataPad = true
                         },
+
                         content = { Icon(Icons.Default.Flight, contentDescription = stringResource(R.string.cd_datapad)) }
                     )
                 }
 
-                if (showDataPad) {
+                if (showDataPad && datapadEnabled) {
                     DataPadPopup(onDismiss = { showDataPad = false })
                 }
             }

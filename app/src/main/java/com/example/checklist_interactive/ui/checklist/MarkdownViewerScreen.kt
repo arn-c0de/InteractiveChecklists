@@ -119,6 +119,8 @@ fun MarkdownViewerScreen(
     var expandAllSections by remember { mutableStateOf(prefsManager.areMarkdownSectionsExpandedByDefault()) }
     var showQuickAccess by remember { mutableStateOf(false) }
     var showDataPad by remember { mutableStateOf(false) }
+    val datapadManager = LocalDataPadManager.current
+    val datapadEnabled by datapadManager.isEnabled.collectAsState()
     var resetTrigger by remember { mutableStateOf(0) }
 
     Scaffold(
@@ -242,6 +244,9 @@ fun MarkdownViewerScreen(
             // DataPad FAB - placed first to be rendered
             val datapadPos = prefsManager.getPdfViewerFabPosition("datapad", 0.75f, 0.9f)
             android.util.Log.d("MarkdownViewer", "datapad saved pos: x=${datapadPos.first}, y=${datapadPos.second}")
+            val datapadManager = LocalDataPadManager.current
+            val datapadEnabled by datapadManager.isEnabled.collectAsState()
+
             Box(modifier = Modifier.fillMaxSize()) {
                 DraggableFab(
                     name = "datapad",
@@ -251,11 +256,12 @@ fun MarkdownViewerScreen(
                     fabSizePx = fabSizePx,
                     defaultX = 0.75f,
                     defaultY = 0.9f,
-                    visible = true,
+                    visible = datapadEnabled,
                     onClick = { 
                         android.util.Log.d("MarkdownViewer", "DataPad FAB clicked!")
-                        showDataPad = true
+                        if (datapadEnabled) showDataPad = true
                     },
+
                     content = { Icon(Icons.Default.Flight, contentDescription = stringResource(R.string.cd_datapad)) }
                 )
             }
@@ -276,7 +282,7 @@ fun MarkdownViewerScreen(
     }
 
     // DataPad Popup
-    if (showDataPad) {
+    if (showDataPad && datapadEnabled) {
         DataPadPopup(onDismiss = { showDataPad = false })
     }
 

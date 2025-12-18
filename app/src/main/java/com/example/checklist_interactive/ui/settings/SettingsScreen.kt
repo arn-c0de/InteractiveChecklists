@@ -41,6 +41,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.text.font.FontFamily
 import com.example.checklist_interactive.data.tags.FileTag
 import com.example.checklist_interactive.data.prefs.ContributorEntry
+import com.example.checklist_interactive.ui.datapad.LocalDataPadManager
 
 // The list of available aircraft folders is loaded from the assets/Checklists directory
 
@@ -792,6 +793,38 @@ fun SettingsScreen(
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            // === DataPad Enable/Disable ===
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = stringResource(R.string.datapad_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+
+            item {
+                val dataPadManager = LocalDataPadManager.current
+                val dpEnabled by dataPadManager.isEnabled.collectAsState()
+
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(text = stringResource(R.string.datapad_title), style = MaterialTheme.typography.titleMedium)
+                            Text(text = stringResource(R.string.datapad_settings_description), style = MaterialTheme.typography.bodySmall)
+                        }
+                        Switch(checked = dpEnabled, onCheckedChange = { dataPadManager.setEnabled(it) })
                     }
                 }
             }

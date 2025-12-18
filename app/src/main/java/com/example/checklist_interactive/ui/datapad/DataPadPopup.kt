@@ -340,14 +340,15 @@ fun DataPadPopup(
                     }
                 }
 
-                // Connection Status
+                // Connection Status (popup controls runtime connect/disconnect only)
+                val isRunning by manager.isRunning.collectAsState()
                 ConnectionStatusCard(
                     isConnected = isConnected,
                     timeSinceUpdate = timeSinceUpdate,
                     deviceIpAddress = deviceIpAddress,
                     udpPort = udpPort,
-                    isEnabled = isEnabled,
-                    onToggleEnabled = { manager.toggleEnabled() }
+                    isRunning = isRunning,
+                    onToggleEnabled = { if (isRunning) manager.disconnect() else manager.connect() }
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -379,7 +380,7 @@ private fun ConnectionStatusCard(
     timeSinceUpdate: String,
     deviceIpAddress: String,
     udpPort: Int,
-    isEnabled: Boolean,
+    isRunning: Boolean,
     onToggleEnabled: () -> Unit
 ) {
     Card(
@@ -402,10 +403,10 @@ private fun ConnectionStatusCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Enabled indicator
+                    // Running indicator (transient, controlled by popup)
                     Text(
-                        text = stringResource(if (isEnabled) R.string.datapad_reception_on else R.string.datapad_reception_off),
-                        color = if (isEnabled) Color(0xFFB9F6CA) else Color(0xFFB0BEC5),
+                        text = stringResource(if (isRunning) R.string.datapad_reception_on else R.string.datapad_reception_off),
+                        color = if (isRunning) Color(0xFFB9F6CA) else Color(0xFFB0BEC5),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -433,8 +434,8 @@ private fun ConnectionStatusCard(
                     ) {
                         Icon(
                             imageVector = Icons.Default.PowerSettingsNew,
-                            contentDescription = stringResource(if (isEnabled) R.string.datapad_toggle_reception_on else R.string.datapad_toggle_reception_off),
-                            tint = if (isEnabled) Color.White else Color.Gray
+                            contentDescription = stringResource(if (isRunning) R.string.datapad_toggle_reception_on else R.string.datapad_toggle_reception_off),
+                            tint = if (isRunning) Color.White else Color.Gray
                         )
                     }
 

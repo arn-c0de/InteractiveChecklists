@@ -65,27 +65,28 @@ fun FlightMiniStatusBar(noteManager: QuickNoteManager, onClick: (() -> Unit)? = 
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // DataPad connection status indicator: green = connected, yellow = enabled but not connected, red = disabled
+        // DataPad connection status indicator: only visible when DataPad is enabled
         val dataPadManager = LocalDataPadManager.current
         val dpConnected by dataPadManager.isConnected.collectAsState()
         val dpEnabled by dataPadManager.isEnabled.collectAsState()
-        val indicatorColor = when {
-            dpConnected -> Color(0xFF4CAF50) // green
-            dpEnabled -> Color(0xFFFFC107) // amber/yellow
-            else -> Color(0xFFF44336) // red
-        }
 
-        Box(
-            modifier = Modifier
-                .size(10.dp)
-                .clip(CircleShape)
-                .background(indicatorColor)
-                .semantics { contentDescription = when {
-                    dpConnected -> "DataPad verbunden"
-                    dpEnabled -> "DataPad aktiviert, aber nicht verbunden"
-                    else -> "DataPad deaktiviert"
-                } }
-        )
+        if (dpEnabled) {
+            val indicatorColor = when {
+                dpConnected -> Color(0xFF4CAF50) // green
+                else -> Color(0xFFFFC107) // amber/yellow (enabled but not connected)
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(indicatorColor)
+                    .semantics { contentDescription = when {
+                        dpConnected -> "DataPad verbunden"
+                        else -> "DataPad aktiviert, aber nicht verbunden"
+                    } }
+            )
+        }
 
         Spacer(modifier = Modifier.width(6.dp))
 
