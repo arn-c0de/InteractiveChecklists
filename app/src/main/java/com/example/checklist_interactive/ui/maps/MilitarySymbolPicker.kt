@@ -42,7 +42,11 @@ enum class SymbolCategory(val displayName: String) {
     EQUIPMENT("Equipment"),
     INSTALLATIONS("Installations"),
     ACTIVITIES("Activities"),
-    UNIT_SIZE("Unit Size")
+    UNIT_SIZE("Unit Size"),
+    AIRCRAFT("Aircraft"),
+    HELICOPTER("Helicopter"),
+    SHIP("Ship"),
+    VEHICLE("Vehicle")
 }
 
 /**
@@ -239,21 +243,28 @@ private fun getSymbolsForCategory(ctx: Context, category: SymbolCategory): List<
             val entity = name.removePrefix("ic_mapicon_")
             val resId = ctx.resources.getIdentifier(name, "drawable", ctx.packageName)
             if (resId != 0) {
-                val display = entity.replace('_', ' ').split(' ').joinToString(" ") { it.replaceFirstChar { ch -> ch.uppercase() } }
+                // Extract category from prefix if present (e.g., equipment_mortar -> mortar)
+                val categoryPrefixes = listOf("equipment_", "groundunit_", "installations_", "activities_", "unitsize_", "aircraft_", "helicopter_", "ship_", "vehicle_")
+                val displayName = categoryPrefixes.fold(entity) { acc, prefix -> acc.removePrefix(prefix) }
+                val display = displayName.replace('_', ' ').split(' ').joinToString(" ") { it.replaceFirstChar { ch -> ch.uppercase() } }
                 drawables.add(Triple(entity, display, resId))
             }
         }
     }
 
-    // Simple categorization heuristics (no hard-coded icon lists)
+    // Automatic categorization by prefix
     fun classify(entity: String): SymbolCategory {
         return when {
-            entity.startsWith("size_") -> SymbolCategory.UNIT_SIZE
-            listOf("infantry", "armor", "tank", "mechanized", "recon").any { entity.contains(it) } -> SymbolCategory.GROUND_UNITS
-            listOf("mortar", "missile", "sam", "aaa", "radar", "tank").any { entity.contains(it) } -> SymbolCategory.EQUIPMENT
-            listOf("bridge", "hq", "supply", "airfield", "port").any { entity.contains(it) } -> SymbolCategory.INSTALLATIONS
-            listOf("mp", "medical", "engineer", "signal").any { entity.contains(it) } -> SymbolCategory.ACTIVITIES
-            else -> SymbolCategory.EQUIPMENT
+            entity.startsWith("equipment_") -> SymbolCategory.EQUIPMENT
+            entity.startsWith("groundunit_") -> SymbolCategory.GROUND_UNITS
+            entity.startsWith("installations_") -> SymbolCategory.INSTALLATIONS
+            entity.startsWith("activities_") -> SymbolCategory.ACTIVITIES
+            entity.startsWith("unitsize_") -> SymbolCategory.UNIT_SIZE
+            entity.startsWith("aircraft_") -> SymbolCategory.AIRCRAFT
+            entity.startsWith("helicopter_") -> SymbolCategory.HELICOPTER
+            entity.startsWith("ship_") -> SymbolCategory.SHIP
+            entity.startsWith("vehicle_") -> SymbolCategory.VEHICLE
+            else -> SymbolCategory.EQUIPMENT // default fallback
         }
     }
 

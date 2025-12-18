@@ -183,16 +183,62 @@ class LocationEditDialog(QDialog):
         self.setLayout(layout)
     
     def update_icon_list(self):
-        """Update icon combo - ONLY Android drawable symbols!"""
+        """Update icon combo - ONLY Android drawable symbols with category grouping!"""
         self.icon_combo.clear()
         
         # Get available Android symbols
         available = get_available_symbols()
         
-        # Add symbols to combo
-        self.icon_combo.addItem("(None)", "")
+        # Organize by category prefix
+        categories = {
+            'equipment_': [],
+            'groundunit_': [],
+            'installations_': [],
+            'activities_': [],
+            'unitsize_': [],
+            'aircraft_': [],
+            'helicopter_': [],
+            'ship_': [],
+            'vehicle_': [],
+            'other': []
+        }
+        
         for symbol_entity, display_name in available.items():
-            self.icon_combo.addItem(f"{symbol_entity} - {display_name}", symbol_entity)
+            categorized = False
+            for prefix in ['equipment_', 'groundunit_', 'installations_', 'activities_', 'unitsize_', 'aircraft_', 'helicopter_', 'ship_', 'vehicle_']:
+                if symbol_entity.startswith(prefix):
+                    categories[prefix].append((symbol_entity, display_name))
+                    categorized = True
+                    break
+            if not categorized:
+                categories['other'].append((symbol_entity, display_name))
+        
+        # Add to combo with category headers
+        self.icon_combo.addItem("(None)", "")
+        
+        category_labels = {
+            'equipment_': '━━━ EQUIPMENT ━━━',
+            'groundunit_': '━━━ GROUND UNITS ━━━',
+            'installations_': '━━━ INSTALLATIONS ━━━',
+            'activities_': '━━━ ACTIVITIES ━━━',
+            'unitsize_': '━━━ UNIT SIZE ━━━',
+            'aircraft_': '━━━ AIRCRAFT ━━━',
+            'helicopter_': '━━━ HELICOPTER ━━━',
+            'ship_': '━━━ SHIP ━━━',
+            'vehicle_': '━━━ VEHICLE ━━━',
+            'other': '━━━ OTHER ━━━'
+        }
+        
+        for prefix in ['equipment_', 'groundunit_', 'installations_', 'activities_', 'unitsize_', 'aircraft_', 'helicopter_', 'ship_', 'vehicle_', 'other']:
+            items = categories[prefix]
+            if items:
+                # Add category header (non-selectable)
+                self.icon_combo.addItem(category_labels[prefix], None)
+                self.icon_combo.model().item(self.icon_combo.count() - 1).setEnabled(False)
+                
+                # Add items in this category
+                for symbol_entity, display_name in sorted(items, key=lambda x: x[1]):
+                    self.icon_combo.addItem(f"  {display_name}", symbol_entity)
         
         # Set current value if exists
         if hasattr(self.location, 'symbol_entity') and self.location.symbol_entity:
@@ -250,15 +296,65 @@ class LocationEditDialog(QDialog):
         return group
     
     def create_tactical_section(self) -> QGroupBox:
-        """Create tactical symbol section - ONLY Android drawable symbols!"""
+        """Create tactical symbol section - ONLY Android drawable symbols with categories!"""
         group = QGroupBox("Military Symbol (Android Drawables Only)")
         layout = QFormLayout()
         
-        # Symbol Entity (ONLY Android drawables!)
+        # Symbol Entity (ONLY Android drawables!) - organized by category
         self.symbol_entity_combo = QComboBox()
+        
+        # Organize symbols by category prefix
+        available = get_available_symbols()
+        categories = {
+            'equipment_': [],
+            'groundunit_': [],
+            'installations_': [],
+            'activities_': [],
+            'unitsize_': [],
+            'aircraft_': [],
+            'helicopter_': [],
+            'ship_': [],
+            'vehicle_': [],
+            'other': []
+        }
+        
+        for symbol_entity, display_name in available.items():
+            categorized = False
+            for prefix in ['equipment_', 'groundunit_', 'installations_', 'activities_', 'unitsize_', 'aircraft_', 'helicopter_', 'ship_', 'vehicle_']:
+                if symbol_entity.startswith(prefix):
+                    categories[prefix].append((symbol_entity, display_name))
+                    categorized = True
+                    break
+            if not categorized:
+                categories['other'].append((symbol_entity, display_name))
+        
+        # Add to combo with category headers
         self.symbol_entity_combo.addItem("(None)", "")
-        for symbol_entity, display_name in get_available_symbols().items():
-            self.symbol_entity_combo.addItem(f"{display_name}", symbol_entity)
+        
+        category_labels = {
+            'equipment_': '━━━ EQUIPMENT ━━━',
+            'groundunit_': '━━━ GROUND UNITS ━━━',
+            'installations_': '━━━ INSTALLATIONS ━━━',
+            'activities_': '━━━ ACTIVITIES ━━━',
+            'unitsize_': '━━━ UNIT SIZE ━━━',
+            'aircraft_': '━━━ AIRCRAFT ━━━',
+            'helicopter_': '━━━ HELICOPTER ━━━',
+            'ship_': '━━━ SHIP ━━━',
+            'vehicle_': '━━━ VEHICLE ━━━',
+            'other': '━━━ OTHER ━━━'
+        }
+        
+        for prefix in ['equipment_', 'groundunit_', 'installations_', 'activities_', 'unitsize_', 'aircraft_', 'helicopter_', 'ship_', 'vehicle_', 'other']:
+            items = categories[prefix]
+            if items:
+                # Add category header (non-selectable)
+                self.symbol_entity_combo.addItem(category_labels[prefix], None)
+                self.symbol_entity_combo.model().item(self.symbol_entity_combo.count() - 1).setEnabled(False)
+                
+                # Add items in this category
+                for symbol_entity, display_name in sorted(items, key=lambda x: x[1]):
+                    self.symbol_entity_combo.addItem(f"  {display_name}", symbol_entity)
+        
         if hasattr(self.location, 'symbol_entity') and self.location.symbol_entity:
             idx = self.symbol_entity_combo.findData(self.location.symbol_entity)
             if idx >= 0:

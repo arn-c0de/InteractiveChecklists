@@ -3,11 +3,5 @@
     "name": "OpenStreetMap",
     "website": "https://www.openstreetmap.org",
     "license": "Open Database License (ODbL) 1.0 – © OpenStreetMap contributors"
-  },
-  {
-    "name": "NATO Joint Military Symbols",
-    "website": "https://commons.wikimedia.org/wiki/Category:APP-6_Military_Symbols",
-    "license": "Creative Commons Attribution-Share Alike 4.0 International (CC BY-SA 4.0)",
-    "author": "CdnMCG"
   }
 ]
