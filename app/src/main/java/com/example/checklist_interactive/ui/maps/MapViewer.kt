@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import android.util.Log
@@ -81,11 +83,21 @@ fun MapViewer(
     var rangeRingsEnabled by remember { mutableStateOf(prefsManager.isMapOverlayRangeRingsEnabled()) }
     var rangeRingsMaxNm by remember { mutableStateOf(prefsManager.getMapOverlayRangeRingsMaxNm()) }
     var compassOverlay by remember { mutableStateOf<org.osmdroid.views.overlay.Overlay?>(null) }
+    var headingSpeedLineOverlay by remember { mutableStateOf<org.osmdroid.views.overlay.Overlay?>(null) }
     var rangeRingsOverlay by remember { mutableStateOf<org.osmdroid.views.overlay.Overlay?>(null) }
     var showQuickAccess by remember { mutableStateOf(false) }
     var showDataPad by remember { mutableStateOf(false) }
     var showMarkerRouteManagement by remember { mutableStateOf(false) }
     var showRouteCreation by remember { mutableStateOf(false) }
+    
+    // Map rotation mode: 0 = North-up, 1 = HDG-up (follow aircraft heading)
+    var mapRotationMode by remember { mutableStateOf(0) }
+
+    // Active navigation target
+    var activeNavigationTarget by remember { mutableStateOf<com.example.checklist_interactive.data.tactical.LocationEntity?>(null) }
+    var navigationLine by remember { mutableStateOf<org.osmdroid.views.overlay.Polyline?>(null) }
+    var navigationDistanceNm by remember { mutableStateOf<Double?>(null) }
+    var navigationHeading by remember { mutableStateOf<Double?>(null) }
     
     // Store last valid player position to prevent reset during recompositions
     var lastValidPlayerPosition by remember { mutableStateOf<GeoPoint?>(null) }
@@ -98,6 +110,9 @@ fun MapViewer(
 
     // Create a coroutine scope for state updates from listeners
     val scope = rememberCoroutineScope()
+
+    // Density for dp<->px conversions needed by effects below
+    val density = androidx.compose.ui.platform.LocalDensity.current
     
     // Initialize tactical database and repositories
     // Initialize tactical database and repositories
@@ -166,6 +181,76 @@ fun MapViewer(
         return BitmapDrawable(ctx.resources, bitmap)
     }
 
+    // Update live navigation line when flight data or target changes
+    LaunchedEffect(flightData, activeNavigationTarget, mapRotationMode) {
+        val data = flightData
+        val target = activeNavigationTarget
+        val map = mapView
+        
+        // If rotation mode is HDG-up, update map orientation to latest heading (fix: add 180° to align correctly)
+        if (mapRotationMode == 1 && data != null && map != null) {
+            try { 
+                map.setMapOrientation(Math.toDegrees(data.heading).toFloat()) 
+                // Ensure the player is visually placed at the top-center so the heading line points to the top center
+                try {
+                    val playerPos = GeoPoint(data.latitude, data.longitude)
+                    // Center on player then offset upward so player sits at top-center with some padding
+                    map.controller.animateTo(playerPos)
+                    // Use a small delay to allow controller to apply before scrolling (non-blocking)
+                    kotlinx.coroutines.delay(30L)
+                    val desiredTopDp = 72.dp
+                    val desiredTopPx = with(density) { desiredTopDp.toPx() }
+                    val offsetPx = ((map.height / 2f) - desiredTopPx).toInt()
+                    // Scroll map so player moves from center to the desired top offset
+                    map.scrollBy(0, -offsetPx)
+                } catch (_: Throwable) {}
+            } catch (_: Throwable) {}
+        }
+
+        if (data != null && target != null && map != null && data.latitude != 0.0 && data.longitude != 0.0) {
+            val playerPos = GeoPoint(data.latitude, data.longitude)
+            val targetPos = GeoPoint(target.latitude, target.longitude)
+            
+            // Calculate distance and heading
+            val distanceMeters = playerPos.distanceToAsDouble(targetPos)
+            val distanceNm = distanceMeters / 1852.0
+            navigationDistanceNm = distanceNm
+            
+            // Calculate bearing/heading
+            val lat1 = Math.toRadians(playerPos.latitude)
+            val lat2 = Math.toRadians(targetPos.latitude)
+            val lon1 = Math.toRadians(playerPos.longitude)
+            val lon2 = Math.toRadians(targetPos.longitude)
+            val dLon = lon2 - lon1
+            val y = Math.sin(dLon) * Math.cos(lat2)
+            val x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon)
+            val bearing = (Math.toDegrees(Math.atan2(y, x)) + 360) % 360
+            navigationHeading = bearing
+            
+            // Update or create red navigation line
+            scope.launch {
+                val line = navigationLine ?: org.osmdroid.views.overlay.Polyline(map).apply {
+                    outlinePaint.color = android.graphics.Color.RED
+                    outlinePaint.strokeWidth = 10f
+                    outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                    map.overlays.add(this)
+                    navigationLine = this
+                }
+                line.setPoints(listOf(playerPos, targetPos))
+                map.invalidate()
+            }
+        } else if (target == null && navigationLine != null) {
+            // Remove navigation line if target cleared
+            scope.launch {
+                mapView?.overlays?.remove(navigationLine)
+                navigationLine = null
+                navigationDistanceNm = null
+                navigationHeading = null
+                mapView?.invalidate()
+            }
+        }
+    }
+    
     // Update position marker when flight data changes
     LaunchedEffect(flightData, autoCenter) {
         val data = flightData
@@ -233,7 +318,8 @@ fun MapViewer(
 
                 // Update marker snippet with altitude and speed
                 val altFt = (data.altitude * 3.28084).toInt()
-                val speedKts = (data.groundSpeed ?: 0.0) * 1.9438
+                val speedSource = data.groundSpeed ?: data.trueAirspeed ?: data.indicatedAirspeed ?: 0.0
+                val speedKts = (speedSource * 1.9438)
                 val baseSnippet = context.getString(R.string.marker_snippet_fmt, altFt, speedKts.toInt(), Math.toDegrees(data.heading).toInt())
                 marker.snippet = if (data.unitName.isNotBlank()) {
                     baseSnippet + "\n\n" + context.getString(R.string.marker_pilot_fmt, data.unitName)
@@ -251,17 +337,25 @@ fun MapViewer(
                     Log.d(TAG, "Auto-center is disabled, not animating")
                 }
 
-                // Update overlays (compass heading + centers, range rings center)
+                // Update overlays (compass + heading line + range rings)
                 try {
-                    // compass overlay
+                    // compass overlay (fixed size, scales with zoom)
                     (compassOverlay as? CompassOverlay)?.let { co ->
                         co.center = GeoPoint(lat, lon)
                         co.heading = headingDeg
+                    }
+                    // heading speed line overlay (length scales with speed)
+                    (headingSpeedLineOverlay as? HeadingSpeedLineOverlay)?.let { hsl ->
+                        hsl.center = GeoPoint(lat, lon)
+                        hsl.heading = headingDeg
+                        hsl.speedKts = speedKts
                     }
                     // range rings center
                     (rangeRingsOverlay as? RangeRingsOverlay)?.let { rr ->
                         rr.center = GeoPoint(lat, lon)
                         rr.heading = headingDeg
+                        // pass through speed for scaling the heading radial
+                        rr.speedKts = speedKts
                     }
                 } catch (e: Exception) {
                     // ignore
@@ -280,7 +374,6 @@ fun MapViewer(
     
     // Compute layout metrics so map and FABs are bounded correctly (exclude TabBar height)
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val density = androidx.compose.ui.platform.LocalDensity.current
     val screenWidthPx = with(density) { configuration.screenWidthDp.dp.roundToPx() }
     val screenHeightPx = with(density) { configuration.screenHeightDp.dp.roundToPx() }
     val tabBarHeightPx = with(density) { 40.dp.roundToPx() } // matches TabBar height
@@ -615,6 +708,24 @@ fun MapViewer(
                     contentDescription = if (isScreenLocked) stringResource(R.string.cd_unlock_screen) else stringResource(R.string.cd_lock_screen)
                 )
             }
+
+            // Map rotate button (North-up / HDG-up toggle)
+            FloatingActionButton(
+                onClick = {
+                    mapRotationMode = (mapRotationMode + 1) % 2
+                    if (mapRotationMode == 0) {
+                        try { mapView?.setMapOrientation(0f) } catch (_: Throwable) {}
+                    } else {
+                        flightData?.let { d -> try { mapView?.setMapOrientation(Math.toDegrees(d.heading).toFloat()) } catch (_: Throwable) {} }
+                    }
+                },
+                containerColor = if (mapRotationMode == 1) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+            ) {
+                Icon(
+                    imageVector = if (mapRotationMode == 1) Icons.Default.Flight else Icons.Default.Explore,
+                    contentDescription = "Toggle map rotation (North / HDG)"
+                )
+            }
         }
         
         // Connection status indicator (only show when DataPad enabled)
@@ -693,6 +804,66 @@ fun MapViewer(
             }
         }
 
+        // Active Navigation HUD (top-center) - shows target, heading, distance
+        if (activeNavigationTarget != null && navigationDistanceNm != null && navigationHeading != null) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 8.dp)
+                    .widthIn(max = 400.dp),
+                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.95f),
+                shape = MaterialTheme.shapes.medium
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Flight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "→ ${activeNavigationTarget!!.name}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(
+                                text = String.format("%.1f NM", navigationDistanceNm),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Text(
+                                text = String.format("%03.0f°", navigationHeading),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                    IconButton(
+                        onClick = { 
+                            activeNavigationTarget = null
+                            navigationLine = null
+                            navigationDistanceNm = null
+                            navigationHeading = null
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Clear route",
+                            tint = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+            }
+        }
+        
         // Flight data HUD (bottom-left) - shows Altitude, Speed, Pitch, Bank, Mach live from DataPad
         if (datapadEnabled && flightData != null) {
             val fd = flightData!!
@@ -812,11 +983,22 @@ fun MapViewer(
             // Apply persisted overlay preferences immediately (if not already present)
             mapView?.let { mv ->
                 if (compassEnabled && compassOverlay == null) {
+                    // Fixed-size compass ring
                     val co = CompassOverlay()
                     flightData?.let { d -> if (d.latitude != 0.0 && d.longitude != 0.0) co.center = GeoPoint(d.latitude, d.longitude) }
                     flightData?.let { d -> co.heading = Math.toDegrees(d.heading).toFloat() }
                     mv.overlays.add(co)
                     compassOverlay = co
+                    
+                    // Speed-based heading line
+                    if (headingSpeedLineOverlay == null) {
+                        val hsl = HeadingSpeedLineOverlay()
+                        flightData?.let { d -> if (d.latitude != 0.0 && d.longitude != 0.0) hsl.center = GeoPoint(d.latitude, d.longitude) }
+                        flightData?.let { d -> hsl.heading = Math.toDegrees(d.heading).toFloat() }
+                        flightData?.let { d -> hsl.speedKts = ((d.groundSpeed ?: d.trueAirspeed ?: d.indicatedAirspeed ?: 0.0) * 1.9438) }
+                        mv.overlays.add(hsl)
+                        headingSpeedLineOverlay = hsl
+                    }
                 }
                 if (rangeRingsEnabled && rangeRingsOverlay == null) {
                     val rr = RangeRingsOverlay()
@@ -868,15 +1050,26 @@ fun MapViewer(
                 prefsManager.setMapOverlayCompassEnabled(enabled)
                 // apply immediately
                 mapView?.let { mv ->
-                    // remove existing compass
+                    // remove existing compass and heading line
                     compassOverlay?.let { mv.overlays.remove(it) }
                     compassOverlay = null
+                    headingSpeedLineOverlay?.let { mv.overlays.remove(it) }
+                    headingSpeedLineOverlay = null
                     if (enabled) {
+                        // Fixed-size compass ring
                         val co = CompassOverlay()
                         flightData?.let { d -> if (d.latitude != 0.0 && d.longitude != 0.0) co.center = GeoPoint(d.latitude, d.longitude) }
                         flightData?.let { d -> co.heading = Math.toDegrees(d.heading).toFloat() }
                         mv.overlays.add(co)
                         compassOverlay = co
+                        
+                        // Speed-based heading line
+                        val hsl = HeadingSpeedLineOverlay()
+                        flightData?.let { d -> if (d.latitude != 0.0 && d.longitude != 0.0) hsl.center = GeoPoint(d.latitude, d.longitude) }
+                        flightData?.let { d -> hsl.heading = Math.toDegrees(d.heading).toFloat() }
+                        flightData?.let { d -> hsl.speedKts = ((d.groundSpeed ?: d.trueAirspeed ?: d.indicatedAirspeed ?: 0.0) * 1.9438) }
+                        mv.overlays.add(hsl)
+                        headingSpeedLineOverlay = hsl
                     }
                     mv.invalidate()
                 }
@@ -966,7 +1159,14 @@ fun MapViewer(
                 showRouteCreation = true
             },
             selectedMarker = selectedLocation,
-            selectedRunways = selectedRunways
+            selectedRunways = selectedRunways,
+            onSetActiveRoute = { location ->
+                activeNavigationTarget = location
+                // Auto-center disabled so user can see the full route
+                autoCenter = false
+                // Optionally close the sheet
+                showMarkerRouteManagement = false
+            }
         )
     }
     
@@ -987,6 +1187,11 @@ fun MapViewer(
     
     DisposableEffect(Unit) {
         onDispose {
+            // Clear navigation line
+            navigationLine?.let { line ->
+                mapView?.overlays?.remove(line)
+            }
+            navigationLine = null
             // Save current map center/zoom and tile preferences on dispose
             try {
                 mapView?.let { mv ->
@@ -999,6 +1204,7 @@ fun MapViewer(
                     prefsManager.setMapOverlayRangeRingsEnabled(rangeRingsEnabled)
                     prefsManager.setMapOverlayRangeRingsMaxNm(rangeRingsMaxNm)
                     try { compassOverlay?.let { mv.overlays.remove(it) } } catch (_: Exception) {}
+                    try { headingSpeedLineOverlay?.let { mv.overlays.remove(it) } } catch (_: Exception) {}
                     try { rangeRingsOverlay?.let { mv.overlays.remove(it) } } catch (_: Exception) {}
                     // tile source id is persisted when the user explicitly selects a layer via the dialog.
                 }
@@ -1144,7 +1350,7 @@ private fun OverlaySelectionDialog(
 }
 
 /**
- * Simple compass overlay drawn centered on given GeoPoint and displaying heading degrees
+ * Fixed-size compass overlay drawn centered on given GeoPoint (scales with zoom, not speed)
  */
 private class CompassOverlay : org.osmdroid.views.overlay.Overlay() {
     var center: GeoPoint? = null
@@ -1171,74 +1377,179 @@ private class CompassOverlay : org.osmdroid.views.overlay.Overlay() {
         val centerPt = Point()
         proj.toPixels(c, centerPt)
 
-        // Radius relative to view size (increased to make the compass much larger)
-        val length = (minOf(mv.width, mv.height) * 0.25f)
+        // Fixed radius based on zoom level (NOT speed)
+        val zoomLevel = mv.zoomLevelDouble
+        // Original base (40..240) scaled up ~2.2x (a bit smaller than before)
+        val baseRadius = ((40f + (zoomLevel.toFloat() - 8f) * 20f) * 2.2f).coerceIn(88f, 528f)
 
         // outer circle
         val circlePaint = Paint(paint).apply { style = Paint.Style.STROKE; strokeWidth = paint.strokeWidth }
-        canvas?.drawCircle(centerPt.x.toFloat(), centerPt.y.toFloat(), length, circlePaint)
+        canvas?.drawCircle(centerPt.x.toFloat(), centerPt.y.toFloat(), baseRadius, circlePaint)
 
-        // Cardinal radial lines and labels (N, O, S, W)
+        // Cardinal radial lines and labels (N, E, S, W)
         val cardinals = listOf(0, 90, 180, 270)
-        val labelMap = mapOf(0 to "N", 90 to "O", 180 to "S", 270 to "W")
+        val labelMap = mapOf(0 to "N", 90 to "E", 180 to "S", 270 to "W")
         for (angle in cardinals) {
             val rad = Math.toRadians(angle.toDouble())
-            val dx = (Math.sin(rad) * length).toFloat()
-            val dy = (-Math.cos(rad) * length).toFloat()
+            val dx = (Math.sin(rad) * baseRadius).toFloat()
+            val dy = (-Math.cos(rad) * baseRadius).toFloat()
             // full line across the circle
             canvas?.drawLine(centerPt.x - dx, centerPt.y - dy, centerPt.x + dx, centerPt.y + dy, paint)
             // label slightly beyond the ring
-            val lx = centerPt.x + (dx * 1.08f)
-            val ly = centerPt.y + (dy * 1.08f) - (textPaint.textSize / 2)
+            val lx = centerPt.x + (dx * 1.12f)
+            val ly = centerPt.y + (dy * 1.12f) + (textPaint.textSize / 3)
             canvas?.drawText(labelMap[angle] ?: "", lx, ly, textPaint)
         }
 
-        // Degree ticks around outer ring (every 30°, label every 60°)
-        val tickPaint = Paint().apply { isAntiAlias = true; color = android.graphics.Color.WHITE; strokeWidth = 2f }
+        // Degree ticks around outer ring
+        // - Minor ticks every 5° (small)
+        // - Major ticks every 30° (long)
+        // - Numeric labels at 0°, 90°, 180°, 270°
+        val smallTickPaint = Paint().apply { isAntiAlias = true; color = android.graphics.Color.WHITE; strokeWidth = 1f }
+        val majorTickPaint = Paint().apply { isAntiAlias = true; color = android.graphics.Color.WHITE; strokeWidth = 2f }
         val labelSize = Paint(textPaint).apply { textSize = 18f }
-        for (a in 0 until 360 step 30) {
+
+        // Minor ticks (every 5° excluding the major tick positions)
+        for (a in 0 until 360 step 5) {
+            if (a % 30 == 0) continue // skip majors
             val rad = Math.toRadians(a.toDouble())
-            val dx = (Math.sin(rad) * length).toFloat()
-            val dy = (-Math.cos(rad) * length).toFloat()
-            val innerX = centerPt.x + (dx * 0.95f)
-            val innerY = centerPt.y + (dy * 0.95f)
+            val dx = (Math.sin(rad) * baseRadius).toFloat()
+            val dy = (-Math.cos(rad) * baseRadius).toFloat()
+            val innerX = centerPt.x + (dx * 0.985f)
+            val innerY = centerPt.y + (dy * 0.985f)
             val outerX = centerPt.x + dx
             val outerY = centerPt.y + dy
-            canvas?.drawLine(innerX, innerY, outerX, outerY, tickPaint)
-            if (a % 60 == 0) {
-                val lx = centerPt.x + (dx * 1.12f) - (labelSize.measureText("$a°") / 2)
-                val ly = centerPt.y + (dy * 1.12f) + (labelSize.textSize / 2)
+            canvas?.drawLine(innerX, innerY, outerX, outerY, smallTickPaint)
+        }
+
+        // Major ticks and numeric labels (every 30°; label every 90°)
+        for (a in 0 until 360 step 30) {
+            val rad = Math.toRadians(a.toDouble())
+            val dx = (Math.sin(rad) * baseRadius).toFloat()
+            val dy = (-Math.cos(rad) * baseRadius).toFloat()
+            val innerX = centerPt.x + (dx * 0.92f)
+            val innerY = centerPt.y + (dy * 0.92f)
+            val outerX = centerPt.x + dx
+            val outerY = centerPt.y + dy
+            canvas?.drawLine(innerX, innerY, outerX, outerY, majorTickPaint)
+
+            if (a % 90 == 0) {
+                // numeric degree label at 0°, 90°, 180°, 270°
+                val lx = centerPt.x + (dx * 1.22f) - (labelSize.measureText("$a°") / 2)
+                val ly = centerPt.y + (dy * 1.22f) + (labelSize.textSize / 2)
                 canvas?.drawText("$a°", lx, ly, labelSize)
             }
         }
 
-        // Heading arrow and highlighted heading label (flight direction)
+        // Heading indicator (just a small marker on the compass ring, NOT a line)
         val headingNorm = (((heading % 360) + 360) % 360).toInt()
         val radH = Math.toRadians(headingNorm.toDouble())
-        val dxH = (Math.sin(radH) * length).toFloat()
-        val dyH = (-Math.cos(radH) * length).toFloat()
-        // Draw a highlighted heading line and small arrowhead
-        val headingPaint = Paint().apply { isAntiAlias = true; color = android.graphics.Color.YELLOW; strokeWidth = 5f }
-        canvas?.drawLine(centerPt.x.toFloat(), centerPt.y.toFloat(), centerPt.x + dxH, centerPt.y + dyH, headingPaint)
-        // simple arrowhead
-        val ah = 12f
-        val left = Math.toRadians((headingNorm - 140).toDouble())
-        val right = Math.toRadians((headingNorm + 140).toDouble())
-        val ax1 = centerPt.x + (Math.sin(left) * ah).toFloat() + dxH
-        val ay1 = centerPt.y + (-Math.cos(left) * ah).toFloat() + dyH
-        val ax2 = centerPt.x + (Math.sin(right) * ah).toFloat() + dxH
-        val ay2 = centerPt.y + (-Math.cos(right) * ah).toFloat() + dyH
-        canvas?.drawLine(centerPt.x + dxH, centerPt.y + dyH, ax1, ay1, headingPaint)
-        canvas?.drawLine(centerPt.x + dxH, centerPt.y + dyH, ax2, ay2, headingPaint)
-        // Label with heading
+        val dxH = (Math.sin(radH) * baseRadius).toFloat()
+        val dyH = (-Math.cos(radH) * baseRadius).toFloat()
+        // Draw a small circle marker at the heading position on the ring
+        val headingPaint = Paint().apply { isAntiAlias = true; color = android.graphics.Color.YELLOW; style = Paint.Style.FILL }
+        // Draw a small circle marker at the heading position
+        canvas?.drawCircle(centerPt.x + dxH, centerPt.y + dyH, 8f, headingPaint)
+        // Outline for visibility
+        val outlinePaint = Paint().apply { isAntiAlias = true; color = android.graphics.Color.BLACK; style = Paint.Style.STROKE; strokeWidth = 2f }
+        canvas?.drawCircle(centerPt.x + dxH, centerPt.y + dyH, 8f, outlinePaint)
+        
+        // Label with heading near the marker
         val label = "HDG ${headingNorm}°"
-        val labelX = centerPt.x + dxH + 10f
-        val labelY = centerPt.y + dyH - 10f
-        val headingTextPaint = Paint(textPaint).apply { color = android.graphics.Color.YELLOW; textSize = textPaint.textSize + 4f }
+        val labelX = centerPt.x + (dxH * 1.25f)
+        val labelY = centerPt.y + (dyH * 1.25f)
+        val headingTextPaint = Paint(textPaint).apply { color = android.graphics.Color.YELLOW; textSize = 24f }
         // Draw shadow for readability
-        headingTextPaint.style = Paint.Style.FILL
         canvas?.drawText(label, labelX + 2f, labelY + 2f, Paint(headingTextPaint).apply { color = android.graphics.Color.argb(0xCC, 0, 0, 0) })
         canvas?.drawText(label, labelX, labelY, headingTextPaint)
+    }
+}
+
+/**
+ * Heading speed line overlay: yellow line from center showing heading, length based on speed
+ */
+private class HeadingSpeedLineOverlay : org.osmdroid.views.overlay.Overlay() {
+    var center: GeoPoint? = null
+    var heading: Float = 0f
+    var speedKts: Double = 0.0
+    
+    private val linePaint = Paint().apply {
+        color = android.graphics.Color.YELLOW
+        strokeWidth = 6f
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+    }
+    private val textPaint = Paint().apply {
+        isAntiAlias = true
+        color = android.graphics.Color.WHITE
+        textSize = 30f
+    }
+    private val bgPaint = Paint().apply {
+        isAntiAlias = true
+        color = android.graphics.Color.argb(0xCC, 0, 0, 0)
+        style = Paint.Style.FILL
+    }
+
+    override fun draw(canvas: android.graphics.Canvas?, mapView: org.osmdroid.views.MapView?, shadow: Boolean) {
+        if (shadow || canvas == null || mapView == null) return
+        val c = center ?: return
+
+        val screenPt = Point()
+        val projection = mapView.projection
+        projection.toPixels(c, screenPt)
+
+        val cx = screenPt.x.toFloat()
+        val cy = screenPt.y.toFloat()
+
+        // Defensive speed handling to avoid NaN/Infinite lengths
+        val safeSpeed = if (speedKts.isFinite()) speedKts.coerceIn(0.0, 1000.0) else 0.0
+        val speedFactor = (safeSpeed / 300.0).coerceIn(0.0, 1.0)
+        // Original was 50 + 150*factor, scale up 5x, clamp to safe pixel range
+        var lineLength = ((50f + 150f * speedFactor.toFloat()) * 5f).coerceIn(50f, 1000f)
+        if (!lineLength.isFinite()) lineLength = 200f
+
+        // Validate heading
+        if (!heading.isFinite()) return
+        val headingRad = Math.toRadians(heading.toDouble())
+        var endX = cx + lineLength * Math.sin(headingRad).toFloat()
+        var endY = cy - lineLength * Math.cos(headingRad).toFloat()
+
+        // Defensive check: ensure endpoints are finite and within reasonable bounds
+        if (!endX.isFinite() || !endY.isFinite()) {
+            // fallback to capped length
+            lineLength = 200f
+            endX = cx + lineLength * Math.sin(headingRad).toFloat()
+            endY = cy - lineLength * Math.cos(headingRad).toFloat()
+        }
+
+        // Draw the heading line
+        canvas.drawLine(cx, cy, endX, endY, linePaint)
+
+        // Draw speed label at the tip of the line (only if speed is finite)
+        if (safeSpeed.isFinite()) {
+            try {
+                val speedText = String.format("%d kt", safeSpeed.toInt())
+                val padding = 8f
+                val textWidth = textPaint.measureText(speedText)
+                // Position label slightly beyond the end point along the heading
+                val labelOffset = 12f
+                val labelX = endX + labelOffset * Math.sin(headingRad).toFloat()
+                val labelY = endY - labelOffset * Math.cos(headingRad).toFloat()
+
+                val rectLeft = labelX - padding
+                val rectTop = labelY - textPaint.textSize
+                val rectRight = labelX + textWidth + padding
+                val rectBottom = labelY + (textPaint.textSize * 0.2f)
+
+                canvas.drawRoundRect(android.graphics.RectF(rectLeft, rectTop, rectRight, rectBottom), 6f, 6f, bgPaint)
+                // Draw text with small shadow
+                textPaint.color = android.graphics.Color.WHITE
+                canvas.drawText(speedText, labelX, labelY, Paint(textPaint).apply { color = android.graphics.Color.argb(0xCC, 0, 0, 0); textSize = textPaint.textSize })
+                canvas.drawText(speedText, labelX, labelY, textPaint)
+            } catch (_: Throwable) {
+                // ignore drawing errors
+            }
+        }
     }
 }
 
@@ -1249,6 +1560,8 @@ private class RangeRingsOverlay : org.osmdroid.views.overlay.Overlay() {
     var center: GeoPoint? = null
     // current heading (used to place exact heading label on outermost ring)
     var heading: Float = 0f
+    // current speed in knots; used to scale the heading radial length
+    var speedKts: Double = 0.0
     // max radius in NM; default 5
     var maxNm: Int = 5
     private val paint = Paint().apply {
@@ -1348,17 +1661,30 @@ private class RangeRingsOverlay : org.osmdroid.views.overlay.Overlay() {
                 }
             }
 
-            // Draw exact heading label and heading radial line on the outermost ring (e.g., "305°")
+            // Draw exact heading label and heading radial line on the outermost ring (length scaled by speed)
             val headingNorm = (((heading % 360) + 360) % 360).toInt()
             val hRad = Math.toRadians(headingNorm.toDouble())
-            val hx = centerPt.x + (Math.sin(hRad) * outerRadiusPx).toFloat()
-            val hy = centerPt.y + (-Math.cos(hRad) * outerRadiusPx).toFloat()
+
+            // Scale heading radial by speed: small when stationary, longer with speed
+            val minFactor = 0.05f
+            val maxFactor = 1.0f
+            val maxSpeed = 300.0 // knots
+            var scaleFactor = (minFactor + ((speedKts.coerceIn(0.0, maxSpeed) / maxSpeed) * (maxFactor - minFactor))).toFloat()
+            if (!scaleFactor.isFinite() || scaleFactor.isNaN()) scaleFactor = minFactor
+            // Double the computed radial so the visible heading line is more prominent,
+            // but keep it clamped to the outer ring
+            val headingRadiusRaw = outerRadiusPx * scaleFactor * 2f
+            val minHeadingPx = 12f
+            val headingRadius = headingRadiusRaw.coerceIn(minHeadingPx, outerRadiusPx)
+
+            val hx = centerPt.x + (Math.sin(hRad) * headingRadius).toFloat()
+            val hy = centerPt.y + (-Math.cos(hRad) * headingRadius).toFloat()
             val headingLabel = "${headingNorm}°"
             val headingPaint = Paint(textPaint).apply { color = android.graphics.Color.YELLOW; textSize = textPaint.textSize + 2f }
             // Draw a highlighted radial for heading
             val headLine = Paint().apply { isAntiAlias = true; color = android.graphics.Color.YELLOW; strokeWidth = 4f }
             canvas?.drawLine(centerPt.x.toFloat(), centerPt.y.toFloat(), hx, hy, headLine)
-            // arrowhead on outer ring
+            // arrowhead on radial end (short)
             val ah = 10f
             val left = Math.toRadians((headingNorm - 140).toDouble())
             val right = Math.toRadians((headingNorm + 140).toDouble())
@@ -1372,6 +1698,8 @@ private class RangeRingsOverlay : org.osmdroid.views.overlay.Overlay() {
             val headingPaintText = Paint(headingPaint).apply { style = Paint.Style.FILL }
             canvas?.drawText(headingLabel, hx + 6f, hy - 6f, Paint(headingPaintText).apply { color = android.graphics.Color.argb(0xCC, 0, 0, 0) })
             canvas?.drawText(headingLabel, hx + 6f, hy - 6f, headingPaint)
+            // debug
+            try { android.util.Log.d("RangeRingsOverlay", "speedKts=$speedKts scaleFactor=$scaleFactor headingRadius=$headingRadius outerRadiusPx=$outerRadiusPx") } catch (_: Throwable) {}
         }
     }
 }

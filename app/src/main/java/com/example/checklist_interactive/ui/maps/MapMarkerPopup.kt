@@ -9,6 +9,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.background
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material3.*
 import androidx.compose.material3.AssistChip
 import androidx.compose.ui.text.font.FontFamily
@@ -51,7 +53,8 @@ fun MapMarkerPopup(
     runways: List<RunwayEntity>,
     onClose: () -> Unit,
     onManage: () -> Unit,
-    onRunwayClick: (RunwayEntity) -> Unit = {}
+    onRunwayClick: (RunwayEntity) -> Unit = {},
+    onSetRoute: (LocationEntity) -> Unit = {}
 ) {
     val context = LocalContext.current
     // Persisted sheet fraction + opacity like DataPadPopup
