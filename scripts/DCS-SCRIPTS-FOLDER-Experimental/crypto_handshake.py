@@ -85,9 +85,9 @@ class SessionData:
                 logger.warning(f"⚠️ Replay attack detected in session {self.session_id[:8]}... ! Nonce counter: {counter}")
                 return False
             self._received_nonces.add(counter)
-            # Cleanup old nonces
-            if len(self._received_nonces) > 10000:
-                old_nonces = sorted(self._received_nonces)[:5000]
+            # Cleanup old nonces (reduced threshold from 10000 to 1000 for security)
+            if len(self._received_nonces) > 1000:
+                old_nonces = sorted(self._received_nonces)[:500]
                 self._received_nonces.difference_update(old_nonces)
         return True
 
@@ -138,16 +138,13 @@ class SessionManager:
     
     def load_authorized_devices(self):
         """Load authorized devices from JSON file"""
-        if not self.authorized_devices_path.exists():
-            logger.warning(f"⚠️ No authorized devices file found at {self.authorized_devices_path}")
-            logger.info("Creating empty authorized_devices.json template...")
-            self._create_empty_whitelist()
-            return
-        
         try:
             with open(self.authorized_devices_path, 'r') as f:
                 data = json.load(f)
-            
+
+            # Clear existing devices before reloading
+            self.authorized_devices.clear()
+
             for device_data in data.get('devices', []):
                 device = AuthorizedDevice(
                     device_id=device_data['deviceId'],
@@ -157,11 +154,19 @@ class SessionManager:
                     added_date=device_data['addedDate']
                 )
                 self.authorized_devices[device.device_id] = device
-            
+
             logger.info(f"✅ Loaded {len(self.authorized_devices)} authorized devices")
             for device in self.authorized_devices.values():
                 logger.info(f"  - {device.name} ({device.device_id[:16]}...)")
-        
+
+        except FileNotFoundError:
+            logger.warning(f"⚠️ No authorized devices file found at {self.authorized_devices_path}")
+            logger.info("Creating empty authorized_devices.json template...")
+            self._create_empty_whitelist()
+
+        except json.JSONDecodeError as e:
+            logger.error(f"❌ Invalid JSON in authorized devices file: {e}")
+
         except Exception as e:
             logger.error(f"❌ Error loading authorized devices: {e}")
     
@@ -186,9 +191,17 @@ class SessionManager:
         }
         
         try:
-            with open(self.authorized_devices_path, 'w') as f:
+            # SECURITY: Create file with restricted permissions (owner read/write only)
+            # On Windows, os.open with 0o600 may not work as expected, but we try anyway
+            import stat
+            fd = os.open(
+                str(self.authorized_devices_path),
+                os.O_CREAT | os.O_WRONLY | os.O_TRUNC,
+                stat.S_IRUSR | stat.S_IWUSR  # 0o600: owner read/write only
+            )
+            with os.fdopen(fd, 'w') as f:
                 json.dump(template, f, indent=2)
-            logger.info(f"📝 Created {self.authorized_devices_path} template")
+            logger.info(f"📝 Created {self.authorized_devices_path} template with secure permissions (0600)")
         except Exception as e:
             logger.error(f"❌ Could not create template: {e}")
     
@@ -250,6 +263,68 @@ class SessionManager:
             client_timestamp = message.get('timestamp', 0)
             ip_address = sender_address[0]
 
+            # SECURITY: Validate deviceId format and length
+            if not device_id or not isinstance(device_id, str):
+                logger.warning(f"❌ Missing or invalid deviceId from {ip_address}")
+                return {
+                    "type": "Error",
+                    "error": "InvalidDeviceId",
+                    "message": "deviceId is required and must be a string",
+                    "timestamp": int(time.time() * 1000)
+                }
+
+            if len(device_id) > 128:
+                logger.warning(f"❌ deviceId too long from {ip_address}: {len(device_id)} chars")
+                return {
+                    "type": "Error",
+                    "error": "InvalidDeviceId",
+                    "message": "deviceId must not exceed 128 characters",
+                    "timestamp": int(time.time() * 1000)
+                }
+
+            # Validate deviceId contains only safe characters (alphanumeric, dash, underscore)
+            import re
+            if not re.match(r'^[a-zA-Z0-9_-]+$', device_id):
+                logger.warning(f"❌ deviceId contains invalid characters from {ip_address}")
+                return {
+                    "type": "Error",
+                    "error": "InvalidDeviceIdFormat",
+                    "message": "deviceId must contain only alphanumeric characters, dash, or underscore",
+                    "timestamp": int(time.time() * 1000)
+                }
+
+            # SECURITY: Validate deviceName length (prevent log injection)
+            if not isinstance(device_name, str):
+                device_name = 'Unknown'
+            if len(device_name) > 128:
+                device_name = device_name[:128]  # Truncate
+            # Remove newlines and control characters from device name
+            device_name = ''.join(char for char in device_name if char.isprintable())
+
+            # SECURITY: Validate publicKey is valid Base64 and correct length
+            if not client_public_key_b64 or not isinstance(client_public_key_b64, str):
+                logger.warning(f"❌ Missing or invalid publicKey from {ip_address}")
+                return {
+                    "type": "Error",
+                    "error": "InvalidPublicKey",
+                    "message": "publicKey is required and must be a string",
+                    "timestamp": int(time.time() * 1000)
+                }
+
+            try:
+                decoded_key = self._base64_decode(client_public_key_b64)
+                # SECP256R1 DER-encoded public key should be around 91 bytes
+                if len(decoded_key) < 50 or len(decoded_key) > 200:
+                    raise ValueError(f"Invalid key length: {len(decoded_key)}")
+            except Exception as e:
+                logger.warning(f"❌ Invalid publicKey format from {ip_address}: {e}")
+                return {
+                    "type": "Error",
+                    "error": "InvalidPublicKeyFormat",
+                    "message": "publicKey must be valid Base64-encoded DER key",
+                    "timestamp": int(time.time() * 1000)
+                }
+
             logger.info(f"📥 ClientHello from {device_name} ({device_id[:16]}...) @ {ip_address}")
 
             # SECURITY: Rate limiting (prevent DoS attacks)
@@ -265,7 +340,7 @@ class SessionManager:
             # SECURITY: Validate timestamp (prevent replay of old messages)
             server_time = time.time() * 1000  # milliseconds
             time_diff = abs(server_time - client_timestamp)
-            MAX_TIMESTAMP_DRIFT_MS = 300000  # 5 minutes
+            MAX_TIMESTAMP_DRIFT_MS = 120000  # 120 seconds / 2 minutes (compromise between security and clock drift tolerance)
 
             if time_diff > MAX_TIMESTAMP_DRIFT_MS:
                 logger.warning(f"❌ Timestamp too old/future: {time_diff/1000:.1f}s drift (max {MAX_TIMESTAMP_DRIFT_MS/1000}s)")
@@ -306,7 +381,37 @@ class SessionManager:
                 self._base64_decode(client_public_key_b64),
                 backend=default_backend()
             )
-            
+
+            # SECURITY: Validate ECDH public key
+            if not isinstance(client_public_key, ec.EllipticCurvePublicKey):
+                logger.error(f"❌ Invalid key type for device {device_id[:8]}...")
+                return {
+                    "type": "Error",
+                    "error": "InvalidPublicKeyType",
+                    "message": "Public key must be an EC key",
+                    "timestamp": int(server_time)
+                }
+
+            if not isinstance(client_public_key.curve, ec.SECP256R1):
+                logger.error(f"❌ Invalid curve for device {device_id[:8]}... - only SECP256R1 allowed")
+                return {
+                    "type": "Error",
+                    "error": "InvalidCurve",
+                    "message": "Only SECP256R1 curve is allowed",
+                    "timestamp": int(server_time)
+                }
+
+            # Validate public key is not point at infinity
+            public_numbers = client_public_key.public_numbers()
+            if public_numbers.x == 0 and public_numbers.y == 0:
+                logger.error(f"❌ Invalid public key (point at infinity) for device {device_id[:8]}...")
+                return {
+                    "type": "Error",
+                    "error": "InvalidPublicKey",
+                    "message": "Public key is invalid (point at infinity)",
+                    "timestamp": int(server_time)
+                }
+
             # Derive shared secret using ECDH
             shared_secret = self.server_private_key.exchange(
                 ec.ECDH(), client_public_key
@@ -389,7 +494,7 @@ class SessionManager:
             # SECURITY: Validate timestamp
             server_time = time.time() * 1000
             time_diff = abs(server_time - client_timestamp)
-            MAX_TIMESTAMP_DRIFT_MS = 300000  # 5 minutes
+            MAX_TIMESTAMP_DRIFT_MS = 120000  # 120 seconds / 2 minutes (compromise between security and clock drift tolerance)
 
             if time_diff > MAX_TIMESTAMP_DRIFT_MS:
                 logger.warning(f"❌ KeyConfirm timestamp too old/future: {time_diff/1000:.1f}s drift")

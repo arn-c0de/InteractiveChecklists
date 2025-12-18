@@ -103,7 +103,7 @@ _nonce_lock = __import__('threading').Lock()
 _received_nonces = set()
 # Highest counter observed from clients and sliding window for replay protection
 _highest_counter = 0
-_REPLAY_WINDOW = 10000  # keep recent counters within this window
+_REPLAY_WINDOW = 1000  # keep recent counters within this window (reduced from 10000 for security)
 
 def generate_nonce_server() -> bytes:
     """Generate counter-based nonce for SERVER (prevents collision).
@@ -301,8 +301,8 @@ def tail_and_send(path: str, host: str, port: int, send_existing=False, once=Fal
                             handshake_sock.sendto(response_json, addr)
                             if response.get('status') == 'ready':
                                 logger.info(f"✅ Session established with device {msg.get('sessionId', 'unknown')[:8]}...")
-                    except (json.JSONDecodeError, UnicodeDecodeError):
-                        # Not a handshake message, ignore
+                    except (json.JSONDecodeError, UnicodeDecodeError, KeyError):
+                        # Not a handshake message or malformed, ignore
                         pass
                 except socket.timeout:
                     # No handshake message, continue
@@ -464,10 +464,13 @@ def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=Fals
                             handshake_sock.sendto(response_json, addr)
                             if response.get('status') == 'ready':
                                 logger.info(f"✅ Session established with device {msg.get('sessionId', 'unknown')[:8]}...")
-                    except (json.JSONDecodeError, UnicodeDecodeError, Exception) as decode_err:
-                        # Not a handshake message, ignore
+                    except (json.JSONDecodeError, UnicodeDecodeError, KeyError) as decode_err:
+                        # Not a handshake message or malformed, ignore
                         logger.debug(f"Failed to parse handshake: {decode_err}")
                         pass
+                    except Exception as unexpected_err:
+                        # Log unexpected errors for debugging
+                        logger.warning(f"⚠️ Unexpected error parsing handshake: {unexpected_err}")
                 except socket.timeout:
                     # No handshake message, continue
                     pass
