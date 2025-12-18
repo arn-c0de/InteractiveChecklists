@@ -237,7 +237,7 @@ def caucasus_samples():
             elevation_m=20.0,
             country="Georgia",
             tags=["airbase"],
-            source="dcsviper.gr"
+            source="OpenStreetMap / PilotNav / limited public/military sources (no definitive published AIP)"
         ),
         Location(
             name="Kutaisi – Kopitnari",
@@ -246,21 +246,26 @@ def caucasus_samples():
             marker_type=MarkerType.AIRPORT.value,
             icao="UGKO",
             iata="KUT",
-            elevation_m=130.0,
+            elevation_m=68.0,
+            runways=[Runway(name="08/26", length_m=2500, width_m=44, heading=80.0, surface="asphalt", ils=True)],
+            frequencies={"tower":"125.5 MHz"},
             country="Georgia",
             tags=["civilian"],
-            source="server.3rd-wing.net"
+            source="OurAirports / PilotNav / Wikipedia / kutaisi.aero"
         ),
         Location(
             name="Gudauta",
             latitude=43.1000,
             longitude=40.7180,
             marker_type=MarkerType.AIRPORT.value,
-            icao="UG23",
+            icao="UGAD",
             elevation_m=150.0,
+            # Disused / limited public data — runway present but status uncertain
+            runways=[Runway(name="12/30", length_m=None, width_m=None, heading=None, surface="concrete", ils=False)],
+            frequencies=None,
             country="Abkhazia",
             tags=["military"],
-            source="server.3rd-wing.net"
+            source="OpenStreetMap / Wikidata (disused airfield 'Bamboura'); runway info unverified"
         ),
         Location(
             name="Kobuleti",
@@ -269,9 +274,12 @@ def caucasus_samples():
             marker_type=MarkerType.AIRPORT.value,
             icao="UG5X",
             elevation_m=5.0,
+            # Runway length estimated from imagery / OSM; verify before operational use
+            runways=[Runway(name="08/26", length_m=1500, width_m=30, heading=80.0, surface="asphalt", ils=False)],
+            frequencies=None,
             country="Georgia",
             tags=["civilian"],
-            source="server.3rd-wing.net"
+            source="OpenStreetMap / PilotNav (runway length approximate from satellite imagery)"
         ),
         Location(
             name="Vaziani",
@@ -279,10 +287,13 @@ def caucasus_samples():
             longitude=44.6797,
             marker_type=MarkerType.AIRPORT.value,
             icao="UG27",
-            elevation_m=600.0,
+            elevation_m=445.0,
+            # Former Soviet airfield — runway length approximated from OurAirports/imagery
+            runways=[Runway(name="11/29", length_m=3000, width_m=45, heading=110.0, surface="concrete", ils=False)],
+            frequencies=None,
             country="Georgia",
             tags=["military"],
-            source="server.3rd-wing.net"
+            source="OurAirports / Wikipedia (former Soviet airfield; runway length approximate)"
         ),
     ]
 
