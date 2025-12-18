@@ -156,7 +156,8 @@ fun MarkerRouteManagementSheet(
     onRouteClick: (RouteEntity) -> Unit,
     onCreateRoute: () -> Unit,
     selectedMarker: LocationEntity? = null,
-    selectedRunways: List<RunwayEntity> = emptyList()
+    selectedRunways: List<RunwayEntity> = emptyList(),
+    onSetActiveRoute: (LocationEntity) -> Unit = {}
 ) {
     val markerGroups by viewModel.markerGroups.collectAsState()
     val expandedGroups by viewModel.expandedGroups.collectAsState()
@@ -626,7 +627,8 @@ fun RouteListItem(
 fun MarkerDetailsContent(
     location: LocationEntity,
     runways: List<RunwayEntity>,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    onSetRoute: (LocationEntity) -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -786,11 +788,27 @@ fun MarkerDetailsContent(
             Spacer(modifier = Modifier.height(12.dp))
         }
 
-        // Back button
-        Button(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Default.ArrowBack, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Back to Markers")
+        // Action buttons
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Set Route button (prominent)
+            Button(
+                onClick = { onSetRoute(location) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Icon(Icons.Default.Flight, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Set Route")
+            }
+            
+            // Back button
+            OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.ArrowBack, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Back to Markers")
+            }
         }
     }
 }
