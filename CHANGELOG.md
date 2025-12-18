@@ -2,9 +2,17 @@
 
 All relevant changes are summarized here by version.
 ## [1.0.13] - 2025-12-17
-### Patches
-- **Security patch:** forwarder communication (2025-12-18)
+### Added
+- **Map improvements:** marker popups, route info, marker rotation, and map tools; Python MapDatabaseTools integration so the app and tools can share the same DB.
 
+### Fixed
+- **DataPad / forwarder:** stability and parsing fixes, forwarder empty-parse handling, and DataPad status shown in the flight mini-status bar.
+
+### Security
+- **Hardened telemetry/forwarder:** added nonce and replay protection, per-client nonce management, public-key validation, auth for rate-limiting, session timeouts and audit-log fixes, whitelist/blacklist handling, improved encryption provider and JSON parse limits.
+
+### Docs
+- README and docs updates and small fixes.
 
 ## [1.0.12] - 2025-12-17
 ### Added
