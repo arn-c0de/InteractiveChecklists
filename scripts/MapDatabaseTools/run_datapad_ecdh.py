@@ -33,8 +33,6 @@ def main():
     parser.add_argument('--device-name', default='Python DataPad', help='Device name for ECDH')
     parser.add_argument('--psk', default='DCS_DataPad_Secret_Key_32BYTES!!', 
                        help='Pre-shared key for non-ECDH mode')
-    parser.add_argument('--show-sensitive', action='store_true', 
-                       help='Show sensitive data (IPs, coordinates)')
     parser.add_argument('--allow-bind-all', action='store_true',
                        help='Allow binding to 0.0.0.0 (all interfaces)')
     
@@ -50,7 +48,7 @@ def main():
         port=args.port,
         bind_ip=args.bind_ip,
         pre_shared_key=args.psk,
-        show_sensitive=args.show_sensitive,
+        show_sensitive=False,
         allow_bind_all=args.allow_bind_all,
         use_ecdh=args.use_ecdh,
         sender_ip=args.sender_ip,
@@ -67,10 +65,7 @@ def main():
         if flight_data.groundSpeed:
             print(f"Speed: {flight_data.groundSpeed:.1f} m/s")
         print(f"Heading: {flight_data.heading:.1f}°")
-        if args.show_sensitive:
-            print(f"Position: {flight_data.latitude:.6f}, {flight_data.longitude:.6f}")
-        else:
-            print(f"Position: [REDACTED]")
+        print(f"Position: [REDACTED]")
     
     def on_connection(connected):
         status = "CONNECTED" if connected else "DISCONNECTED"

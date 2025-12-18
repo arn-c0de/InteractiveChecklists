@@ -199,7 +199,6 @@ class DataPadReceiver:
     def __init__(self, port: int = DEFAULT_UDP_PORT, 
                  bind_ip: str = DEFAULT_BIND_IP,
                  pre_shared_key: str = DEFAULT_PRE_SHARED_KEY,
-                 show_sensitive: bool = False,
                  allow_bind_all: bool = False,
                  use_ecdh: bool = False,
                  sender_ip: Optional[str] = None,
@@ -209,7 +208,6 @@ class DataPadReceiver:
         self.port = port
         self.bind_ip = bind_ip
         self.pre_shared_key = pre_shared_key.encode('utf-8')
-        self.show_sensitive = show_sensitive
         self.allow_bind_all = allow_bind_all  # must be explicitly set to allow binding to 0.0.0.0
         
         # ECDH support
@@ -356,12 +354,8 @@ class DataPadReceiver:
         # Start cleanup thread for inactive client nonce states
         self.cleanup_thread = threading.Thread(target=self._cleanup_loop, daemon=True)
         self.cleanup_thread.start()
-        if self.show_sensitive:
-            print(f"DataPad receiver started on {self.bind_ip}:{self.port}")
-            print(f"Local IP: {self.get_local_ip()}")
-        else:
-            print(f"DataPad receiver started on port {self.port}")
-            print("Local IP: [REDACTED]")
+        print(f"DataPad receiver started on port {self.port}")
+        print("Local IP: [REDACTED]")
         if self.bind_ip == "0.0.0.0" and not self.allow_bind_all and os.getenv("DATAPAD_ALLOW_BIND_ALL", "0") != "1":
             print("WARNING: requested bind to 0.0.0.0 but allow_bind_all is not enabled. For safety, the receiver will bind to localhost instead. To allow binding to all interfaces set DATAPAD_ALLOW_BIND_ALL=1 or pass allow_bind_all=True to the constructor.")
     
@@ -464,13 +458,10 @@ class DataPadReceiver:
                 self.socket = None
                 return
 
-            if self.show_sensitive:
-                print(f"UDP socket opened on {bind_target}:{self.port}")
+            if bind_target in ("127.0.0.1", "localhost"):
+                print(f"UDP socket opened on localhost:{self.port}")
             else:
-                if bind_target in ("127.0.0.1", "localhost"):
-                    print(f"UDP socket opened on localhost:{self.port}")
-                else:
-                    print(f"UDP socket opened on port {self.port}")
+                print(f"UDP socket opened on port {self.port}")
             
             print(f"Waiting for encrypted UDP packets...")
             
@@ -480,10 +471,7 @@ class DataPadReceiver:
                 try:
                     # Receive UDP packet
                     data, addr = self.socket.recvfrom(BUFFER_SIZE)
-                    if self.show_sensitive:
-                        print(f"Received {len(data)} bytes from {addr}")
-                    else:
-                        print(f"Received {len(data)} bytes")
+                    print(f"Received {len(data)} bytes")
                     
                     # Try to decrypt (pass sender address for per-client nonce tracking)
                     decrypted_data = self.decrypt_payload(data, sender_addr=addr)
@@ -545,10 +533,8 @@ class DataPadReceiver:
 def main():
     """Console mode test runner"""
     # Simple test without GUI
-    # Opt-in: only print sensitive details (exact location/IP) if env var DATAPAD_DEBUG_SHOW_SENSITIVE=1
-    show_sensitive = os.getenv("DATAPAD_DEBUG_SHOW_SENSITIVE", "0") == "1"
     allow_bind_all = os.getenv("DATAPAD_ALLOW_BIND_ALL", "0") == "1"
-    receiver = DataPadReceiver(show_sensitive=show_sensitive, allow_bind_all=allow_bind_all)
+    receiver = DataPadReceiver(allow_bind_all=allow_bind_all)
     
     def on_data(flight_data):
         print(f"\n=== Flight Data Update ===")
