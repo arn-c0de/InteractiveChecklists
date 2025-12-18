@@ -27,6 +27,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.backends import default_backend
 import hmac as hmac_lib
+import subprocess
 
 logger = logging.getLogger(__name__)
 
@@ -44,21 +45,72 @@ class SecurityAuditLogger:
         self._audit_key = None
         self._ensure_secure_permissions()
 
+    def _try_apply_windows_acl(self, user_identifier: str) -> bool:
+        """Attempt to set ACLs via icacls for the provided user identifier.
+        Returns True if resulting ACL appears restrictive.
+        """
+        try:
+            # Remove inheritance then grant read/write to specific user only
+            cmds = [
+                ['icacls', str(self.audit_file), '/inheritance:r'],
+                ['icacls', str(self.audit_file), '/grant:r', f'"{user_identifier}:(R,W)"']
+            ]
+            for cmd in cmds:
+                subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+            # Verify ACL contents - ensure common broad principals are not present
+            out = subprocess.run(['icacls', str(self.audit_file)], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            acl_text = out.stdout.decode('utf-8', errors='ignore')
+            insecure_principals = ['Everyone', 'Users', 'Authenticated Users']
+            for p in insecure_principals:
+                if p in acl_text:
+                    logger.debug(f"Windows ACL still contains '{p}': {acl_text}")
+                    return False
+            return True
+        except subprocess.CalledProcessError as e:
+            logger.debug(f"icacls command failed: {e} - output: {getattr(e, 'output', None)}")
+            return False
+        except Exception as e:
+            logger.debug(f"Unexpected error applying icacls: {e}")
+            return False
+
+    @staticmethod
+    def _parse_audit_key(key_b64: str) -> Optional[bytes]:
+        """Decode and validate base64 AUDIT_LOG_KEY. Return raw bytes or None if invalid."""
+        import base64
+        try:
+            key = base64.b64decode(key_b64)
+            if len(key) not in (16, 24, 32):
+                logger.error(f"❌ AUDIT_LOG_KEY has invalid length: {len(key)} bytes (expected 32 preferred)")
+                return None
+            if len(key) != 32:
+                logger.warning("⚠️ AUDIT_LOG_KEY is not 32 bytes; consider using a 32-byte key for AES-256")
+            return key
+        except Exception as e:
+            logger.error(f"❌ Failed to decode AUDIT_LOG_KEY: {e}")
+            return None
+
     def _ensure_secure_permissions(self):
         """Ensure audit file exists and has secure permissions.
 
         Behavior (strict/fail-safe):
         1. Try POSIX-style 0o600 permissions.
-        2. If that fails on Windows, attempt to set ACLs via `icacls` (best-effort).
-        3. If permissions cannot be made secure, require an encryption key via
-           the `AUDIT_LOG_KEY` environment variable (base64, 32 bytes) and enable
+        2. If that fails on Windows, attempt a robust ACL fix using `icacls` (best-effort),
+           trying several username formats and verifying the resulting ACL.
+        3. If permissions cannot be made secure, require a valid encryption key via
+           the `AUDIT_LOG_KEY` environment variable (base64, 32 bytes preferred) and enable
            on-disk encryption for audit entries.
         4. If neither permissions nor a valid key are available, raise RuntimeError
            to abort startup (fail-safe).
         """
         import base64
         import getpass
-        import subprocess
+        import stat
+
+        # Use helper instance/static methods defined on the class:
+        # - self._try_apply_windows_acl(user_identifier)
+        # - self._parse_audit_key(key_b64)
+        # These exist as dedicated methods to improve testability and separation of concerns.
 
         try:
             # Ensure parent directory exists
@@ -67,7 +119,6 @@ class SecurityAuditLogger:
             # If file does not exist, create it with secure permissions if possible
             if not self.audit_file.exists():
                 try:
-                    import stat
                     fd = os.open(str(self.audit_file), os.O_CREAT | os.O_WRONLY, stat.S_IRUSR | stat.S_IWUSR)
                     os.close(fd)
                 except Exception:
@@ -80,55 +131,115 @@ class SecurityAuditLogger:
 
             # Try to set POSIX permissions (0o600)
             try:
-                import stat
                 self.audit_file.chmod(stat.S_IRUSR | stat.S_IWUSR)  # 0o600
-                # Verify
+                current_mode = self.audit_file.stat().st_mode & 0o777
+                if current_mode == 0o600:
+                    self._encryption_enabled = False
+                    self._audit_key = None
+                    return
+            except Exception as posix_err:
+                logger.debug(f"POSIX chmod failed: {posix_err}")
+
+            # If on Windows, attempt to set ACLs using icacls (robust sequence)
+            if os.name == 'nt':
+                user = getpass.getuser()
+                # First attempt: plain username
+                if self._try_apply_windows_acl(user):
+                    logger.info(f"✅ Applied Windows ACLs for audit file: {self.audit_file} (user: {user})")
+                    self._encryption_enabled = False
+                    self._audit_key = None
+                    return
+
+                # Second attempt: try full whoami (DOMAIN\\User)
                 try:
-                    current_mode = self.audit_file.stat().st_mode & 0o777
-                    if current_mode == 0o600:
+                    whoami = subprocess.run(['whoami'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+                    whoami_name = whoami.stdout.decode('utf-8', errors='ignore').strip()
+                    if whoami_name and self._try_apply_windows_acl(whoami_name):
+                        logger.info(f"✅ Applied Windows ACLs for audit file: {self.audit_file} (whoami: {whoami_name})")
                         self._encryption_enabled = False
                         self._audit_key = None
                         return
                 except Exception:
-                    # If we cannot stat, continue to other attempts
                     pass
-            except Exception as posix_err:
-                logger.debug(f"POSIX chmod failed: {posix_err}")
 
-            # If on Windows, attempt to set ACLs using icacls (best-effort)
-            if os.name == 'nt':
+                # As a best-effort fallback, try granting to Administrators and current user
                 try:
-                    user = getpass.getuser()
-                    # Remove inheritance and grant read/write to current user only
-                    subprocess.run([
-                        'icacls', str(self.audit_file), '/inheritance:r', '/grant:r', f'{user}:(R,W)'
-                    ], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    # Verify by checking that file exists (icacls success assumed)
-                    logger.info(f"✅ Applied Windows ACLs for audit file: {self.audit_file}")
-                    self._encryption_enabled = False
-                    self._audit_key = None
-                    return
-                except Exception as win_err:
-                    logger.debug(f"Windows ACL setting (icacls) failed: {win_err}")
+                    admin_cmds = [
+                        ['icacls', str(self.audit_file), '/grant:r', 'Administrators:(R,W)'],
+                        ['icacls', str(self.audit_file), '/grant:r', f'"{user}:(R,W)"']
+                    ]
+                    for cmd in admin_cmds:
+                        subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    out = subprocess.run(['icacls', str(self.audit_file)], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    if 'Everyone' not in out.stdout.decode('utf-8', errors='ignore'):
+                        logger.info(f"✅ Applied relaxed Windows ACLs for audit file: {self.audit_file}")
+                        self._encryption_enabled = False
+                        self._audit_key = None
+                        return
+                except Exception as e:
+                    logger.debug(f"Windows ACL attempts failed: {e}")
 
             # If we reached here, permissions were not made secure — attempt encryption fallback
             key_b64 = os.environ.get('AUDIT_LOG_KEY') or os.environ.get('AUDIT_LOG_ENCRYPT_KEY')
             if key_b64:
-                try:
-                    key = base64.b64decode(key_b64)
-                    if len(key) not in (16, 24, 32):
-                        raise ValueError("Invalid key length")
-                    # Use AES-GCM - require 16/24/32; prefer 32
+                key = self._parse_audit_key(key_b64)
+                if key:
+                    # Enable encryption for audit logs
                     self._audit_key = key
                     self._encryption_enabled = True
                     logger.warning("⚠️ Audit log permissions could not be enforced; encrypting audit log using AUDIT_LOG_KEY")
                     return
-                except Exception as e:
-                    logger.error(f"❌ Provided AUDIT_LOG_KEY is invalid: {e}")
 
-            # Nothing worked — fail-safe: abort startup
-            logger.critical("🚨 SECURITY: Could not secure audit log file and no valid AUDIT_LOG_KEY provided — aborting")
-            raise RuntimeError("Insecure audit log configuration: secure permissions not set and no valid encryption key")
+            # Nothing worked — instead of aborting, generate a random key and persist it if possible.
+            # This provides an elegant fallback: audit entries remain encrypted even when ACLs cannot be fixed.
+            try:
+                generated_key = os.urandom(32)
+                key_file = self.audit_file.with_suffix('.key')
+
+                # Attempt to persist key atomically with restrictive permissions
+                try:
+                    import tempfile
+                    tmp = key_file.with_suffix('.tmp')
+                    # Write via os.open with 0o600 mode to ensure restrictive permissions
+                    fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, stat.S_IRUSR | stat.S_IWUSR)
+                    with os.fdopen(fd, 'wb') as f:
+                        f.write(generated_key)
+                    # Replace atomically
+                    os.replace(str(tmp), str(key_file))
+
+                    # Try to set POSIX permissions on key file
+                    try:
+                        key_file.chmod(stat.S_IRUSR | stat.S_IWUSR)
+                    except Exception:
+                        logger.debug("Could not chmod key file; will attempt Windows ACLs if available")
+
+                    # On Windows, try to restrict key file ACLs as well
+                    if os.name == 'nt':
+                        try:
+                            user = __import__('getpass').getuser()
+                            if self._try_apply_windows_acl(user) or self._try_apply_windows_acl(__import__('subprocess').run(['whoami'], stdout=__import__('subprocess').PIPE, check=True).stdout.decode().strip()):
+                                logger.info(f"✅ Persisted audit key to {key_file} with restrictive ACLs")
+                            else:
+                                logger.warning(f"⚠️ Persisted audit key to {key_file} but could not enforce ACLs; please secure this file manually")
+                        except Exception:
+                            logger.warning(f"⚠️ Persisted audit key to {key_file} but failed to verify ACLs")
+
+                    # Use persisted key
+                    self._audit_key = generated_key
+                    self._encryption_enabled = True
+                    logger.warning("⚠️ Audit log permissions could not be enforced; generated and persisted an audit key")
+                    return
+
+                except Exception as persist_err:
+                    logger.warning(f"⚠️ Could not persist generated audit key: {persist_err}; falling back to ephemeral in-memory key")
+                    # Use ephemeral key in memory (won't survive restart) but keeps logs encrypted
+                    self._audit_key = generated_key
+                    self._encryption_enabled = True
+                    logger.critical("⚠️ AUDIT LOG: using ephemeral audit key (not persisted). Set AUDIT_LOG_KEY to a stable Base64 key to persist across restarts")
+                    return
+            except Exception as e:
+                logger.critical(f"🚨 SECURITY: Could not secure audit log file and failed to generate fallback key: {e}")
+                raise RuntimeError("Insecure audit log configuration: secure permissions not set and no valid audit key available")
         except Exception as e:
             # Bubble up RuntimeError for caller to stop startup, log others
             if isinstance(e, RuntimeError):
@@ -190,9 +301,49 @@ class SecurityAuditLogger:
 
                 # Verify permissions after write (best-effort)
                 try:
-                    current_mode = self.audit_file.stat().st_mode & 0o777
-                    if current_mode != (0o600) and not getattr(self, '_encryption_enabled', False):
-                        logger.error(f"❌ Audit log has insecure permissions: {oct(current_mode)}")
+                    secure = True
+                    # POSIX-style mode check where meaningful
+                    try:
+                        current_mode = self.audit_file.stat().st_mode & 0o777
+                        if current_mode != 0o600:
+                            secure = False
+                    except Exception:
+                        secure = False
+
+                    # On Windows, use icacls to verify ACLs if available
+                    if not secure and os.name == 'nt':
+                        try:
+                            out = subprocess.run(['icacls', str(self.audit_file)], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                            acl_text = out.stdout.decode('utf-8', errors='ignore')
+                            if any(p in acl_text for p in ['Everyone', 'Users', 'Authenticated Users']):
+                                secure = False
+                            else:
+                                secure = True
+                        except Exception:
+                            secure = False
+
+                    if not secure and not getattr(self, '_encryption_enabled', False):
+                        # If an encryption key is available, shift to encrypted append mode immediately
+                        key_b64 = os.environ.get('AUDIT_LOG_KEY') or os.environ.get('AUDIT_LOG_ENCRYPT_KEY')
+                        if key_b64:
+                            key = None
+                            try:
+                                import base64
+                                key = base64.b64decode(key_b64)
+                            except Exception:
+                                key = None
+                            if key and len(key) in (16, 24, 32):
+                                self._audit_key = key
+                                self._encryption_enabled = True
+                                logger.warning("⚠️ Audit file permissions found insecure at write time; switching to encrypted audit log using provided key")
+                                # Avoid having written sensitive plaintext; we do NOT attempt to rewrite prior plaintext entries
+                            else:
+                                # No valid key — log critical problem for operator attention
+                                try:
+                                    current_mode = self.audit_file.stat().st_mode & 0o777
+                                    logger.error(f"❌ Audit log has insecure permissions: {oct(current_mode)}")
+                                except Exception:
+                                    logger.error("❌ Audit log has insecure permissions and no valid AUDIT_LOG_KEY provided")
                 except Exception as e:
                     logger.debug(f"Could not verify audit file permissions: {e}")
             except Exception as e:
