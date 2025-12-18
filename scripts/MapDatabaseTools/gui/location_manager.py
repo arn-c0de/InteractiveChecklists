@@ -15,7 +15,8 @@ from core.markers_database import (
     MarkersDatabase, Location, MarkerType, TacticalSymbol, Runway
 )
 from core.marker_icons import (
-    TacticalMarkerStyle, ICON_PRESETS, get_available_icons, get_icon_preset
+    TacticalMarkerStyle, get_available_symbols, get_available_icons, 
+    get_affiliation_color, is_valid_symbol
 )
 from typing import Optional, List
 
@@ -182,29 +183,22 @@ class LocationEditDialog(QDialog):
         self.setLayout(layout)
     
     def update_icon_list(self):
-        """Update icon combo based on selected type and coalition"""
+        """Update icon combo - ONLY Android drawable symbols!"""
         self.icon_combo.clear()
-        marker_type = self.type_combo.currentText()
         
-        # Add all available icons
-        icons = list(ICON_PRESETS.keys())
+        # Get available Android symbols
+        available = get_available_symbols()
         
-        # Filter icons relevant to current type
-        if marker_type == MarkerType.AIRPORT.value:
-            relevant = [i for i in icons if 'airport' in i or 'heli' in i]
-        elif marker_type.startswith("tactical_"):
-            coalition = self.coalition_combo.currentText().lower()
-            relevant = [i for i in icons if coalition in i]
-        elif marker_type == MarkerType.WAYPOINT.value:
-            relevant = [i for i in icons if 'waypoint' in i]
-        else:
-            relevant = icons
-        
-        self.icon_combo.addItems(relevant or icons)
+        # Add symbols to combo
+        self.icon_combo.addItem("(None)", "")
+        for symbol_entity, display_name in available.items():
+            self.icon_combo.addItem(f"{symbol_entity} - {display_name}", symbol_entity)
         
         # Set current value if exists
-        if self.location.icon and self.location.icon in icons:
-            self.icon_combo.setCurrentText(self.location.icon)
+        if hasattr(self.location, 'symbol_entity') and self.location.symbol_entity:
+            idx = self.icon_combo.findData(self.location.symbol_entity)
+            if idx >= 0:
+                self.icon_combo.setCurrentIndex(idx)
     
     def create_airport_section(self) -> QGroupBox:
         """Create airport-specific fields"""
@@ -256,18 +250,39 @@ class LocationEditDialog(QDialog):
         return group
     
     def create_tactical_section(self) -> QGroupBox:
-        """Create tactical-specific fields"""
-        group = QGroupBox("Tactical Information")
+        """Create tactical symbol section - ONLY Android drawable symbols!"""
+        group = QGroupBox("Military Symbol (Android Drawables Only)")
         layout = QFormLayout()
         
-        self.symbol_combo = QComboBox()
-        self.symbol_combo.addItem("")
-        for symbol in TacticalSymbol:
-            self.symbol_combo.addItem(symbol.value)
-        if self.location.tactical_symbol:
-            self.symbol_combo.setCurrentText(self.location.tactical_symbol)
-        layout.addRow("Symbol:", self.symbol_combo)
+        # Symbol Entity (ONLY Android drawables!)
+        self.symbol_entity_combo = QComboBox()
+        self.symbol_entity_combo.addItem("(None)", "")
+        for symbol_entity, display_name in get_available_symbols().items():
+            self.symbol_entity_combo.addItem(f"{display_name}", symbol_entity)
+        if hasattr(self.location, 'symbol_entity') and self.location.symbol_entity:
+            idx = self.symbol_entity_combo.findData(self.location.symbol_entity)
+            if idx >= 0:
+                self.symbol_entity_combo.setCurrentIndex(idx)
+        layout.addRow("Symbol:", self.symbol_entity_combo)
         
+        # Affiliation
+        self.affiliation_combo = QComboBox()
+        affiliations = [
+            ("Friendly (Blue)", "friendly"),
+            ("Hostile (Red)", "hostile"),
+            ("Neutral (Green)", "neutral"),
+            ("Unknown (Yellow)", "unknown")
+        ]
+        for display, value in affiliations:
+            self.affiliation_combo.addItem(display, value)
+        
+        current_affiliation = getattr(self.location, 'symbol_affiliation', 'unknown')
+        idx = self.affiliation_combo.findData(current_affiliation)
+        if idx >= 0:
+            self.affiliation_combo.setCurrentIndex(idx)
+        layout.addRow("Affiliation:", self.affiliation_combo)
+        
+        # Legacy fields for compatibility
         self.threat_spin = QSpinBox()
         self.threat_spin.setRange(0, 5)
         self.threat_spin.setValue(self.location.threat_level or 0)
@@ -350,7 +365,12 @@ class LocationEditDialog(QDialog):
         self.location.longitude = self.lon_spin.value()
         self.location.marker_type = self.type_combo.currentText()
         self.location.coalition = self.coalition_combo.currentText() or None
-        self.location.icon = self.icon_combo.currentText()
+        
+        # Get selected Android symbol entity
+        selected_symbol = self.icon_combo.currentData()
+        if selected_symbol:
+            self.location.symbol_entity = selected_symbol
+        
         self.location.description = self.desc_edit.toPlainText()
         
         # Airport fields
@@ -360,9 +380,27 @@ class LocationEditDialog(QDialog):
             self.location.elevation_m = self.elevation_spin.value() if self.elevation_spin.value() != 0 else None
             self.location.runways = self.runways if self.runways else None
         
-        # Tactical fields
+        # Tactical fields - ONLY Android symbols!
         if self.tactical_group.isVisible():
-            self.location.tactical_symbol = self.symbol_combo.currentText() or None
+            # Get symbol entity from combo
+            symbol_entity = self.symbol_entity_combo.currentData()
+            if symbol_entity:
+                self.location.symbol_entity = symbol_entity
+                # Validate it's an Android drawable
+                if not is_valid_symbol(symbol_entity):
+                    QMessageBox.warning(
+                        self, "Invalid Symbol", 
+                        f"Symbol '{symbol_entity}' is not available in Android drawables!"
+                    )
+                    return
+            
+            # Get affiliation
+            affiliation = self.affiliation_combo.currentData()
+            if affiliation:
+                self.location.symbol_affiliation = affiliation
+                self.location.symbol_color = get_affiliation_color(affiliation)
+            
+            # Legacy fields
             self.location.threat_level = self.threat_spin.value() if self.threat_spin.value() > 0 else None
             self.location.unit_type = self.unit_edit.text().strip() or None
             self.location.strength = self.strength_spin.value() if self.strength_spin.value() > 0 else None
@@ -489,26 +527,47 @@ class LocationManagerWidget(QWidget):
         
         # Populate list
         for loc in locations:
-            # Get icon style
-            style = TacticalMarkerStyle.get_style(
-                loc.marker_type, 
-                loc.coalition or "", 
-                loc.tactical_symbol
-            )
+            # Check if location has Android drawable symbol
+            if hasattr(loc, 'symbol_entity') and loc.symbol_entity and is_valid_symbol(loc.symbol_entity):
+                # Use Android symbol
+                affiliation = getattr(loc, 'symbol_affiliation', 'unknown')
+                try:
+                    symbol_text, color = TacticalMarkerStyle.get_style(loc.symbol_entity, affiliation)
+                    symbol_display = loc.symbol_entity.upper()[:3]  # Short code
+                except ValueError:
+                    symbol_display = "???"
+                    color = "#FFFF80"
+            else:
+                # No valid symbol
+                symbol_display = "📍"
+                color = "#808080"
             
             # Create item text with icon
-            item_text = f"{style['symbol']}  {loc.name}"
+            item_text = f"[{symbol_display}]  {loc.name}"
             if loc.icao:
                 item_text += f" ({loc.icao})"
+            elif hasattr(loc, 'symbol_affiliation') and loc.symbol_affiliation:
+                item_text += f" [{loc.symbol_affiliation}]"
             elif loc.coalition:
                 item_text += f" [{loc.coalition}]"
             
             item = QListWidgetItem(item_text)
             item.setData(Qt.ItemDataRole.UserRole, loc)
             
-            # Color code by type
+            # Color code by type/affiliation
             if loc.marker_type == MarkerType.AIRPORT.value:
                 item.setForeground(QColor("#8B4513"))
+            elif loc.marker_type == "tactical_military":
+                # Use symbol_affiliation for military symbols
+                if hasattr(loc, 'symbol_affiliation'):
+                    if loc.symbol_affiliation == "friendly":
+                        item.setForeground(QColor("#00A8FF"))
+                    elif loc.symbol_affiliation == "hostile":
+                        item.setForeground(QColor("#FF4444"))
+                    elif loc.symbol_affiliation == "neutral":
+                        item.setForeground(QColor("#00FF00"))
+                    else:
+                        item.setForeground(QColor("#FFFF80"))
             elif "blufor" in loc.marker_type:
                 item.setForeground(QColor("#00A8FF"))
             elif "opfor" in loc.marker_type:

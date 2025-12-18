@@ -25,7 +25,7 @@ import java.io.File
         LocationTagCrossRef::class,
         NavaidEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class TacticalDatabase : RoomDatabase() {
@@ -185,6 +185,18 @@ abstract class TacticalDatabase : RoomDatabase() {
                 db.execSQL("INSERT OR IGNORE INTO tags (name) VALUES ('training_area')")
             }
         }
+
+        // Migration from v2 to v3: add military symbol columns
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE locations ADD COLUMN symbol_set TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE locations ADD COLUMN symbol_entity TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE locations ADD COLUMN symbol_size TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE locations ADD COLUMN symbol_affiliation TEXT NOT NULL DEFAULT 'unknown'")
+                db.execSQL("ALTER TABLE locations ADD COLUMN symbol_color TEXT NOT NULL DEFAULT '#FFFF80'")
+                db.execSQL("ALTER TABLE locations ADD COLUMN symbol_modifier TEXT NOT NULL DEFAULT ''")
+            }
+        }
         
         /**
          * Get database instance
@@ -269,7 +281,7 @@ abstract class TacticalDatabase : RoomDatabase() {
                 DATABASE_NAME
             )
                 .createFromAsset("databases/$DATABASE_NAME")
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .fallbackToDestructiveMigration()
                 .build()
         }
@@ -287,7 +299,7 @@ abstract class TacticalDatabase : RoomDatabase() {
                 TacticalDatabase::class.java,
                 dbFile.absolutePath
             )
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .fallbackToDestructiveMigration()
                 .build()
         }
