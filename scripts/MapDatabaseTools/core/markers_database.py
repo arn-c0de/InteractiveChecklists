@@ -565,8 +565,33 @@ class MarkersDatabase:
             location.deleted_at
         ))
         
+        location_id = cursor.lastrowid
+        
+        # Also insert runways into the separate runways table for Android app compatibility
+        if location.runways:
+            for runway in location.runways:
+                length_ft = int(round(runway.length_m * 3.28084)) if runway.length_m else None
+                width_ft = int(round(runway.width_m * 3.28084)) if runway.width_m else None
+                cursor.execute("""
+                    INSERT INTO runways (
+                        location_id, name, length_m, length_ft, width_m, width_ft,
+                        surface, heading_deg, has_lighting, notes
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    location_id,
+                    runway.name,
+                    int(runway.length_m) if runway.length_m else None,
+                    length_ft,
+                    int(runway.width_m) if runway.width_m else None,
+                    width_ft,
+                    runway.surface,
+                    runway.heading,
+                    1 if runway.ils else 0,
+                    "ILS" if runway.ils else None
+                ))
+        
         self.conn.commit()
-        return cursor.lastrowid
+        return location_id
     
     def update_location(self, location: Location) -> bool:
         """Update an existing location"""
@@ -626,6 +651,33 @@ class MarkersDatabase:
             location.deleted_at,
             location.id
         ))
+        
+        # Also update runways in the separate runways table for Android app compatibility
+        # Delete existing runways for this location first
+        cursor.execute("DELETE FROM runways WHERE location_id=?", (location.id,))
+        
+        # Insert updated runways
+        if location.runways:
+            for runway in location.runways:
+                length_ft = int(round(runway.length_m * 3.28084)) if runway.length_m else None
+                width_ft = int(round(runway.width_m * 3.28084)) if runway.width_m else None
+                cursor.execute("""
+                    INSERT INTO runways (
+                        location_id, name, length_m, length_ft, width_m, width_ft,
+                        surface, heading_deg, has_lighting, notes
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    location.id,
+                    runway.name,
+                    int(runway.length_m) if runway.length_m else None,
+                    length_ft,
+                    int(runway.width_m) if runway.width_m else None,
+                    width_ft,
+                    runway.surface,
+                    runway.heading,
+                    1 if runway.ils else 0,
+                    "ILS" if runway.ils else None
+                ))
         
         self.conn.commit()
         return cursor.rowcount > 0
@@ -704,8 +756,33 @@ class MarkersDatabase:
     
     def _row_to_location(self, row: sqlite3.Row) -> Location:
         """Convert database row to Location object"""
+        location_id = row['id']
+        
+        # Load runways from the separate runways table (preferred)
+        # Fallback to JSON field if no runways in table
+        runways = None
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT * FROM runways WHERE location_id=? ORDER BY name", (location_id,))
+        runway_rows = cursor.fetchall()
+        
+        if runway_rows:
+            # Load from runways table
+            runways = []
+            for rw in runway_rows:
+                runways.append(Runway(
+                    name=rw['name'],
+                    length_m=float(rw['length_m']) if rw['length_m'] else 0,
+                    width_m=float(rw['width_m']) if rw['width_m'] else 0,
+                    heading=float(rw['heading_deg']) if rw['heading_deg'] else 0,
+                    surface=rw['surface'] or 'unknown',
+                    ils=bool(rw['has_lighting'])  # Using has_lighting as ILS indicator
+                ))
+        elif row['runways']:
+            # Fallback to JSON field
+            runways = [Runway.from_dict(r) for r in json.loads(row['runways'])]
+        
         return Location(
-            id=row['id'],
+            id=location_id,
             name=row['name'],
             latitude=row['latitude'],
             longitude=row['longitude'],
@@ -718,7 +795,7 @@ class MarkersDatabase:
             iata=row['iata'],
             elevation_m=row['elevation_m'],
             frequencies=json.loads(row['frequencies']) if row['frequencies'] else None,
-            runways=[Runway.from_dict(r) for r in json.loads(row['runways'])] if row['runways'] else None,
+            runways=runways,
             threat_level=row['threat_level'],
             unit_type=row['unit_type'],
             strength=row['strength'],
