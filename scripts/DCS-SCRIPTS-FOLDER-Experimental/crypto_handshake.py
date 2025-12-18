@@ -17,6 +17,7 @@ import os
 import time
 import uuid
 import logging
+import hashlib
 from typing import Dict, Optional, Tuple
 from pathlib import Path
 
@@ -28,6 +29,59 @@ from cryptography.hazmat.backends import default_backend
 import hmac as hmac_lib
 
 logger = logging.getLogger(__name__)
+
+
+class SecurityAuditLogger:
+    """Logs security events in structured JSON format for analysis"""
+
+    def __init__(self, audit_file: str = "security_audit.jsonl"):
+        self.audit_file = Path(audit_file)
+        self._lock = __import__('threading').Lock()
+        self._ensure_secure_permissions()
+
+    def _ensure_secure_permissions(self):
+        """Ensure audit file has secure permissions"""
+        if self.audit_file.exists():
+            try:
+                import stat
+                self.audit_file.chmod(stat.S_IRUSR | stat.S_IWUSR)  # 0o600
+            except Exception as e:
+                logger.warning(f"⚠️ Could not set secure permissions on audit file: {e}")
+
+    def log_event(self, event_type: str, severity: str, details: dict):
+        """Log a security event in JSON format
+
+        Args:
+            event_type: Type of event (e.g., 'auth_failure', 'rate_limit', 'blacklist')
+            severity: Severity level ('low', 'medium', 'high', 'critical')
+            details: Additional details about the event
+        """
+        event = {
+            'timestamp': time.time(),
+            'timestamp_iso': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+            'event_type': event_type,
+            'severity': severity,
+            **details
+        }
+
+        with self._lock:
+            try:
+                with open(self.audit_file, 'a', encoding='utf-8') as f:
+                    f.write(json.dumps(event) + '\n')
+            except Exception as e:
+                logger.error(f"❌ Failed to write security audit log: {e}")
+
+
+# Global security audit logger
+_audit_logger = None
+
+
+def get_audit_logger() -> SecurityAuditLogger:
+    """Get or create the global security audit logger"""
+    global _audit_logger
+    if _audit_logger is None:
+        _audit_logger = SecurityAuditLogger()
+    return _audit_logger
 
 
 class SessionData:
@@ -83,6 +137,15 @@ class SessionData:
         with self._nonce_lock:
             if counter in self._received_nonces:
                 logger.warning(f"⚠️ Replay attack detected in session {self.session_id[:8]}... ! Nonce counter: {counter}")
+
+                # SECURITY AUDIT: Log replay attack
+                get_audit_logger().log_event('replay_attack_detected', 'critical', {
+                    'session_id': self.session_id[:8] + '...',
+                    'device_id': self.device_id[:16] + '...',
+                    'nonce_counter': counter,
+                    'reason': 'Duplicate nonce counter detected'
+                })
+
                 return False
             self._received_nonces.add(counter)
             # Cleanup old nonces (reduced threshold from 10000 to 1000 for security)
@@ -117,58 +180,103 @@ class SessionManager:
         self._cleanup_thread = None
         self._stop_cleanup = False
 
+        # SECURITY: Whitelist file integrity tracking
+        self._whitelist_hash: Optional[str] = None  # SHA-256 hash of loaded whitelist
+        self._whitelist_mtime: Optional[float] = None  # Last modification time of whitelist file
+        self._whitelist_load_time: Optional[float] = None  # When whitelist was last loaded
+        self._whitelist_last_check: float = 0  # Last time integrity was checked
+        self._whitelist_check_interval: float = 60.0  # Check integrity every 60 seconds (cooldown)
+        self._whitelist_lock = __import__('threading').Lock()
+
         # Rate limiting: IP -> (attempt_count, window_start_time)
         self.handshake_attempts: Dict[str, Tuple[int, float]] = {}
+        # Device-ID based rate limiting: device_id -> (attempt_count, window_start_time, consecutive_violations)
+        self.device_rate_limits: Dict[str, Tuple[int, float, int]] = {}
+        # IP blacklist: IP -> (blacklist_until_timestamp, violation_count)
+        self.ip_blacklist: Dict[str, Tuple[float, int]] = {}
         self.rate_limit_lock = __import__('threading').Lock()
         self.MAX_HANDSHAKE_ATTEMPTS = 5  # Max attempts per window
         self.RATE_LIMIT_WINDOW = 60.0  # Window in seconds (1 minute)
-        
+        self.MAX_DEVICE_ATTEMPTS = 3  # Max attempts per device per window (stricter)
+        self.BLACKLIST_DURATION_BASE = 300.0  # 5 minutes base blacklist duration
+        self.MAX_BLACKLIST_DURATION = 86400.0  # 24 hours max blacklist
+
         # Generate server key pair (ephemeral, regenerated each run)
         self.server_private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
         self.server_public_key = self.server_private_key.public_key()
-        
+
         logger.info("🔐 SessionManager initialized")
         logger.info(f"📂 Authorized devices file: {self.authorized_devices_path}")
-        
-        # Load authorized devices
+
+        # Load authorized devices (SECURITY: Only loaded once at startup)
         self.load_authorized_devices()
-        
+
         # Start periodic cleanup thread
         self._start_cleanup_thread()
     
     def load_authorized_devices(self):
-        """Load authorized devices from JSON file"""
-        try:
-            with open(self.authorized_devices_path, 'r') as f:
-                data = json.load(f)
+        """Load authorized devices from JSON file with integrity tracking.
 
-            # Clear existing devices before reloading
-            self.authorized_devices.clear()
+        SECURITY: This method should only be called once at startup or via explicit
+        manual reload command. It does NOT automatically reload on every authorization check.
+        """
+        with self._whitelist_lock:
+            try:
+                # Read file content for hashing
+                with open(self.authorized_devices_path, 'rb') as f:
+                    file_content = f.read()
 
-            for device_data in data.get('devices', []):
-                device = AuthorizedDevice(
-                    device_id=device_data['deviceId'],
-                    name=device_data['name'],
-                    public_key=device_data['publicKey'],
-                    permissions=device_data['permissions'],
-                    added_date=device_data['addedDate']
-                )
-                self.authorized_devices[device.device_id] = device
+                # Compute SHA-256 hash for integrity verification
+                file_hash = hashlib.sha256(file_content).hexdigest()
 
-            logger.info(f"✅ Loaded {len(self.authorized_devices)} authorized devices")
-            for device in self.authorized_devices.values():
-                logger.info(f"  - {device.name} ({device.device_id[:16]}...)")
+                # Get file modification time
+                file_stat = os.stat(self.authorized_devices_path)
+                file_mtime = file_stat.st_mtime
 
-        except FileNotFoundError:
-            logger.warning(f"⚠️ No authorized devices file found at {self.authorized_devices_path}")
-            logger.info("Creating empty authorized_devices.json template...")
-            self._create_empty_whitelist()
+                # Parse JSON
+                data = json.loads(file_content.decode('utf-8'))
 
-        except json.JSONDecodeError as e:
-            logger.error(f"❌ Invalid JSON in authorized devices file: {e}")
+                # Clear existing devices before loading
+                self.authorized_devices.clear()
 
-        except Exception as e:
-            logger.error(f"❌ Error loading authorized devices: {e}")
+                for device_data in data.get('devices', []):
+                    device = AuthorizedDevice(
+                        device_id=device_data['deviceId'],
+                        name=device_data['name'],
+                        public_key=device_data['publicKey'],
+                        permissions=device_data['permissions'],
+                        added_date=device_data['addedDate']
+                    )
+                    self.authorized_devices[device.device_id] = device
+
+                # Store integrity information
+                self._whitelist_hash = file_hash
+                self._whitelist_mtime = file_mtime
+                self._whitelist_load_time = time.time()
+
+                logger.info(f"✅ Loaded {len(self.authorized_devices)} authorized devices")
+                logger.info(f"🔒 Whitelist file hash (SHA-256): {file_hash[:16]}...")
+                for device in self.authorized_devices.values():
+                    logger.info(f"  - {device.name} ({device.device_id[:16]}...)")
+
+                # SECURITY AUDIT: Log whitelist load event
+                get_audit_logger().log_event('whitelist_loaded', 'medium', {
+                    'device_count': len(self.authorized_devices),
+                    'file_hash': file_hash,
+                    'file_mtime': file_mtime,
+                    'load_time': self._whitelist_load_time
+                })
+
+            except FileNotFoundError:
+                logger.warning(f"⚠️ No authorized devices file found at {self.authorized_devices_path}")
+                logger.info("Creating empty authorized_devices.json template...")
+                self._create_empty_whitelist()
+
+            except json.JSONDecodeError as e:
+                logger.error(f"❌ Invalid JSON in authorized devices file: {e}")
+
+            except Exception as e:
+                logger.error(f"❌ Error loading authorized devices: {e}")
     
     def _create_empty_whitelist(self):
         """Create an empty whitelist template"""
@@ -206,11 +314,174 @@ class SessionManager:
             logger.error(f"❌ Could not create template: {e}")
     
     def is_device_authorized(self, device_id: str) -> bool:
-        """Check if device is in whitelist"""
-        # Reload devices file to allow hot-reload
-        self.load_authorized_devices()
+        """Check if device is in whitelist.
+
+        SECURITY FIX: Removed automatic reload to prevent privilege escalation.
+        Whitelist is now only loaded once at startup. If file is modified after startup,
+        it will be detected and logged, but NOT automatically reloaded.
+        Administrator must restart the server to apply whitelist changes.
+        """
+        # Check for unauthorized file modifications (log but don't reload)
+        self._check_whitelist_integrity()
+
         return device_id in self.authorized_devices
-    
+
+    def _check_whitelist_integrity(self):
+        """Check if whitelist file has been modified since loading.
+
+        SECURITY: Detects unauthorized modifications but does NOT automatically reload.
+        Logs a critical security event if the file has been tampered with.
+
+        Uses cooldown to avoid excessive file system checks (checks at most once per minute).
+        """
+        try:
+            # Only check if we have a baseline hash
+            if self._whitelist_hash is None or self._whitelist_mtime is None:
+                return
+
+            # Cooldown: only check periodically to avoid excessive filesystem operations
+            current_time = time.time()
+            if current_time - self._whitelist_last_check < self._whitelist_check_interval:
+                return
+
+            self._whitelist_last_check = current_time
+
+            # Get current file stats
+            file_stat = os.stat(self.authorized_devices_path)
+            current_mtime = file_stat.st_mtime
+
+            # Quick check: has modification time changed?
+            if current_mtime != self._whitelist_mtime:
+                # File has been modified - compute hash to verify
+                with open(self.authorized_devices_path, 'rb') as f:
+                    file_content = f.read()
+                current_hash = hashlib.sha256(file_content).hexdigest()
+
+                if current_hash != self._whitelist_hash:
+                    # File content has CHANGED - potential security issue!
+                    logger.critical(f"🚨 SECURITY ALERT: Whitelist file has been MODIFIED since loading!")
+                    logger.critical(f"   Original hash: {self._whitelist_hash[:16]}...")
+                    logger.critical(f"   Current hash:  {current_hash[:16]}...")
+                    logger.critical(f"   Original mtime: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self._whitelist_mtime))}")
+                    logger.critical(f"   Current mtime:  {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(current_mtime))}")
+                    logger.critical(f"   ⚠️  Changes will NOT take effect until server restart!")
+                    logger.critical(f"   ⚠️  If this change was unauthorized, investigate immediately!")
+
+                    # SECURITY AUDIT: Log critical event
+                    get_audit_logger().log_event('whitelist_modified_after_load', 'critical', {
+                        'original_hash': self._whitelist_hash,
+                        'current_hash': current_hash,
+                        'original_mtime': self._whitelist_mtime,
+                        'current_mtime': current_mtime,
+                        'loaded_at': self._whitelist_load_time,
+                        'detected_at': time.time(),
+                        'action': 'Change detected but NOT applied - restart required'
+                    })
+
+                    # Update our tracking to avoid repeated warnings (but don't reload!)
+                    self._whitelist_hash = current_hash
+                    self._whitelist_mtime = current_mtime
+
+        except FileNotFoundError:
+            logger.critical(f"🚨 SECURITY ALERT: Whitelist file has been DELETED!")
+            get_audit_logger().log_event('whitelist_deleted', 'critical', {
+                'original_hash': self._whitelist_hash,
+                'detected_at': time.time()
+            })
+        except Exception as e:
+            logger.debug(f"Error checking whitelist integrity: {e}")
+
+    def reload_authorized_devices(self, force: bool = False) -> bool:
+        """Manually reload the authorized devices whitelist.
+
+        SECURITY: This method provides a way for administrators to reload the whitelist
+        without restarting the server, but requires explicit action. Should only be called
+        via a secure administrative interface or signal handler.
+
+        Args:
+            force: If True, reload even if file hasn't changed. If False, only reload if modified.
+
+        Returns:
+            True if whitelist was reloaded, False otherwise.
+        """
+        try:
+            # Check if file has been modified
+            file_stat = os.stat(self.authorized_devices_path)
+            current_mtime = file_stat.st_mtime
+
+            if not force and current_mtime == self._whitelist_mtime:
+                logger.info("ℹ️  Whitelist file has not been modified, skipping reload")
+                return False
+
+            logger.warning("⚠️  MANUAL RELOAD of authorized devices whitelist requested")
+            logger.warning(f"   This will apply changes from {self.authorized_devices_path}")
+            logger.warning(f"   Current device count: {len(self.authorized_devices)}")
+
+            # Reload the whitelist
+            self.load_authorized_devices()
+
+            logger.info(f"✅ Whitelist reloaded successfully")
+            logger.info(f"   New device count: {len(self.authorized_devices)}")
+
+            # SECURITY AUDIT: Log manual reload
+            get_audit_logger().log_event('whitelist_manually_reloaded', 'high', {
+                'device_count': len(self.authorized_devices),
+                'file_hash': self._whitelist_hash,
+                'reload_time': time.time(),
+                'forced': force
+            })
+
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ Failed to reload whitelist: {e}")
+            return False
+
+    def is_ip_blacklisted(self, ip_address: str) -> bool:
+        """Check if IP is blacklisted and add to blacklist if rate limit exceeded"""
+        with self.rate_limit_lock:
+            current_time = time.time()
+
+            # Check if IP is currently blacklisted
+            if ip_address in self.ip_blacklist:
+                blacklist_until, violation_count = self.ip_blacklist[ip_address]
+                if current_time < blacklist_until:
+                    logger.warning(f"🚫 IP {ip_address} is blacklisted until {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(blacklist_until))}")
+                    return True
+                else:
+                    # Blacklist expired, remove entry
+                    del self.ip_blacklist[ip_address]
+            return False
+
+    def add_to_blacklist(self, ip_address: str):
+        """Add IP to blacklist with exponential backoff"""
+        with self.rate_limit_lock:
+            current_time = time.time()
+
+            if ip_address in self.ip_blacklist:
+                _, violation_count = self.ip_blacklist[ip_address]
+                violation_count += 1
+            else:
+                violation_count = 1
+
+            # Exponential backoff: 5 min, 10 min, 20 min, ... up to 24 hours
+            blacklist_duration = min(
+                self.BLACKLIST_DURATION_BASE * (2 ** (violation_count - 1)),
+                self.MAX_BLACKLIST_DURATION
+            )
+            blacklist_until = current_time + blacklist_duration
+
+            self.ip_blacklist[ip_address] = (blacklist_until, violation_count)
+            logger.warning(f"🚫 IP {ip_address} blacklisted for {blacklist_duration/60:.1f} minutes (violation #{violation_count})")
+
+            # SECURITY AUDIT: Log blacklist event
+            get_audit_logger().log_event('ip_blacklisted', 'high', {
+                'ip': ip_address,
+                'violation_count': violation_count,
+                'blacklist_duration_seconds': blacklist_duration,
+                'blacklist_until': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(blacklist_until))
+            })
+
     def is_rate_limited(self, ip_address: str) -> bool:
         """Check if IP address is rate limited for handshake attempts"""
         with self.rate_limit_lock:
@@ -228,6 +499,8 @@ class SessionManager:
                 # Within window - check count
                 if count >= self.MAX_HANDSHAKE_ATTEMPTS:
                     logger.warning(f"⚠️ Rate limit exceeded for {ip_address} ({count} attempts in {current_time - window_start:.1f}s)")
+                    # Add to blacklist after repeated violations
+                    self.add_to_blacklist(ip_address)
                     return True
 
                 # Increment count
@@ -238,18 +511,66 @@ class SessionManager:
                 self.handshake_attempts[ip_address] = (1, current_time)
                 return False
 
+    def is_device_rate_limited(self, device_id: str) -> bool:
+        """Check if device ID is rate limited (stricter than IP-based)"""
+        with self.rate_limit_lock:
+            current_time = time.time()
+
+            if device_id in self.device_rate_limits:
+                count, window_start, violations = self.device_rate_limits[device_id]
+
+                # Check if window has expired
+                if current_time - window_start > self.RATE_LIMIT_WINDOW:
+                    # Reset window (keep violation count for progressive penalties)
+                    self.device_rate_limits[device_id] = (1, current_time, violations)
+                    return False
+
+                # Within window - check count
+                if count >= self.MAX_DEVICE_ATTEMPTS:
+                    logger.warning(f"⚠️ Device rate limit exceeded for {device_id[:16]}... ({count} attempts in {current_time - window_start:.1f}s)")
+                    # Increment violation count
+                    self.device_rate_limits[device_id] = (count, window_start, violations + 1)
+                    return True
+
+                # Increment count
+                self.device_rate_limits[device_id] = (count + 1, window_start, violations)
+                return False
+            else:
+                # First attempt from this device
+                self.device_rate_limits[device_id] = (1, current_time, 0)
+                return False
+
     def cleanup_rate_limits(self):
         """Remove expired rate limit entries (prevent memory leak)"""
         with self.rate_limit_lock:
             current_time = time.time()
-            expired = [
+
+            # Cleanup IP rate limits
+            expired_ips = [
                 ip for ip, (_, window_start) in self.handshake_attempts.items()
                 if current_time - window_start > self.RATE_LIMIT_WINDOW * 2
             ]
-            for ip in expired:
+            for ip in expired_ips:
                 del self.handshake_attempts[ip]
-            if expired:
-                logger.debug(f"🧹 Cleaned up {len(expired)} expired rate limit entries")
+
+            # Cleanup device rate limits
+            expired_devices = [
+                device_id for device_id, (_, window_start, _) in self.device_rate_limits.items()
+                if current_time - window_start > self.RATE_LIMIT_WINDOW * 2
+            ]
+            for device_id in expired_devices:
+                del self.device_rate_limits[device_id]
+
+            # Cleanup expired blacklist entries
+            expired_blacklist = [
+                ip for ip, (blacklist_until, _) in self.ip_blacklist.items()
+                if current_time > blacklist_until + 3600  # Keep for 1 hour after expiry for logging
+            ]
+            for ip in expired_blacklist:
+                del self.ip_blacklist[ip]
+
+            if expired_ips or expired_devices or expired_blacklist:
+                logger.debug(f"🧹 Cleaned up {len(expired_ips)} IP limits, {len(expired_devices)} device limits, {len(expired_blacklist)} blacklist entries")
 
     def handle_client_hello(self, message: dict, sender_address: Tuple[str, int]) -> dict:
         """
@@ -268,7 +589,7 @@ class SessionManager:
                 logger.warning(f"❌ Missing or invalid deviceId from {ip_address}")
                 return {
                     "type": "Error",
-                    "error": "InvalidDeviceId",
+                    "error": "HandshakeFailed",
                     "message": "deviceId is required and must be a string",
                     "timestamp": int(time.time() * 1000)
                 }
@@ -277,7 +598,7 @@ class SessionManager:
                 logger.warning(f"❌ deviceId too long from {ip_address}: {len(device_id)} chars")
                 return {
                     "type": "Error",
-                    "error": "InvalidDeviceId",
+                    "error": "HandshakeFailed",
                     "message": "deviceId must not exceed 128 characters",
                     "timestamp": int(time.time() * 1000)
                 }
@@ -288,7 +609,7 @@ class SessionManager:
                 logger.warning(f"❌ deviceId contains invalid characters from {ip_address}")
                 return {
                     "type": "Error",
-                    "error": "InvalidDeviceIdFormat",
+                    "error": "HandshakeFailed",
                     "message": "deviceId must contain only alphanumeric characters, dash, or underscore",
                     "timestamp": int(time.time() * 1000)
                 }
@@ -306,7 +627,7 @@ class SessionManager:
                 logger.warning(f"❌ Missing or invalid publicKey from {ip_address}")
                 return {
                     "type": "Error",
-                    "error": "InvalidPublicKey",
+                    "error": "HandshakeFailed",
                     "message": "publicKey is required and must be a string",
                     "timestamp": int(time.time() * 1000)
                 }
@@ -320,20 +641,39 @@ class SessionManager:
                 logger.warning(f"❌ Invalid publicKey format from {ip_address}: {e}")
                 return {
                     "type": "Error",
-                    "error": "InvalidPublicKeyFormat",
+                    "error": "HandshakeFailed",
                     "message": "publicKey must be valid Base64-encoded DER key",
                     "timestamp": int(time.time() * 1000)
                 }
 
             logger.info(f"📥 ClientHello from {device_name} ({device_id[:16]}...) @ {ip_address}")
 
-            # SECURITY: Rate limiting (prevent DoS attacks)
+            # SECURITY: Check IP blacklist first (prevent DoS from banned IPs)
+            if self.is_ip_blacklisted(ip_address):
+                return {
+                    "type": "Error",
+                    "error": "IPBlacklisted",
+                    "message": "Your IP address has been temporarily blacklisted due to repeated violations.",
+                    "timestamp": int(time.time() * 1000)
+                }
+
+            # SECURITY: IP-based rate limiting (prevent DoS attacks)
             if self.is_rate_limited(ip_address):
                 logger.warning(f"🚫 Rate limit exceeded for {ip_address} - rejecting handshake")
                 return {
                     "type": "Error",
                     "error": "RateLimitExceeded",
                     "message": f"Too many handshake attempts. Please wait {self.RATE_LIMIT_WINDOW}s and try again.",
+                    "timestamp": int(time.time() * 1000)
+                }
+
+            # SECURITY: Device-ID-based rate limiting (stricter, prevents abuse even with IP rotation)
+            if self.is_device_rate_limited(device_id):
+                logger.warning(f"🚫 Device rate limit exceeded for {device_id[:16]}... - rejecting handshake")
+                return {
+                    "type": "Error",
+                    "error": "DeviceRateLimitExceeded",
+                    "message": f"Too many handshake attempts from this device. Please wait {self.RATE_LIMIT_WINDOW}s and try again.",
                     "timestamp": int(time.time() * 1000)
                 }
 
@@ -346,7 +686,7 @@ class SessionManager:
                 logger.warning(f"❌ Timestamp too old/future: {time_diff/1000:.1f}s drift (max {MAX_TIMESTAMP_DRIFT_MS/1000}s)")
                 return {
                     "type": "Error",
-                    "error": "InvalidTimestamp",
+                    "error": "HandshakeFailed",
                     "message": f"Timestamp drift too large: {time_diff/1000:.1f}s (max {MAX_TIMESTAMP_DRIFT_MS/1000}s). Check device clock.",
                     "timestamp": int(server_time)
                 }
@@ -355,9 +695,18 @@ class SessionManager:
             if not self.is_device_authorized(device_id):
                 logger.warning(f"❌ Unauthorized device: {device_id[:16]}... ({device_name})")
                 logger.warning(f"   Add to {self.authorized_devices_path} to authorize")
+
+                # SECURITY AUDIT: Log unauthorized access attempt
+                get_audit_logger().log_event('auth_failure_unauthorized', 'high', {
+                    'device_id': device_id[:16] + '...',
+                    'device_name': device_name,
+                    'ip': ip_address,
+                    'reason': 'Device not in whitelist'
+                })
+
                 return {
                     "type": "Error",
-                    "error": "Unauthorized",
+                    "error": "HandshakeFailed",
                     "message": f"Device {device_id[:16]}... is not authorized. Add to authorized_devices.json on server.",
                     "timestamp": int(server_time)
                 }
@@ -442,8 +791,17 @@ class SessionManager:
             
             self.sessions[session_id] = session
             self.device_sessions[device_id] = session_id
-            
+
             logger.info(f"🔑 Session created: {session_id[:8]}... (key derived from ECDH)")
+
+            # SECURITY AUDIT: Log successful session establishment
+            get_audit_logger().log_event('session_established', 'low', {
+                'session_id': session_id[:8] + '...',
+                'device_id': device_id[:16] + '...',
+                'device_name': self.authorized_devices[device_id].name if device_id in self.authorized_devices else 'Unknown',
+                'ip': ip_address,
+                'aircraft': self.aircraft_name
+            })
             
             # Export server public key
             server_public_key_b64 = self._base64_encode(
@@ -500,7 +858,7 @@ class SessionManager:
                 logger.warning(f"❌ KeyConfirm timestamp too old/future: {time_diff/1000:.1f}s drift")
                 return {
                     "type": "Error",
-                    "error": "InvalidTimestamp",
+                    "error": "AuthFailed",
                     "message": f"Timestamp drift too large: {time_diff/1000:.1f}s",
                     "timestamp": int(server_time)
                 }
@@ -527,9 +885,17 @@ class SessionManager:
             
             if not hmac_lib.compare_digest(expected_hmac, client_hmac):
                 logger.error(f"❌ HMAC verification failed for session {session_id[:8]}...")
+
+                # SECURITY AUDIT: Log HMAC verification failure
+                get_audit_logger().log_event('hmac_verification_failed', 'high', {
+                    'session_id': session_id[:8] + '...',
+                    'device_id': session.device_id[:16] + '...' if session else 'Unknown',
+                    'reason': 'HMAC mismatch - possible MITM or corrupted message'
+                })
+
                 return {
                     "type": "Error",
-                    "error": "HMACVerificationFailed",
+                    "error": "AuthFailed",
                     "message": "Key confirmation failed",
                     "timestamp": int(time.time() * 1000)
                 }

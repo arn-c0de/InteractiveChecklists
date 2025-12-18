@@ -74,7 +74,7 @@ def check_bind_security(bind_ip: str):
     """Check if binding to all interfaces (0.0.0.0) and require confirmation"""
     if bind_ip == '0.0.0.0':
         sys.stderr.write("\n" + "="*70 + "\n")
-        sys.stderr.write("🚨 CRITICAL SECURITY WARNING: Binding to ALL network interfaces!\n")
+        sys.stderr.write("🚨 CRITICAL SECURITY WARNING: Binding to ALL network interfaces is BLOCKED!\n")
         sys.stderr.write("="*70 + "\n")
         sys.stderr.write("This exposes your server to:\n")
         sys.stderr.write("  - Internet (if PC has public IP)\n")
@@ -82,20 +82,11 @@ def check_bind_security(bind_ip: str):
         sys.stderr.write("  - VPN connections\n")
         sys.stderr.write("  - ALL other network interfaces\n")
         sys.stderr.write("\n")
-        sys.stderr.write("RECOMMENDATION: Use --bind-ip 127.0.0.1 (localhost only)\n")
-        sys.stderr.write("                or bind to specific LAN IP only\n")
+        sys.stderr.write("BINDING TO 0.0.0.0 IS NOT ALLOWED.\n")
+        sys.stderr.write("Use --bind-ip 127.0.0.1 (localhost only) or a specific LAN IP.\n")
         sys.stderr.write("="*70 + "\n")
-        
-        # Require explicit confirmation
-        try:
-            response = input("\nType 'ALLOW_INSECURE_BIND' to continue (NOT RECOMMENDED): ")
-            if response.strip() != 'ALLOW_INSECURE_BIND':
-                sys.stderr.write("\n❌ Aborted. Use --bind-ip to specify a safer address.\n")
-                sys.exit(1)
-            sys.stderr.write("\n⚠️  Proceeding with INSECURE bind to 0.0.0.0\n\n")
-        except (EOFError, KeyboardInterrupt):
-            sys.stderr.write("\n\n❌ Aborted by user.\n")
-            sys.exit(1)
+        sys.stderr.write("\n❌ Aborted. Binding to 0.0.0.0 is forbidden for security reasons.\n")
+        sys.exit(1)
 
 # Global nonce counter for SERVER side (0x01 prefix)
 _nonce_counter = 0
@@ -104,6 +95,167 @@ _received_nonces = set()
 # Highest counter observed from clients and sliding window for replay protection
 _highest_counter = 0
 _REPLAY_WINDOW = 1000  # keep recent counters within this window (reduced from 10000 for security)
+
+# DoS protection: Global message rate limiting
+_message_timestamps = []  # List of timestamps for received messages
+_rate_limit_lock = __import__('threading').Lock()
+_MAX_MESSAGES_PER_SECOND = 50  # Reduced from 100 to 50 for better DoS protection
+_RATE_LIMIT_WINDOW_SECONDS = 1.0  # 1 second window
+
+# DoS protection: Per-IP rate limiting (independent of SessionManager)
+_ip_rate_limits = {}  # IP -> (message_count, window_start_time, violation_count)
+_MAX_MESSAGES_PER_IP = 5  # Maximum 5 messages per IP per window (strict)
+_IP_RATE_LIMIT_WINDOW = 10.0  # 10 second window
+_IP_BAN_DURATION = 300.0  # 5 minutes ban for violators
+_ip_bans = {}  # IP -> ban_until_timestamp
+
+# DoS protection: Message size limits
+_MAX_HANDSHAKE_MESSAGE_SIZE = 8192  # 8KB max for handshake messages (prevents large payload attacks)
+
+def check_ip_banned(ip: str) -> bool:
+    """Check if IP is currently banned.
+
+    Returns True if banned, False otherwise.
+    """
+    with _rate_limit_lock:
+        if ip in _ip_bans:
+            ban_until = _ip_bans[ip]
+            if time.time() < ban_until:
+                return True
+            else:
+                # Ban expired, remove
+                del _ip_bans[ip]
+        return False
+
+def ban_ip(ip: str):
+    """Ban an IP address temporarily."""
+    with _rate_limit_lock:
+        ban_until = time.time() + _IP_BAN_DURATION
+        _ip_bans[ip] = ban_until
+        logger.warning(f"🚫 Banned IP {ip} for {_IP_BAN_DURATION/60:.1f} minutes due to rate limit violations")
+
+def check_ip_rate_limit(ip: str) -> bool:
+    """Check per-IP rate limit (strict, independent of SessionManager).
+
+    Returns True if rate limit is OK, False if exceeded.
+    """
+    with _rate_limit_lock:
+        current_time = time.time()
+
+        if ip in _ip_rate_limits:
+            count, window_start, violations = _ip_rate_limits[ip]
+
+            # Check if window expired
+            if current_time - window_start > _IP_RATE_LIMIT_WINDOW:
+                # Reset window
+                _ip_rate_limits[ip] = (1, current_time, violations)
+                return True
+
+            # Within window - check count
+            if count >= _MAX_MESSAGES_PER_IP:
+                logger.warning(f"⚠️ IP rate limit exceeded for {ip}: {count} messages in {current_time - window_start:.1f}s")
+                # Increment violations and ban
+                _ip_rate_limits[ip] = (count, window_start, violations + 1)
+                ban_ip(ip)
+                return False
+
+            # Increment count
+            _ip_rate_limits[ip] = (count + 1, window_start, violations)
+            return True
+        else:
+            # First message from this IP
+            _ip_rate_limits[ip] = (1, current_time, 0)
+            return True
+
+def cleanup_rate_limits():
+    """Cleanup expired rate limit entries to prevent memory leak."""
+    with _rate_limit_lock:
+        current_time = time.time()
+
+        # Cleanup IP rate limits (keep for 2x window after last activity)
+        expired_ips = [
+            ip for ip, (_, window_start, _) in _ip_rate_limits.items()
+            if current_time - window_start > _IP_RATE_LIMIT_WINDOW * 2
+        ]
+        for ip in expired_ips:
+            del _ip_rate_limits[ip]
+
+        # Cleanup expired bans
+        expired_bans = [
+            ip for ip, ban_until in _ip_bans.items()
+            if current_time > ban_until + 3600  # Keep for 1 hour after expiry for logging
+        ]
+        for ip in expired_bans:
+            del _ip_bans[ip]
+
+def check_global_rate_limit() -> bool:
+    """Check if global message rate limit is exceeded (DoS protection).
+
+    Returns True if rate limit is OK, False if exceeded.
+    """
+    global _message_timestamps
+    with _rate_limit_lock:
+        current_time = time.time()
+
+        # Remove timestamps older than the window
+        cutoff_time = current_time - _RATE_LIMIT_WINDOW_SECONDS
+        _message_timestamps = [ts for ts in _message_timestamps if ts > cutoff_time]
+
+        # Check if we're over the limit
+        if len(_message_timestamps) >= _MAX_MESSAGES_PER_SECOND:
+            logger.warning(f"⚠️ Global message rate limit exceeded: {len(_message_timestamps)} messages in last {_RATE_LIMIT_WINDOW_SECONDS}s")
+            return False
+
+        # Record this message
+        _message_timestamps.append(current_time)
+        return True
+
+def validate_handshake_message(data: bytes, addr: tuple) -> bool:
+    """Early validation of handshake message before expensive parsing.
+
+    This provides DoS protection by rejecting invalid messages early.
+
+    Returns True if message passes validation, False otherwise.
+    """
+    ip = addr[0]
+
+    # 1. Check IP ban status first (cheapest check)
+    if check_ip_banned(ip):
+        logger.debug(f"🚫 Rejected message from banned IP {ip}")
+        return False
+
+    # 2. Check message size (prevent large payload attacks)
+    if len(data) > _MAX_HANDSHAKE_MESSAGE_SIZE:
+        logger.warning(f"⚠️ Oversized handshake message from {ip}: {len(data)} bytes (max {_MAX_HANDSHAKE_MESSAGE_SIZE})")
+        ban_ip(ip)
+        return False
+
+    if len(data) < 10:  # Minimum reasonable JSON size
+        logger.debug(f"⚠️ Undersized message from {ip}: {len(data)} bytes")
+        return False
+
+    # 3. Check per-IP rate limit (before global to catch targeted attacks)
+    if not check_ip_rate_limit(ip):
+        return False
+
+    # 4. Check global rate limit (prevent distributed floods)
+    if not check_global_rate_limit():
+        logger.warning(f"🚫 Dropping message from {ip} due to global rate limit")
+        return False
+
+    # 5. Basic format validation (check for JSON-like structure without full parsing)
+    try:
+        # Quick check: message should start with '{' and end with '}'
+        data_str = data.decode('utf-8', errors='strict')
+        stripped = data_str.strip()
+        if not (stripped.startswith('{') and stripped.endswith('}')):
+            logger.debug(f"⚠️ Invalid JSON format from {ip}")
+            return False
+    except UnicodeDecodeError:
+        logger.warning(f"⚠️ Invalid UTF-8 from {ip}")
+        return False
+
+    return True
 
 def generate_nonce_server() -> bytes:
     """Generate counter-based nonce for SERVER (prevents collision).
@@ -281,7 +433,13 @@ def tail_and_send(path: str, host: str, port: int, send_existing=False, once=Fal
             # In ECDH mode: check for incoming handshake messages
             if handshake_sock:
                 try:
-                    data, addr = handshake_sock.recvfrom(4096)
+                    data, addr = handshake_sock.recvfrom(65535)  # Max UDP size
+
+                    # SECURITY: Early validation before expensive parsing (DoS protection)
+                    if not validate_handshake_message(data, addr):
+                        # Message rejected by validation (rate limit, size, format, etc.)
+                        continue
+
                     # Try to parse as handshake message (PLAINTEXT - no PSK encryption)
                     try:
                         msg_str = data.decode('utf-8')
@@ -437,18 +595,25 @@ def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=Fals
             # In ECDH mode: check for incoming handshake messages
             if handshake_sock:
                 try:
-                    data, addr = handshake_sock.recvfrom(4096)
+                    data, addr = handshake_sock.recvfrom(65535)  # Max UDP size
+
+                    # SECURITY: Early validation before expensive parsing (DoS protection)
+                    if not validate_handshake_message(data, addr):
+                        # Message rejected by validation (rate limit, size, format, etc.)
+                        continue
+
                     # Parse handshake message (PLAINTEXT - no PSK encryption)
                     try:
-                        logger.info(f"📦 Received {len(data)} bytes from {addr}")
-                        
+                        logger.debug(f"📦 Received {len(data)} bytes from {addr}")
+
                         # Handshake messages are sent in PLAINTEXT for proper ECDH
                         msg_str = data.decode('utf-8')
-                        logger.info(f"📄 Full message: {msg_str}")
+                        # SECURITY: Only log full message in debug mode to avoid exposing sensitive data
+                        logger.debug(f"📄 Full message: {msg_str}")
                         msg = json.loads(msg_str)
-                        logger.info(f"📨 Parsed message type: {msg.get('type')} from {addr}")
-                        logger.info(f"📊 Message keys: {list(msg.keys())}")
-                        
+                        logger.info(f"📨 Received {msg.get('type', 'Unknown')} from {addr[0]}")
+                        logger.debug(f"📊 Message keys: {list(msg.keys())}")
+
                         if 'type' in msg and msg['type'] == 'ClientHello':
                             logger.info(f"📥 Received ClientHello from {addr}")
                             response = session_mgr.handle_client_hello(msg, addr)
