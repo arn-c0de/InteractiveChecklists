@@ -93,8 +93,8 @@ fun MapViewer(
     // Map theme helper
     val isDarkTheme = isSystemInDarkTheme()
 
-    // Helper: create an airplane emoji bitmap drawable, optionally rotated to heading
-    fun createPlaneDrawable(ctx: Context, sizeDp: Float, color: Int, heading: Float = 0f): BitmapDrawable {
+    // Helper: create an airplane emoji bitmap drawable (no rotation - handled by Marker.rotation)
+    fun createPlaneDrawable(ctx: Context, sizeDp: Float, color: Int): BitmapDrawable {
         val emoji = "\u2708\uFE0F"
         val metrics = ctx.resources.displayMetrics
         val sizePx = (sizeDp * metrics.density).toInt().coerceAtLeast(16)
@@ -110,14 +110,7 @@ fun MapViewer(
         val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
         val canvas = android.graphics.Canvas(bitmap)
         canvas.drawText(emoji, width / 2f, baseline, paint)
-        return if ((heading % 360f) != 0f) {
-            val matrix = android.graphics.Matrix()
-            matrix.postRotate(heading, width / 2f, height / 2f)
-            val rotated = android.graphics.Bitmap.createBitmap(bitmap, 0, 0, width, height, matrix, true)
-            BitmapDrawable(ctx.resources, rotated)
-        } else {
-            BitmapDrawable(ctx.resources, bitmap)
-        }
+        return BitmapDrawable(ctx.resources, bitmap)
     }
 
     // Update position marker when flight data changes
@@ -137,14 +130,17 @@ fun MapViewer(
             if (lat != 0.0 && lon != 0.0) {
                 val newPosition = GeoPoint(lat, lon)
                 marker.position = newPosition
-                marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                // use center anchor so rotation pivots around icon center
+                marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
 
                 // Update marker rotation based on heading
                 val heading = data.heading.toFloat()
-                marker.rotation = heading
+                // flip by 180° because the icon is oriented opposite the heading
+                marker.rotation = (heading + 180f) % 360f
                 try {
                     val color = if (isDarkTheme) android.graphics.Color.WHITE else android.graphics.Color.BLACK
-                    marker.icon = createPlaneDrawable(context, 28f, color, heading)
+                    // rely on Marker.rotation for rotation; use unrotated bitmap
+                    marker.icon = createPlaneDrawable(context, 28f, color)
                     marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                 } catch (e: Exception) {
                     // ignore
@@ -232,7 +228,7 @@ fun MapViewer(
                     val marker = Marker(this).apply {
                         title = context.getString(R.string.map_aircraft_position)
                         snippet = context.getString(R.string.map_waiting_for_data)
-                        // anchor center for correct rotation
+                        // anchor center for correct rotation and pivot
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
 
                         // initial plane icon
