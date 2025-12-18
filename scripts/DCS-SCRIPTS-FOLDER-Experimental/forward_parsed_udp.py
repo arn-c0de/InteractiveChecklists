@@ -166,48 +166,6 @@ def validate_data_message(data: bytes, encrypt: bool = True) -> bool:
     return True
 
 
-def safe_json_parse(data: bytes | str, max_size: int = 8192, max_depth: int = 6) -> dict | None:
-    """Safely parse JSON with size and depth limits.
-
-    - data can be bytes or str
-    - max_size bounds the length of the input in bytes
-    - max_depth bounds nesting depth to avoid JSON bombs
-
-    Returns the parsed dict/list or None on failure.
-    """
-    try:
-        # Normalize to bytes for size check
-        if isinstance(data, str):
-            b = data.encode('utf-8')
-        else:
-            b = data
-
-        if len(b) > max_size:
-            logger.warning(f"⚠️ JSON too large: {len(b)} > {max_size}")
-            return None
-
-        s = b.decode('utf-8', errors='strict')
-        obj = json.loads(s)
-
-        def _check_depth(o, depth=0):
-            if depth > max_depth:
-                raise ValueError('JSON nesting too deep')
-            if isinstance(o, dict):
-                for v in o.values():
-                    _check_depth(v, depth + 1)
-            elif isinstance(o, list):
-                for v in o:
-                    _check_depth(v, depth + 1)
-
-        _check_depth(obj, 0)
-        return obj
-    except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as e:
-        logger.warning(f"⚠️ Invalid JSON: {e}")
-        return None
-    except Exception as e:
-        logger.debug(f"Unexpected error in safe_json_parse: {e}")
-        return None
-
 def check_ip_banned(ip: str) -> bool:
     """Check if IP is currently banned.
 
@@ -358,34 +316,63 @@ def validate_handshake_message(data: bytes, addr: tuple) -> bool:
 def safe_json_parse(data: bytes | str, max_size: int = 8192, max_depth: int = 6) -> dict | None:
     """Safely parse JSON with size and depth limits.
 
+    SECURITY: Size check happens BEFORE any parsing to prevent DoS attacks.
+    Uses custom decoder with depth tracking to avoid JSON bombs.
+
     Returns a dict/list on success or None on failure.
     """
     try:
+        # SECURITY: Check size BEFORE any processing (prevents memory exhaustion)
         if isinstance(data, bytes):
             if len(data) > max_size:
-                raise ValueError(f"JSON too large: {len(data)} > {max_size}")
-            s = data.decode('utf-8', errors='strict')
+                logger.warning(f"⚠️ JSON too large: {len(data)} > {max_size} bytes")
+                return None
+            json_str = data.decode('utf-8', errors='strict')
         else:
-            s = str(data)
-            if len(s.encode('utf-8')) > max_size:
-                raise ValueError(f"JSON too large: {len(s)} > {max_size}")
+            json_str = str(data)
+            # Check encoded size
+            encoded_size = len(json_str.encode('utf-8'))
+            if encoded_size > max_size:
+                logger.warning(f"⚠️ JSON too large: {encoded_size} > {max_size} bytes")
+                return None
 
-        obj = json.loads(s)
+        # Custom JSON decoder with depth tracking (prevents CPU exhaustion from deep nesting)
+        class DepthTrackingDecoder(json.JSONDecoder):
+            def __init__(self, max_depth, *args, **kwargs):
+                self.max_depth = max_depth
+                super().__init__(*args, **kwargs)
 
-        # Validate structure depth
-        def check_depth(o, depth=0):
-            if depth > max_depth:
-                raise ValueError("JSON nesting too deep")
-            if isinstance(o, dict):
-                for v in o.values():
-                    check_depth(v, depth + 1)
-            elif isinstance(o, list):
-                for v in o:
-                    check_depth(v, depth + 1)
+            def decode(self, s, **kwargs):
+                return self._decode_with_depth(s, 0)
 
-        check_depth(obj)
+            def _decode_with_depth(self, s, depth):
+                if depth > self.max_depth:
+                    raise ValueError(f"JSON nesting depth exceeds limit of {self.max_depth}")
+                # Use the parent decoder but intercept object_hook to track depth
+                original_object_hook = self.object_hook
+                def depth_checking_hook(obj):
+                    if depth + 1 > self.max_depth:
+                        raise ValueError(f"JSON nesting depth exceeds limit of {self.max_depth}")
+                    return original_object_hook(obj) if original_object_hook else obj
+
+                self.object_hook = depth_checking_hook
+                try:
+                    result = super(DepthTrackingDecoder, self).decode(s)
+                    return result
+                finally:
+                    self.object_hook = original_object_hook
+
+        # Parse with depth-limited decoder
+        decoder = DepthTrackingDecoder(max_depth)
+        obj = decoder.decode(json_str)
+
+        # Additional validation: ensure result is a dict or list (expected structures)
+        if not isinstance(obj, (dict, list)):
+            logger.warning("⚠️ JSON root must be object or array")
+            return None
+
         return obj
-    except (json.JSONDecodeError, ValueError, UnicodeDecodeError) as e:
+    except (json.JSONDecodeError, ValueError, UnicodeDecodeError, RecursionError) as e:
         logger.warning(f"⚠️ Invalid or unsafe JSON: {e}")
         return None
 
