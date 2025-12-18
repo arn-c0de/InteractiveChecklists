@@ -24,6 +24,7 @@ import time
 import json
 import logging
 import traceback
+from datetime import datetime
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.backends import default_backend
 
@@ -165,6 +166,41 @@ def validate_data_message(data: bytes, encrypt: bool = True) -> bool:
         logger.warning(f"⚠️ Oversized data message: {len(data)} bytes (max {allowed})")
         return False
     return True
+
+
+# Timestamp filtering to prevent forwarding of old/cached data
+# Stores last processed timestamp as ISO-8601 string (or None)
+_last_processed_timestamp = None
+
+def _parse_iso_timestamp(ts_str: str):
+    try:
+        if not isinstance(ts_str, str):
+            return None
+        # Accept trailing 'Z' as UTC
+        if ts_str.endswith('Z'):
+            ts_str = ts_str[:-1] + '+00:00'
+        return datetime.fromisoformat(ts_str)
+    except Exception:
+        return None
+
+
+def _timestamp_is_newer(current_ts: str, last_ts: str) -> bool:
+    # Treat missing timestamps as newer (accept)
+    if current_ts is None:
+        return True
+    if last_ts is None:
+        return True
+
+    cur = _parse_iso_timestamp(current_ts)
+    last = _parse_iso_timestamp(last_ts)
+    if cur is not None and last is not None:
+        return cur > last
+
+    # Fallback to lexicographic comparison for identical ISO-8601 formats
+    try:
+        return current_ts > last_ts
+    except Exception:
+        return True
 
 
 def check_ip_banned(ip: str) -> bool:
@@ -573,6 +609,8 @@ def _is_same_file(f, path: str) -> bool:
 def tail_and_send(path: str, host: str, port: int, send_existing=False, once=False, interval=0.2, 
                   verbose=False, show_env=False, encrypt=True, session_mgr: 'SessionManager' = None, handshake_port: int = None, bind_ip: str = '127.0.0.1'):
     """Tail a file and send only new JSON lines as UDP datagrams (do not send existing lines)."""
+    # Use global timestamp state to prevent forwarding old/cached messages
+    global _last_processed_timestamp
     if not os.path.exists(path):
         raise FileNotFoundError(path)
     
@@ -698,7 +736,22 @@ def tail_and_send(path: str, host: str, port: int, send_existing=False, once=Fal
             if parsed is None:
                 logger.debug("Skipping invalid/empty JSON line")
                 continue
-            
+
+            # Timestamp validation: reject old/cached messages (prevents client position resets)
+            try:
+                cur_ts = parsed.get('timestamp')
+            except Exception:
+                cur_ts = None
+
+            if not _timestamp_is_newer(cur_ts, _last_processed_timestamp):
+                logger.warning(f"⚠️ REJECTED OLD DATA: timestamp={cur_ts} (last={_last_processed_timestamp}) - preventing position reset!")
+                continue
+
+            # Accept and record timestamp
+            if cur_ts is not None:
+                logger.info(f"✅ Accepted data with timestamp={cur_ts}")
+                _last_processed_timestamp = cur_ts
+
             # Send to all devices with active sessions (ECDH mode) or broadcast (PSK mode)
             if session_mgr:
                 # Send to each device with an active session
@@ -749,10 +802,53 @@ def tail_and_send(path: str, host: str, port: int, send_existing=False, once=Fal
         # handshake_sock is same as sock in ECDH mode, don't close twice
 
 
+def get_last_line(path: str) -> str | None:
+    """Efficiently read the last complete line from a file by seeking from the end.
+    
+    This avoids reading the entire file, which is important for large JSONL files.
+    Returns None if file is empty or only contains incomplete lines.
+    """
+    try:
+        with open(path, 'rb') as f:
+            # Seek to end
+            f.seek(0, os.SEEK_END)
+            file_size = f.tell()
+            
+            if file_size == 0:
+                return None
+            
+            # Read backwards in chunks to find last complete line
+            # We read up to 64KB from the end, which should be enough for any JSON line
+            chunk_size = min(65536, file_size)
+            f.seek(-chunk_size, os.SEEK_END)
+            
+            # Read chunk and decode
+            chunk = f.read(chunk_size)
+            try:
+                text = chunk.decode('utf-8', errors='ignore')
+            except Exception:
+                return None
+            
+            # Find last complete line (split by newline and take last non-empty)
+            lines = text.split('\n')
+            # Work backwards to find last non-empty line
+            for i in range(len(lines) - 1, -1, -1):
+                line = lines[i].strip()
+                if line:
+                    return line
+            
+            return None
+    except Exception as e:
+        logger.debug(f"Error reading last line: {e}")
+        return None
+
+
 # New feature: repeat the last line every X seconds
 def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=False, show_env=False, encrypt=True, 
                      session_mgr: 'SessionManager' = None, handshake_port: int = None, bind_ip: str = '127.0.0.1'):
     """Send the last line of the file as a UDP datagram every <interval> seconds."""
+    # Use global timestamp state to prevent forwarding old/cached messages
+    global _last_processed_timestamp
     if not os.path.exists(path):
         raise FileNotFoundError(path)
     
@@ -777,6 +873,8 @@ def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=Fals
     try:
         last_sent = None
         last_send_time = 0
+        last_file_mtime = 0  # Track file modification time to detect changes
+        cached_last_line = None  # Cache the last line to avoid unnecessary reads
         
         while True:
             # In ECDH mode: check for incoming handshake messages
@@ -844,12 +942,32 @@ def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=Fals
                 continue
             
             try:
-                with open(path, 'r', encoding='utf-8', errors='ignore') as f:
-                    lines = f.readlines()
-                if not lines:
+                # Check if file has been modified since last read
+                try:
+                    file_mtime = os.path.getmtime(path)
+                except OSError:
                     time.sleep(0.1)
                     continue
-                last_line = lines[-1]
+                
+                # Only read file if it has been modified OR we haven't cached anything yet
+                if file_mtime != last_file_mtime or cached_last_line is None:
+                    last_line = get_last_line(path)
+                    if last_line:
+                        cached_last_line = last_line
+                        last_file_mtime = file_mtime
+                        logger.debug(f"📄 Updated cached line from file (mtime: {file_mtime})")
+                    else:
+                        time.sleep(0.1)
+                        continue
+                else:
+                    # Use cached line (file hasn't changed)
+                    last_line = cached_last_line
+                    logger.debug("📦 Using cached last line (file unchanged)")
+                
+                if not last_line:
+                    time.sleep(0.1)
+                    continue
+                    
                 jsonpart = extract_json_from_line(last_line)
                 if not jsonpart:
                     time.sleep(0.1)
@@ -860,7 +978,23 @@ def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=Fals
                 if parsed is None:
                     time.sleep(0.1)
                     continue
-                
+
+                # Timestamp validation: reject old/cached messages
+                try:
+                    cur_ts = parsed.get('timestamp')
+                except Exception:
+                    cur_ts = None
+
+                if not _timestamp_is_newer(cur_ts, _last_processed_timestamp):
+                    logger.warning(f"⚠️ REJECTED OLD DATA: timestamp={cur_ts} (last={_last_processed_timestamp}) - preventing position reset!")
+                    time.sleep(0.1)
+                    continue
+
+                # Accept and record timestamp
+                if cur_ts is not None:
+                    logger.info(f"✅ Accepted data with timestamp={cur_ts}")
+                    _last_processed_timestamp = cur_ts
+
                 # Send to all devices with active sessions (ECDH mode) or broadcast (PSK mode)
                 if session_mgr:
                     sent_count = 0
