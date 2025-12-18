@@ -112,31 +112,44 @@ class AndroidDrawablesLoader:
     def _make_display_name(self, symbol_entity: str) -> str:
         """
         Generate human-readable display name from symbol entity
-        mortar -> Mortar
-        size_squad -> Squad
-        military_police -> Military Police
+        equipment_mortar -> Mortar
+        unitsize_squad -> Squad
+        activities_military_police -> Military Police
+        aircraft_fighter -> Fighter
         """
-        # Remove 'size_' prefix for size modifiers
-        if symbol_entity.startswith('size_'):
-            symbol_entity = symbol_entity[5:]
+        # Remove category prefixes
+        category_prefixes = ['equipment_', 'groundunit_', 'installations_', 'activities_', 'unitsize_', 'aircraft_', 'helicopter_', 'ship_', 'vehicle_']
+        display_entity = symbol_entity
+        for prefix in category_prefixes:
+            if display_entity.startswith(prefix):
+                display_entity = display_entity[len(prefix):]
+                break
         
         # Replace underscores with spaces and title case
-        return symbol_entity.replace('_', ' ').title()
+        return display_entity.replace('_', ' ').title()
     
     def _guess_category(self, symbol_entity: str) -> str:
-        """Guess category from symbol entity name"""
-        if symbol_entity.startswith('size_'):
-            return 'unit_size'
-        elif any(x in symbol_entity for x in ['mortar', 'missile', 'artillery', 'radar']):
+        """Automatic category detection from prefix"""
+        if symbol_entity.startswith('equipment_'):
             return 'equipment'
-        elif any(x in symbol_entity for x in ['infantry', 'armor', 'tank']):
-            return 'unit'
-        elif any(x in symbol_entity for x in ['bridge', 'engineer']):
-            return 'installation'
-        elif any(x in symbol_entity for x in ['police', 'medical']):
-            return 'activity'
+        elif symbol_entity.startswith('groundunit_'):
+            return 'ground_units'
+        elif symbol_entity.startswith('installations_'):
+            return 'installations'
+        elif symbol_entity.startswith('activities_'):
+            return 'activities'
+        elif symbol_entity.startswith('unitsize_'):
+            return 'unit_size'
+        elif symbol_entity.startswith('aircraft_'):
+            return 'aircraft'
+        elif symbol_entity.startswith('helicopter_'):
+            return 'helicopter'
+        elif symbol_entity.startswith('ship_'):
+            return 'ship'
+        elif symbol_entity.startswith('vehicle_'):
+            return 'vehicle'
         else:
-            return 'other'
+            return 'equipment'  # default fallback
     
     def get_available_symbols(self) -> List[str]:
         """Get list of all available symbol entities"""
