@@ -42,6 +42,11 @@ import androidx.compose.ui.text.font.FontFamily
 import com.example.checklist_interactive.data.tags.FileTag
 import com.example.checklist_interactive.data.prefs.ContributorEntry
 import com.example.checklist_interactive.ui.datapad.LocalDataPadManager
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import kotlinx.coroutines.flow.collectLatest
+import android.app.Application
 
 // The list of available aircraft folders is loaded from the assets/Checklists directory
 
@@ -67,11 +72,26 @@ fun SettingsScreen(
 
     // Map cache clear state
     var showClearMapCacheConfirm by remember { mutableStateOf(false) }
-    var isClearingMapCache by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    var isImporting by remember { mutableStateOf(false) }
+    val uiScope = rememberCoroutineScope()
+    val vm: SettingsViewModel = viewModel(
+        factory = SettingsViewModel.provideFactory(
+            LocalContext.current.applicationContext as Application,
+            prefsManager,
+            fileManager
+        )
+    )
+    val isImporting by vm.isImporting.collectAsState()
+    val isClearingMapCache by vm.isClearingMapCache.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(vm) {
+        vm.snackbarMessages.collectLatest { message ->
+            snackbarHostState.showSnackbar(message)
+        }
+    }
+
     // Load available aircraft from assets/Checklists (subfolders)
     var availableAircrafts by remember { mutableStateOf(listOf<String>()) }
     LaunchedEffect(context) {
@@ -84,10 +104,11 @@ fun SettingsScreen(
         }
         availableAircrafts = list
     }
-    val rotation by animateFloatAsState(targetValue = if (importExpanded) 180f else 0f)
+
+    val rotation by animateFloatAsState(targetValue = if (importExpanded) 180f else 0f) 
 
     var showTagJsonDialog by remember { mutableStateOf(false) }
-    var tagJsonContent by remember { mutableStateOf("") }
+    val tagJsonContent by vm.tagJsonContent.collectAsState("")
     var tagReloadKey by remember { mutableStateOf(0) }
     
     var showSourcesJsonDialog by remember { mutableStateOf(false) }
@@ -131,79 +152,10 @@ fun SettingsScreen(
         }
     }
 
-    fun handleReimport() {
-        coroutineScope.launch {
-            isImporting = true
-            try {
-                val imported = withContext(Dispatchers.IO) {
-                    fileManager.importAllBundledAssets("")
-                }
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, context.resources.getQuantityString(R.plurals.imported_files, imported, imported), Toast.LENGTH_SHORT).show()
-                    onFilesRefreshed()
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, context.getString(R.string.import_failed, e.message ?: ""), Toast.LENGTH_LONG).show()
-                }
-            } finally {
-                isImporting = false
-            }
-        }
-    }
-
-    fun handleWipeAndReimport() {
-        coroutineScope.launch {
-            isImporting = true
-            try {
-                val imported = withContext(Dispatchers.IO) {
-                    fileManager.wipeInternalRoot()
-                    fileManager.importAllBundledAssets("")
-                }
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, context.resources.getQuantityString(R.plurals.wiped_imported_files, imported, imported), Toast.LENGTH_SHORT).show()
-                    onFilesRefreshed()
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, context.getString(R.string.wipe_import_failed, e.message ?: ""), Toast.LENGTH_LONG).show()
-                }
-            } finally {
-                isImporting = false
-            }
-        }
-    }
-
-    // Clear map cache (osmdroid) — deletes the osmdroid cache directory
-    fun handleClearMapCache() {
-        coroutineScope.launch {
-            isClearingMapCache = true
-            try {
-                withContext(Dispatchers.IO) {
-                    try {
-                        val basePathFile = Configuration.getInstance().osmdroidBasePath
-                        if (basePathFile != null && basePathFile.exists()) {
-                            // Delete the osmdroid base directory recursively
-                            basePathFile.deleteRecursively()
-                        }
-                    } catch (e: Exception) {
-                        throw e
-                    }
-                }
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, context.getString(R.string.msg_map_cache_cleared), Toast.LENGTH_SHORT).show()
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, context.getString(R.string.msg_map_cache_clear_failed, e.message ?: ""), Toast.LENGTH_LONG).show()
-                }
-            } finally {
-                isClearingMapCache = false
-            }
-        }
-    }
+    // Import/clear logic moved to SettingsViewModel (vm). Use vm.reimport(), vm.wipeAndReimport(), vm.clearMapCache() and observe vm.snackbarMessages for feedback.
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
@@ -244,10 +196,10 @@ fun SettingsScreen(
                         prefsManager.setImportFolderUri(null)
                         currentFolderUri = null
                     },
-                    onReimport = { handleReimport() },
+                    onReimport = { vm.reimport() },
                     showWipeConfirm = showWipeConfirm,
                     onShowWipeConfirm = { showWipeConfirm = it },
-                    onWipeAndReimport = { handleWipeAndReimport() },
+                    onWipeAndReimport = { vm.wipeAndReimport() },
                     isImporting = isImporting
                 )
             }
@@ -272,7 +224,7 @@ fun SettingsScreen(
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Button(onClick = {
                                 prefsManager.resetPdfViewerLayout()
-                                Toast.makeText(context, context.getString(R.string.msg_fab_positions_restored), Toast.LENGTH_SHORT).show()
+                                uiScope.launch { snackbarHostState.showSnackbar(context.getString(R.string.msg_fab_positions_restored)) }
                             }) {
                                 Text(stringResource(R.string.settings_reset_fab_positions))
                             }
@@ -652,30 +604,15 @@ fun SettingsScreen(
                                 Spacer(modifier = Modifier.height(12.dp))
                                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                     Button(onClick = {
-                                        // Load tags and display JSON
-                                        try {
-                                            val tags = fileManager.tagManager.loadFileTags()
-                                            val jsonStr = json.encodeToString(
-                                                kotlinx.serialization.builtins.ListSerializer(FileTag.serializer()),
-                                                tags
-                                            )
-                                            tagJsonContent = jsonStr
-                                        } catch (e: Exception) {
-                                            tagJsonContent = context.getString(R.string.error_loading_tags, e.message ?: "")
-                                        }
+                                        // Load tags and display JSON via ViewModel
+                                        vm.loadInternalTagsToJson()
                                         showTagJsonDialog = true
                                     }) {
                                         Text(stringResource(R.string.settings_view_internal_tag_json))
                                     }
                                     OutlinedButton(onClick = {
-                                        // Show asset default file as JSON if present
-                                        try {
-                                            val stream = context.assets.open("file_tags.json")
-                                            val content = stream.bufferedReader().use { it.readText() }
-                                            tagJsonContent = content
-                                        } catch (e: Exception) {
-                                            tagJsonContent = context.getString(R.string.no_default_tags_asset)
-                                        }
+                                        // Show asset default file as JSON via ViewModel
+                                        vm.loadDefaultTagsAssetToTagJson()
                                         showTagJsonDialog = true
                                     }) {
                                         Text(stringResource(R.string.settings_view_default_asset_json))
@@ -683,19 +620,9 @@ fun SettingsScreen(
                                 }
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Button(onClick = {
-                                    // Import and reload tags from asset file_tags.json
-                                    try {
-                                        // Overwrite internal file_tags.json with asset version
-                                        context.assets.open("file_tags.json").use { input ->
-                                            val outFile = java.io.File(context.filesDir, "file_tags.json")
-                                            outFile.outputStream().use { output -> input.copyTo(output) }
-                                        }
-                                        tagReloadKey++
-                                        onFilesRefreshed()
-                                        Toast.makeText(context, context.getString(R.string.msg_tags_imported), Toast.LENGTH_SHORT).show()
-                                    } catch (e: Exception) {
-                                        Toast.makeText(context, context.getString(R.string.import_failed, e.message ?: ""), Toast.LENGTH_LONG).show()
-                                    }
+                                    vm.importTagsFromAsset()
+                                    tagReloadKey++
+                                    onFilesRefreshed()
                                 }, modifier = Modifier.fillMaxWidth()) {
                                     Icon(Icons.Default.Refresh, contentDescription = null)
                                     Spacer(modifier = Modifier.width(8.dp))
@@ -856,7 +783,7 @@ fun SettingsScreen(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     LazyColumn {
-                        items(availableAircrafts) { aircraft ->
+                        items(availableAircrafts, key = { it }) { aircraft ->
                             val displayName = aircraft.replace('_', ' ')
                             val checked = selectedSet.contains(aircraft)
                             Row(
@@ -927,7 +854,7 @@ fun SettingsScreen(
                     val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
                     val clip = android.content.ClipData.newPlainText(context.getString(R.string.clipboard_tags_json_label), tagJsonContent)
                     clipboard.setPrimaryClip(clip)
-                    Toast.makeText(context, context.getString(R.string.msg_copied_to_clipboard), Toast.LENGTH_SHORT).show()
+                    uiScope.launch { snackbarHostState.showSnackbar(context.getString(R.string.msg_copied_to_clipboard)) }
                 }) { Text(stringResource(R.string.action_copy)) }
             }
         )
@@ -957,7 +884,7 @@ fun SettingsScreen(
                     val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
                     val clip = android.content.ClipData.newPlainText(context.getString(R.string.clipboard_sources_json_label), sourcesJsonContent)
                     clipboard.setPrimaryClip(clip)
-                    Toast.makeText(context, context.getString(R.string.msg_copied_to_clipboard), Toast.LENGTH_SHORT).show()
+                    uiScope.launch { snackbarHostState.showSnackbar(context.getString(R.string.msg_copied_to_clipboard)) }
                 }) { Text(stringResource(R.string.action_copy)) }
             }
         )
@@ -987,7 +914,7 @@ fun SettingsScreen(
                     val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
                     val clip = android.content.ClipData.newPlainText(context.getString(R.string.clipboard_contributors_json_label), contributorsJsonContent)
                     clipboard.setPrimaryClip(clip)
-                    Toast.makeText(context, context.getString(R.string.msg_copied_to_clipboard), Toast.LENGTH_SHORT).show()
+                    uiScope.launch { snackbarHostState.showSnackbar(context.getString(R.string.msg_copied_to_clipboard)) }
                 }) { Text(stringResource(R.string.action_copy)) }
             }
         )
@@ -1002,7 +929,7 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton({
                     showClearMapCacheConfirm = false
-                    handleClearMapCache()
+                    vm.clearMapCache()
                 }) { Text(stringResource(R.string.action_yes)) }
             },
             dismissButton = {

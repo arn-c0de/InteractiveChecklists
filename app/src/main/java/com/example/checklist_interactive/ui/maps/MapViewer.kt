@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Flight
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
@@ -80,9 +81,28 @@ fun MapViewer(
     var rangeRingsOverlay by remember { mutableStateOf<org.osmdroid.views.overlay.Overlay?>(null) }
     var showQuickAccess by remember { mutableStateOf(false) }
     var showDataPad by remember { mutableStateOf(false) }
+    var showMarkerRouteManagement by remember { mutableStateOf(false) }
+    var showRouteCreation by remember { mutableStateOf(false) }
 
     // Create a coroutine scope for state updates from listeners
     val scope = rememberCoroutineScope()
+    
+    // Initialize tactical database and repositories
+    val tacticalDb = remember { 
+        com.example.checklist_interactive.data.tactical.TacticalDatabase.getInstance(context, useExternalPath = false)
+    }
+    val locationRepository = remember { 
+        com.example.checklist_interactive.data.tactical.LocationRepositoryImpl(tacticalDb.locationDao())
+    }
+    val routeRepository = remember {
+        com.example.checklist_interactive.data.tactical.RouteRepositoryImpl(tacticalDb.routeDao(), tacticalDb.locationDao())
+    }
+    val markerRouteViewModel = remember {
+        MarkerRouteViewModel(locationRepository, routeRepository)
+    }
+    val routeCreationViewModel = remember {
+        RouteCreationViewModel(routeRepository, locationRepository)
+    }
 
     // Track last programmatic map movement to avoid treating it as a user scroll
     val lastProgrammaticMove = remember { mutableStateOf(0L) }
@@ -346,6 +366,76 @@ fun MapViewer(
             }
         }
         
+        // Load and display markers from database
+        LaunchedEffect(mapView) {
+            if (mapView != null) {
+                locationRepository.getAllLocations().collect { markers ->
+                    mapView?.let { mv ->
+                        // Remove existing marker overlays (except position marker)
+                        mv.overlays.removeAll { it is org.osmdroid.views.overlay.Marker && it != positionMarker }
+                        
+                        // Add markers to map
+                        markers.forEach { marker ->
+                            val osmMarker = org.osmdroid.views.overlay.Marker(mv).apply {
+                                position = GeoPoint(marker.latitude, marker.longitude)
+                                title = marker.name
+                                snippet = buildString {
+                                    append("Type: ${marker.markerType}")
+                                    if (marker.coalition != null) {
+                                        append("\nCoalition: ${marker.coalition}")
+                                    }
+                                    if (marker.description.isNotEmpty()) {
+                                        append("\n${marker.description}")
+                                    }
+                                }
+                                
+                                // Set marker icon based on type
+                                setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_BOTTOM)
+                                
+                                // Different colors for different types
+                                val markerColor = when {
+                                    marker.markerType == "airport" -> android.graphics.Color.parseColor("#8B4513")
+                                    marker.markerType == "waypoint" -> android.graphics.Color.parseColor("#FFA500")
+                                    marker.markerType.startsWith("tactical_blufor") -> android.graphics.Color.parseColor("#00A8FF")
+                                    marker.markerType.startsWith("tactical_opfor") -> android.graphics.Color.parseColor("#FF4444")
+                                    marker.markerType == "target" -> android.graphics.Color.parseColor("#FF0000")
+                                    marker.markerType == "threat" -> android.graphics.Color.parseColor("#FF0000")
+                                    else -> android.graphics.Color.parseColor("#9370DB")
+                                }
+                                
+                                // Create simple colored circle icon
+                                try {
+                                    val bitmap = android.graphics.Bitmap.createBitmap(48, 48, android.graphics.Bitmap.Config.ARGB_8888)
+                                    val canvas = android.graphics.Canvas(bitmap)
+                                    val paint = android.graphics.Paint().apply {
+                                        isAntiAlias = true
+                                        color = markerColor
+                                        style = android.graphics.Paint.Style.FILL
+                                    }
+                                    val strokePaint = android.graphics.Paint().apply {
+                                        isAntiAlias = true
+                                        color = android.graphics.Color.WHITE
+                                        style = android.graphics.Paint.Style.STROKE
+                                        strokeWidth = 4f
+                                    }
+                                    canvas.drawCircle(24f, 24f, 18f, paint)
+                                    canvas.drawCircle(24f, 24f, 18f, strokePaint)
+                                    icon = BitmapDrawable(context.resources, bitmap)
+                                } catch (e: Exception) {
+                                    // Use default marker
+                                }
+                            }
+                            
+                            mv.overlays.add(osmMarker)
+                        }
+                        
+                        mv.invalidate()
+                        Log.d(TAG, "Loaded ${markers.size} markers onto map")
+                    }
+                }
+            }
+        }
+        
         // Control overlay
         Column(
             modifier = Modifier
@@ -418,6 +508,17 @@ fun MapViewer(
                 Icon(
                     imageVector = Icons.Default.Flight,
                     contentDescription = stringResource(R.string.map_overlays)
+                )
+            }
+            
+            // Marker/Route management button
+            FloatingActionButton(
+                onClick = { showMarkerRouteManagement = true },
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer
+            ) {
+                Icon(
+                    imageVector = Icons.Default.List,
+                    contentDescription = "Markers & Routes"
                 )
             }
             
@@ -695,6 +796,65 @@ fun MapViewer(
     // DataPad Popup
     if (showDataPad && datapadEnabled) {
         DataPadPopup(onDismiss = { showDataPad = false })
+    }
+    
+    // Marker/Route Management Sheet
+    if (showMarkerRouteManagement) {
+        MarkerRouteManagementSheet(
+            viewModel = markerRouteViewModel,
+            onDismiss = { showMarkerRouteManagement = false },
+            onMarkerClick = { marker ->
+                // Center map on marker
+                mapView?.controller?.animateTo(GeoPoint(marker.latitude, marker.longitude))
+                showMarkerRouteManagement = false
+            },
+            onRouteClick = { route ->
+                // Load and display route on map
+                scope.launch {
+                    val routeData = routeRepository.getRouteWithWaypoints(route.id)
+                    routeData?.let { data ->
+                        // Draw route on map
+                        val waypoints = data.waypoints.map { wpWithLoc ->
+                            Triple(
+                                wpWithLoc.location,
+                                wpWithLoc.waypoint.distanceNm,
+                                wpWithLoc.waypoint.headingMag
+                            )
+                        }
+                        mapView?.let { mv ->
+                            drawRouteOnMap(mv, waypoints)
+                            // Center on first waypoint
+                            if (waypoints.isNotEmpty()) {
+                                mv.controller.animateTo(
+                                    GeoPoint(waypoints[0].first.latitude, waypoints[0].first.longitude)
+                                )
+                            }
+                        }
+                    }
+                }
+                showMarkerRouteManagement = false
+            },
+            onCreateRoute = {
+                showMarkerRouteManagement = false
+                routeCreationViewModel.startRouteCreation()
+                showRouteCreation = true
+            }
+        )
+    }
+    
+    // Route Creation Sheet
+    if (showRouteCreation) {
+        RouteCreationSheet(
+            viewModel = routeCreationViewModel,
+            onDismiss = { 
+                showRouteCreation = false
+                routeCreationViewModel.cancelRouteCreation()
+            },
+            onWaypointClick = { location ->
+                // Center map on waypoint
+                mapView?.controller?.animateTo(GeoPoint(location.latitude, location.longitude))
+            }
+        )
     }
     
     DisposableEffect(Unit) {

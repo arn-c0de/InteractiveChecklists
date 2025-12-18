@@ -53,6 +53,8 @@ import androidx.compose.material.icons.filled.ViewModule
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Flight
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import com.example.checklist_interactive.ui.datapad.LocalDataPadManager
 import com.example.checklist_interactive.ui.datapad.DataPadPopup
 import kotlinx.coroutines.launch
@@ -134,6 +136,8 @@ fun InternalFilesScreen(
     var folderTree by remember { mutableStateOf<List<InternalFileManager.FolderNode>>(emptyList()) }
     // Cache of enriched files by path to avoid repeated enrichWithTags calls
     var enrichedFileMap by remember { mutableStateOf<Map<String, FileInfo>>(emptyMap()) }
+    // Per-node lazy enrichment cache (keyed by relativePath)
+    val enrichedNodes = remember { mutableStateMapOf<String, InternalFileManager.FolderNode>() }
     var shortcuts by remember { mutableStateOf<List<PageShortcut>>(emptyList()) }
     var showImportDialog by remember { mutableStateOf(false) }
     var showImportChoiceDialog by remember { mutableStateOf(false) }
@@ -168,19 +172,37 @@ fun InternalFilesScreen(
     var searchQuery by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<FileInfo>>(emptyList()) }
     var isSearching by remember { mutableStateOf(false) }
-    // Perform a simple search across displayName, path and tags (IO-bound)
+    // Cached flat list of enriched files to avoid repeated flatten/map allocations during searches
+    var allEnrichedFiles by remember { mutableStateOf<List<FileInfo>>(emptyList()) }
+    // Job used to debounce user typing
+    var searchJob by remember { mutableStateOf<Job?>(null) }
+
+    // Perform a simple search across displayName, path and tags (CPU-bound, debounced)
     fun performSearch(query: String) {
-        coroutineScope.launch {
+        val qTrimmed = query.trim()
+        // If empty, return all files immediately (no debounce)
+        if (qTrimmed.isEmpty()) {
+            coroutineScope.launch {
+                isSearching = true
+                val allFiles = withContext(Dispatchers.Default) { if (allEnrichedFiles.isNotEmpty()) allEnrichedFiles else (groupedFiles.values.flatten()).map { enrichedFileMap[it.path] ?: it } }
+                searchResults = allFiles
+                isSearching = false
+            }
+            return
+        }
+
+        // Debounce typing to avoid repeated work
+        searchJob?.cancel()
+        searchJob = coroutineScope.launch {
             isSearching = true
-            val q = query.trim().lowercase()
-            val results = withContext(Dispatchers.IO) {
-                // Use the enriched map when available to include tags
-                val allFiles = (groupedFiles.values.flatten()).map { enrichedFileMap[it.path] ?: it }
-                if (q.isEmpty()) return@withContext allFiles
+            delay(200L) // small debounce
+            val q = qTrimmed
+            val results = withContext(Dispatchers.Default) {
+                val allFiles = if (allEnrichedFiles.isNotEmpty()) allEnrichedFiles else (groupedFiles.values.flatten()).map { enrichedFileMap[it.path] ?: it }
                 allFiles.filter { file ->
-                    file.displayName.lowercase().contains(q) ||
-                    file.path.lowercase().contains(q) ||
-                    file.tags.any { tag -> tag.lowercase().contains(q) }
+                    file.displayName.contains(q, ignoreCase = true) ||
+                    file.path.contains(q, ignoreCase = true) ||
+                    file.tags.any { tag -> tag.contains(q, ignoreCase = true) }
                 }
             }
             searchResults = results
@@ -205,6 +227,8 @@ fun InternalFilesScreen(
         val allFiles = rawGroupedFiles.values.flatten().distinctBy { it.path }
         val enrichedAll = withContext(Dispatchers.IO) { fileManager.enrichWithTags(allFiles) }
         val newEnrichedMap = enrichedAll.associateBy { it.path }
+        // Cache flat enriched list to speed up searches and other operations
+        allEnrichedFiles = enrichedAll
 
         // Perform grouping and filtering off the main thread to avoid UI jank
         val newGrouped = withContext(Dispatchers.Default) {
@@ -228,9 +252,9 @@ fun InternalFilesScreen(
         val rawTree = withContext(Dispatchers.IO) {
             fileManager.getFolderTree().map { node -> filterAircraftChildren(node, assetAircraftsLower, prefsManager) }
         }
-        // Enrich the tree off the main thread as well
-        val newTree = withContext(Dispatchers.Default) { rawTree.map { node -> enrichNodeWithTags(node, newEnrichedMap, selectedTagFilters, tagFilterMode) } }
-        if (newTree != folderTree) folderTree = newTree
+        // Keep raw tree and clear per-node enrichment cache; enrichment will be performed lazily when nodes are expanded
+        if (rawTree != folderTree) folderTree = rawTree
+        enrichedNodes.clear()
         android.util.Log.i("InternalFiles", "refreshFilesWithTags: tree nodes ${folderTree.size}")
         android.util.Log.i("InternalFiles", "refreshFilesWithTags: done")
     }
@@ -291,6 +315,28 @@ fun InternalFilesScreen(
         }
         if (!expandedCategories.containsKey("shortcuts")) {
             expandedCategories["shortcuts"] = prefsManager.isCategoryExpanded("shortcuts") ?: false
+        }
+
+        // Pre-enrich any nodes that are already expanded so the UI shows enriched files immediately
+        coroutineScope.launch {
+            expandedCategories.filterValues { it }.keys.forEach { key ->
+                if (!enrichedNodes.containsKey(key)) {
+                    // Find node by path
+                    fun rec(list: List<InternalFileManager.FolderNode>): InternalFileManager.FolderNode? {
+                        list.forEach { n ->
+                            if (n.relativePath == key) return n
+                            val c = rec(n.children)
+                            if (c != null) return c
+                        }
+                        return null
+                    }
+                    val node = rec(folderTree)
+                    node?.let {
+                        val enriched = withContext(Dispatchers.Default) { enrichNodeFiles(it, enrichedFileMap, selectedTagFilters, tagFilterMode) }
+                        enrichedNodes[key] = enriched
+                    }
+                }
+            }
         }
     }
 
@@ -628,6 +674,19 @@ fun InternalFilesScreen(
                     }
                 }
                 
+                // Helper to find a node by relativePath in the raw folderTree
+                fun findNodeByRelativePath(path: String): InternalFileManager.FolderNode? {
+                    fun rec(list: List<InternalFileManager.FolderNode>): InternalFileManager.FolderNode? {
+                        list.forEach { n ->
+                            if (n.relativePath == path) return n
+                            val child = rec(n.children)
+                            if (child != null) return child
+                        }
+                        return null
+                    }
+                    return rec(folderTree)
+                }
+
                 // Render folder tree lazily (improves performance for large trees)
                 // Emit folder nodes, files and children as separate lazy items so only visible content is composed
                 if (folderTree.isNotEmpty()) {
@@ -638,6 +697,16 @@ fun InternalFilesScreen(
                             onToggleExpanded = { key, newState ->
                                 expandedCategories[key] = newState
                                 prefsManager.setCategoryExpanded(key, newState)
+                                // Perform lazy enrichment once when expanded
+                                if (newState && !enrichedNodes.containsKey(key)) {
+                                    coroutineScope.launch {
+                                        val node = findNodeByRelativePath(key)
+                                        node?.let {
+                                            val enriched = withContext(Dispatchers.Default) { enrichNodeFiles(it, enrichedFileMap, selectedTagFilters, tagFilterMode) }
+                                            enrichedNodes[key] = enriched
+                                        }
+                                    }
+                                }
                             },
                             onFileOpen = onFileOpen,
                             onDelete = { file ->
@@ -649,7 +718,8 @@ fun InternalFilesScreen(
                                 showTagEditor = true
                             },
                             level = 0,
-                            isGridView = isGridView
+                            isGridView = isGridView,
+                            enrichedNodes = enrichedNodes
                         )
                     }
                 }
@@ -1010,6 +1080,26 @@ private fun enrichNodeWithTags(
     return node.copy(files = enrichedFiles, children = enrichedChildren)
 }
 
+// Enrich only the files of a single node (no recursive enrichment of children)
+private fun enrichNodeFiles(
+    node: InternalFileManager.FolderNode,
+    enrichedMap: Map<String, FileInfo>,
+    selectedTagFilters: Set<String>,
+    tagFilterMode: String
+): InternalFileManager.FolderNode {
+    fun applyTagFilters(files: List<FileInfo>): List<FileInfo> {
+        if (selectedTagFilters.isEmpty()) return files
+        val enrichedFiles = files.map { enrichedMap[it.path] ?: it }
+        return if (tagFilterMode == "all") {
+            enrichedFiles.filter { file -> selectedTagFilters.all { tag -> file.tags.contains(tag) } }
+        } else {
+            enrichedFiles.filter { file -> file.tags.any { tag -> selectedTagFilters.contains(tag) } }
+        }
+    }
+    val enrichedFiles = applyTagFilters(node.files).map { enrichedMap[it.path] ?: it }
+    return node.copy(files = enrichedFiles)
+}
+
 /**
  * Recursively filter aircraft subfolders based on visibility settings.
  * All top-level folders (Checklists, Handbooks, radiocommunication, etc.) are always shown.
@@ -1053,7 +1143,8 @@ private fun FolderTree(
     onDelete: (FileInfo) -> Unit,
     onEditTags: (FileInfo) -> Unit,
     level: Int,
-    isGridView: Boolean
+    isGridView: Boolean,
+    enrichedNodes: Map<String, InternalFileManager.FolderNode>
 ) {
     nodes.forEach { node ->
         FolderNodeItem(
@@ -1063,9 +1154,9 @@ private fun FolderTree(
             onFileOpen = onFileOpen,
             onDelete = onDelete,
             onEditTags = onEditTags,
-            level = level
-            ,
-            isGridView = isGridView
+            level = level,
+            isGridView = isGridView,
+            enrichedNodes = enrichedNodes
         )
     }
 }
@@ -1086,13 +1177,15 @@ private fun FolderNodeItem(
     onFileOpen: (FileInfo) -> Unit,
     onDelete: (FileInfo) -> Unit,
     onEditTags: (FileInfo) -> Unit,
-    level: Int
-    ,
-    isGridView: Boolean
+    level: Int,
+    isGridView: Boolean,
+    enrichedNodes: Map<String, InternalFileManager.FolderNode>
 ) {
     val key = node.relativePath
     val isExpanded = expanded[key] ?: true
     val fileCount = remember(node) { countFiles(node) }
+    // Use enriched node for files/children display when available
+    val displayNode = enrichedNodes[key] ?: node
 
     Surface(
         modifier = Modifier
@@ -1136,10 +1229,10 @@ private fun FolderNodeItem(
     }
 
     if (isExpanded) {
-        // Show files for this node
+        // Show files for this node (use enriched files if available)
         if (isGridView) {
             val columns = 3
-            val rows = node.files.chunked(columns)
+            val rows = displayNode.files.chunked(columns)
             rows.forEach { rowFiles ->
                 Row(modifier = Modifier.fillMaxWidth()) {
                     rowFiles.forEach { file ->
@@ -1162,7 +1255,7 @@ private fun FolderNodeItem(
                 }
             }
         } else {
-            node.files.forEach { file ->
+            displayNode.files.forEach { file ->
                 FileListItem(
                     file = file,
                     onClick = { onFileOpen(file) },
@@ -1172,7 +1265,7 @@ private fun FolderNodeItem(
             }
         }
 
-        // Recurse into children nodes
+        // Recurse into children nodes (children themselves will be enriched lazily)
         node.children.forEach { child ->
             FolderNodeItem(
                 node = child,
@@ -1182,7 +1275,8 @@ private fun FolderNodeItem(
                 onDelete = onDelete,
                 onEditTags = onEditTags,
                 level = level + 1,
-                isGridView = isGridView
+                isGridView = isGridView,
+                enrichedNodes = enrichedNodes
             )
         }
     }
@@ -1197,7 +1291,8 @@ private fun androidx.compose.foundation.lazy.LazyListScope.addFolderNodeItems(
     onDelete: (com.example.checklist_interactive.data.files.FileInfo) -> Unit,
     onEditTags: (com.example.checklist_interactive.data.files.FileInfo) -> Unit,
     level: Int,
-    isGridView: Boolean
+    isGridView: Boolean,
+    enrichedNodes: Map<String, com.example.checklist_interactive.data.files.InternalFileManager.FolderNode>
 ) {
     val key = node.relativePath
 
@@ -1248,12 +1343,13 @@ private fun androidx.compose.foundation.lazy.LazyListScope.addFolderNodeItems(
         }
     }
 
-    // Files (lazy) and children
+    // Files (lazy) and children (use enriched files if available)
     val isExpandedNow = expanded[key] ?: true
     if (isExpandedNow) {
+        val displayNode = enrichedNodes[key] ?: node
         if (isGridView) {
             val columns = 3
-            val rows = node.files.chunked(columns)
+            val rows = displayNode.files.chunked(columns)
             rows.forEachIndexed { rowIndex, rowFiles ->
                 item(key = "node_files_row:${key}:$rowIndex") {
                     Row(modifier = Modifier.fillMaxWidth()) {
@@ -1278,7 +1374,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.addFolderNodeItems(
                 }
             }
         } else {
-            items(node.files, key = { it.path }) { file ->
+            items(displayNode.files, key = { it.path }) { file ->
                 FileListItem(
                     file = file,
                     onClick = { onFileOpen(file) },
@@ -1297,7 +1393,8 @@ private fun androidx.compose.foundation.lazy.LazyListScope.addFolderNodeItems(
                 onDelete = onDelete,
                 onEditTags = onEditTags,
                 level = level + 1,
-                isGridView = isGridView
+                isGridView = isGridView,
+                enrichedNodes = enrichedNodes
             )
         }
     }
@@ -1364,7 +1461,9 @@ private fun ShortcutsHeader(
     onToggleExpanded: () -> Unit
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onToggleExpanded() },
         color = MaterialTheme.colorScheme.primaryContainer
     ) {
         Row(

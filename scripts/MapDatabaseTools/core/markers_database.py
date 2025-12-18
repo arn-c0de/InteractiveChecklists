@@ -103,6 +103,56 @@ class Border:
 
 
 @dataclass
+class Route:
+    """Flight route with multiple waypoints"""
+    id: Optional[int] = None
+    name: str = ""
+    description: str = ""
+    color: str = "#00A8FF"  # Line color
+    created: Optional[str] = None
+    modified: Optional[str] = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'color': self.color,
+            'created': self.created,
+            'modified': self.modified
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'Route':
+        return cls(**{k: v for k, v in data.items() if k in cls.__annotations__})
+
+
+@dataclass
+class RouteWaypoint:
+    """Waypoint in a route with sequence and navigation data"""
+    id: Optional[int] = None
+    route_id: int = 0
+    location_id: int = 0
+    sequence: int = 0  # Order in route (0, 1, 2, ...)
+    distance_nm: Optional[float] = None  # Distance to next waypoint in nautical miles
+    heading_mag: Optional[float] = None  # Magnetic heading to next waypoint (0-360)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            'id': self.id,
+            'route_id': self.route_id,
+            'location_id': self.location_id,
+            'sequence': self.sequence,
+            'distance_nm': self.distance_nm,
+            'heading_mag': self.heading_mag
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'RouteWaypoint':
+        return cls(**{k: v for k, v in data.items() if k in cls.__annotations__})
+
+
+@dataclass
 class Location:
     """Location/Marker data model"""
     id: Optional[int] = None
@@ -165,10 +215,43 @@ class MarkersDatabase:
                     that can be shared with Android app
         """
         if db_path is None:
-            # Default location that can be synced to Android assets
-            # Database is in the parent MapDatabaseTools directory
-            db_path = Path(__file__).parent.parent / "markers.db"
-        
+            # Default location: app/src/main/assets/databases/map_data.db
+            # This gets packaged as an asset and deployed with the app
+            project_root = Path(__file__).parents[3]
+            default_dir = project_root / "app" / "src" / "main" / "assets" / "databases"
+            default_dir.mkdir(parents=True, exist_ok=True)
+            db_path = default_dir / "map_data.db"
+
+            # Handle migrations from older locations:
+            #  1. app/database/map_data.db (previous default)
+            #  2. app/maps/map_data.db (older default)
+            #  3. app/maps/tactical_data.db (older default)
+            old_database_dir = project_root / "app" / "database"
+            database_old = old_database_dir / "map_data.db"
+            old_maps_dir = project_root / "app" / "maps"
+            map_data_old = old_maps_dir / "map_data.db"
+            tactical_old = old_maps_dir / "tactical_data.db"
+
+            # Priority: app/database > app/maps/map_data.db > app/maps/tactical_data.db
+            if database_old.exists() and not db_path.exists():
+                try:
+                    import shutil
+                    shutil.copy2(database_old, db_path)
+                except Exception as e:
+                    pass
+            elif map_data_old.exists() and not db_path.exists():
+                try:
+                    import shutil
+                    shutil.copy2(map_data_old, db_path)
+                except Exception:
+                    pass
+            elif tactical_old.exists() and not db_path.exists():
+                try:
+                    import shutil
+                    shutil.copy2(tactical_old, db_path)
+                except Exception:
+                    pass
+
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
@@ -182,7 +265,7 @@ class MarkersDatabase:
         # Main locations table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS locations (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 latitude REAL NOT NULL,
                 longitude REAL NOT NULL,
@@ -190,7 +273,7 @@ class MarkersDatabase:
                 coalition TEXT,
                 tactical_symbol TEXT,
                 icon TEXT NOT NULL DEFAULT 'default',
-                description TEXT,
+                description TEXT NOT NULL DEFAULT '',
                 
                 -- Airport fields
                 icao TEXT,
@@ -213,25 +296,57 @@ class MarkersDatabase:
         """)
         
         # Create indices for common queries
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_marker_type ON locations(marker_type)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_coalition ON locations(coalition)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_location ON locations(latitude, longitude)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_name ON locations(name)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS index_locations_marker_type ON locations(marker_type)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS index_locations_coalition ON locations(coalition)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS index_locations_latitude_longitude ON locations(latitude, longitude)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS index_locations_name ON locations(name)")
         
         # Borders table for map region boundaries
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS borders (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 points TEXT NOT NULL,  -- JSON array of [lat, lon] pairs
-                description TEXT,
+                description TEXT NOT NULL DEFAULT '',
                 color TEXT NOT NULL DEFAULT '#FF0000',
                 created TEXT NOT NULL,
                 modified TEXT NOT NULL
             )
         """)
         
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_border_name ON borders(name)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS index_borders_name ON borders(name)")
+        
+        # Routes table for flight routes
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS routes (
+                id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL DEFAULT '',
+                color TEXT NOT NULL DEFAULT '#00A8FF',
+                created TEXT NOT NULL,
+                modified TEXT NOT NULL
+            )
+        """)
+        
+        cursor.execute("CREATE INDEX IF NOT EXISTS index_routes_name ON routes(name)")
+        
+        # Route waypoints table (links routes to locations with sequence)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS route_waypoints (
+                id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                route_id INTEGER NOT NULL,
+                location_id INTEGER NOT NULL,
+                sequence INTEGER NOT NULL,
+                distance_nm REAL,
+                heading_mag REAL,
+                FOREIGN KEY (route_id) REFERENCES routes(id) ON DELETE CASCADE,
+                FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE CASCADE
+            )
+        """)
+        
+        cursor.execute("CREATE INDEX IF NOT EXISTS index_route_waypoints_route_id ON route_waypoints(route_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS index_route_waypoints_route_id_sequence ON route_waypoints(route_id, sequence)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS index_route_waypoints_location_id ON route_waypoints(location_id)")
         
         self.conn.commit()
     
@@ -428,8 +543,27 @@ class MarkersDatabase:
         a = sin(delta_lat / 2) ** 2 + cos(lat1_rad) * cos(lat2_rad) * sin(delta_lon / 2) ** 2
         c = 2 * atan2(sqrt(a), sqrt(1 - a))
         
-        return R * c
+        return R * c    
+    @staticmethod
+    def calculate_bearing(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+        """Calculate initial bearing from point 1 to point 2 in degrees (0-360)"""
+        from math import radians, degrees, sin, cos, atan2
+        
+        lat1_rad = radians(lat1)
+        lat2_rad = radians(lat2)
+        delta_lon = radians(lon2 - lon1)
+        
+        x = sin(delta_lon) * cos(lat2_rad)
+        y = cos(lat1_rad) * sin(lat2_rad) - sin(lat1_rad) * cos(lat2_rad) * cos(delta_lon)
+        
+        bearing = degrees(atan2(x, y))
+        # Normalize to 0-360
+        return (bearing + 360) % 360
     
+    @staticmethod
+    def km_to_nautical_miles(km: float) -> float:
+        """Convert kilometers to nautical miles"""
+        return km * 0.539957    
     def export_to_json(self, filepath: Path):
         """Export all locations to JSON file"""
         locations = self.get_all_locations()
@@ -528,6 +662,200 @@ class MarkersDatabase:
             id=row['id'],
             name=row['name'],
             points=json.loads(row['points']) if row['points'] else [],
+            description=row['description'],
+            color=row['color'],
+            created=row['created'],
+            modified=row['modified']
+        )
+    
+    # Route CRUD operations
+    def add_route(self, route: Route, waypoint_location_ids: List[int]) -> int:
+        """
+        Add a new route with waypoints
+        
+        Args:
+            route: Route object
+            waypoint_location_ids: List of location IDs in sequence order
+            
+        Returns:
+            Route ID
+        """
+        now = datetime.utcnow().isoformat()
+        route.created = route.created or now
+        route.modified = now
+        
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            INSERT INTO routes (name, description, color, created, modified)
+            VALUES (?, ?, ?, ?, ?)
+        """, (route.name, route.description, route.color, route.created, route.modified))
+        
+        route_id = cursor.lastrowid
+        
+        # Add waypoints with calculated distances and headings
+        for i, location_id in enumerate(waypoint_location_ids):
+            distance_nm = None
+            heading = None
+            
+            # Calculate distance and heading to next waypoint
+            if i < len(waypoint_location_ids) - 1:
+                loc1 = self.get_location(location_id)
+                loc2 = self.get_location(waypoint_location_ids[i + 1])
+                
+                if loc1 and loc2:
+                    distance_km = self._haversine_distance(
+                        loc1.latitude, loc1.longitude,
+                        loc2.latitude, loc2.longitude
+                    )
+                    distance_nm = self.km_to_nautical_miles(distance_km)
+                    heading = self.calculate_bearing(
+                        loc1.latitude, loc1.longitude,
+                        loc2.latitude, loc2.longitude
+                    )
+            
+            cursor.execute("""
+                INSERT INTO route_waypoints (route_id, location_id, sequence, distance_nm, heading_mag)
+                VALUES (?, ?, ?, ?, ?)
+            """, (route_id, location_id, i, distance_nm, heading))
+        
+        self.conn.commit()
+        return route_id
+    
+    def update_route(self, route: Route, waypoint_location_ids: Optional[List[int]] = None) -> bool:
+        """
+        Update an existing route
+        
+        Args:
+            route: Route object with ID
+            waypoint_location_ids: Optional new list of waypoints. If None, keeps existing waypoints
+            
+        Returns:
+            True if successful
+        """
+        if route.id is None:
+            raise ValueError("Route must have an ID to update")
+        
+        route.modified = datetime.utcnow().isoformat()
+        
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            UPDATE routes SET name=?, description=?, color=?, modified=?
+            WHERE id=?
+        """, (route.name, route.description, route.color, route.modified, route.id))
+        
+        # Update waypoints if provided
+        if waypoint_location_ids is not None:
+            # Delete old waypoints
+            cursor.execute("DELETE FROM route_waypoints WHERE route_id=?", (route.id,))
+            
+            # Add new waypoints
+            for i, location_id in enumerate(waypoint_location_ids):
+                distance_nm = None
+                heading = None
+                
+                if i < len(waypoint_location_ids) - 1:
+                    loc1 = self.get_location(location_id)
+                    loc2 = self.get_location(waypoint_location_ids[i + 1])
+                    
+                    if loc1 and loc2:
+                        distance_km = self._haversine_distance(
+                            loc1.latitude, loc1.longitude,
+                            loc2.latitude, loc2.longitude
+                        )
+                        distance_nm = self.km_to_nautical_miles(distance_km)
+                        heading = self.calculate_bearing(
+                            loc1.latitude, loc1.longitude,
+                            loc2.latitude, loc2.longitude
+                        )
+                
+                cursor.execute("""
+                    INSERT INTO route_waypoints (route_id, location_id, sequence, distance_nm, heading_mag)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (route.id, location_id, i, distance_nm, heading))
+        
+        self.conn.commit()
+        return cursor.rowcount > 0
+    
+    def delete_route(self, route_id: int) -> bool:
+        """Delete a route and its waypoints"""
+        cursor = self.conn.cursor()
+        cursor.execute("DELETE FROM route_waypoints WHERE route_id=?", (route_id,))
+        cursor.execute("DELETE FROM routes WHERE id=?", (route_id,))
+        self.conn.commit()
+        return cursor.rowcount > 0
+    
+    def get_route(self, route_id: int) -> Optional[Route]:
+        """Get a route by ID"""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT * FROM routes WHERE id=?", (route_id,))
+        row = cursor.fetchone()
+        return self._row_to_route(row) if row else None
+    
+    def get_all_routes(self) -> List[Route]:
+        """Get all routes"""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT * FROM routes ORDER BY name")
+        return [self._row_to_route(row) for row in cursor.fetchall()]
+    
+    def get_route_waypoints(self, route_id: int) -> List[Tuple[Location, RouteWaypoint]]:
+        """
+        Get all waypoints for a route with their location data
+        
+        Returns:
+            List of (Location, RouteWaypoint) tuples ordered by sequence
+        """
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            SELECT l.*, rw.id as rw_id, rw.route_id, rw.sequence, rw.distance_nm, rw.heading_mag
+            FROM route_waypoints rw
+            JOIN locations l ON rw.location_id = l.id
+            WHERE rw.route_id = ?
+            ORDER BY rw.sequence
+        """, (route_id,))
+        
+        results = []
+        for row in cursor.fetchall():
+            location = self._row_to_location(row)
+            waypoint = RouteWaypoint(
+                id=row['rw_id'],
+                route_id=row['route_id'],
+                location_id=location.id,
+                sequence=row['sequence'],
+                distance_nm=row['distance_nm'],
+                heading_mag=row['heading_mag']
+            )
+            results.append((location, waypoint))
+        
+        return results
+    
+    def get_route_with_waypoints(self, route_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Get route with all waypoint details
+        
+        Returns:
+            Dict with 'route' and 'waypoints' keys, or None if not found
+        """
+        route = self.get_route(route_id)
+        if not route:
+            return None
+        
+        waypoints = self.get_route_waypoints(route_id)
+        
+        # Calculate total distance
+        total_distance_nm = sum(wp[1].distance_nm for wp in waypoints if wp[1].distance_nm)
+        
+        return {
+            'route': route,
+            'waypoints': waypoints,
+            'total_distance_nm': total_distance_nm,
+            'waypoint_count': len(waypoints)
+        }
+    
+    def _row_to_route(self, row: sqlite3.Row) -> Route:
+        """Convert database row to Route object"""
+        return Route(
+            id=row['id'],
+            name=row['name'],
             description=row['description'],
             color=row['color'],
             created=row['created'],
