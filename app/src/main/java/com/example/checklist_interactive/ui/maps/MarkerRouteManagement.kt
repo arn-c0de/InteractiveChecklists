@@ -275,7 +275,8 @@ fun MarkerRouteManagementSheet(
                         MarkerDetailsContent(
                             location = selectedMarker,
                             runways = selectedRunways,
-                            onClose = { selectedTab = 1 }
+                            onClose = { selectedTab = 1 },
+                            onSetRoute = onSetActiveRoute
                         )
                     } else {
                         Box(
@@ -384,25 +385,29 @@ fun MarkerGroupItem(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(onClick = onToggle)
                     .padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
-                    contentDescription = if (isExpanded) "Collapse" else "Expand",
-                    modifier = Modifier.size(24.dp)
-                )
-                
+                // Arrow button toggles the group (separate clickable so action icons aren't blocked)
+                IconButton(onClick = onToggle, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                        contentDescription = if (isExpanded) "Collapse" else "Expand",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
                 Spacer(modifier = Modifier.width(8.dp))
-                
-                Text(
-                    text = groupName,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
-                
+
+                // Make the title area toggle the group as well (but keep action icons free)
+                Column(modifier = Modifier.weight(1f).clickable(onClick = onToggle)) {
+                    Text(
+                        text = groupName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
                 // Count badge
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer,
@@ -415,12 +420,12 @@ fun MarkerGroupItem(
                         fontWeight = FontWeight.Bold
                     )
                 }
-                
+
                 Spacer(modifier = Modifier.width(8.dp))
-                
-                // Create route button
+
+                // Create route button (now reliably clickable)
                 if (markers.size >= 2) {
-                    IconButton(onClick = onCreateRoute) {
+                    IconButton(onClick = { onCreateRoute() }) {
                         Icon(
                             Icons.Default.AddRoad,
                             contentDescription = "Create route from group",
