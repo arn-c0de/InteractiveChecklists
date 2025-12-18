@@ -534,13 +534,20 @@ def send_udp(payload: bytes, host: str, port: int, sock: socket.socket, encrypt:
 
 
 def extract_json_from_line(line: str) -> str | None:
-    # find first '{' and use from there; fallback to whole line
+    # find JSON object start and end (first '{' and last '}') and extract that range
     idx = line.find('{')
     if idx == -1:
-        s = line.strip()
-        return s if s else None
-    else:
-        return line[idx:].strip()
+        # No JSON object start found: do not attempt to send arbitrary non-JSON lines
+        return None
+
+    end_idx = line.rfind('}')
+    if end_idx == -1 or end_idx <= idx:
+        # No JSON object end found or malformed
+        return None
+
+    # Return the substring that should represent a JSON object
+    s = line[idx:end_idx + 1].strip()
+    return s if s else None
 
 
 def _is_same_file(f, path: str) -> bool:
@@ -684,6 +691,12 @@ def tail_and_send(path: str, host: str, port: int, send_existing=False, once=Fal
 
             jsonpart = extract_json_from_line(line)
             if not jsonpart:
+                continue
+
+            # Validate that the extracted substring is valid JSON before sending
+            parsed = safe_json_parse(jsonpart, max_size=_MAX_DATA_MESSAGE_SIZE)
+            if parsed is None:
+                logger.debug("Skipping invalid/empty JSON line")
                 continue
             
             # Send to all devices with active sessions (ECDH mode) or broadcast (PSK mode)
@@ -839,6 +852,12 @@ def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=Fals
                 last_line = lines[-1]
                 jsonpart = extract_json_from_line(last_line)
                 if not jsonpart:
+                    time.sleep(0.1)
+                    continue
+
+                # Validate that the extracted substring is valid JSON before sending
+                parsed = safe_json_parse(jsonpart, max_size=_MAX_DATA_MESSAGE_SIZE)
+                if parsed is None:
                     time.sleep(0.1)
                     continue
                 
