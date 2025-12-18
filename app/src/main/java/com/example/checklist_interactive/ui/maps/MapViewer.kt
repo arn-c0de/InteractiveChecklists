@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
@@ -91,6 +92,7 @@ fun MapViewer(
     var showDataPad by remember { mutableStateOf(false) }
     var showMarkerRouteManagement by remember { mutableStateOf(false) }
     var showRouteCreation by remember { mutableStateOf(false) }
+    var showMilitarySymbolPicker by remember { mutableStateOf(false) }
     
     // Map rotation mode: 0 = North-up, 1 = HDG-up (follow aircraft heading)
     var mapRotationMode by remember { mutableStateOf(0) }
@@ -100,6 +102,9 @@ fun MapViewer(
     var navigationLine by remember { mutableStateOf<org.osmdroid.views.overlay.Polyline?>(null) }
     var navigationDistanceNm by remember { mutableStateOf<Double?>(null) }
     var navigationHeading by remember { mutableStateOf<Double?>(null) }
+    
+    // Military symbol placement state
+    var pendingSymbolPlacement by remember { mutableStateOf<Pair<MilitarySymbol, SymbolAffiliation>?>(null) }
     
     // Store last valid player position to prevent reset during recompositions
     var lastValidPlayerPosition by remember { mutableStateOf<GeoPoint?>(null) }
@@ -451,6 +456,53 @@ fun MapViewer(
 
                     overlays.add(marker)
                     positionMarker = marker
+                    
+                    // Map click handler for symbol placement
+                    val mapEventsReceiver = object : org.osmdroid.events.MapEventsReceiver {
+                        override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
+                            p?.let { geoPoint ->
+                                pendingSymbolPlacement?.let { (symbol, affiliation) ->
+                                    // Place military symbol at clicked location
+                                    scope.launch {
+                                        try {
+                                            val newLocation = com.example.checklist_interactive.data.tactical.LocationEntity(
+                                                name = "${symbol.name} - ${java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}",
+                                                latitude = geoPoint.latitude,
+                                                longitude = geoPoint.longitude,
+                                                markerType = "tactical_military",
+                                                coalition = affiliation.name.lowercase(),
+                                                symbolSet = symbol.symbolSet,
+                                                symbolEntity = symbol.symbolEntity,
+                                                symbolAffiliation = affiliation.name.lowercase(),
+                                                symbolColor = String.format("#%06X", (0xFFFFFF and affiliation.color.hashCode())),
+                                                icon = symbol.id,
+                                                description = "Military symbol: ${symbol.name}"
+                                            )
+                                            
+                                            val insertedId = locationRepository.saveLocation(newLocation)
+                                            Log.d(TAG, "Placed military symbol: ${symbol.name} at ${geoPoint.latitude}, ${geoPoint.longitude} (id=$insertedId)")
+                                            
+                                            // Clear pending placement and optionally set selectedLocation
+                                            pendingSymbolPlacement = null
+                                            // Optionally fetch the saved entity if needed
+                                            // selectedLocation = locationRepository.getLocationById(insertedId.toInt())
+                                        } catch (e: Exception) {
+                                            Log.e(TAG, "Failed to place military symbol", e)
+                                        }
+                                    }
+                                    return true
+                                }
+                            }
+                            return false
+                        }
+                        
+                        override fun longPressHelper(p: GeoPoint?): Boolean {
+                            return false
+                        }
+                    }
+                    val mapEventsOverlay = org.osmdroid.views.overlay.MapEventsOverlay(mapEventsReceiver)
+                    overlays.add(0, mapEventsOverlay) // Add at index 0 so it processes events first
+                    
                     mapView = this
 
                     // Touch listener: mark when real user touches the map so we don't disable auto-center from animations
@@ -542,6 +594,14 @@ fun MapViewer(
                                     if (marker.coalition != null) {
                                         append("\nCoalition: ${marker.coalition}")
                                     }
+                                    if (marker.markerType == "tactical_military") {
+                                        if (marker.symbolEntity.isNotEmpty()) {
+                                            append("\nSymbol: ${marker.symbolEntity}")
+                                        }
+                                        if (marker.symbolAffiliation.isNotEmpty()) {
+                                            append("\nAffiliation: ${marker.symbolAffiliation}")
+                                        }
+                                    }
                                     if (marker.description.isNotEmpty()) {
                                         append("\n${marker.description}")
                                     }
@@ -561,24 +621,60 @@ fun MapViewer(
                                     else -> android.graphics.Color.parseColor("#9370DB")
                                 }
                                 
-                                // Create simple colored circle icon
+                                // Create marker icon - try military symbol first
                                 try {
-                                    val bitmap = android.graphics.Bitmap.createBitmap(48, 48, android.graphics.Bitmap.Config.ARGB_8888)
-                                    val canvas = android.graphics.Canvas(bitmap)
-                                    val paint = android.graphics.Paint().apply {
-                                        isAntiAlias = true
-                                        color = markerColor
-                                        style = android.graphics.Paint.Style.FILL
+                                    // For military symbols, try to use the vector drawable icon
+                                    if (marker.markerType == "tactical_military" && marker.symbolEntity.isNotEmpty()) {
+                                        try {
+                                            // Dynamic drawable lookup by resource name (ic_mapicon_<entity>)
+                                            val resName = "ic_mapicon_${'$'}{marker.symbolEntity}"
+                                            val iconResId = context.resources.getIdentifier(resName, "drawable", context.packageName)
+                                            if (iconResId != 0) {
+                                                val drawable = ContextCompat.getDrawable(context, iconResId)
+                                                drawable?.let { d ->
+                                                    // Tint with affiliation color
+                                                    val tintColor = when (marker.symbolAffiliation) {
+                                                        "friendly" -> android.graphics.Color.parseColor("#00A8FF")
+                                                        "hostile" -> android.graphics.Color.parseColor("#FF4444")
+                                                        "neutral" -> android.graphics.Color.parseColor("#00FF00")
+                                                        else -> android.graphics.Color.parseColor("#FFFF80")
+                                                    }
+                                                    d.setTint(tintColor)
+
+                                                    val bitmap = android.graphics.Bitmap.createBitmap(64, 64, android.graphics.Bitmap.Config.ARGB_8888)
+                                                    val canvas = android.graphics.Canvas(bitmap)
+                                                    d.setBounds(0, 0, 64, 64)
+                                                    d.draw(canvas)
+                                                    icon = BitmapDrawable(context.resources, bitmap)
+                                                }
+                                            } else {
+                                                // No drawable found for symbol entity; leave icon null so fallback applies
+                                                Log.d(TAG, "No map icon drawable for entity: ${'$'}{marker.symbolEntity}")
+                                            }
+                                        } catch (e: Exception) {
+                                            Log.e(TAG, "Failed to load military symbol icon", e)
+                                        }
                                     }
-                                    val strokePaint = android.graphics.Paint().apply {
-                                        isAntiAlias = true
-                                        color = android.graphics.Color.WHITE
-                                        style = android.graphics.Paint.Style.STROKE
-                                        strokeWidth = 4f
+                                    
+                                    // Fallback: create simple colored circle marker if no icon set
+                                    if (icon == null) {
+                                        val bitmap = android.graphics.Bitmap.createBitmap(48, 48, android.graphics.Bitmap.Config.ARGB_8888)
+                                        val canvas = android.graphics.Canvas(bitmap)
+                                        val paint = android.graphics.Paint().apply {
+                                            isAntiAlias = true
+                                            color = markerColor
+                                            style = android.graphics.Paint.Style.FILL
+                                        }
+                                        val strokePaint = android.graphics.Paint().apply {
+                                            isAntiAlias = true
+                                            color = android.graphics.Color.WHITE
+                                            style = android.graphics.Paint.Style.STROKE
+                                            strokeWidth = 4f
+                                        }
+                                        canvas.drawCircle(24f, 24f, 18f, paint)
+                                        canvas.drawCircle(24f, 24f, 18f, strokePaint)
+                                        icon = BitmapDrawable(context.resources, bitmap)
                                     }
-                                    canvas.drawCircle(24f, 24f, 18f, paint)
-                                    canvas.drawCircle(24f, 24f, 18f, strokePaint)
-                                    icon = BitmapDrawable(context.resources, bitmap)
                                 } catch (e: Exception) {
                                     // Use default marker
                                 }
@@ -686,6 +782,17 @@ fun MapViewer(
                 Icon(
                     imageVector = Icons.Default.Flight,
                     contentDescription = stringResource(R.string.map_overlays)
+                )
+            }
+            
+            // Add Military Symbol button
+            FloatingActionButton(
+                onClick = { showMilitarySymbolPicker = true },
+                containerColor = if (pendingSymbolPlacement != null) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.tertiaryContainer
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Add Military Symbol"
                 )
             }
             
@@ -1130,6 +1237,20 @@ fun MapViewer(
     // DataPad Popup
     if (showDataPad && datapadEnabled) {
         DataPadPopup(onDismiss = { showDataPad = false })
+    }
+    
+    // Military Symbol Picker Dialog
+    if (showMilitarySymbolPicker) {
+        MilitarySymbolPickerDialog(
+            onDismiss = { 
+                showMilitarySymbolPicker = false
+                pendingSymbolPlacement = null
+            },
+            onSymbolSelected = { symbol, affiliation ->
+                // Store selected symbol, wait for map click
+                pendingSymbolPlacement = symbol to affiliation
+            }
+        )
     }
     
     // Marker/Route Management Sheet (with integrated marker details)

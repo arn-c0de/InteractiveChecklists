@@ -39,6 +39,25 @@ data class LocationEntity(
     @ColumnInfo(defaultValue = "''")
     val description: String = "",
     
+    // NATO Military Symbol fields
+    @ColumnInfo(name = "symbol_set", defaultValue = "''")
+    val symbolSet: String = "",  // e.g., "ground_unit", "equipment", "installation"
+    
+    @ColumnInfo(name = "symbol_entity", defaultValue = "''")
+    val symbolEntity: String = "",  // e.g., "infantry", "armor", "artillery", "mortar", "missile"
+    
+    @ColumnInfo(name = "symbol_size", defaultValue = "''")
+    val symbolSize: String = "",  // e.g., "squad", "platoon", "company", "battalion", "regiment"
+    
+    @ColumnInfo(name = "symbol_affiliation", defaultValue = "'unknown'")
+    val symbolAffiliation: String = "unknown",  // "friendly", "hostile", "neutral", "unknown"
+    
+    @ColumnInfo(name = "symbol_color", defaultValue = "'#FFFF80'")
+    val symbolColor: String = "#FFFF80",  // Background color based on affiliation
+    
+    @ColumnInfo(name = "symbol_modifier", defaultValue = "''")
+    val symbolModifier: String = "",  // Additional symbol modifiers (JSON)
+    
     // Airport fields
     val icao: String? = null,
     val iata: String? = null,

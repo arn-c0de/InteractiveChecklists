@@ -160,10 +160,18 @@ class Location:
     latitude: float = 0.0
     longitude: float = 0.0
     marker_type: str = MarkerType.WAYPOINT.value
-    coalition: Optional[str] = None  # BLUFOR, OPFOR, NEUTRAL
+    coalition: Optional[str] = None  # BLUFOR, OPFOR, NEUTRAL (legacy, use symbol_affiliation)
     tactical_symbol: Optional[str] = None
     icon: str = "default"
     description: str = ""
+    
+    # NATO Military Symbol fields (new)
+    symbol_set: str = ""  # e.g., "ground_unit", "equipment", "installation"
+    symbol_entity: str = ""  # e.g., "infantry", "armor", "artillery", "mortar", "missile"
+    symbol_size: str = ""  # e.g., "squad", "platoon", "company", "battalion", "regiment"
+    symbol_affiliation: str = "unknown"  # "friendly", "hostile", "neutral", "unknown"
+    symbol_color: str = "#FFFF80"  # Background color based on affiliation
+    symbol_modifier: str = ""  # Additional symbol modifiers (JSON)
     
     # Airport-specific
     icao: Optional[str] = None

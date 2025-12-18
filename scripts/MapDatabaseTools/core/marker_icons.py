@@ -1,308 +1,226 @@
 """
-Marker Icon System - Unicode and color-coded tactical symbols
-Provides icons for various marker types with NATO-style symbology
+Marker Icon System - Android Drawable compatible tactical symbols
+Automatically loads ONLY symbols available in Android app drawables (ic_mapicon_*.xml)
+NO fallback symbols - maintains consistency between Python tools and Android app
 """
-from enum import Enum
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
+from .android_drawables_loader import (
+    load_android_icons, 
+    is_valid_android_symbol, 
+    get_available_android_symbols,
+    get_loader
+)
 
 
 class IconColor:
-    """Standard NATO APP-6 colors"""
-    BLUFOR = "#00A8FF"  # Blue (Friendly)
-    OPFOR = "#FF4444"   # Red (Hostile)
-    NEUTRAL = "#00FF00" # Green (Neutral)
-    UNKNOWN = "#FFFF00" # Yellow (Unknown)
-    AIRPORT = "#8B4513"  # Brown (Infrastructure)
-    WAYPOINT = "#FFA500" # Orange (Navigation)
-    POI = "#9370DB"      # Purple (Points of Interest)
-    THREAT = "#FF0000"   # Bright Red (Threats)
+    """Standard NATO APP-6 colors (matching Android app)"""
+    FRIENDLY = "#0080FF"  # Blue (Friendly/BLUFOR)
+    HOSTILE = "#FF4444"   # Red (Hostile/OPFOR)
+    NEUTRAL = "#00FF00"   # Green (Neutral)
+    UNKNOWN = "#FFFF80"   # Yellow (Unknown)
 
 
-class MarkerIcon:
-    """Icon definitions for different marker types"""
-    
-    # Unicode symbols for various marker types
-    AIRPORT = "✈"
-    HELICOPTER = "🚁"
-    WAYPOINT = "📍"
-    FLAG = "🚩"
-    
-    # Military symbols (simplified Unicode representation)
-    FIGHTER = "✈"
-    BOMBER = "✈"
-    TRANSPORT = "🛫"
-    UAV = "🛸"
-    
-    # Ground units
-    TANK = "🛡"
-    ARTILLERY = "💥"
-    SAM = "🚀"
-    RADAR = "📡"
-    INFANTRY = "👥"
-    AAA = "⚡"
-    HQ = "🏛"
-    SUPPLY = "📦"
-    
-    # Naval
-    SHIP = "🚢"
-    SUBMARINE = "🔱"
-    
-    # Generic
-    STAR = "⭐"
-    CIRCLE = "⚫"
-    SQUARE = "◼"
-    TRIANGLE = "▲"
-    DIAMOND = "◆"
-    
-    # Special
-    TARGET = "🎯"
-    EXPLOSION = "💥"
-    WARNING = "⚠"
-
-
-class TacticalMarkerStyle:
-    """Style definitions for tactical markers combining symbol and color"""
-    
-    @staticmethod
-    def get_style(marker_type: str, coalition: str, tactical_symbol: str = None) -> Dict[str, str]:
-        """
-        Get marker style (icon + color) based on type and coalition
-        
-        Returns:
-            Dict with 'icon', 'color', 'size' keys
-        """
-        style = {
-            'icon': MarkerIcon.CIRCLE,
-            'color': IconColor.UNKNOWN,
-            'size': 24,
-            'symbol': '?'
-        }
-        
-        # Determine color by coalition
-        if coalition:
-            coalition_upper = coalition.upper()
-            if coalition_upper == "BLUFOR":
-                style['color'] = IconColor.BLUFOR
-            elif coalition_upper == "OPFOR":
-                style['color'] = IconColor.OPFOR
-            elif coalition_upper == "NEUTRAL":
-                style['color'] = IconColor.NEUTRAL
-        
-        # Determine icon by marker type
-        if marker_type == "airport":
-            style['icon'] = MarkerIcon.AIRPORT
-            style['color'] = IconColor.AIRPORT
-            style['size'] = 28
-            style['symbol'] = '✈'
-        
-        elif marker_type == "waypoint":
-            style['icon'] = MarkerIcon.WAYPOINT
-            style['color'] = IconColor.WAYPOINT
-            style['size'] = 20
-            style['symbol'] = '📍'
-        
-        elif marker_type == "poi":
-            style['icon'] = MarkerIcon.FLAG
-            style['color'] = IconColor.POI
-            style['size'] = 22
-            style['symbol'] = '🚩'
-        
-        elif marker_type == "threat":
-            style['icon'] = MarkerIcon.WARNING
-            style['color'] = IconColor.THREAT
-            style['size'] = 26
-            style['symbol'] = '⚠'
-        
-        elif marker_type == "target":
-            style['icon'] = MarkerIcon.TARGET
-            style['color'] = IconColor.THREAT
-            style['size'] = 24
-            style['symbol'] = '🎯'
-        
-        # Tactical symbols
-        elif marker_type.startswith("tactical_"):
-            if tactical_symbol:
-                symbol_map = {
-                    'fighter': (MarkerIcon.FIGHTER, '✈'),
-                    'bomber': (MarkerIcon.BOMBER, '✈'),
-                    'transport': (MarkerIcon.TRANSPORT, '🛫'),
-                    'helicopter': (MarkerIcon.HELICOPTER, '🚁'),
-                    'uav': (MarkerIcon.UAV, '🛸'),
-                    'infantry': (MarkerIcon.INFANTRY, '👥'),
-                    'armor': (MarkerIcon.TANK, '🛡'),
-                    'artillery': (MarkerIcon.ARTILLERY, '💥'),
-                    'sam': (MarkerIcon.SAM, '🚀'),
-                    'aaa': (MarkerIcon.AAA, '⚡'),
-                    'radar': (MarkerIcon.RADAR, '📡'),
-                    'ship': (MarkerIcon.SHIP, '🚢'),
-                    'submarine': (MarkerIcon.SUBMARINE, '🔱'),
-                    'hq': (MarkerIcon.HQ, '🏛'),
-                    'supply': (MarkerIcon.SUPPLY, '📦'),
-                    'unit': (MarkerIcon.SQUARE, '◼'),
-                }
-                
-                if tactical_symbol in symbol_map:
-                    style['icon'], style['symbol'] = symbol_map[tactical_symbol]
-                    style['size'] = 26
-        
-        return style
-    
-    @staticmethod
-    def get_svg_marker(marker_type: str, coalition: str, tactical_symbol: str = None) -> str:
-        """
-        Generate SVG marker icon for Leaflet
-        Returns data URI for inline SVG
-        """
-        style = TacticalMarkerStyle.get_style(marker_type, coalition, tactical_symbol)
-        
-        # Create SVG with border and shadow for better visibility
-        svg = f"""
-        <svg width="{style['size']*2}" height="{style['size']*2}" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-                <filter id="shadow">
-                    <feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.5"/>
-                </filter>
-            </defs>
-            <circle cx="{style['size']}" cy="{style['size']}" r="{style['size']-4}" 
-                    fill="{style['color']}" stroke="white" stroke-width="2" filter="url(#shadow)"/>
-            <text x="{style['size']}" y="{style['size']+6}" 
-                  font-size="{style['size']-4}" text-anchor="middle" fill="white">
-                {style['symbol']}
-            </text>
-        </svg>
-        """.strip()
-        
-        # Return as data URI
-        import base64
-        encoded = base64.b64encode(svg.encode('utf-8')).decode('utf-8')
-        return f"data:image/svg+xml;base64,{encoded}"
-    
-    @staticmethod
-    def get_leaflet_icon_config(marker_type: str, coalition: str, tactical_symbol: str = None) -> Dict:
-        """
-        Get Leaflet icon configuration for JavaScript
-        
-        Returns config dict that can be passed to L.divIcon or L.icon
-        """
-        style = TacticalMarkerStyle.get_style(marker_type, coalition, tactical_symbol)
-        
-        return {
-            'html': f'<div style="font-size: {style["size"]}px; color: {style["color"]}; text-shadow: 0 0 3px black, 0 0 3px black;">{style["symbol"]}</div>',
-            'className': f'marker-{marker_type}',
-            'iconSize': [style['size'], style['size']],
-            'iconAnchor': [style['size'] // 2, style['size'] // 2],
-            'popupAnchor': [0, -style['size'] // 2]
-        }
-
-
-# Pre-defined icon sets for quick access
-ICON_PRESETS = {
-    # Airports
-    'airport_military': ('airport', None, None),
-    'airport_civilian': ('airport', 'NEUTRAL', None),
-    'heliport': ('waypoint', None, 'helicopter'),
-    
-    # Waypoints
-    'waypoint_nav': ('waypoint', None, None),
-    'waypoint_ip': ('waypoint', 'BLUFOR', None),
-    'waypoint_target': ('waypoint', 'OPFOR', None),
-    
-    # BLUFOR Air
-    'blufor_fighter': ('tactical_blufor', 'BLUFOR', 'fighter'),
-    'blufor_bomber': ('tactical_blufor', 'BLUFOR', 'bomber'),
-    'blufor_transport': ('tactical_blufor', 'BLUFOR', 'transport'),
-    'blufor_helo': ('tactical_blufor', 'BLUFOR', 'helicopter'),
-    'blufor_uav': ('tactical_blufor', 'BLUFOR', 'uav'),
-    
-    # BLUFOR Ground
-    'blufor_infantry': ('tactical_blufor', 'BLUFOR', 'infantry'),
-    'blufor_armor': ('tactical_blufor', 'BLUFOR', 'armor'),
-    'blufor_artillery': ('tactical_blufor', 'BLUFOR', 'artillery'),
-    'blufor_hq': ('tactical_blufor', 'BLUFOR', 'hq'),
-    
-    # OPFOR Air
-    'opfor_fighter': ('tactical_opfor', 'OPFOR', 'fighter'),
-    'opfor_bomber': ('tactical_opfor', 'OPFOR', 'bomber'),
-    'opfor_helo': ('tactical_opfor', 'OPFOR', 'helicopter'),
-    'opfor_uav': ('tactical_opfor', 'OPFOR', 'uav'),
-    
-    # OPFOR Ground
-    'opfor_sam': ('tactical_opfor', 'OPFOR', 'sam'),
-    'opfor_aaa': ('tactical_opfor', 'OPFOR', 'aaa'),
-    'opfor_radar': ('tactical_opfor', 'OPFOR', 'radar'),
-    'opfor_armor': ('tactical_opfor', 'OPFOR', 'armor'),
-    'opfor_infantry': ('tactical_opfor', 'OPFOR', 'infantry'),
-    
-    # Neutral
-    'neutral_ship': ('tactical_neutral', 'NEUTRAL', 'ship'),
-    'neutral_hq': ('tactical_neutral', 'NEUTRAL', 'hq'),
-    
-    # Special
-    'target': ('target', 'OPFOR', None),
-    'threat': ('threat', 'OPFOR', None),
-    'poi': ('poi', None, None),
+# Load Android icons dynamically at module import
+_android_icons = load_android_icons()
+AVAILABLE_ANDROID_SYMBOLS = {
+    symbol: metadata['display_name'] 
+    for symbol, metadata in _android_icons.items()
 }
 
 
-def get_icon_preset(preset_name: str) -> Dict:
-    """Get Leaflet icon config for a preset"""
-    if preset_name not in ICON_PRESETS:
-        preset_name = 'waypoint_nav'  # Default fallback
+def get_affiliation_color(affiliation: str) -> str:
+    """Get color for symbol affiliation (matching Android app)"""
+    colors = {
+        'friendly': IconColor.FRIENDLY,
+        'hostile': IconColor.HOSTILE,
+        'neutral': IconColor.NEUTRAL,
+        'unknown': IconColor.UNKNOWN,
+    }
+    return colors.get(affiliation.lower(), IconColor.UNKNOWN)
+
+
+def is_valid_symbol(symbol_entity: str) -> bool:
+    """Check if symbol entity exists in Android drawables"""
+    return is_valid_android_symbol(symbol_entity)
+
+
+def get_available_symbols() -> Dict[str, str]:
+    """Get all available Android drawable symbols"""
+    return AVAILABLE_ANDROID_SYMBOLS.copy()
+
+
+def get_symbols_by_category() -> Dict[str, List[Tuple[str, str]]]:
+    """
+    Get symbols organized by category
+    Returns: {category: [(symbol_entity, display_name), ...]}
+    """
+    loader = get_loader()
+    by_category = loader.get_symbols_by_category()
     
-    marker_type, coalition, tactical_symbol = ICON_PRESETS[preset_name]
-    return TacticalMarkerStyle.get_leaflet_icon_config(marker_type, coalition, tactical_symbol)
+    result = {}
+    for category, symbols in by_category.items():
+        result[category] = [
+            (symbol, AVAILABLE_ANDROID_SYMBOLS.get(symbol, symbol))
+            for symbol in symbols
+        ]
+    return result
+
+
+class TacticalMarkerStyle:
+    """Style definitions for tactical markers using ONLY Android drawable symbols"""
+    
+    @staticmethod
+    def get_style(symbol_entity: str, affiliation: str = 'unknown') -> Tuple[str, str]:
+        """
+        Get marker style for Android-compatible symbol
+        Returns: (symbol_text, color_hex)
+        
+        ONLY returns symbols that exist in Android drawables!
+        No fallbacks - raises ValueError if symbol not available.
+        """
+        if not is_valid_symbol(symbol_entity):
+            available = ', '.join(AVAILABLE_ANDROID_SYMBOLS.keys())
+            raise ValueError(
+                f"Symbol '{symbol_entity}' not available in Android drawables. "
+                f"Available symbols: {available}"
+            )
+        
+        color = get_affiliation_color(affiliation)
+        symbol_display = AVAILABLE_ANDROID_SYMBOLS[symbol_entity]
+        
+        return (symbol_display, color)
+    
+    @staticmethod
+    def get_leaflet_icon_config(symbol_entity: str, affiliation: str = 'unknown') -> Dict:
+        """
+        Get Leaflet/Folium marker configuration
+        Uses ONLY Android-compatible symbols
+        """
+        symbol_text, color = TacticalMarkerStyle.get_style(symbol_entity, affiliation)
+        
+        return {
+            'icon': 'info-sign',  # Bootstrap Glyphicon fallback for Leaflet
+            'color': color,
+            'prefix': 'glyphicon',
+            'extraClasses': 'tactical-marker',
+        }
+    
+    @staticmethod
+    def get_svg_marker(symbol_entity: str, affiliation: str = 'unknown', size: int = 40) -> str:
+        """
+        Generate SVG marker for web display
+        Displays symbol name as text (actual icon rendering done by Android app)
+        """
+        symbol_text, color = TacticalMarkerStyle.get_style(symbol_entity, affiliation)
+        
+        svg = f'''<svg width="{size}" height="{size}" xmlns="http://www.w3.org/2000/svg">
+            <rect width="{size}" height="{size}" fill="{color}" opacity="0.7" rx="3"/>
+            <text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle" 
+                  font-size="10" fill="#000000" font-weight="bold">
+                {symbol_entity.upper()}
+            </text>
+        </svg>'''
+        
+        import base64
+        encoded = base64.b64encode(svg.encode('utf-8')).decode('utf-8')
+        return f"data:image/svg+xml;base64,{encoded}"
+
+
+def get_icon_preset(preset_name: str) -> Dict:
+    """Get Leaflet icon config for a preset
+
+    Preset names are parsed dynamically - no hardcoded presets stored in the code.
+    Supported formats:
+      - "<affiliation>_<symbol>" (e.g., "friendly_mortar")
+      - "<symbol>_<affiliation>" (e.g., "mortar_friendly")
+
+    Affiliations: friendly, hostile, neutral, unknown
+    """
+    affiliations = {'friendly', 'hostile', 'neutral', 'unknown'}
+
+    if not isinstance(preset_name, str) or '_' not in preset_name:
+        raise ValueError('preset_name must be a string containing "_" separator')
+
+    parts = preset_name.split('_')
+
+    # Try parse affiliation at start
+    if parts[0] in affiliations:
+        affiliation = parts[0]
+        symbol_entity = '_'.join(parts[1:])
+    # Or affiliation at end
+    elif parts[-1] in affiliations:
+        affiliation = parts[-1]
+        symbol_entity = '_'.join(parts[:-1])
+    else:
+        raise ValueError(f"Could not parse affiliation from preset '{preset_name}'")
+
+    # Validate symbol exists in Android drawables
+    if not is_valid_symbol(symbol_entity):
+        raise ValueError(f"Symbol '{symbol_entity}' not available in Android drawables")
+
+    return TacticalMarkerStyle.get_leaflet_icon_config(symbol_entity, affiliation)
 
 
 def get_available_icons() -> Dict[str, list]:
-    """Get list of all available icon presets organized by category"""
+    """
+    Get all available Android drawable symbols organized by category
+    Returns: {category: [(symbol_entity, display_name, affiliation), ...]}
+    """
     categories = {
-        'Airports': [],
-        'Waypoints': [],
-        'BLUFOR Air': [],
-        'BLUFOR Ground': [],
-        'OPFOR Air': [],
-        'OPFOR Ground': [],
-        'OPFOR Defense': [],
-        'Neutral': [],
-        'Special': []
+        'Equipment': [],
+        'Unit Sizes': [],
     }
     
-    for preset_name in ICON_PRESETS.keys():
-        if preset_name.startswith('airport'):
-            categories['Airports'].append(preset_name)
-        elif preset_name.startswith('waypoint') or preset_name == 'heliport':
-            categories['Waypoints'].append(preset_name)
-        elif preset_name.startswith('blufor') and any(x in preset_name for x in ['fighter', 'bomber', 'transport', 'helo', 'uav']):
-            categories['BLUFOR Air'].append(preset_name)
-        elif preset_name.startswith('blufor'):
-            categories['BLUFOR Ground'].append(preset_name)
-        elif preset_name.startswith('opfor') and any(x in preset_name for x in ['fighter', 'bomber', 'helo', 'uav']):
-            categories['OPFOR Air'].append(preset_name)
-        elif preset_name.startswith('opfor') and any(x in preset_name for x in ['sam', 'aaa', 'radar']):
-            categories['OPFOR Defense'].append(preset_name)
-        elif preset_name.startswith('opfor'):
-            categories['OPFOR Ground'].append(preset_name)
-        elif preset_name.startswith('neutral'):
-            categories['Neutral'].append(preset_name)
-        else:
-            categories['Special'].append(preset_name)
+    # Automatically load from Android drawables - no hardcoded symbols!
+    by_category = get_symbols_by_category()
+    affiliations = ['friendly', 'hostile', 'neutral', 'unknown']
     
-    # Remove empty categories
-    return {k: v for k, v in categories.items() if v}
+    result = {}
+    for category, symbols in by_category.items():
+        # Format category name nicely
+        category_name = category.replace('_', ' ').title()
+        result[category_name] = []
+        
+        for symbol_entity, display_name in symbols:
+            # For unit sizes, only add once with neutral
+            if category == 'unit_size':
+                result[category_name].append((symbol_entity, display_name, 'neutral'))
+            else:
+                # For other symbols, add all affiliations
+                for affiliation in affiliations:
+                    display = f"{display_name} ({affiliation.title()})"
+                    result[category_name].append((symbol_entity, display, affiliation))
+    
+    return result
 
 
 if __name__ == "__main__":
-    # Test icon generation
-    print("Available Icon Categories:")
+    # Test Android drawable symbol system
+    print("=== Android Drawable Icons Only ===")
+    print("\nAvailable Symbols:")
+    for symbol, name in get_available_symbols().items():
+        print(f"  - {symbol}: {name}")
+    
+    print("\n\nAvailable Icon Categories:")
     for category, icons in get_available_icons().items():
         print(f"\n{category}:")
-        for icon in icons:
-            preset = ICON_PRESETS[icon]
-            style = TacticalMarkerStyle.get_style(*preset)
-            print(f"  {icon:25} -> {style['symbol']} ({style['color']})")
+        for symbol_entity, display_name, affiliation in icons[:3]:  # Show first 3
+            print(f"  - {symbol_entity} ({affiliation})")
+        if len(icons) > 3:
+            print(f"  ... and {len(icons) - 3} more")
     
     # Example SVG generation
-    print("\n\nExample SVG marker (BLUFOR Fighter):")
-    svg_uri = TacticalMarkerStyle.get_svg_marker('tactical_blufor', 'BLUFOR', 'fighter')
-    print(f"Length: {len(svg_uri)} chars")
-    print(f"Preview: {svg_uri[:100]}...")
+    print("\n\nExample SVG marker (Hostile Mortar):")
+    try:
+        svg_uri = TacticalMarkerStyle.get_svg_marker('mortar', 'hostile')
+        print(f"Length: {len(svg_uri)} chars")
+        print(f"Preview: {svg_uri[:100]}...")
+    except ValueError as e:
+        print(f"Error: {e}")
+    
+    # Test invalid symbol
+    print("\n\nTest invalid symbol (should raise error):")
+    try:
+        TacticalMarkerStyle.get_style('fighter', 'friendly')
+    except ValueError as e:
+        print(f"Correctly rejected: {e}")
