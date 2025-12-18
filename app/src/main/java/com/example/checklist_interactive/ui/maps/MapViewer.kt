@@ -86,10 +86,9 @@ fun MapViewer(
     var showMarkerRouteManagement by remember { mutableStateOf(false) }
     var showRouteCreation by remember { mutableStateOf(false) }
 
-    // Selected location for custom popup
+    // Selected location for marker details in management sheet
     var selectedLocation by remember { mutableStateOf<com.example.checklist_interactive.data.tactical.LocationEntity?>(null) }
     var selectedRunways by remember { mutableStateOf<List<com.example.checklist_interactive.data.tactical.RunwayEntity>>(emptyList()) }
-    var showLocationSheet by remember { mutableStateOf(false) }
 
     // Create a coroutine scope for state updates from listeners
     val scope = rememberCoroutineScope()
@@ -454,7 +453,7 @@ fun MapViewer(
                             osmMarker.setOnMarkerClickListener(object : org.osmdroid.views.overlay.Marker.OnMarkerClickListener {
                                 override fun onMarkerClick(markerView: org.osmdroid.views.overlay.Marker?, mapView: org.osmdroid.views.MapView?): Boolean {
                                     selectedLocation = marker
-                                    showLocationSheet = true
+                                    showMarkerRouteManagement = true
 
                                     (context as? android.app.Activity)?.runOnUiThread {
                                         lastProgrammaticMove.value = System.currentTimeMillis()
@@ -838,15 +837,17 @@ fun MapViewer(
         DataPadPopup(onDismiss = { showDataPad = false })
     }
     
-    // Marker/Route Management Sheet
+    // Marker/Route Management Sheet (with integrated marker details)
     if (showMarkerRouteManagement) {
         MarkerRouteManagementSheet(
             viewModel = markerRouteViewModel,
-            onDismiss = { showMarkerRouteManagement = false },
-            onMarkerClick = { marker ->
-                // Center map on marker
-                mapView?.controller?.animateTo(GeoPoint(marker.latitude, marker.longitude))
+            onDismiss = { 
                 showMarkerRouteManagement = false
+                selectedLocation = null
+            },
+            onMarkerClick = { marker ->
+                // Update selected location to show details in tab
+                selectedLocation = marker
             },
             onRouteClick = { route ->
                 // Load and display route on map
@@ -878,7 +879,9 @@ fun MapViewer(
                 showMarkerRouteManagement = false
                 routeCreationViewModel.startRouteCreation()
                 showRouteCreation = true
-            }
+            },
+            selectedMarker = selectedLocation,
+            selectedRunways = selectedRunways
         )
     }
     
@@ -893,32 +896,6 @@ fun MapViewer(
             onWaypointClick = { location ->
                 // Center map on waypoint
                 mapView?.controller?.animateTo(GeoPoint(location.latitude, location.longitude))
-            }
-        )
-    }
-
-    // Custom location popup (reusable composable in MapMarkerPopup.kt)
-    if (showLocationSheet && selectedLocation != null) {
-        MapMarkerPopup(
-            location = selectedLocation!!,
-            runways = selectedRunways,
-            onClose = {
-                showLocationSheet = false
-                selectedLocation = null
-            },
-            onManage = {
-                showLocationSheet = false
-                selectedLocation = null
-                showMarkerRouteManagement = true
-            },
-            onRunwayClick = { rw ->
-                // center on runway touchdown if available
-                val lat = rw.touchdownStartLat ?: rw.touchdownEndLat ?: selectedLocation!!.latitude
-                val lon = rw.touchdownStartLon ?: rw.touchdownEndLon ?: selectedLocation!!.longitude
-                (context as? android.app.Activity)?.runOnUiThread {
-                    mapView?.controller?.animateTo(GeoPoint(lat, lon))
-                    mapView?.invalidate()
-                }
             }
         )
     }
