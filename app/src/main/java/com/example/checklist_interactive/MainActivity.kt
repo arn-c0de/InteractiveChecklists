@@ -60,7 +60,7 @@ import java.util.Locale
 
 class MainActivity : ComponentActivity() {
         companion object {
-            const val SOFTWARE_VERSION = "1.0.13"
+            const val SOFTWARE_VERSION = "1.0.14"
         }
 
         val softwareVersion = SOFTWARE_VERSION
