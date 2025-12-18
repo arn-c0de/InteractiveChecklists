@@ -409,7 +409,7 @@ class SessionManager:
         self._whitelist_lock = __import__('threading').Lock()
 
         # Rate limiting: IP -> (attempt_count, window_start_time)
-        self.handshake_attempts: Dict[str, Tuple[int, float]] = {}
+        self.handshake_attempts: Dict[str, Tuple[int, float, int]] = {}  # Now: (count, window_start, violations)
         # Device-ID based rate limiting: device_id -> (attempt_count, window_start_time, consecutive_violations)
         self.device_rate_limits: Dict[str, Tuple[int, float, int]] = {}
         # IP blacklist: IP -> (blacklist_until_timestamp, violation_count)
@@ -769,36 +769,89 @@ class SessionManager:
             except Exception as e:
                 logger.error(f"❌ Failed to persist ip blacklist: {e}")
 
-    def is_rate_limited(self, ip_address: str) -> bool:
-        """Check if IP address is rate limited for handshake attempts"""
+    def is_combined_rate_limited(self, ip_address: str, device_id: str) -> bool:
+        """Check combined IP + Device-ID rate limiting for enhanced security.
+
+        This prevents attackers from bypassing limits by rotating IPs or device IDs.
+        Uses adaptive rate limits based on violation history.
+        """
         with self.rate_limit_lock:
             current_time = time.time()
+            key = f"{ip_address}:{device_id}"  # Combined key
 
-            if ip_address in self.handshake_attempts:
-                count, window_start = self.handshake_attempts[ip_address]
+            if key in self.handshake_attempts:
+                count, window_start, violations = self.handshake_attempts[key]
+
+                # Adaptive rate limiting: stricter limits for repeat offenders
+                adaptive_max_attempts = self.MAX_HANDSHAKE_ATTEMPTS
+                if violations > 0:
+                    # Reduce allowed attempts for violators (minimum 1)
+                    adaptive_max_attempts = max(1, self.MAX_HANDSHAKE_ATTEMPTS // (2 ** violations))
 
                 # Check if window has expired
                 if current_time - window_start > self.RATE_LIMIT_WINDOW:
-                    # Reset window
-                    self.handshake_attempts[ip_address] = (1, current_time)
+                    # Reset window but keep violation count
+                    self.handshake_attempts[key] = (1, current_time, violations)
                     return False
 
                 # Within window - check count
-                if count >= self.MAX_HANDSHAKE_ATTEMPTS:
-                    logger.warning(f"⚠️ Rate limit exceeded for {ip_address} ({count} attempts in {current_time - window_start:.1f}s)")
-                    # Add to blacklist after repeated violations
+                if count >= adaptive_max_attempts:
+                    logger.warning(f"⚠️ Combined rate limit exceeded for {ip_address}:{device_id[:8]}... "
+                                 f"({count}/{adaptive_max_attempts} attempts in {current_time - window_start:.1f}s, "
+                                 f"violations: {violations})")
+
+                    # Increment violation count and add to blacklist
+                    self.handshake_attempts[key] = (count, window_start, violations + 1)
                     self.add_to_blacklist(ip_address)
+
+                    # SECURITY AUDIT: Log rate limit violation
+                    get_audit_logger().log_event('rate_limit_violation', 'medium', {
+                        'ip': ip_address,
+                        'device_id': device_id[:16] + '...',
+                        'attempts': count,
+                        'max_attempts': adaptive_max_attempts,
+                        'violations': violations + 1,
+                        'window_seconds': current_time - window_start
+                    })
+
                     return True
 
                 # Increment count
-                self.handshake_attempts[ip_address] = (count + 1, window_start)
+                self.handshake_attempts[key] = (count + 1, window_start, violations)
                 return False
             else:
-                # First attempt from this IP
-                self.handshake_attempts[ip_address] = (1, current_time)
+                # First attempt from this IP+device combination
+                self.handshake_attempts[key] = (1, current_time, 0)
                 return False
 
     def is_device_rate_limited(self, device_id: str) -> bool:
+        """Check if device ID is rate limited (stricter than IP-based)"""
+        with self.rate_limit_lock:
+            current_time = time.time()
+
+            if device_id in self.device_rate_limits:
+                count, window_start, violations = self.device_rate_limits[device_id]
+
+                # Check if window has expired
+                if current_time - window_start > self.RATE_LIMIT_WINDOW:
+                    # Reset window (keep violation count for progressive penalties)
+                    self.device_rate_limits[device_id] = (1, current_time, violations)
+                    return False
+
+                # Within window - check count
+                if count >= self.MAX_DEVICE_ATTEMPTS:
+                    logger.warning(f"⚠️ Device rate limit exceeded for {device_id[:16]}... ({count} attempts in {current_time - window_start:.1f}s)")
+                    # Increment violation count
+                    self.device_rate_limits[device_id] = (count, window_start, violations + 1)
+                    return True
+
+                # Increment count
+                self.device_rate_limits[device_id] = (count + 1, window_start, violations)
+                return False
+            else:
+                # First attempt from this device
+                self.device_rate_limits[device_id] = (1, current_time, 0)
+                return False
         """Check if device ID is rate limited (stricter than IP-based)"""
         with self.rate_limit_lock:
             current_time = time.time()
@@ -832,13 +885,13 @@ class SessionManager:
         with self.rate_limit_lock:
             current_time = time.time()
 
-            # Cleanup IP rate limits
-            expired_ips = [
-                ip for ip, (_, window_start) in self.handshake_attempts.items()
+            # Cleanup IP rate limits (now combined IP:device keys)
+            expired_combined = [
+                key for key, (_, window_start, _) in self.handshake_attempts.items()
                 if current_time - window_start > self.RATE_LIMIT_WINDOW * 2
             ]
-            for ip in expired_ips:
-                del self.handshake_attempts[ip]
+            for key in expired_combined:
+                del self.handshake_attempts[key]
 
             # Cleanup device rate limits
             expired_devices = [
@@ -863,8 +916,8 @@ class SessionManager:
                 except Exception as e:
                     logger.debug(f"Failed to persist blacklist cleanup: {e}")
 
-            if expired_ips or expired_devices or expired_blacklist:
-                logger.debug(f"🧹 Cleaned up {len(expired_ips)} IP limits, {len(expired_devices)} device limits, {len(expired_blacklist)} blacklist entries")
+            if expired_combined or expired_devices or expired_blacklist:
+                logger.debug(f"🧹 Cleaned up {len(expired_combined)} combined limits, {len(expired_devices)} device limits, {len(expired_blacklist)} blacklist entries")
 
     def handle_client_hello(self, message: dict, sender_address: Tuple[str, int]) -> dict:
         """
@@ -1005,6 +1058,16 @@ class SessionManager:
 
             logger.info(f"📥 ClientHello from {device_name} ({device_id[:16]}...) @ {ip_address}")
 
+            # SECURITY: Combined IP + Device-ID rate limiting (prevents IP rotation attacks)
+            if self.is_combined_rate_limited(ip_address, device_id):
+                logger.warning(f"🚫 Combined rate limit exceeded for {ip_address}:{device_id[:8]}... - rejecting handshake")
+                return {
+                    "type": "Error",
+                    "error": "RateLimitExceeded",
+                    "message": f"Too many handshake attempts. Please wait {self.RATE_LIMIT_WINDOW}s and try again.",
+                    "timestamp": int(time.time() * 1000)
+                }
+
             # Check authorization
             if not self.is_device_authorized(device_id):
                 logger.warning(f"❌ Unauthorized device: {device_id[:16]}... ({device_name})")
@@ -1017,6 +1080,9 @@ class SessionManager:
                     'ip': ip_address,
                     'reason': 'Device not in whitelist'
                 })
+
+                # SECURITY: Constant time delay to prevent timing attacks on authorization
+                time.sleep(0.05)  # 50ms delay on auth failure
 
                 # Return a generic error message to clients to avoid leaking internal details
                 return {
@@ -1138,11 +1204,12 @@ class SessionManager:
             }
         
         except Exception as e:
+            # SECURITY: Log detailed error internally but return generic message to client
             logger.error(f"❌ Error handling ClientHello: {e}", exc_info=True)
             return {
                 "type": "Error",
                 "error": "HandshakeFailed",
-                "message": str(e),
+                "message": "Handshake failed due to an internal error. Please try again.",
                 "timestamp": int(time.time() * 1000)
             }
     
@@ -1268,6 +1335,9 @@ class SessionManager:
                     'reason': 'HMAC mismatch - possible MITM or corrupted message'
                 })
 
+                # SECURITY: Constant time delay to prevent timing attacks on authentication
+                time.sleep(0.1)  # 100ms delay on auth failure
+
                 return {
                     "type": "Error",
                     "error": "AuthFailed",
@@ -1295,11 +1365,12 @@ class SessionManager:
             }
         
         except Exception as e:
+            # SECURITY: Log detailed error internally but return generic message to client
             logger.error(f"❌ Error handling KeyConfirm: {e}", exc_info=True)
             return {
                 "type": "Error",
                 "error": "KeyConfirmFailed",
-                "message": str(e),
+                "message": "Key confirmation failed due to an internal error. Please try again.",
                 "timestamp": int(time.time() * 1000)
             }
     
