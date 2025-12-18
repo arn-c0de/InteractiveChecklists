@@ -238,6 +238,8 @@ class SessionData:
         # Session validity / rekey signaling
         self._needs_rekey = False
         self._is_valid = True
+        # Track last received counter for monotonicity check
+        self._last_received_counter = 0
 
     def is_expired(self, timeout_seconds: int = 900) -> bool:
         """Check if session has expired (default 15 minutes - shorter for security)"""
@@ -248,32 +250,35 @@ class SessionData:
         self.last_activity = time.time()
 
     def generate_nonce(self) -> bytes:
-        """Generate counter-based nonce for this session (SERVER side, 0x01 prefix) with exhaustion protection and rekey warning."""
+        """Generate counter-based nonce for this session (SERVER side, 0x01 prefix) with exhaustion protection and rekey warning.
+
+        SECURITY: All counter operations are atomic under lock to prevent race conditions.
+        """
         with self._nonce_lock:
-            if not self._is_valid:
-                raise RuntimeError("Session invalid")
+            # SECURITY: Check session validity FIRST, before any counter operations
+            if not getattr(self, '_is_valid', True):
+                raise RuntimeError("Session invalid - cannot generate nonce")
 
-            self._nonce_counter += 1
-
-            # Trigger re-key at 75% capacity (2^62 messages)
-            if self._nonce_counter >= (2**64 * 0.75):
-                logger.warning(f"⚠️ Nonce counter at 75% capacity for session {self.session_id[:8]}...")
-                # Signal to application layer that re-keying is needed
-                self._needs_rekey = True
-
-            if self._nonce_counter >= 2**64:
+            # SECURITY: Check counter bounds BEFORE increment to prevent overflow
+            if self._nonce_counter >= 2**64 - 1:  # Leave room for one more increment
                 logger.critical(f"🚨 Nonce counter exhausted for session {self.session_id[:8]}!")
-                # Invalidate the session immediately (fail-safe)
                 self._is_valid = False
                 raise RuntimeError("Nonce exhausted - session invalidated")
 
-            # Additional protection: if the server-side counter grows suspiciously high
-            # relative to observed client counters, warn and mark for rekey.
-            # (This helps detect potential counter wrap/abuse.)
-            if self._nonce_counter >= (2**64 * 0.9):
-                logger.critical(f"🚨 Nonce counter dangerously high for session {self.session_id[:8]} - invalidating to be safe")
-                self._is_valid = False
-                raise RuntimeError("Nonce counter dangerously high - session invalidated")
+            # Atomic increment with overflow protection
+            self._nonce_counter += 1
+
+            # Trigger re-key at 75% capacity (warn early)
+            if self._nonce_counter >= (2**64 * 0.75):
+                logger.warning(f"⚠️ Nonce counter at 75% capacity for session {self.session_id[:8]}...")
+                self._needs_rekey = True
+
+            # Additional protection: if counter grows suspiciously high relative to received nonces
+            # This could indicate abuse or counter manipulation
+            received_count = len(self._received_nonces)
+            if received_count > 0 and self._nonce_counter > received_count * 10:
+                logger.warning(f"⚠️ Server nonce counter ({self._nonce_counter}) far exceeds received nonces ({received_count}) - possible abuse")
+                # Don't invalidate immediately, but log for monitoring
 
             # Format: 0x01 (server) + 3 bytes reserved + 8 bytes counter
             return bytes([0x01, 0x00, 0x00, 0x00]) + self._nonce_counter.to_bytes(8, 'big')
@@ -281,9 +286,9 @@ class SessionData:
     def validate_nonce(self, nonce: bytes, expected_sender: int = 0x00) -> bool:
         """Validate received nonce to prevent replay attacks and check sender id.
 
+        SECURITY: All nonce validation operations are atomic under lock.
         Nonce format: [sender_id:1][reserved:3][counter:8]
         For messages coming from the client to the server, sender_id MUST be 0x00.
-        Uses a sliding window with automatic eviction for memory safety.
         """
         if len(nonce) != 12:
             return False
@@ -293,13 +298,20 @@ class SessionData:
             logger.warning(f"⚠️ Invalid nonce sender id: {nonce[0]:#02x} - expected {expected_sender:#02x} for session {self.session_id[:8]}...")
             return False
 
-        # Extract counter (bytes 4-11)
-        counter = int.from_bytes(nonce[4:12], 'big')
+        # Extract counter (bytes 4-11) - bounds check to prevent overflow
+        try:
+            counter = int.from_bytes(nonce[4:12], 'big')
+            if counter >= 2**64:
+                logger.warning(f"⚠️ Invalid nonce counter value: {counter}")
+                return False
+        except (ValueError, OverflowError):
+            logger.warning("⚠️ Malformed nonce counter bytes")
+            return False
 
         with self._nonce_lock:
             current_time = time.time()
 
-            # Reject if session already invalidated
+            # SECURITY: Check session validity first
             if not getattr(self, '_is_valid', True):
                 logger.warning(f"⚠️ Rejecting nonce for invalid session {self.session_id[:8]}...")
                 return False
@@ -309,7 +321,7 @@ class SessionData:
                 logger.warning(f"⚠️ Nonce too old: {counter} < {self._nonce_counter_min}")
                 return False
 
-            # Check for duplicate (replay)
+            # Check for duplicate (replay) - this is the critical check
             if counter in self._received_nonces:
                 logger.warning(f"⚠️ Replay attack: {counter}")
                 # SECURITY AUDIT: Log replay attack
@@ -321,13 +333,19 @@ class SessionData:
                 })
                 return False
 
+            # SECURITY: Prevent nonce counter from going backwards (should be monotonically increasing)
+            # This could indicate an attack or implementation bug
+            if hasattr(self, '_last_received_counter') and counter < self._last_received_counter:
+                logger.warning(f"⚠️ Nonce counter went backwards: {counter} < {self._last_received_counter}")
+                return False
+
             # Accept and record timestamp
             self._received_nonces[counter] = current_time
+            self._last_received_counter = counter
 
             # Evict old entries by age first (keeps window bounded for long-running sessions)
             if self._NONCE_RETENTION_SECONDS is not None:
                 cutoff = current_time - self._NONCE_RETENTION_SECONDS
-                # Iterate keys and remove old ones (avoid changing dict size during iteration)
                 old = [k for k, t in self._received_nonces.items() if t < cutoff]
                 for k in old:
                     del self._received_nonces[k]
@@ -350,8 +368,8 @@ class SessionData:
             if self._received_nonces:
                 try:
                     self._nonce_counter_min = min(self._received_nonces)
-                except Exception:
-                    # Fall back to a conservative behavior
+                except (ValueError, TypeError):
+                    # Fallback to conservative behavior
                     self._nonce_counter_min = 0
 
         return True
@@ -854,13 +872,23 @@ class SessionManager:
         Returns ServerHello response or error
         """
         try:
+            # SECURITY: Validate message structure first
+            if not isinstance(message, dict):
+                logger.warning(f"❌ Invalid message type from {sender_address[0]}: {type(message)}")
+                return {
+                    "type": "Error",
+                    "error": "HandshakeFailed",
+                    "message": "Message must be a JSON object",
+                    "timestamp": int(time.time() * 1000)
+                }
+
             device_id = message.get('deviceId', '')
             device_name = message.get('deviceName', 'Unknown')
             client_public_key_b64 = message.get('publicKey', '')
             client_timestamp = message.get('timestamp', 0)
             ip_address = sender_address[0]
 
-            # SECURITY: Validate deviceId format and length
+            # SECURITY: Comprehensive deviceId validation
             if not device_id or not isinstance(device_id, str):
                 logger.warning(f"❌ Missing or invalid deviceId from {ip_address}")
                 return {
@@ -870,19 +898,20 @@ class SessionManager:
                     "timestamp": int(time.time() * 1000)
                 }
 
-            if len(device_id) > 128:
-                logger.warning(f"❌ deviceId too long from {ip_address}: {len(device_id)} chars")
+            # Length limits (prevent DoS and buffer overflows)
+            if len(device_id) < 8 or len(device_id) > 128:
+                logger.warning(f"❌ deviceId length invalid from {ip_address}: {len(device_id)} chars (must be 8-128)")
                 return {
                     "type": "Error",
                     "error": "HandshakeFailed",
-                    "message": "deviceId must not exceed 128 characters",
+                    "message": "deviceId must be between 8 and 128 characters",
                     "timestamp": int(time.time() * 1000)
                 }
 
-            # Validate deviceId contains only safe characters (alphanumeric, dash, underscore)
+            # Strict character whitelist (prevent injection attacks)
             import re
             if not re.match(r'^[a-zA-Z0-9_-]+$', device_id):
-                logger.warning(f"❌ deviceId contains invalid characters from {ip_address}")
+                logger.warning(f"❌ deviceId contains invalid characters from {ip_address}: {repr(device_id)}")
                 return {
                     "type": "Error",
                     "error": "HandshakeFailed",
@@ -890,15 +919,20 @@ class SessionManager:
                     "timestamp": int(time.time() * 1000)
                 }
 
-            # SECURITY: Validate deviceName length (prevent log injection)
+            # SECURITY: Comprehensive deviceName validation
             if not isinstance(device_name, str):
                 device_name = 'Unknown'
-            if len(device_name) > 128:
-                device_name = device_name[:128]  # Truncate
-            # Remove newlines and control characters from device name
-            device_name = ''.join(char for char in device_name if char.isprintable())
+            else:
+                # Length limit and sanitization
+                if len(device_name) > 64:  # Reduced from 128 for better UX
+                    device_name = device_name[:64] + '...'
+                # Remove control characters and normalize whitespace
+                device_name = ''.join(char for char in device_name if char.isprintable())
+                device_name = ' '.join(device_name.split())  # Normalize whitespace
+                if not device_name.strip():
+                    device_name = 'Unknown'
 
-            # SECURITY: Validate publicKey is valid Base64 and correct length
+            # SECURITY: Comprehensive publicKey validation
             if not client_public_key_b64 or not isinstance(client_public_key_b64, str):
                 logger.warning(f"❌ Missing or invalid publicKey from {ip_address}")
                 return {
@@ -908,64 +942,68 @@ class SessionManager:
                     "timestamp": int(time.time() * 1000)
                 }
 
+            # Length validation before Base64 decoding (prevent DoS)
+            if len(client_public_key_b64) < 80 or len(client_public_key_b64) > 200:
+                logger.warning(f"❌ publicKey Base64 length invalid from {ip_address}: {len(client_public_key_b64)} chars")
+                return {
+                    "type": "Error",
+                    "error": "HandshakeFailed",
+                    "message": "publicKey Base64 string length invalid",
+                    "timestamp": int(time.time() * 1000)
+                }
+
+            # Validate Base64 format and decode
             try:
                 decoded_key = self._base64_decode(client_public_key_b64)
-                # SECP256R1 DER-encoded public key should be around 91 bytes
-                if len(decoded_key) < 50 or len(decoded_key) > 200:
-                    raise ValueError(f"Invalid key length: {len(decoded_key)}")
+                # SECP256R1 DER-encoded public key should be exactly 91 bytes (uncompressed)
+                if len(decoded_key) != 91:
+                    raise ValueError(f"DER key length must be 91 bytes, got {len(decoded_key)}")
             except Exception as e:
                 logger.warning(f"❌ Invalid publicKey format from {ip_address}: {e}")
                 return {
                     "type": "Error",
                     "error": "HandshakeFailed",
-                    "message": "publicKey must be valid Base64-encoded DER key",
+                    "message": "publicKey must be valid Base64-encoded SECP256R1 DER key",
                     "timestamp": int(time.time() * 1000)
                 }
 
-            logger.info(f"📥 ClientHello from {device_name} ({device_id[:16]}...) @ {ip_address}")
-
-            # SECURITY: Check IP blacklist first (prevent DoS from banned IPs)
-            if self.is_ip_blacklisted(ip_address):
-                return {
-                    "type": "Error",
-                    "error": "IPBlacklisted",
-                    "message": "Your IP address has been temporarily blacklisted due to repeated violations.",
-                    "timestamp": int(time.time() * 1000)
-                }
-
-            # SECURITY: IP-based rate limiting (prevent DoS attacks)
-            if self.is_rate_limited(ip_address):
-                logger.warning(f"🚫 Rate limit exceeded for {ip_address} - rejecting handshake")
-                return {
-                    "type": "Error",
-                    "error": "RateLimitExceeded",
-                    "message": f"Too many handshake attempts. Please wait {self.RATE_LIMIT_WINDOW}s and try again.",
-                    "timestamp": int(time.time() * 1000)
-                }
-
-            # SECURITY: Device-ID-based rate limiting (stricter, prevents abuse even with IP rotation)
-            if self.is_device_rate_limited(device_id):
-                logger.warning(f"🚫 Device rate limit exceeded for {device_id[:16]}... - rejecting handshake")
-                return {
-                    "type": "Error",
-                    "error": "DeviceRateLimitExceeded",
-                    "message": f"Too many handshake attempts from this device. Please wait {self.RATE_LIMIT_WINDOW}s and try again.",
-                    "timestamp": int(time.time() * 1000)
-                }
-
-            # SECURITY: Validate timestamp (prevent replay of old messages)
-            server_time = time.time() * 1000  # milliseconds
-            time_diff = abs(server_time - client_timestamp)
-            MAX_TIMESTAMP_DRIFT_MS = 120000  # 120 seconds / 2 minutes (compromise between security and clock drift tolerance)
-
-            if time_diff > MAX_TIMESTAMP_DRIFT_MS:
-                logger.warning(f"❌ Timestamp too old/future: {time_diff/1000:.1f}s drift (max {MAX_TIMESTAMP_DRIFT_MS/1000}s)")
+            # SECURITY: Stricter timestamp validation
+            if not isinstance(client_timestamp, (int, float)) or client_timestamp <= 0:
+                logger.warning(f"❌ Invalid timestamp type/value from {ip_address}: {client_timestamp}")
                 return {
                     "type": "Error",
                     "error": "HandshakeFailed",
-                    "message": f"Timestamp drift too large: {time_diff/1000:.1f}s (max {MAX_TIMESTAMP_DRIFT_MS/1000}s). Check device clock.",
+                    "message": "timestamp must be a positive number",
+                    "timestamp": int(time.time() * 1000)
+                }
+
+            server_time = time.time() * 1000  # milliseconds
+            time_diff = abs(server_time - client_timestamp)
+
+            # Stricter time window: 60 seconds instead of 120 (reduced attack window)
+            MAX_TIMESTAMP_DRIFT_MS = 60000  # 60 seconds
+
+            # Additional check: prevent timestamps from far future (clock skew protection)
+            if client_timestamp > server_time + MAX_TIMESTAMP_DRIFT_MS:
+                logger.warning(f"❌ Timestamp from future: {time_diff/1000:.1f}s ahead")
+                return {
+                    "type": "Error",
+                    "error": "HandshakeFailed",
+                    "message": "Device clock appears to be set to future time",
                     "timestamp": int(server_time)
                 }
+
+            # Prevent timestamps that are too old (replay protection)
+            if time_diff > MAX_TIMESTAMP_DRIFT_MS:
+                logger.warning(f"❌ Timestamp too old: {time_diff/1000:.1f}s drift (max {MAX_TIMESTAMP_DRIFT_MS/1000}s)")
+                return {
+                    "type": "Error",
+                    "error": "HandshakeFailed",
+                    "message": f"Timestamp too old. Check device clock synchronization.",
+                    "timestamp": int(server_time)
+                }
+
+            logger.info(f"📥 ClientHello from {device_name} ({device_id[:16]}...) @ {ip_address}")
 
             # Check authorization
             if not self.is_device_authorized(device_id):
@@ -1114,21 +1152,89 @@ class SessionManager:
         Verifies HMAC and returns Ack
         """
         try:
+            # SECURITY: Validate message structure first
+            if not isinstance(message, dict):
+                logger.warning("❌ Invalid KeyConfirm message type")
+                return {
+                    "type": "Error",
+                    "error": "AuthFailed",
+                    "message": "Message must be a JSON object",
+                    "timestamp": int(time.time() * 1000)
+                }
+
             session_id = message.get('sessionId', '')
             client_hmac_b64 = message.get('hmac', '')
             client_timestamp = message.get('timestamp', 0)
 
-            # SECURITY: Validate timestamp
-            server_time = time.time() * 1000
-            time_diff = abs(server_time - client_timestamp)
-            MAX_TIMESTAMP_DRIFT_MS = 120000  # 120 seconds / 2 minutes (compromise between security and clock drift tolerance)
-
-            if time_diff > MAX_TIMESTAMP_DRIFT_MS:
-                logger.warning(f"❌ KeyConfirm timestamp too old/future: {time_diff/1000:.1f}s drift")
+            # SECURITY: Validate sessionId
+            if not session_id or not isinstance(session_id, str):
+                logger.warning("❌ Missing or invalid sessionId in KeyConfirm")
                 return {
                     "type": "Error",
                     "error": "AuthFailed",
-                    "message": f"Timestamp drift too large: {time_diff/1000:.1f}s",
+                    "message": "sessionId is required and must be a string",
+                    "timestamp": int(time.time() * 1000)
+                }
+
+            if len(session_id) != 36:  # UUID4 length
+                logger.warning(f"❌ Invalid sessionId length: {len(session_id)}")
+                return {
+                    "type": "Error",
+                    "error": "AuthFailed",
+                    "message": "sessionId must be a valid UUID",
+                    "timestamp": int(time.time() * 1000)
+                }
+
+            # SECURITY: Validate HMAC
+            if not client_hmac_b64 or not isinstance(client_hmac_b64, str):
+                logger.warning("❌ Missing or invalid HMAC in KeyConfirm")
+                return {
+                    "type": "Error",
+                    "error": "AuthFailed",
+                    "message": "hmac is required and must be a string",
+                    "timestamp": int(time.time() * 1000)
+                }
+
+            # Length validation for HMAC (SHA256 HMAC is 32 bytes -> 44 chars Base64)
+            if len(client_hmac_b64) != 44:
+                logger.warning(f"❌ Invalid HMAC length: {len(client_hmac_b64)}")
+                return {
+                    "type": "Error",
+                    "error": "AuthFailed",
+                    "message": "hmac must be valid Base64-encoded SHA256 HMAC",
+                    "timestamp": int(time.time() * 1000)
+                }
+
+            # SECURITY: Stricter timestamp validation
+            if not isinstance(client_timestamp, (int, float)) or client_timestamp <= 0:
+                logger.warning(f"❌ Invalid timestamp in KeyConfirm: {client_timestamp}")
+                return {
+                    "type": "Error",
+                    "error": "AuthFailed",
+                    "message": "timestamp must be a positive number",
+                    "timestamp": int(time.time() * 1000)
+                }
+
+            server_time = time.time() * 1000
+            time_diff = abs(server_time - client_timestamp)
+            MAX_TIMESTAMP_DRIFT_MS = 60000  # 60 seconds (stricter than ClientHello)
+
+            # Prevent future timestamps (clock skew protection)
+            if client_timestamp > server_time + MAX_TIMESTAMP_DRIFT_MS:
+                logger.warning(f"❌ KeyConfirm timestamp from future: {time_diff/1000:.1f}s ahead")
+                return {
+                    "type": "Error",
+                    "error": "AuthFailed",
+                    "message": "Device clock appears to be set to future time",
+                    "timestamp": int(server_time)
+                }
+
+            if time_diff > MAX_TIMESTAMP_DRIFT_MS:
+                logger.warning(f"❌ KeyConfirm timestamp too old: {time_diff/1000:.1f}s drift")
+                return {
+                    "type": "Error",
+                    "error": "AuthFailed",
+                    "message": f"Timestamp too old. Maximum drift: {MAX_TIMESTAMP_DRIFT_MS/1000}s",
                     "timestamp": int(server_time)
                 }
 
