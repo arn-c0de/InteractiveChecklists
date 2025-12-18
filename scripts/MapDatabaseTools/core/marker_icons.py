@@ -91,18 +91,39 @@ class TacticalMarkerStyle:
         return (symbol_display, color)
     
     @staticmethod
-    def get_leaflet_icon_config(symbol_entity: str, affiliation: str = 'unknown') -> Dict:
+    def get_leaflet_icon_config(symbol_entity: str, affiliation: str = 'unknown', size: int = 28) -> Dict:
         """
         Get Leaflet/Folium marker configuration
-        Uses ONLY Android-compatible symbols
+        Uses ONLY Android-compatible symbols. Returns an object with fields
+        expected by `map.html` (including `html` and `className`) so the map
+        can render the icon even inside QWebEngineView.
         """
-        symbol_text, color = TacticalMarkerStyle.get_style(symbol_entity, affiliation)
-        
+        # Default color based on affiliation
+        color = get_affiliation_color(affiliation)
+        class_name = 'custom-marker tactical-marker'
+
+        # Try to render an SVG image for the symbol (preferred)
+        if symbol_entity:
+            try:
+                svg_uri = TacticalMarkerStyle.get_svg_marker(symbol_entity, affiliation, size)
+                html = f'<img src="{svg_uri}" width="{size}" height="{size}" style="display:block;" />'
+            except Exception:
+                # Fallback to a simple colored square
+                html = f'<div style="width:{size}px;height:{size}px;background:{color};border-radius:4px;border:1px solid rgba(0,0,0,0.1)"></div>'
+        else:
+            # No symbol specified -> colored square representing affiliation
+            html = f'<div style="width:{size}px;height:{size}px;background:{color};border-radius:4px;border:1px solid rgba(0,0,0,0.1)"></div>'
+
         return {
-            'icon': 'info-sign',  # Bootstrap Glyphicon fallback for Leaflet
+            'icon': 'info-sign',  # kept for legacy code
             'color': color,
             'prefix': 'glyphicon',
             'extraClasses': 'tactical-marker',
+            'html': html,
+            'className': class_name,
+            'iconSize': [size, size],
+            'iconAnchor': [size // 2, size // 2],
+            'popupAnchor': [0, -size // 2]
         }
     
     @staticmethod
