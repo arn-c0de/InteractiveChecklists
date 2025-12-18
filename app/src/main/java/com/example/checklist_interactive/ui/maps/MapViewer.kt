@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import android.util.Log
@@ -184,8 +185,11 @@ fun MapViewer(
                 val rawHeading = data.heading.toFloat()
                 // Convert raw heading to degrees for overlays/labels
                 val headingDeg = Math.toDegrees(rawHeading.toDouble()).toFloat()
-                // flip by 180° because the icon is oriented opposite the heading
-                marker.rotation = (rawHeading + 180f) % 360f
+                // Adjust rotation: apply rotationOffset so marker is corrected for icon orientation
+                val rotationOffset = 90f // 90° correction (adjusted left by 45°)
+                val computedRotation = (headingDeg + rotationOffset) % 360f
+                marker.rotation = computedRotation
+                Log.d(TAG, "headingDeg=$headingDeg rotationOffset=$rotationOffset computedRotation=$computedRotation")
                 try {
                     val color = if (isDarkTheme) android.graphics.Color.WHITE else android.graphics.Color.BLACK
                     // rely on Marker.rotation for rotation; use unrotated bitmap
@@ -649,21 +653,61 @@ fun MapViewer(
             }
         }
 
-        // Small tip when map lock is disabled (top-center, English, lowercase)
-        if (!isScreenLocked) {
+        // Flight data HUD (top-center) - shows Altitude, Speed, Pitch, Bank, Mach live from DataPad
+        if (datapadEnabled && flightData != null) {
+            val fd = flightData!!
+            val altFt = (fd.altitude * 3.28084).toInt()
+            val speedSource = fd.groundSpeed ?: fd.trueAirspeed ?: fd.indicatedAirspeed
+            val speedKts = speedSource?.let { (it * 1.9438).toInt() }
+            val pitchDeg = Math.toDegrees(fd.pitch)
+            val bankDeg = Math.toDegrees(fd.bank)
+            val machVal = fd.mach
+
             Surface(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 8.dp)
                     .padding(horizontal = 12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                shape = MaterialTheme.shapes.small
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(text = "ALT ${altFt} ft", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
+
+                    Divider(modifier = Modifier.height(18.dp).width(1.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+
+                    Text(text = "SPD ${speedKts ?: "--"} kt", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
+
+                    Divider(modifier = Modifier.height(18.dp).width(1.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+
+                    Text(text = "P ${String.format("%.1f", pitchDeg)}°", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
+                    Text(text = "B ${String.format("%.1f", bankDeg)}°", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
+
+                    Divider(modifier = Modifier.height(18.dp).width(1.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+
+                    Text(text = "Mach ${if (machVal != null) String.format("%.2f", machVal) else "--"}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
+                }
+            }
+        }
+
+        // Small tip when map lock is disabled (top-right, smaller to avoid overlapping datapad HUD)
+        if (!isScreenLocked) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 8.dp, end = 12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
                 shape = MaterialTheme.shapes.small
             ) {
                 Text(
                     text = stringResource(R.string.map_tip_tap_lock),
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.labelSmall
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp)
                 )
             }
         }
