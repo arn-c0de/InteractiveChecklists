@@ -142,6 +142,13 @@ class MarkerRouteViewModel(
             loadData()
         }
     }
+    
+    fun updateMarker(location: LocationEntity) {
+        viewModelScope.launch {
+            locationRepository.updateLocation(location)
+            loadData()
+        }
+    }
 }
 
 /**
@@ -276,7 +283,14 @@ fun MarkerRouteManagementSheet(
                             location = selectedMarker,
                             runways = selectedRunways,
                             onClose = { selectedTab = 1 },
-                            onSetRoute = onSetActiveRoute
+                            onSetRoute = onSetActiveRoute,
+                            onEdit = { updatedLocation ->
+                                viewModel.updateMarker(updatedLocation)
+                            },
+                            onDelete = { markerId ->
+                                viewModel.deleteMarker(markerId)
+                                selectedTab = 1
+                            }
                         )
                     } else {
                         Box(
@@ -633,8 +647,12 @@ fun MarkerDetailsContent(
     location: LocationEntity,
     runways: List<RunwayEntity>,
     onClose: () -> Unit,
-    onSetRoute: (LocationEntity) -> Unit = {}
+    onSetRoute: (LocationEntity) -> Unit = {},
+    onEdit: (LocationEntity) -> Unit = {},
+    onDelete: (Int) -> Unit = {}
 ) {
+    var showEditDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -808,11 +826,450 @@ fun MarkerDetailsContent(
                 Text("Set Route")
             }
             
+            // Edit and Delete buttons row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Edit button
+                OutlinedButton(
+                    onClick = { showEditDialog = true },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.Edit, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Edit")
+                }
+                
+                // Delete button
+                OutlinedButton(
+                    onClick = { showDeleteConfirm = true },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Delete")
+                }
+            }
+            
             // Back button
             OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.ArrowBack, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Back to Markers")
+            }
+        }
+    }
+    
+    // Edit dialog
+    if (showEditDialog) {
+        LocationEditDialog(
+            location = location,
+            onDismiss = { showEditDialog = false },
+            onSave = { updatedLocation ->
+                onEdit(updatedLocation)
+                showEditDialog = false
+            }
+        )
+    }
+    
+    // Delete confirmation
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete Marker") },
+            text = { Text("Are you sure you want to delete '${location.name}'? This action cannot be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDelete(location.id)
+                        showDeleteConfirm = false
+                        onClose()
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+}
+
+/**
+ * Comprehensive location/marker edit dialog with all database fields
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LocationEditDialog(
+    location: LocationEntity,
+    onDismiss: () -> Unit,
+    onSave: (LocationEntity) -> Unit
+) {
+    var name by remember { mutableStateOf(location.name) }
+    var latitude by remember { mutableStateOf(location.latitude.toString()) }
+    var longitude by remember { mutableStateOf(location.longitude.toString()) }
+    var markerType by remember { mutableStateOf(location.markerType) }
+    var coalition by remember { mutableStateOf(location.coalition ?: "") }
+    var icon by remember { mutableStateOf(location.icon) }
+    var description by remember { mutableStateOf(location.description) }
+    
+    // NATO symbol fields
+    var symbolSet by remember { mutableStateOf(location.symbolSet) }
+    var symbolEntity by remember { mutableStateOf(location.symbolEntity) }
+    var symbolSize by remember { mutableStateOf(location.symbolSize) }
+    var symbolAffiliation by remember { mutableStateOf(location.symbolAffiliation) }
+    var symbolColor by remember { mutableStateOf(location.symbolColor) }
+    
+    // Airport fields
+    var icao by remember { mutableStateOf(location.icao ?: "") }
+    var iata by remember { mutableStateOf(location.iata ?: "") }
+    var elevationM by remember { mutableStateOf(location.elevationM?.toString() ?: "") }
+    var frequencies by remember { mutableStateOf(location.frequencies ?: "") }
+    
+    // Tactical fields
+    var threatLevel by remember { mutableStateOf(location.threatLevel?.toString() ?: "") }
+    var unitType by remember { mutableStateOf(location.unitType ?: "") }
+    var strength by remember { mutableStateOf(location.strength?.toString() ?: "") }
+    
+    // Geography & admin
+    var country by remember { mutableStateOf(location.country ?: "") }
+    var region by remember { mutableStateOf(location.region ?: "") }
+    var timezone by remember { mutableStateOf(location.timezone ?: "") }
+    
+    // Source & verification
+    var source by remember { mutableStateOf(location.source ?: "") }
+    var tags by remember { mutableStateOf(location.tags ?: "") }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.fillMaxHeight(0.9f)
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Edit Marker",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, "Close")
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Scrollable content
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Basic info section
+                    Text("Basic Information", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Name *") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = latitude,
+                            onValueChange = { latitude = it },
+                            label = { Text("Latitude *") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = longitude,
+                            onValueChange = { longitude = it },
+                            label = { Text("Longitude *") },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = markerType,
+                            onValueChange = { markerType = it },
+                            label = { Text("Type *") },
+                            placeholder = { Text("airport, waypoint, tactical_military, etc.") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = coalition,
+                            onValueChange = { coalition = it },
+                            label = { Text("Coalition") },
+                            placeholder = { Text("blufor, opfor, neutral") },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    
+                    OutlinedTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        label = { Text("Description") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                        maxLines = 4
+                    )
+                    
+                    HorizontalDivider()
+                    
+                    // NATO Symbol section
+                    Text("NATO Military Symbol", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    
+                    OutlinedTextField(
+                        value = symbolEntity,
+                        onValueChange = { symbolEntity = it },
+                        label = { Text("Symbol Entity") },
+                        placeholder = { Text("equipment_mortar, aircraft_fighter, etc.") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = symbolSet,
+                            onValueChange = { symbolSet = it },
+                            label = { Text("Symbol Set") },
+                            placeholder = { Text("ground_unit, equipment, etc.") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = symbolSize,
+                            onValueChange = { symbolSize = it },
+                            label = { Text("Size") },
+                            placeholder = { Text("squad, platoon, etc.") },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = symbolAffiliation,
+                            onValueChange = { symbolAffiliation = it },
+                            label = { Text("Affiliation") },
+                            placeholder = { Text("friendly, hostile, neutral, unknown") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = symbolColor,
+                            onValueChange = { symbolColor = it },
+                            label = { Text("Color") },
+                            placeholder = { Text("#00A8FF") },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    
+                    OutlinedTextField(
+                        value = icon,
+                        onValueChange = { icon = it },
+                        label = { Text("Icon") },
+                        placeholder = { Text("ic_mapicon_...") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    HorizontalDivider()
+                    
+                    // Airport section
+                    Text("Airport Fields", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = icao,
+                            onValueChange = { icao = it.uppercase() },
+                            label = { Text("ICAO") },
+                            placeholder = { Text("EDDF") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = iata,
+                            onValueChange = { iata = it.uppercase() },
+                            label = { Text("IATA") },
+                            placeholder = { Text("FRA") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = elevationM,
+                            onValueChange = { elevationM = it },
+                            label = { Text("Elevation (m)") },
+                            placeholder = { Text("100") },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    
+                    OutlinedTextField(
+                        value = frequencies,
+                        onValueChange = { frequencies = it },
+                        label = { Text("Frequencies (JSON)") },
+                        placeholder = { Text("{\"tower\":\"118.5\", \"ground\":\"121.9\"}") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2
+                    )
+                    
+                    HorizontalDivider()
+                    
+                    // Tactical section
+                    Text("Tactical Fields", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = unitType,
+                            onValueChange = { unitType = it },
+                            label = { Text("Unit Type") },
+                            placeholder = { Text("Infantry, Armor, etc.") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = threatLevel,
+                            onValueChange = { threatLevel = it },
+                            label = { Text("Threat Level") },
+                            placeholder = { Text("0-10") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = strength,
+                            onValueChange = { strength = it },
+                            label = { Text("Strength") },
+                            placeholder = { Text("Number of units") },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    
+                    HorizontalDivider()
+                    
+                    // Geography section
+                    Text("Geography & Admin", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = country,
+                            onValueChange = { country = it },
+                            label = { Text("Country") },
+                            placeholder = { Text("Germany") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = region,
+                            onValueChange = { region = it },
+                            label = { Text("Region") },
+                            placeholder = { Text("Hesse") },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    
+                    OutlinedTextField(
+                        value = timezone,
+                        onValueChange = { timezone = it },
+                        label = { Text("Timezone") },
+                        placeholder = { Text("Europe/Berlin") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    HorizontalDivider()
+                    
+                    // Meta section
+                    Text("Metadata", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    
+                    OutlinedTextField(
+                        value = source,
+                        onValueChange = { source = it },
+                        label = { Text("Source") },
+                        placeholder = { Text("OpenFlightMaps, user_created, etc.") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    OutlinedTextField(
+                        value = tags,
+                        onValueChange = { tags = it },
+                        label = { Text("Tags") },
+                        placeholder = { Text("civil,military,public (comma-separated)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Action buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Cancel")
+                    }
+                    
+                    Button(
+                        onClick = {
+                            // Validate and save
+                            val lat = latitude.toDoubleOrNull() ?: location.latitude
+                            val lon = longitude.toDoubleOrNull() ?: location.longitude
+                            
+                            val updatedLocation = location.copy(
+                                name = name.takeIf { it.isNotBlank() } ?: location.name,
+                                latitude = lat,
+                                longitude = lon,
+                                markerType = markerType.takeIf { it.isNotBlank() } ?: location.markerType,
+                                coalition = coalition.takeIf { it.isNotBlank() },
+                                icon = icon,
+                                description = description,
+                                symbolSet = symbolSet,
+                                symbolEntity = symbolEntity,
+                                symbolSize = symbolSize,
+                                symbolAffiliation = symbolAffiliation,
+                                symbolColor = symbolColor,
+                                icao = icao.takeIf { it.isNotBlank() },
+                                iata = iata.takeIf { it.isNotBlank() },
+                                elevationM = elevationM.toDoubleOrNull(),
+                                frequencies = frequencies.takeIf { it.isNotBlank() },
+                                threatLevel = threatLevel.toIntOrNull(),
+                                unitType = unitType.takeIf { it.isNotBlank() },
+                                strength = strength.toIntOrNull(),
+                                country = country.takeIf { it.isNotBlank() },
+                                region = region.takeIf { it.isNotBlank() },
+                                timezone = timezone.takeIf { it.isNotBlank() },
+                                source = source.takeIf { it.isNotBlank() },
+                                tags = tags.takeIf { it.isNotBlank() }
+                            )
+                            
+                            onSave(updatedLocation)
+                        },
+                        modifier = Modifier.weight(1f),
+                        enabled = name.isNotBlank() && latitude.toDoubleOrNull() != null && longitude.toDoubleOrNull() != null
+                    ) {
+                        Text("Save")
+                    }
+                }
             }
         }
     }
