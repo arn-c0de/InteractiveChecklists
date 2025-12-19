@@ -53,14 +53,22 @@ class ECDHClient:
     Uses JSON-based protocol compatible with crypto_handshake.py SessionManager
     """
     
-    def __init__(self, device_id: str, device_name: str = "Python DataPad", private_key_pem: Optional[str] = None):
+    def __init__(self, device_id: str, device_name: str = "Python DataPad", private_key_pem: Optional[str] = None, password: Optional[str] = None):
         self.device_id = device_id
         self.device_name = device_name
         
         # Load provided private key PEM OR generate new key
         if private_key_pem:
             try:
-                self.private_key = serialization.load_pem_private_key(private_key_pem.encode('utf-8'), password=None, backend=default_backend())
+                password_bytes = password.encode('utf-8') if password else None
+                self.private_key = serialization.load_pem_private_key(
+                    private_key_pem.encode('utf-8'),
+                    password=password_bytes,
+                    backend=default_backend()
+                )
+            except (TypeError, ValueError) as e:
+                logger.error(f"Failed to load private key, password may be incorrect: {e}")
+                raise  # Re-raise to signal failure to the caller
             except Exception as e:
                 logger.error(f"Failed to load provided private key PEM: {e}")
                 self.private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())

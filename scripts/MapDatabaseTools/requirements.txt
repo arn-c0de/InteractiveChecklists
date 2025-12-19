@@ -5,6 +5,11 @@
 # License: Apache 2.0 / BSD
 cryptography>=46.0.3
 
+# Windows DPAPI support for secure key storage
+# License: PSF (Python Software Foundation)
+# Only needed on Windows, but safe to install on all platforms
+pywin32>=311; sys_platform == 'win32'
+
 # PySide6 for GUI (Qt6 bindings from Qt Company)
 # License: LGPL v3 (commercial-friendly, no GPL contamination)
 # WebEngine is included in the main package since 6.2+
