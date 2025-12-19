@@ -20,9 +20,24 @@ if str(scripts_dir) not in sys.path:
 from core.markers_database import MarkersDatabase, Location, Runway, MarkerType
 
 
+def estimate_heading_from_name(name: str):
+    """Estimate runway heading from runway name (e.g., '12/30' -> 120.0). Returns None if it cannot parse a numeric runway designation."""
+    import re
+    if not name:
+        return None
+    m = re.search(r"(\d{1,2})", name)
+    if not m:
+        return None
+    try:
+        num = int(m.group(1))
+        return float(num * 10.0)
+    except Exception:
+        return None
+
+
 def caucasus_samples():
     """Return a list of Location objects representing sample airports."""
-    return [
+    samples = [
         # Georgia
         Location(
             name="Tbilisi Intl",
@@ -261,7 +276,8 @@ def caucasus_samples():
             icao="UGAD",
             elevation_m=150.0,
             # Disused / limited public data — runway present but status uncertain
-            runways=[Runway(name="12/30", length_m=None, width_m=None, heading=None, surface="concrete", ils=False)],
+            # Heading estimated from runway name "12/30" -> 120° (unverified)
+            runways=[Runway(name="12/30", length_m=None, width_m=None, heading=120.0, surface="concrete", ils=False)],
             frequencies=None,
             country="Abkhazia",
             tags=["military"],
@@ -296,6 +312,17 @@ def caucasus_samples():
             source="OurAirports / Wikipedia (former Soviet airfield; runway length approximate)"
         ),
     ]
+
+    # Estimate missing runway headings from runway names (e.g., "12/30" -> 120.0)
+    for loc in samples:
+        if loc.runways:
+            for rw in loc.runways:
+                if getattr(rw, 'heading', None) is None:
+                    est = estimate_heading_from_name(rw.name)
+                    if est is not None:
+                        rw.heading = est
+
+    return samples
 
 
 def main():
