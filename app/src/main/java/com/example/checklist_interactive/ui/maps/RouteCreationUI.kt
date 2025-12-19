@@ -80,6 +80,132 @@ class RouteCreationViewModel(
     private val _lockedWaypoints = MutableStateFlow<Set<Int>>(emptySet())
     val lockedWaypoints: StateFlow<Set<Int>> = _lockedWaypoints.asStateFlow()
 
+    // Route candidate options (multiple possible reorderings with distances)
+    private val _routeCandidates = MutableStateFlow<List<Pair<List<LocationEntity>, Double>>>(emptyList())
+    val routeCandidates: StateFlow<List<Pair<List<LocationEntity>, Double>>> = _routeCandidates.asStateFlow()
+
+    /**
+     * Generate multiple route candidates (combinations) and compute their total distances
+     * Respects locked waypoints (keeps them at their positions) and provides up to `maxCandidates` best
+     */
+    fun generateRouteCandidates(maxCandidates: Int = 10) {
+        val waypoints = _selectedWaypoints.value
+        if (waypoints.size < 3) return
+
+        viewModelScope.launch {
+            val lockedIds = _lockedWaypoints.value
+
+            // Separate locked and unlocked waypoints with their original indices
+            val waypointsWithIndices = waypoints.mapIndexed { index, waypoint ->
+                Triple(index, waypoint, lockedIds.contains(waypoint.id))
+            }
+
+            val locked = waypointsWithIndices.filter { it.third }
+            val unlockedEntries = waypointsWithIndices.filter { !it.third }
+            val unlocked = unlockedEntries.map { it.second }
+
+            if (unlocked.isEmpty()) return@launch
+
+            val candidateRoutes = mutableListOf<List<LocationEntity>>()
+
+            if (unlocked.size <= 9) {
+                // Exact permutations on unlocked subset
+                val perms = generatePermutations(unlocked)
+                perms.forEach { perm ->
+                    // Reconstruct full route keeping locked positions
+                    val result = MutableList<LocationEntity?>(waypoints.size) { null }
+                    locked.forEach { (index, waypoint, _) -> result[index] = waypoint }
+                    var uIndex = 0
+                    for (i in result.indices) {
+                        if (result[i] == null && uIndex < perm.size) {
+                            result[i] = perm[uIndex]
+                            uIndex++
+                        }
+                    }
+                    candidateRoutes.add(result.filterNotNull())
+                }
+            } else {
+                // Heuristic candidates for larger sizes: greedy starting at different start points and random shuffles
+                // Greedy starting from each unlocked waypoint (limiting to maxCandidates)
+                val starts = unlocked.take(maxCandidates)
+                for (start in starts) {
+                    val remaining = unlocked.toMutableList()
+                    remaining.remove(start)
+                    val result = mutableListOf<LocationEntity>()
+                    result.add(start)
+                    var current = start
+                    while (remaining.isNotEmpty()) {
+                        var nearestIndex = 0
+                        var nearestDistance = Double.MAX_VALUE
+                        for (i in remaining.indices) {
+                            val d = NavigationUtils.calculateDistance(
+                                current.latitude, current.longitude,
+                                remaining[i].latitude, remaining[i].longitude
+                            )
+                            if (d < nearestDistance) {
+                                nearestDistance = d
+                                nearestIndex = i
+                            }
+                        }
+                        current = remaining.removeAt(nearestIndex)
+                        result.add(current)
+                    }
+                    // Reconstruct full route with locked positions
+                    val resultFull = MutableList<LocationEntity?>(waypoints.size) { null }
+                    locked.forEach { (index, waypoint, _) -> resultFull[index] = waypoint }
+                    var uIndex = 0
+                    for (i in resultFull.indices) {
+                        if (resultFull[i] == null && uIndex < result.size) {
+                            resultFull[i] = result[uIndex]
+                            uIndex++
+                        }
+                    }
+                    candidateRoutes.add(resultFull.filterNotNull())
+                }
+
+                // add a few random shuffles
+                val random = java.util.Random(0)
+                for (i in 0 until maxCandidates) {
+                    val shuffled = unlocked.shuffled(random)
+                    val resultFull = MutableList<LocationEntity?>(waypoints.size) { null }
+                    locked.forEach { (index, waypoint, _) -> resultFull[index] = waypoint }
+                    var uIndex = 0
+                    for (j in resultFull.indices) {
+                        if (resultFull[j] == null && uIndex < shuffled.size) {
+                            resultFull[j] = shuffled[uIndex]
+                            uIndex++
+                        }
+                    }
+                    candidateRoutes.add(resultFull.filterNotNull())
+                }
+            }
+
+            // Compute distances and keep best unique routes by distance
+            val routeWithDistances = candidateRoutes
+                .map { it to calculateTotalDistance(it) }
+                .distinctBy { routeWithDistance ->
+                    // Uniqueness by sequence of ids
+                    routeWithDistance.first.joinToString(",") { it.id.toString() }
+                }
+                .sortedBy { it.second }
+                .take(maxCandidates)
+
+            _routeCandidates.value = routeWithDistances
+        }
+    }
+
+    /**
+     * Apply candidate at index `candidateIndex` (reorders current selected waypoints)
+     */
+    fun applyRouteCandidate(candidateIndex: Int) {
+        val candidates = _routeCandidates.value
+        if (candidateIndex in candidates.indices) {
+            _selectedWaypoints.value = candidates[candidateIndex].first
+            // clear candidates after apply to avoid stale UI
+            _routeCandidates.value = emptyList()
+        }
+    }
+
     init {
         loadRoutes()
         loadLocations()
@@ -429,6 +555,7 @@ fun RouteCreationSheet(
     val lockedWaypoints by viewModel.lockedWaypoints.collectAsState()
     var showNameDialog by remember { mutableStateOf(false) }
     var showLocationPicker by remember { mutableStateOf(false) }
+    var showCandidatesDialog by remember { mutableStateOf(false) }
 
     val isEditMode = currentRouteId != null
 
@@ -802,13 +929,50 @@ fun RouteCreationSheet(
                     }
 
                     Button(
-                        onClick = { viewModel.optimizeRouteOrder() },
+                        onClick = {
+                            viewModel.generateRouteCandidates(maxCandidates = 8)
+                            showCandidatesDialog = true
+                        },
                         modifier = Modifier.weight(0.75f),
                         enabled = selectedWaypoints.size >= 3
                     ) {
                         Icon(Icons.Default.Route, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Plan Fastest Route")
+                    }
+
+                    // Route candidates dropdown (no modal) anchored near the Plan button
+                    Box {
+                        val candidates by viewModel.routeCandidates.collectAsState()
+
+                        DropdownMenu(
+                            expanded = showCandidatesDialog,
+                            onDismissRequest = { showCandidatesDialog = false },
+                        ) {
+                            if (candidates.isEmpty()) {
+                                DropdownMenuItem(
+                                    text = { Text("No candidate routes generated.") },
+                                    onClick = { showCandidatesDialog = false }
+                                )
+                            } else {
+                                candidates.forEachIndexed { idx, pair ->
+                                    val (routeList, distanceNm) = pair
+                                    DropdownMenuItem(
+                                        text = {
+                                            Column {
+                                                Text(text = String.format("%d) %.1f NM", idx + 1, distanceNm), fontWeight = FontWeight.Bold)
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(text = routeList.joinToString(" → ") { it.name }.take(80), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
+                                        },
+                                        onClick = {
+                                            viewModel.applyRouteCandidate(idx)
+                                            showCandidatesDialog = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 
