@@ -53,8 +53,10 @@ The file automatically reloads when changed—no need to restart the script.
 ### 4. Run Python Script with ECDH
 
 ```bash
-python forward_parsed_udp.py --host 192.168.178.100 --port 5010 --use-handshake --verbose
+python forward_parsed_udp.py --host 192.168.178.100 --port 5010 --verbose
 ```
+
+**Note**: ECDH mode is now the default and only mode. The `--use-handshake` flag is no longer needed.
 
 ## Features
 
@@ -65,7 +67,7 @@ python forward_parsed_udp.py --host 192.168.178.100 --port 5010 --use-handshake 
 - **Session-Based Encryption**: Unique AES-256 key per connection
 - **Forward Secrecy**: Compromising one session doesn't affect past/future sessions
 - **Hot-Reload**: Device whitelist reloads automatically
-- **Dual Mode**: Supports both legacy PSK and modern ECDH modes
+- **ECDH Only**: Legacy PSK mode has been removed for enhanced security
 
 ### 🔄 Future Enhancements
 

@@ -1,10 +1,9 @@
 # DataPad Forward Script - Usage Guide
 
-## 🚀 Quick Start Commands
+## 🚀 Quick Start Command
 
-### ✅ **RECOMMENDED: ECDH Mode (Secure)**
 ```bash
-python forward_parsed_udp.py --repeat-last --interval 5 --host 192.168.178.131 --port 5010 --verbose --use-handshake --authorized-devices authorized_devices.json
+python forward_parsed_udp.py --repeat-last --interval 5 --host 192.168.178.131 --port 5010 --verbose --authorized-devices authorized_devices.json
 ```
 
 **Features:**
@@ -35,19 +34,6 @@ python forward_parsed_udp.py --repeat-last --interval 5 --host 192.168.178.131 -
 
 ---
 
-### ⚠️ **PSK Mode (Legacy - Requires Confirmation)**
-```bash
-python forward_parsed_udp.py --repeat-last --interval 5 --host 192.168.178.131 --port 5010 --verbose
-```
-
-**Security Notice:**
-- Uses default pre-shared key (INSECURE)
-- You will be prompted to type `ACCEPT` to continue
-- Not recommended for production use
-- Change `PRE_SHARED_KEY` in the script if you use this mode
-
----
-
 ## 📋 Command Options
 
 | Option | Description | Default |
@@ -57,7 +43,6 @@ python forward_parsed_udp.py --repeat-last --interval 5 --host 192.168.178.131 -
 | `--interval` | Polling/repeat interval (seconds) | 0.2 |
 | `--verbose` | Enable detailed logging | Off |
 | `--repeat-last` | Repeat last line instead of tailing | Off |
-| `--use-handshake` | Enable ECDH encryption mode | Off |
 | `--authorized-devices` | Path to device whitelist JSON | authorized_devices.json |
 | `--aircraft` | Aircraft name for handshake | Auto-detect |
 | `--no-encrypt` | Disable encryption (NOT RECOMMENDED) | Off |
@@ -87,34 +72,14 @@ Copy these files to `%USERPROFILE%\Saved Games\DCS\Scripts\`:
 Edit `authorized_devices.json` and add your device ID
 
 ### 5. Run Script
-Use the ECDH command from above
-
----
-
-## 🛡️ Security Comparison
-
-| Feature | ECDH Mode | PSK Mode |
-|---------|-----------|----------|
-| **Key Exchange** | ✅ Automatic | ❌ Manual |
-| **Device Authorization** | ✅ Whitelist | ❌ Anyone with key |
-| **Mutual Authentication** | ✅ Yes | ❌ No |
-| **Session Keys** | ✅ Ephemeral | ❌ Permanent |
-| **Forward Secrecy** | ✅ Yes | ❌ No |
-| **Setup Complexity** | Medium | Easy |
-| **Recommended for** | Production | Testing only |
+Use the quick start command from above
 
 ---
 
 ## 🐛 Troubleshooting
 
 ### "unrecognized arguments: --use-handshake"
-**Solution:** Update to latest `forward_parsed_udp.py` from this directory
-
-### "Type 'ACCEPT' to continue"
-**Explanation:** Default PSK is insecure. Options:
-1. Type `ACCEPT` to proceed (not recommended)
-2. Use ECDH mode with `--use-handshake` (recommended)
-3. Change `PRE_SHARED_KEY` in the script
+**Solution:** This argument is no longer needed. Update to latest `forward_parsed_udp.py` from this directory
 
 ### "Device not authorized"
 **Solution:** Add Device ID to `authorized_devices.json` whitelist
@@ -141,7 +106,6 @@ python forward_parsed_udp.py `
   --host 192.168.178.131 `
   --port 5010 `
   --verbose `
-  --use-handshake `
   --authorized-devices authorized_devices.json `
   --aircraft "F/A-18C_hornet"
 

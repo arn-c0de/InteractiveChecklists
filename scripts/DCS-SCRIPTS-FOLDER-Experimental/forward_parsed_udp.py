@@ -44,99 +44,7 @@ DEFAULT_FILE = os.path.expanduser(r"~\Saved Games\DCS\Scripts\player_aircraft_pa
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 5010
 
-# Pre-Shared Key configuration
-# SECURITY: PSK must be configured externally or via config file
-# DO NOT hardcode production keys in this script
-_PSK_CONFIG_FILE = "datapad_config.json"
-PRE_SHARED_KEY = None  # Will be loaded from config or environment
-
-
-def load_psk_from_config() -> bytes | None:
-    """Load PSK from configuration file or environment variable
-    
-    Priority:
-    1. Environment variable DATAPAD_PSK (base64 encoded)
-    2. Configuration file datapad_config.json
-    3. Interactive prompt for user input
-    
-    Returns: 32-byte PSK or None
-    """
-    import os
-    import json
-    import base64
-    import getpass
-    
-    # Try environment variable first
-    psk_env = os.environ.get('DATAPAD_PSK')
-    if psk_env:
-        try:
-            psk_bytes = base64.b64decode(psk_env)
-            if len(psk_bytes) >= 32:
-                logger.info("✓ Loaded PSK from environment variable")
-                return psk_bytes[:32]
-            else:
-                logger.warning(f"⚠️ PSK from environment too short: {len(psk_bytes)} bytes (need 32)")
-        except Exception as e:
-            logger.error(f"❌ Failed to decode PSK from environment: {e}")
-    
-    # Try config file
-    if os.path.exists(_PSK_CONFIG_FILE):
-        try:
-            with open(_PSK_CONFIG_FILE, 'r') as f:
-                config = json.load(f)
-                psk_b64 = config.get('pre_shared_key')
-                if psk_b64:
-                    psk_bytes = base64.b64decode(psk_b64)
-                    if len(psk_bytes) >= 32:
-                        logger.info(f"✓ Loaded PSK from config file: {_PSK_CONFIG_FILE}")
-                        return psk_bytes[:32]
-                    else:
-                        logger.warning(f"⚠️ PSK from config too short: {len(psk_bytes)} bytes (need 32)")
-        except Exception as e:
-            logger.error(f"❌ Failed to load PSK from config: {e}")
-    
-    # Interactive prompt (console mode only)
-    if sys.stdin.isatty():
-        print("\n" + "="*60)
-        print("🔐 PSK Configuration Required")
-        print("="*60)
-        print("No Pre-Shared Key (PSK) found in environment or config.")
-        print("You can:")
-        print("  1. Set environment variable: DATAPAD_PSK=<base64_encoded_key>")
-        print(f"  2. Create config file: {_PSK_CONFIG_FILE}")
-        print("  3. Enter PSK now (32 characters minimum)")
-        print("="*60)
-        
-        psk_input = getpass.getpass("Enter PSK (or press Enter to generate random): ")
-        if not psk_input:
-            # Generate random PSK
-            import secrets
-            psk_bytes = secrets.token_bytes(32)
-            psk_b64 = base64.b64encode(psk_bytes).decode('utf-8')
-            print(f"\n✓ Generated random PSK: {psk_b64}")
-            print("⚠️ SAVE THIS KEY - You'll need it for the Android app!")
-            print(f"💡 Store in: {_PSK_CONFIG_FILE}")
-            
-            # Offer to save
-            save = input("\nSave to config file? (y/n): ").strip().lower()
-            if save == 'y':
-                try:
-                    with open(_PSK_CONFIG_FILE, 'w') as f:
-                        json.dump({'pre_shared_key': psk_b64}, f, indent=2)
-                    print(f"✓ Saved to {_PSK_CONFIG_FILE}")
-                except Exception as e:
-                    print(f"❌ Failed to save: {e}")
-            
-            return psk_bytes
-        else:
-            # Use provided PSK
-            psk_bytes = psk_input.encode('utf-8')
-            if len(psk_bytes) < 32:
-                logger.error(f"❌ PSK too short: {len(psk_bytes)} bytes (need 32)")
-                return None
-            return psk_bytes[:32]
-    
-    return None
+# PSK mode removed - ECDH only
 
 
 def find_dcs_scripts_folder() -> str | None:
@@ -218,36 +126,6 @@ def find_export_file(scripts_dir: str) -> str | None:
     return matches[0]
 
 
-def check_psk_security():
-    """Validate PSK configuration and security"""
-    global PRE_SHARED_KEY
-    
-    if PRE_SHARED_KEY is None:
-        # Load PSK from config/environment
-        PRE_SHARED_KEY = load_psk_from_config()
-        
-        if PRE_SHARED_KEY is None:
-            sys.stderr.write("\n❌ ERROR: No PSK configured!\n")
-            sys.stderr.write("Options:\n")
-            sys.stderr.write("  1. Set DATAPAD_PSK environment variable (base64)\n")
-            sys.stderr.write(f"  2. Create {_PSK_CONFIG_FILE} with 'pre_shared_key'\n")
-            sys.stderr.write("  3. Use --use-handshake for ECDH mode (recommended)\n")
-            sys.exit(1)
-    
-    # Validate PSK length
-    if len(PRE_SHARED_KEY) < 32:
-        sys.stderr.write(f"\n⚠️ WARNING: PSK too short ({len(PRE_SHARED_KEY)} bytes, need 32)\n")
-        sys.stderr.write("PSK will be padded, but this reduces security.\n")
-        sys.stderr.write("Recommended: Use 32-byte (256-bit) key or ECDH mode.\n")
-        
-        try:
-            response = input("\nContinue anyway? (y/n): ")
-            if response.strip().lower() != 'y':
-                sys.exit(1)
-        except (EOFError, KeyboardInterrupt):
-            sys.stderr.write("\n\n❌ Aborted by user.\n")
-            sys.exit(1)
-
 def check_bind_security(bind_ip: str):
     """Enhanced bind security check.
 
@@ -295,15 +173,6 @@ def check_bind_security(bind_ip: str):
     # Recommend localhost for maximum safety
     if bind_ip != '127.0.0.1':
         logger.warning(f"⚠️ Binding to {bind_ip} - consider using 127.0.0.1 for localhost only")
-
-# Global nonce counter for SERVER side (0x01 prefix)
-_nonce_counter = 0
-_nonce_lock = __import__('threading').Lock()
-
-# Per-client nonce state for PSK mode (prevents multi-client conflicts)
-_client_nonce_states = {}  # (ip, port) -> {'seen': set(), 'highest': int, 'last_activity': float}
-_REPLAY_WINDOW = 1000  # keep recent counters within this window (reduced from 10000 for security)
-_CLIENT_TIMEOUT = 600  # Remove inactive clients after 10 minutes
 
 # DoS protection: Global message rate limiting
 _message_timestamps = []  # List of timestamps for received messages
@@ -590,156 +459,35 @@ def safe_json_parse(data: bytes | str, max_size: int = 8192, max_depth: int = 6)
         logger.warning(f"⚠️ Invalid or unsafe JSON: {e}")
         return None
 
-def generate_nonce_server() -> bytes:
-    """Generate counter-based nonce for SERVER (prevents collision).
-    Format: [sender_id:1][reserved:3][counter:8] = 12 bytes
-    Server uses sender_id = 0x01, Client uses 0x00
-    """
-    global _nonce_counter
-    with _nonce_lock:
-        _nonce_counter += 1
-        if _nonce_counter >= 2**64:
-            raise RuntimeError("Nonce counter exhausted - re-key required!")
+def send_udp(payload: bytes, host: str, port: int, sock: socket.socket,
+             session_mgr: 'SessionManager', device_id: str) -> bool:
+    """Send UDP packet with ECDH encryption
 
-        # Format: 0x01 (server) + 3 bytes reserved + 8 bytes counter
-        return bytes([0x01, 0x00, 0x00, 0x00]) + _nonce_counter.to_bytes(8, 'big')
-
-def validate_nonce_server(nonce: bytes, client_addr: tuple = None) -> bool:
-    """Validate received nonce to prevent replay attacks with per-client state.
-
-    Additional checks added:
-      - ensure nonce prefix indicates a CLIENT message (0x00)
-      - sliding-window replay protection with bounded memory
-      - per-client state to prevent multi-client conflicts
-
-    Args:
-        nonce: 12-byte nonce to validate
-        client_addr: (IP, port) tuple to identify client. If None, uses global state (legacy)
-
-    Returns True if nonce is valid (not replayed), False otherwise.
-    """
-    if len(nonce) != 12:
-        return False
-
-    # Validate prefix: client messages must have sender_id = 0x00
-    if nonce[0] != 0x00:
-        logger.warning(f"⚠️ Invalid nonce sender id: {nonce[0]:#02x} - expected client (0x00)")
-        return False
-
-    # Extract counter (bytes 4-11)
-    counter = int.from_bytes(nonce[4:12], 'big')
-
-    with _nonce_lock:
-        # Get or create client-specific state
-        if client_addr is None:
-            # Legacy mode: use global state
-            client_addr = ("global", 0)
-        
-        if client_addr not in _client_nonce_states:
-            _client_nonce_states[client_addr] = {
-                'seen': set(),
-                'highest': 0,
-                'last_activity': __import__('time').time()
-            }
-            logger.debug(f"Created nonce state for new client {client_addr}")
-        
-        client_state = _client_nonce_states[client_addr]
-        
-        # Reject counters that are far in the past (stale)
-        if client_state['highest'] and counter <= (client_state['highest'] - _REPLAY_WINDOW):
-            logger.warning(f"⚠️ Stale nonce from {client_addr}: counter {counter} (highest: {client_state['highest']})")
-            return False
-
-        # Replay detection
-        if counter in client_state['seen']:
-            logger.warning(f"⚠️ Replay attack detected from {client_addr}! Nonce counter: {counter}")
-            return False
-
-        # Accept and record
-        client_state['seen'].add(counter)
-        if counter > client_state['highest']:
-            client_state['highest'] = counter
-        
-        # Update activity timestamp
-        client_state['last_activity'] = __import__('time').time()
-
-        # Cleanup old nonces to prevent memory leak (keep window)
-        min_allowed = max(0, client_state['highest'] - _REPLAY_WINDOW)
-        old_nonces = [n for n in client_state['seen'] if n < min_allowed]
-        for n in old_nonces:
-            client_state['seen'].remove(n)
-
-    return True
-
-def cleanup_inactive_clients_nonce():
-    """Remove inactive client nonce states to prevent memory leaks.
-    
-    Should be called periodically (e.g., every few minutes).
-    """
-    with _nonce_lock:
-        current_time = __import__('time').time()
-        inactive_clients = []
-        
-        for addr, state in _client_nonce_states.items():
-            if current_time - state['last_activity'] > _CLIENT_TIMEOUT:
-                inactive_clients.append(addr)
-        
-        for addr in inactive_clients:
-            del _client_nonce_states[addr]
-            logger.debug(f"Cleaned up inactive client nonce state: {addr}")
-        
-        if inactive_clients:
-            logger.info(f"Removed {len(inactive_clients)} inactive client(s) from nonce manager")
-
-def encrypt_payload(data: bytes, key: bytes = PRE_SHARED_KEY) -> bytes:
-    """Encrypt data using AES-GCM with counter-based nonce (prevents collision).
-
-    Returns: nonce (12 bytes) + ciphertext + tag (16 bytes)
-    """
-    aesgcm = AESGCM(key)
-    nonce = generate_nonce_server()  # Counter-based, no collision possible
-    ciphertext = aesgcm.encrypt(nonce, data, None)  # no additional authenticated data
-    return nonce + ciphertext
-
-
-def send_udp(payload: bytes, host: str, port: int, sock: socket.socket, encrypt: bool = True, 
-             session_mgr: 'SessionManager' = None, device_id: str = None) -> bool:
-    """Send UDP packet with optional encryption
-    
     Args:
         payload: Data to send
         host: Destination host
         port: Destination port
         sock: UDP socket
-        encrypt: Whether to encrypt (PSK or ECDH)
-        session_mgr: SessionManager instance (for ECDH mode)
-        device_id: Device ID to send to (for ECDH mode, looks up active session)
+        session_mgr: SessionManager instance (required for ECDH mode)
+        device_id: Device ID to send to (looks up active session)
     """
     try:
         # Validate payload size before doing expensive encryption work
-        if not validate_data_message(payload, encrypt=bool(session_mgr or encrypt)):
+        if not validate_data_message(payload, encrypt=True):
             return False
 
-        if session_mgr and device_id:
-            # ECDH mode: get session for device and encrypt with session key
-            session_id = session_mgr.device_sessions.get(device_id)
-            if not session_id:
-                # No active session for this device
-                return False
-            
-            encrypted = session_mgr.encrypt_with_session(payload, session_id)
-            if not encrypted:
-                # Session expired or encryption failed
-                return False
-            
-            sock.sendto(encrypted, (host, port))
-        elif encrypt:
-            # PSK mode: use pre-shared key
-            encrypted = encrypt_payload(payload)
-            sock.sendto(encrypted, (host, port))
-        else:
-            # Unencrypted mode
-            sock.sendto(payload, (host, port))
+        # Get session for device and encrypt with session key
+        session_id = session_mgr.device_sessions.get(device_id)
+        if not session_id:
+            # No active session for this device
+            return False
+
+        encrypted = session_mgr.encrypt_with_session(payload, session_id)
+        if not encrypted:
+            # Session expired or encryption failed
+            return False
+
+        sock.sendto(encrypted, (host, port))
         return True
     except Exception as e:
         print(f"Send error: {e}", file=sys.stderr)
@@ -783,31 +531,26 @@ def _is_same_file(f, path: str) -> bool:
     return (int(st1.st_mtime) == int(st2.st_mtime)) and (st1.st_size == st2.st_size)
 
 
-def tail_and_send(path: str, host: str, port: int, send_existing=False, once=False, interval=0.2, 
-                  verbose=False, show_env=False, encrypt=True, session_mgr: 'SessionManager' = None, handshake_port: int = None, bind_ip: str = '127.0.0.1'):
-    """Tail a file and send only new JSON lines as UDP datagrams (do not send existing lines)."""
+def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager', send_existing=False, once=False, interval=0.2,
+                  verbose=False, show_env=False, handshake_port: int = None, bind_ip: str = '127.0.0.1'):
+    """Tail a file and send only new JSON lines as UDP datagrams (ECDH only)."""
     # Use global timestamp state to prevent forwarding old/cached messages
     global _last_processed_timestamp
     if not os.path.exists(path):
         raise FileNotFoundError(path)
-    
-    # For ECDH mode: create a UDP socket bound to handshake_port for handshake, send data to destination port
-    # For PSK mode: create unbound socket
-    if session_mgr:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        # SECURITY: Default bind to localhost only for safety
-        # Use handshake_port if specified, otherwise use data port
-        listen_port = handshake_port if handshake_port is not None else port
-        sock.bind((bind_ip, listen_port))  # Bind to specified IP (default: localhost)
-        sock.settimeout(1.0)  # Non-blocking with timeout
-        logger.info(f"🔐 Listening for handshakes on {bind_ip}:{listen_port}")
-        if handshake_port is not None and handshake_port != port:
-            logger.info(f"📤 Will send data to {host}:{port}")
-        handshake_sock = sock  # Use same socket for handshake and data
-    else:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        handshake_sock = None
+
+    # Create a UDP socket bound to handshake_port for handshake, send data to destination port
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    # SECURITY: Default bind to localhost only for safety
+    # Use handshake_port if specified, otherwise use data port
+    listen_port = handshake_port if handshake_port is not None else port
+    sock.bind((bind_ip, listen_port))  # Bind to specified IP (default: localhost)
+    sock.settimeout(1.0)  # Non-blocking with timeout
+    logger.info(f"🔐 Listening for handshakes on {bind_ip}:{listen_port}")
+    if handshake_port is not None and handshake_port != port:
+        logger.info(f"📤 Will send data to {host}:{port}")
+    handshake_sock = sock  # Use same socket for handshake and data
 
     def open_for_tail(read_existing: bool = False):
         f = open(path, 'r', encoding='utf-8', errors='ignore')
@@ -929,25 +672,20 @@ def tail_and_send(path: str, host: str, port: int, send_existing=False, once=Fal
                 logger.info(f"✅ Accepted data with timestamp={cur_ts}")
                 _last_processed_timestamp = cur_ts
 
-            # Send to all devices with active sessions (ECDH mode) or broadcast (PSK mode)
-            if session_mgr:
-                # Send to each device with an active session
-                sent_count = 0
-                for device_id, session_id in list(session_mgr.device_sessions.items()):
-                    # Get device info for logging
-                    device = session_mgr.authorized_devices.get(device_id)
-                    device_name = device.name if device else device_id[:8]
-                    
-                    if send_udp(jsonpart.encode('utf-8'), host, port, sock, encrypt=True, 
-                               session_mgr=session_mgr, device_id=device_id):
-                        sent_count += 1
-                    else:
-                        logger.warning(f"⚠️ Failed to send to {device_name} (session may have expired)")
-                
-                sent = sent_count > 0
-            else:
-                # PSK or unencrypted mode: send once
-                sent = send_udp(jsonpart.encode('utf-8'), host, port, sock, encrypt=encrypt)
+            # Send to all devices with active sessions (ECDH mode)
+            sent_count = 0
+            for device_id, session_id in list(session_mgr.device_sessions.items()):
+                # Get device info for logging
+                device = session_mgr.authorized_devices.get(device_id)
+                device_name = device.name if device else device_id[:8]
+
+                if send_udp(jsonpart.encode('utf-8'), host, port, sock,
+                           session_mgr=session_mgr, device_id=device_id):
+                    sent_count += 1
+                else:
+                    logger.warning(f"⚠️ Failed to send to {device_name} (session may have expired)")
+
+            sent = sent_count > 0
             if verbose or show_env:
                 ts = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
                 if sent:
@@ -1021,31 +759,26 @@ def get_last_line(path: str) -> str | None:
 
 
 # New feature: repeat the last line every X seconds
-def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=False, show_env=False, encrypt=True, 
-                     session_mgr: 'SessionManager' = None, handshake_port: int = None, bind_ip: str = '127.0.0.1'):
-    """Send the last line of the file as a UDP datagram every <interval> seconds."""
+def repeat_last_line(path: str, host: str, port: int, session_mgr: 'SessionManager', interval=5.0, verbose=False, show_env=False,
+                     handshake_port: int = None, bind_ip: str = '127.0.0.1'):
+    """Send the last line of the file as a UDP datagram every <interval> seconds (ECDH only)."""
     # Use global timestamp state to prevent forwarding old/cached messages
     global _last_processed_timestamp
     if not os.path.exists(path):
         raise FileNotFoundError(path)
-    
-    # For ECDH mode: create a UDP socket bound to handshake_port for handshake, send data to destination port
-    # For PSK mode: create unbound socket
-    if session_mgr:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        # SECURITY: Default bind to localhost only for safety
-        # Use handshake_port if specified, otherwise use data port
-        listen_port = handshake_port if handshake_port is not None else port
-        sock.bind((bind_ip, listen_port))  # Bind to specified IP (default: localhost)
-        sock.settimeout(0.1)  # Non-blocking with short timeout
-        logger.info(f"🔐 Listening for handshakes on {bind_ip}:{listen_port}")
-        if handshake_port is not None and handshake_port != port:
-            logger.info(f"📤 Will send data to {host}:{port}")
-        handshake_sock = sock  # Use same socket for handshake and data
-    else:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        handshake_sock = None
+
+    # Create a UDP socket bound to handshake_port for handshake, send data to destination port
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    # SECURITY: Default bind to localhost only for safety
+    # Use handshake_port if specified, otherwise use data port
+    listen_port = handshake_port if handshake_port is not None else port
+    sock.bind((bind_ip, listen_port))  # Bind to specified IP (default: localhost)
+    sock.settimeout(0.1)  # Non-blocking with short timeout
+    logger.info(f"🔐 Listening for handshakes on {bind_ip}:{listen_port}")
+    if handshake_port is not None and handshake_port != port:
+        logger.info(f"📤 Will send data to {host}:{port}")
+    handshake_sock = sock  # Use same socket for handshake and data
     
     try:
         last_sent = None
@@ -1172,22 +905,19 @@ def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=Fals
                     logger.info(f"✅ Accepted data with timestamp={cur_ts}")
                     _last_processed_timestamp = cur_ts
 
-                # Send to all devices with active sessions (ECDH mode) or broadcast (PSK mode)
-                if session_mgr:
-                    sent_count = 0
-                    for device_id, session_id in list(session_mgr.device_sessions.items()):
-                        # Get device info for logging
-                        device = session_mgr.authorized_devices.get(device_id)
-                        device_name = device.name if device else device_id[:8]
-                        
-                        if send_udp(jsonpart.encode('utf-8'), host, port, sock, encrypt=True, 
-                                   session_mgr=session_mgr, device_id=device_id):
-                            sent_count += 1
-                        else:
-                            logger.warning(f"⚠️ Failed to send to {device_name} (session may have expired)")
-                    sent = sent_count > 0
-                else:
-                    sent = send_udp(jsonpart.encode('utf-8'), host, port, sock, encrypt=encrypt)
+                # Send to all devices with active sessions (ECDH mode)
+                sent_count = 0
+                for device_id, session_id in list(session_mgr.device_sessions.items()):
+                    # Get device info for logging
+                    device = session_mgr.authorized_devices.get(device_id)
+                    device_name = device.name if device else device_id[:8]
+
+                    if send_udp(jsonpart.encode('utf-8'), host, port, sock,
+                               session_mgr=session_mgr, device_id=device_id):
+                        sent_count += 1
+                    else:
+                        logger.warning(f"⚠️ Failed to send to {device_name} (session may have expired)")
+                sent = sent_count > 0
                 
                 last_send_time = current_time
                 if verbose or show_env:
@@ -1220,24 +950,22 @@ def repeat_last_line(path: str, host: str, port: int, interval=5.0, verbose=Fals
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(description='Forward parsed JSONL as UDP datagrams with optional ECDH handshake')
+    p = argparse.ArgumentParser(description='Forward parsed JSONL as UDP datagrams with ECDH encryption (PSK mode removed)')
     p.add_argument('--file', '-f', default=DEFAULT_FILE, help='Path to JSONL file')
     p.add_argument('--use-export', action='store_true', help='Auto-detect and use export.lua-generated JSON in DCS Saved Games Scripts folder')
     p.add_argument('--scripts-dir', default=None, help='Override path to DCS Scripts directory for auto-detection')
     p.add_argument('--host', default=DEFAULT_HOST, help='Destination host')
     p.add_argument('--port', '-p', type=int, default=DEFAULT_PORT, help='Destination port')
-    p.add_argument('--bind-ip', default='127.0.0.1', 
+    p.add_argument('--bind-ip', default='127.0.0.1',
                    help='IP address to bind to for ECDH handshakes (default: 127.0.0.1 for localhost only). '
                         'Use 0.0.0.0 to bind to all interfaces (INSECURE - requires confirmation)')
-    p.add_argument('--handshake-port', type=int, default=None, 
+    p.add_argument('--handshake-port', type=int, default=None,
                    help='Port to listen for ECDH handshakes (default: same as --port). '
                         'Use different port when sender and receiver are on same PC.')
     p.add_argument('--interval', type=float, default=0.2, help='Polling interval in seconds')
     p.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
     p.add_argument('--repeat-last', action='store_true', help='Repeat the last line every <interval> seconds')
     p.add_argument('--show-env', action='store_true', help='Print temperature/pressure/wind when sending')
-    p.add_argument('--no-encrypt', action='store_true', help='Disable AES-GCM encryption (not recommended)')
-    p.add_argument('--use-handshake', action='store_true', help='Enable ECDH handshake mode (requires crypto_handshake.py)')
     p.add_argument('--authorized-devices', default='authorized_devices.json', help='Path to authorized devices file')
     p.add_argument('--aircraft', default=None, help='Aircraft name to send in handshake')
     args = p.parse_args(argv)
@@ -1266,43 +994,36 @@ def main(argv=None):
             print("⚠️ Could not locate DCS Scripts folder; continuing with specified/default file")
 
     # Check ECDH mode requirements
-    if args.use_handshake:
-        if not HANDSHAKE_AVAILABLE:
-            print("❌ Error: --use-handshake requires crypto_handshake.py", file=sys.stderr)
-            print("   Make sure crypto_handshake.py is in the same directory", file=sys.stderr)
-            return 2
-        print("🔐 ECDH Handshake Mode ENABLED")
-        print(f"📂 Authorized devices: {args.authorized_devices}")
-        
-        # Security check: warn if binding to all interfaces
-        check_bind_security(args.bind_ip)
-        
-        session_mgr = SessionManager(
-            authorized_devices_path=args.authorized_devices,
-            aircraft_name=args.aircraft
-        )
-    else:
-        session_mgr = None
-        # Only check PSK security if NOT using ECDH
-        encrypt = not args.no_encrypt
-        if encrypt:
-            check_psk_security()
+    if not HANDSHAKE_AVAILABLE:
+        print("❌ Error: crypto_handshake.py not found", file=sys.stderr)
+        print("   Make sure crypto_handshake.py is in the same directory", file=sys.stderr)
+        return 2
 
-    encrypt = not args.no_encrypt
-    enc_status = "🔒 ECDH-AES-GCM" if args.use_handshake else ("🔒 PSK-AES-GCM" if encrypt else "⚠️ UNENCRYPTED")
+    print("🔐 ECDH Handshake Mode (PSK removed)")
+    print(f"📂 Authorized devices: {args.authorized_devices}")
+
+    # Security check: warn if binding to all interfaces
+    check_bind_security(args.bind_ip)
+
+    session_mgr = SessionManager(
+        authorized_devices_path=args.authorized_devices,
+        aircraft_name=args.aircraft
+    )
+
+    enc_status = "🔒 ECDH-AES-GCM"
     
     try:
         if args.repeat_last:
             print(f"Repeating last line every {args.interval} seconds from {args.file} to {args.host}:{args.port} ({enc_status})")
-            repeat_last_line(args.file, args.host, args.port, interval=args.interval, verbose=args.verbose, 
-                           show_env=args.show_env, encrypt=encrypt, session_mgr=session_mgr, handshake_port=args.handshake_port, bind_ip=args.bind_ip)
+            repeat_last_line(args.file, args.host, args.port, session_mgr, interval=args.interval, verbose=args.verbose,
+                           show_env=args.show_env, handshake_port=args.handshake_port, bind_ip=args.bind_ip)
         else:
             print(f"Forwarding {args.file} to {args.host}:{args.port} (forward only new lines) ({enc_status})")
             while True:
                 try:
-                    tail_and_send(args.file, args.host, args.port, send_existing=False, once=False, 
-                                interval=args.interval, verbose=args.verbose, show_env=args.show_env, 
-                                encrypt=encrypt, session_mgr=session_mgr, handshake_port=args.handshake_port, bind_ip=args.bind_ip)
+                    tail_and_send(args.file, args.host, args.port, session_mgr, send_existing=False, once=False,
+                                interval=args.interval, verbose=args.verbose, show_env=args.show_env,
+                                handshake_port=args.handshake_port, bind_ip=args.bind_ip)
                 except KeyboardInterrupt:
                     raise
                 except FileNotFoundError:

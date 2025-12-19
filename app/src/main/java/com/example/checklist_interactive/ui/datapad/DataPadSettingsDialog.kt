@@ -44,18 +44,12 @@ fun DataPadSettingsDialog(
     val currentPort by manager.udpPort.collectAsState()
     val currentBindIp by manager.bindIp.collectAsState()
     val currentServerIp by manager.serverIp.collectAsState()
-    val currentKey by manager.preSharedKey.collectAsState()
-    val useEcdh by manager.useEcdh.collectAsState()
     val deviceName by manager.deviceName.collectAsState()
 
     var portText by remember { mutableStateOf(currentPort.toString()) }
     var bindIpText by remember { mutableStateOf(currentBindIp) }
     var serverIpText by remember { mutableStateOf(currentServerIp) }
-    var keyText by remember { mutableStateOf(currentKey) }
     var deviceNameText by remember { mutableStateOf(deviceName) }
-    var showKeyWarning by remember { mutableStateOf(false) }
-    var keyVisible by remember { mutableStateOf(false) }
-    var useEcdhLocal by remember { mutableStateOf(useEcdh) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -161,54 +155,9 @@ fun DataPadSettingsDialog(
                 }
                 
                 HorizontalDivider()
-                
-                // ECDH Handshake Mode Toggle
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (useEcdhLocal) 
-                            MaterialTheme.colorScheme.primaryContainer 
-                        else 
-                            MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.datapad_ecdh_title),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = if (useEcdhLocal) 
-                                    MaterialTheme.colorScheme.onPrimaryContainer 
-                                else 
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = if (useEcdhLocal)
-                                    stringResource(R.string.datapad_ecdh_description_secure)
-                                else
-                                    stringResource(R.string.datapad_ecdh_description_legacy),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (useEcdhLocal) 
-                                    MaterialTheme.colorScheme.onPrimaryContainer 
-                                else 
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(
-                            checked = useEcdhLocal,
-                            onCheckedChange = { useEcdhLocal = it }
-                        )
-                    }
-                }
-                
-                // Device Name (only shown in ECDH mode)
-                if (useEcdhLocal) {
-                    OutlinedTextField(
+
+                // Device Name for ECDH identification
+                OutlinedTextField(
                         value = deviceNameText,
                         onValueChange = { deviceNameText = it },
                         label = { Text(stringResource(R.string.datapad_device_name_label)) },
@@ -279,8 +228,7 @@ fun DataPadSettingsDialog(
                             }
                         }
                     )
-                }
-                
+
                 HorizontalDivider()
                 
                 // UDP Port Setting
@@ -311,72 +259,18 @@ fun DataPadSettingsDialog(
                 )
 
                 // Server IP (Unicast - more secure than broadcast)
-                if (useEcdhLocal) {
-                    OutlinedTextField(
-                        value = serverIpText,
-                        onValueChange = { serverIpText = it },
-                        label = { Text(stringResource(R.string.datapad_server_ip_label)) },
-                        placeholder = { Text(stringResource(R.string.datapad_server_ip_placeholder)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        supportingText = {
-                            Text(stringResource(R.string.datapad_server_ip_hint))
-                        }
-                    )
-                }
-
-                // Pre-Shared Key Setting (masked by default)
                 OutlinedTextField(
-                    value = keyText,
-                    onValueChange = { 
-                        keyText = it
-                        showKeyWarning = it.length != 32 && it.isNotEmpty()
-                    },
-                    label = { Text(if (useEcdhLocal) stringResource(R.string.datapad_settings_psk_handshake) else stringResource(R.string.datapad_settings_psk)) },
-                    placeholder = { Text(stringResource(R.string.datapad_settings_psk_placeholder)) },
+                    value = serverIpText,
+                    onValueChange = { serverIpText = it },
+                    label = { Text(stringResource(R.string.datapad_server_ip_label)) },
+                    placeholder = { Text(stringResource(R.string.datapad_server_ip_placeholder)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    isError = showKeyWarning,
-                    visualTransformation = if (keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                    trailingIcon = {
-                        IconButton(onClick = { keyVisible = !keyVisible }) {
-                            Icon(
-                                imageVector = if (keyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                contentDescription = if (keyVisible) stringResource(R.string.datapad_hide_key) else stringResource(R.string.datapad_show_key)
-                            )
-                        }
-                    },
                     supportingText = {
-                        if (showKeyWarning) {
-                            Text(
-                                text = stringResource(R.string.datapad_key_length_warning, keyText.length),
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        } else {
-                            Text(
-                                text = if (useEcdhLocal)
-                                    stringResource(R.string.datapad_psk_handshake_hint)
-                                else
-                                    stringResource(R.string.datapad_settings_psk_hint)
-                            )
-                        }
+                        Text(stringResource(R.string.datapad_server_ip_hint))
                     }
                 )
-                if (showKeyWarning) {
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer
-                        )
-                    ) {
-                        Text(
-                            text = stringResource(R.string.datapad_key_length_message),
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(12.dp),
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    }
-                }
-                
+
                 HorizontalDivider()
                 
                 // Action Buttons
@@ -388,18 +282,6 @@ fun DataPadSettingsDialog(
                         Text(stringResource(R.string.action_cancel))
                     }
 
-                    TextButton(onClick = {
-                        // Generate new random PSK
-                        val newRandomKey = java.util.Base64.getEncoder().encodeToString(
-                            java.security.SecureRandom().generateSeed(32)
-                        )
-                        keyText = newRandomKey
-                        showKeyWarning = false
-                        manager.updatePreSharedKey(newRandomKey)
-                    }) {
-                        Text(stringResource(R.string.datapad_settings_generate_key))
-                    }
-                    
                     Button(
                         onClick = {
                             // Validate and save
@@ -407,23 +289,17 @@ fun DataPadSettingsDialog(
                             if (port != null && port in 1024..65535) {
                                 manager.updatePort(port)
                             }
-                            
+
                             manager.updateBindIp(bindIpText.trim())
                             manager.updateServerIp(serverIpText.trim())
 
-                            if (keyText.length == 32 || keyText.isEmpty()) {
-                                manager.updatePreSharedKey(keyText)
-                            }
-
-                            // Update ECDH mode and device name
-                            manager.setUseEcdh(useEcdhLocal)
+                            // Update device name
                             if (deviceNameText.isNotBlank()) {
                                 manager.updateDeviceName(deviceNameText.trim())
                             }
 
                             onDismiss()
-                        },
-                        enabled = !showKeyWarning
+                        }
                     ) {
                         Text(stringResource(R.string.datapad_settings_save_restart))
                     }
@@ -440,33 +316,21 @@ fun DataPadSettingsDialog(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
-                            text = if (useEcdhLocal) stringResource(R.string.datapad_ecdh_info_title) else stringResource(R.string.datapad_configuration_tips_label),
+                            text = stringResource(R.string.datapad_ecdh_info_title),
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                         Text(
-                            text = if (useEcdhLocal)
-                                stringResource(R.string.datapad_ecdh_info_text)
-                            else
-                                stringResource(R.string.datapad_configuration_tips_text),
+                            text = stringResource(R.string.datapad_ecdh_info_text),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
-                        if (useEcdhLocal) {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = stringResource(R.string.datapad_ecdh_warning),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        } else {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = stringResource(R.string.datapad_security_note),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = stringResource(R.string.datapad_ecdh_warning),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
                     }
                 }
             }

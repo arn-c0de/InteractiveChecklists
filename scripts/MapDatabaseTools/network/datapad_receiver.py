@@ -1,7 +1,8 @@
 """
-DataPad UDP Receiver - Python Implementation
-Receives encrypted UDP flight data from DCS and displays it in a GUI.
+DataPad UDP Receiver - Python Implementation (ECDH-only)
+Receives ECDH-encrypted UDP flight data from DCS and displays it in a GUI.
 Matches the functionality of the Kotlin DataPadManager.
+PSK mode has been removed - only ECDH is supported.
 """
 
 import socket
@@ -37,66 +38,7 @@ DEFAULT_BIND_IP = "127.0.0.1"  # Listen on localhost by default
 BUFFER_SIZE = 4096
 SOCKET_TIMEOUT = 1.0
 
-# PSK configuration
-_PSK_CONFIG_FILE = "datapad_config.json"
-
-
-def load_psk_from_config() -> Optional[bytes]:
-    """Load PSK from configuration file or environment variable
-    
-    Priority:
-    1. Environment variable DATAPAD_PSK (base64 encoded)
-    2. Configuration file datapad_config.json
-    3. Generate new random PSK
-    
-    Returns: 32-byte PSK
-    """
-    import os
-    import json
-    import base64
-    import secrets
-    
-    # Try environment variable first
-    psk_env = os.environ.get('DATAPAD_PSK')
-    if psk_env:
-        try:
-            psk_bytes = base64.b64decode(psk_env)
-            if len(psk_bytes) >= 32:
-                logger.info("✓ Loaded PSK from environment variable")
-                return psk_bytes[:32]
-        except Exception as e:
-            logger.error(f"❌ Failed to decode PSK from environment: {e}")
-    
-    # Try config file
-    if os.path.exists(_PSK_CONFIG_FILE):
-        try:
-            with open(_PSK_CONFIG_FILE, 'r') as f:
-                config = json.load(f)
-                psk_b64 = config.get('pre_shared_key')
-                if psk_b64:
-                    psk_bytes = base64.b64decode(psk_b64)
-                    if len(psk_bytes) >= 32:
-                        logger.info(f"✓ Loaded PSK from config file: {_PSK_CONFIG_FILE}")
-                        return psk_bytes[:32]
-        except Exception as e:
-            logger.error(f"❌ Failed to load PSK from config: {e}")
-    
-    # Generate random PSK
-    logger.warning("⚠️ No PSK found - generating random PSK")
-    psk_bytes = secrets.token_bytes(32)
-    psk_b64 = base64.b64encode(psk_bytes).decode('utf-8')
-    logger.warning(f"Generated PSK: {psk_b64}")
-    logger.warning("⚠️ SAVE THIS KEY for the Android app!")
-    
-    # Offer to save
-    try:
-        with open(_PSK_CONFIG_FILE, 'w') as f:
-            json.dump({'pre_shared_key': psk_b64}, f, indent=2)
-        logger.info(f"✓ Saved PSK to {_PSK_CONFIG_FILE}")
-    except Exception as e:
-        logger.error(f"❌ Failed to save PSK: {e}")
-    
-    return psk_bytes
+# ECDH-only mode - PSK support removed
 
 
 @dataclass
@@ -254,62 +196,52 @@ class FlightData:
 
 
 class DataPadReceiver:
-    """UDP receiver for encrypted flight data from DCS"""
-    
+    """UDP receiver for encrypted flight data from DCS (ECDH-only mode)"""
+
     def __init__(self, port: int = DEFAULT_UDP_PORT,
                  bind_ip: str = DEFAULT_BIND_IP,
-                 pre_shared_key: Optional[str] = None,
                  allow_bind_all: bool = False,
-                 use_ecdh: bool = False,
                  sender_ip: Optional[str] = None,
                  sender_port: Optional[int] = None,
                  device_id: Optional[str] = None,
                  device_name: str = "Python DataPad"):
         self.port = port
         self.bind_ip = bind_ip
-        # PSK is only needed for non-ECDH mode
-        self.pre_shared_key = pre_shared_key.encode('utf-8') if pre_shared_key else None
         self.allow_bind_all = allow_bind_all  # must be explicitly set to allow binding to 0.0.0.0
-        
-        # ECDH support
-        self.use_ecdh = use_ecdh
+
+        # ECDH-only mode (PSK removed)
         self.sender_ip = sender_ip
         self.sender_port = sender_port if sender_port is not None else port  # Use same port if not specified
         self.ecdh_client: Optional[ECDHClient] = None
-        
-        if self.use_ecdh:
-            # Load or create persistent device (if no explicit device_id provided)
-            from .ecdh_device import get_or_create_device, get_public_key_b64_from_pem
 
-            if device_id is None:
-                dev = get_or_create_device()
-                device_id = dev['deviceId']
-                private_pem = dev['privateKeyPem']
-                logging.info(f"🔐 Loaded persistent device {device_id} from disk")
-            else:
-                # If user provided device_id, check for stored device
-                dev = None
-                stored = get_or_create_device()  # creates default if none
-                if stored and stored.get('deviceId') == device_id:
-                    dev = stored
-                    private_pem = dev['privateKeyPem']
-                else:
-                    private_pem = None
+        # Load or create persistent device (if no explicit device_id provided)
+        from .ecdh_device import get_or_create_device, get_public_key_b64_from_pem
 
-            self.device_id = device_id
-            self.device_name = device_name
-            
-            # Initialize ECDH client with optional private key PEM for persistence
-            self.ecdh_client = ECDHClient(device_id=self.device_id, device_name=self.device_name, private_key_pem=private_pem)
-            logging.info(f"🔐 ECDH mode enabled")
-            logging.info(f"📱 Device ID: {self.device_id}")
-            
-            if not self.sender_ip:
-                logging.warning("⚠️ ECDH enabled but no sender_ip specified - handshake will fail")
+        if device_id is None:
+            dev = get_or_create_device()
+            device_id = dev['deviceId']
+            private_pem = dev['privateKeyPem']
+            logging.info(f"🔐 Loaded persistent device {device_id} from disk")
         else:
-            # PSK mode - validate that PSK is provided
-            if not self.pre_shared_key:
-                raise ValueError("pre_shared_key is required when use_ecdh=False. Please provide a PSK or enable ECDH mode.")
+            # If user provided device_id, check for stored device
+            dev = None
+            stored = get_or_create_device()  # creates default if none
+            if stored and stored.get('deviceId') == device_id:
+                dev = stored
+                private_pem = dev['privateKeyPem']
+            else:
+                private_pem = None
+
+        self.device_id = device_id
+        self.device_name = device_name
+
+        # Initialize ECDH client with optional private key PEM for persistence
+        self.ecdh_client = ECDHClient(device_id=self.device_id, device_name=self.device_name, private_key_pem=private_pem)
+        logging.info(f"🔐 ECDH mode enabled")
+        logging.info(f"📱 Device ID: {self.device_id}")
+
+        if not self.sender_ip:
+            logging.warning("⚠️ No sender_ip specified - handshake will fail")
 
         self.socket: Optional[socket.socket] = None
         self.running = False
@@ -350,41 +282,22 @@ class DataPadReceiver:
     
     def decrypt_payload(self, encrypted_data: bytes, sender_addr: tuple = None) -> Optional[bytes]:
         """
-        Decrypt AES-GCM encrypted data (for DATA packets, not handshake)
+        Decrypt AES-GCM encrypted data using ECDH session key
         Format: nonce (12 bytes) + ciphertext + tag (16 bytes)
         Note: Handshake messages are sent in PLAINTEXT
-        
+
         Args:
             encrypted_data: Encrypted payload
-            sender_addr: (IP, port) tuple of sender for per-client nonce validation
+            sender_addr: (IP, port) tuple of sender (unused in ECDH mode, kept for compatibility)
         """
         try:
-            # Use ECDH session key if available
-            if self.use_ecdh and self.ecdh_client:
+            # ECDH-only mode
+            if self.ecdh_client:
                 return self.ecdh_client.decrypt_payload(encrypted_data)
-            
-            # Fallback to pre-shared key (PSK mode)
-            if len(encrypted_data) < 28:  # 12 (nonce) + 16 (tag) minimum
-                print(f"Encrypted data too short: {len(encrypted_data)} bytes")
-                return None
-            
-            # Extract nonce (first 12 bytes)
-            nonce = encrypted_data[:12]
-            # Validate nonce prefix and sliding window (server should be sender 0x01)
-            # Pass sender_addr for per-client nonce tracking (prevents multi-client conflicts)
-            if not default_gcm_nonce_manager.validate_nonce(nonce, expected_sender=0x01, client_addr=sender_addr):
-                print("Rejected message due to invalid or replayed nonce")
+            else:
+                print("No ECDH client available for decryption")
                 return None
 
-            # Extract ciphertext + tag (remaining bytes)
-            ciphertext = encrypted_data[12:]
-            
-            # Decrypt using AES-GCM
-            aesgcm = AESGCM(self.pre_shared_key)
-            plaintext = aesgcm.decrypt(nonce, ciphertext, None)
-            
-            return plaintext
-            
         except Exception as e:
             print(f"Decryption failed: {e}")
             return None
@@ -405,21 +318,21 @@ class DataPadReceiver:
         if self.running:
             print("Receiver already running")
             return
-            
+
         self.running = True
-        
-        # Perform ECDH handshake if enabled
-        if self.use_ecdh and self.ecdh_client and self.sender_ip:
+
+        # Perform ECDH handshake (ECDH-only mode)
+        if self.ecdh_client and self.sender_ip:
             self.handshake_thread = threading.Thread(target=self._perform_handshake, daemon=True)
             self.handshake_thread.start()
-        
+
         self.receive_thread = threading.Thread(target=self._receive_loop, daemon=True)
         self.receive_thread.start()
-        
+
         # Start cleanup thread for inactive client nonce states
         self.cleanup_thread = threading.Thread(target=self._cleanup_loop, daemon=True)
         self.cleanup_thread.start()
-        print(f"DataPad receiver started on port {self.port}")
+        print(f"🔐 DataPad receiver started on port {self.port} (ECDH-only mode)")
         print("Local IP: [REDACTED]")
         if self.bind_ip == "0.0.0.0" and not self.allow_bind_all and os.getenv("DATAPAD_ALLOW_BIND_ALL", "0") != "1":
             print("WARNING: requested bind to 0.0.0.0 but allow_bind_all is not enabled. For safety, the receiver will bind to localhost instead. To allow binding to all interfaces set DATAPAD_ALLOW_BIND_ALL=1 or pass allow_bind_all=True to the constructor.")
@@ -559,7 +472,7 @@ class DataPadReceiver:
                         except json.JSONDecodeError as e:
                             print(f"JSON decode error: {e}")
                     else:
-                        print("Failed to decrypt data - check pre-shared key")
+                        print("Failed to decrypt data - check ECDH session")
                 
                 except socket.timeout:
                     consecutive_timeouts += 1
@@ -596,11 +509,33 @@ class DataPadReceiver:
 
 
 def main():
-    """Console mode test runner"""
-    # Simple test without GUI
-    allow_bind_all = os.getenv("DATAPAD_ALLOW_BIND_ALL", "0") == "1"
-    receiver = DataPadReceiver(allow_bind_all=allow_bind_all)
-    
+    """Console mode test runner (ECDH-only mode)"""
+    import argparse
+
+    parser = argparse.ArgumentParser(description='DataPad UDP Receiver (ECDH-only)')
+    parser.add_argument('--port', type=int, default=DEFAULT_UDP_PORT, help='Port to listen on')
+    parser.add_argument('--bind-ip', default=DEFAULT_BIND_IP, help='IP address to bind to')
+    parser.add_argument('--sender-ip', required=True, help='IP address of the sender for ECDH handshake')
+    parser.add_argument('--sender-port', type=int, help='Port of the sender for ECDH handshake (default: same as --port)')
+    parser.add_argument('--device-name', default='Python DataPad', help='Name of this device')
+    parser.add_argument('--allow-bind-all', action='store_true', help='Allow binding to all interfaces (0.0.0.0)')
+    args = parser.parse_args()
+
+    allow_bind_all = args.allow_bind_all or os.getenv("DATAPAD_ALLOW_BIND_ALL", "0") == "1"
+
+    print("🔐 DataPad Receiver - ECDH Mode Only")
+    print(f"📡 Listening on {args.bind_ip}:{args.port}")
+    print(f"📤 Sender: {args.sender_ip}:{args.sender_port or args.port}")
+
+    receiver = DataPadReceiver(
+        port=args.port,
+        bind_ip=args.bind_ip,
+        allow_bind_all=allow_bind_all,
+        sender_ip=args.sender_ip,
+        sender_port=args.sender_port,
+        device_name=args.device_name
+    )
+
     def on_data(flight_data):
         print(f"\n=== Flight Data Update ===")
         print(f"Aircraft: {flight_data.aircraft}")
@@ -609,16 +544,16 @@ def main():
         print(f"Heading: {flight_data.heading:.1f}°")
         # Location data omitted from logs to prevent sensitive coordinate exposure
         print(f"Position data: available (not logged for security)")
-    
+
     def on_connection(connected):
         status = "CONNECTED" if connected else "DISCONNECTED"
         print(f"\n*** Connection Status: {status} ***")
-    
+
     receiver.add_data_callback(on_data)
     receiver.add_connection_callback(on_connection)
-    
+
     receiver.start()
-    
+
     try:
         print("\nPress Ctrl+C to stop...")
         while True:

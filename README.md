@@ -87,16 +87,7 @@ python forward_parsed_udp.py --host 192.168.178.100 --port 5010 --use-handshake 
 # Add your device ID to authorized_devices.json on server
 ```
 
-See `docs/technical/ECDH_USAGE_GUIDE.md` for complete setup instructions.
-
-### Legacy PSK Mode
-
-- Default UDP port: **5010** (configurable in the app)
-- Run the forwarder script and point it to your device IP and port (see `docs/features/DATAPAD_FEATURE.md`)
-- Ensure your firewall allows UDP traffic on the chosen port
-- Packets are AES-GCM encrypted by default; to disable for debugging use `--no-encrypt`. Ensure the pre-shared key matches the Android app (see `docs/technical/AES_GCM_ENCRYPTION.md`).
-
-See `docs/features/DATAPAD_FEATURE.md` for full usage, configuration, and troubleshooting.
+See `docs/technical/ECDH_USAGE_GUIDE.md` for complete setup instructions and `docs/features/DATAPAD_FEATURE.md` for full usage, configuration, and troubleshooting.
 
 **Phase 1 (experimental)**: This release represents Phase 1 of DataPad. Future phases will expand telemetry coverage and add visual and security improvements, including live animated aircraft visualizations and a dedicated UI redesign.
 
