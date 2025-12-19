@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -51,9 +52,10 @@ import android.graphics.Rect
  */
 class RouteCreationViewModel(
     private val routeRepository: RouteRepository,
-    private val locationRepository: LocationRepository
+    private val locationRepository: LocationRepository,
+    private val runwayDao: RunwayDao
 ) : ViewModel() {
-    
+
     private val _isCreatingRoute = MutableStateFlow(false)
     val isCreatingRoute: StateFlow<Boolean> = _isCreatingRoute.asStateFlow()
 
@@ -71,7 +73,13 @@ class RouteCreationViewModel(
 
     private val _availableLocations = MutableStateFlow<List<LocationEntity>>(emptyList())
     val availableLocations: StateFlow<List<LocationEntity>> = _availableLocations.asStateFlow()
-    
+
+    private val _waypointRunways = MutableStateFlow<Map<Int, List<RunwayEntity>>>(emptyMap())
+    val waypointRunways: StateFlow<Map<Int, List<RunwayEntity>>> = _waypointRunways.asStateFlow()
+
+    private val _lockedWaypoints = MutableStateFlow<Set<Int>>(emptySet())
+    val lockedWaypoints: StateFlow<Set<Int>> = _lockedWaypoints.asStateFlow()
+
     init {
         loadRoutes()
         loadLocations()
@@ -100,6 +108,7 @@ class RouteCreationViewModel(
                 _currentRouteId.value = routeId
                 _currentRouteName.value = data.route.name
                 _selectedWaypoints.value = data.waypoints.map { it.location }
+                loadAllRunwaysForWaypoints()
             }
         }
     }
@@ -112,6 +121,27 @@ class RouteCreationViewModel(
     
     fun addWaypoint(location: LocationEntity) {
         _selectedWaypoints.value = _selectedWaypoints.value + location
+        loadRunwaysForWaypoint(location)
+    }
+
+    private fun loadRunwaysForWaypoint(location: LocationEntity) {
+        viewModelScope.launch {
+            runwayDao.getRunwaysByLocation(location.id).collect { runways ->
+                _waypointRunways.value = _waypointRunways.value + (location.id to runways)
+            }
+        }
+    }
+
+    private fun loadAllRunwaysForWaypoints() {
+        viewModelScope.launch {
+            val runwayMap = mutableMapOf<Int, List<RunwayEntity>>()
+            _selectedWaypoints.value.forEach { waypoint ->
+                runwayDao.getRunwaysByLocation(waypoint.id).collect { runways ->
+                    runwayMap[waypoint.id] = runways
+                }
+            }
+            _waypointRunways.value = runwayMap
+        }
     }
 
     /**
@@ -159,9 +189,165 @@ class RouteCreationViewModel(
             _selectedWaypoints.value = list
         }
     }
-    
+
+    fun toggleWaypointLock(locationId: Int) {
+        _lockedWaypoints.value = if (_lockedWaypoints.value.contains(locationId)) {
+            _lockedWaypoints.value - locationId
+        } else {
+            _lockedWaypoints.value + locationId
+        }
+    }
+
+    fun isWaypointLocked(locationId: Int): Boolean {
+        return _lockedWaypoints.value.contains(locationId)
+    }
+
     fun setRouteName(name: String) {
         _currentRouteName.value = name
+    }
+
+    /**
+     * Optimize route order to find the shortest total distance (Traveling Salesman Problem)
+     * Respects locked waypoints - they stay at their current positions
+     */
+    fun optimizeRouteOrder() {
+        val waypoints = _selectedWaypoints.value
+        if (waypoints.size < 3) return
+
+        viewModelScope.launch {
+            val lockedIds = _lockedWaypoints.value
+
+            // Separate locked and unlocked waypoints with their original indices
+            val waypointsWithIndices = waypoints.mapIndexed { index, waypoint ->
+                Triple(index, waypoint, lockedIds.contains(waypoint.id))
+            }
+
+            val locked = waypointsWithIndices.filter { it.third }
+            val unlocked = waypointsWithIndices.filter { !it.third }.map { it.second }
+
+            // If all are locked or no unlocked waypoints, nothing to optimize
+            if (unlocked.isEmpty()) return@launch
+
+            // Optimize only the unlocked waypoints
+            val optimizedUnlocked = if (unlocked.size <= 10) {
+                findOptimalRouteExact(unlocked)
+            } else {
+                findOptimalRouteGreedy(unlocked)
+            }
+
+            // Reconstruct the route: keep locked waypoints at their positions,
+            // fill unlocked positions with optimized order
+            val result = MutableList<LocationEntity?>(waypoints.size) { null }
+
+            // Place locked waypoints at their original positions
+            locked.forEach { (index, waypoint, _) ->
+                result[index] = waypoint
+            }
+
+            // Fill remaining positions with optimized unlocked waypoints
+            var unlockedIndex = 0
+            for (i in result.indices) {
+                if (result[i] == null && unlockedIndex < optimizedUnlocked.size) {
+                    result[i] = optimizedUnlocked[unlockedIndex]
+                    unlockedIndex++
+                }
+            }
+
+            _selectedWaypoints.value = result.filterNotNull()
+        }
+    }
+
+    /**
+     * Find optimal route by checking all permutations (exact solution for TSP)
+     * Only practical for up to ~10 waypoints
+     */
+    private fun findOptimalRouteExact(waypoints: List<LocationEntity>): List<LocationEntity> {
+        var bestRoute = waypoints
+        var bestDistance = calculateTotalDistance(waypoints)
+
+        // Generate all permutations and find the shortest
+        val permutations = generatePermutations(waypoints)
+        for (route in permutations) {
+            val distance = calculateTotalDistance(route)
+            if (distance < bestDistance) {
+                bestDistance = distance
+                bestRoute = route
+            }
+        }
+
+        return bestRoute
+    }
+
+    /**
+     * Find optimal route using nearest neighbor heuristic (approximate solution)
+     * Works well for larger numbers of waypoints
+     */
+    private fun findOptimalRouteGreedy(waypoints: List<LocationEntity>): List<LocationEntity> {
+        if (waypoints.isEmpty()) return waypoints
+
+        val remaining = waypoints.toMutableList()
+        val result = mutableListOf<LocationEntity>()
+
+        // Start with the first waypoint
+        var current = remaining.removeAt(0)
+        result.add(current)
+
+        // Always pick the nearest unvisited waypoint
+        while (remaining.isNotEmpty()) {
+            var nearestIndex = 0
+            var nearestDistance = Double.MAX_VALUE
+
+            for (i in remaining.indices) {
+                val distance = NavigationUtils.calculateDistance(
+                    current.latitude, current.longitude,
+                    remaining[i].latitude, remaining[i].longitude
+                )
+                if (distance < nearestDistance) {
+                    nearestDistance = distance
+                    nearestIndex = i
+                }
+            }
+
+            current = remaining.removeAt(nearestIndex)
+            result.add(current)
+        }
+
+        return result
+    }
+
+    /**
+     * Calculate total distance of a route in nautical miles
+     */
+    private fun calculateTotalDistance(waypoints: List<LocationEntity>): Double {
+        if (waypoints.size < 2) return 0.0
+
+        var totalDistance = 0.0
+        for (i in 0 until waypoints.size - 1) {
+            val distKm = NavigationUtils.calculateDistance(
+                waypoints[i].latitude, waypoints[i].longitude,
+                waypoints[i + 1].latitude, waypoints[i + 1].longitude
+            )
+            totalDistance += NavigationUtils.kmToNauticalMiles(distKm)
+        }
+        return totalDistance
+    }
+
+    /**
+     * Generate all permutations of a list
+     */
+    private fun <T> generatePermutations(list: List<T>): List<List<T>> {
+        if (list.size <= 1) return listOf(list)
+
+        val result = mutableListOf<List<T>>()
+        for (i in list.indices) {
+            val current = list[i]
+            val remaining = list.filterIndexed { index, _ -> index != i }
+            val perms = generatePermutations(remaining)
+            for (perm in perms) {
+                result.add(listOf(current) + perm)
+            }
+        }
+        return result
     }
     
     fun finishRouteCreation(onSuccess: (Int) -> Unit) {
@@ -239,6 +425,8 @@ fun RouteCreationSheet(
     val routeName by viewModel.currentRouteName.collectAsState()
     val currentRouteId by viewModel.currentRouteId.collectAsState()
     val availableLocations by viewModel.availableLocations.collectAsState()
+    val waypointRunways by viewModel.waypointRunways.collectAsState()
+    val lockedWaypoints by viewModel.lockedWaypoints.collectAsState()
     var showNameDialog by remember { mutableStateOf(false) }
     var showLocationPicker by remember { mutableStateOf(false) }
 
@@ -266,7 +454,15 @@ fun RouteCreationSheet(
 
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
-        confirmValueChange = { true }
+        confirmValueChange = { newValue ->
+            // Prevent the sheet from transitioning to Hidden while editing an existing route
+            // Compare the string name to avoid referencing ModalBottomSheetValue directly
+            if (isEditMode && newValue.toString() == "Hidden") {
+                false
+            } else {
+                true
+            }
+        }
     )
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val density = androidx.compose.ui.platform.LocalDensity.current
@@ -319,7 +515,14 @@ fun RouteCreationSheet(
     }
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            // Only allow dismiss via scrim/tap outside if NOT editing an existing route
+            if (!isEditMode) {
+                viewModel.cancelRouteCreation()
+                onDismiss()
+            }
+            // If editing, ignore outside taps to prevent accidental loss of edits
+        },
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface.copy(alpha = sheetOpacity),
         dragHandle = null // Disable default drag handle, use custom one only
@@ -404,18 +607,49 @@ fun RouteCreationSheet(
                     .height(28.dp)
                     .align(Alignment.TopCenter)
                     .pointerInput(Unit) {
-                        detectDragGestures { change, dragAmount ->
-                            change.consume()
-                            val currentHeightPx = sheetHeightDp.toPx()
-                            val screenHeightPx = configuration.screenHeightDp * density.density
-                            val newHeightPx = (currentHeightPx - dragAmount.y).coerceIn(
-                                screenHeightPx * sheetMin,
-                                screenHeightPx * sheetMax
-                            )
-                            sheetFraction = (newHeightPx / screenHeightPx).coerceIn(sheetMin, sheetMax)
-                            prefs.edit().putFloat(KEY_SHEET_FRACTION, sheetFraction).apply()
+                        awaitPointerEventScope {
+                            while (true) {
+                                // Wait for an initial down event
+                                val firstEvent = awaitPointerEvent()
+                                val down = firstEvent.changes.firstOrNull() ?: continue
+                                if (!down.pressed) continue
+
+                                var lastY = down.position.y
+                                val screenHeightPx = configuration.screenHeightDp * density.density
+
+                                // Consume the down so other handlers don't steal it
+                                down.consume()
+
+                                // Track movement until pointer is released
+                                var pointerStillDown = true
+                                while (pointerStillDown) {
+                                    val ev = awaitPointerEvent()
+                                    val change = ev.changes.firstOrNull() ?: break
+
+                                    val dy = change.position.y - lastY
+                                    lastY = change.position.y
+
+                                    val currentHeightPx = sheetHeightDp.toPx()
+                                    val newHeightPx = (currentHeightPx - dy).coerceIn(
+                                        screenHeightPx * sheetMin,
+                                        screenHeightPx * sheetMax
+                                    )
+
+                                    sheetFraction = (newHeightPx / screenHeightPx).coerceIn(sheetMin, sheetMax)
+                                    prefs.edit().putFloat(KEY_SHEET_FRACTION, sheetFraction).apply()
+
+                                    // Consume movement so sheet doesn't snap back
+                                    change.consume()
+
+                                    if (!change.pressed) {
+                                        pointerStillDown = false
+                                    }
+                                }
+                            }
                         }
                     },
+
+
                 contentAlignment = Alignment.Center
             ) {
                 Surface(
@@ -517,28 +751,121 @@ fun RouteCreationSheet(
                             Text("Add waypoints manually or tap locations on the map")
                         }
                     }
+                } else if (selectedWaypoints.size >= 3) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.LockOpen,
+                                contentDescription = null,
+                                modifier = Modifier.padding(end = 12.dp),
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Column {
+                                Text(
+                                    "Lock waypoints to fix their position",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                                Text(
+                                    "Locked waypoints stay in place when optimizing the route",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Add Waypoint button
-                Button(
-                    onClick = { showLocationPicker = true },
-                    modifier = Modifier.fillMaxWidth()
+                // Add Waypoint and Plan Fastest Route buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Add Waypoint")
+                    Button(
+                        onClick = { showLocationPicker = true },
+                        modifier = Modifier.weight(0.25f)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Add")
+                    }
+
+                    Button(
+                        onClick = { viewModel.optimizeRouteOrder() },
+                        modifier = Modifier.weight(0.75f),
+                        enabled = selectedWaypoints.size >= 3
+                    ) {
+                        Icon(Icons.Default.Route, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Plan Fastest Route")
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Waypoint list
-                Text(
-                    text = "Waypoints (${selectedWaypoints.size})",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
+                val totalDistanceNm = remember(selectedWaypoints) {
+                    var total = 0.0
+                    for (i in 0 until selectedWaypoints.size - 1) {
+                        val distKm = NavigationUtils.calculateDistance(
+                            selectedWaypoints[i].latitude, selectedWaypoints[i].longitude,
+                            selectedWaypoints[i + 1].latitude, selectedWaypoints[i + 1].longitude
+                        )
+                        total += NavigationUtils.kmToNauticalMiles(distKm)
+                    }
+                    total
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Waypoints (${selectedWaypoints.size})",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = String.format("%.1f NM", totalDistanceNm),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    // Info about locked waypoints
+                    if (lockedWaypoints.isNotEmpty()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Lock,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "${lockedWaypoints.size} locked",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -559,10 +886,13 @@ fun RouteCreationSheet(
                                         waypoint = waypoint,
                                         index = index,
                                         totalCount = selectedWaypoints.size,
+                                        runways = waypointRunways[waypoint.id] ?: emptyList(),
+                                        isLocked = lockedWaypoints.contains(waypoint.id),
                                         onMoveUp = { viewModel.moveWaypointUp(index) },
                                         onMoveDown = { viewModel.moveWaypointDown(index) },
                                         onRemove = { viewModel.removeWaypoint(index) },
-                                        onClick = { onWaypointClick(waypoint) }
+                                        onClick = { onWaypointClick(waypoint) },
+                                        onToggleLock = { viewModel.toggleWaypointLock(waypoint.id) }
                                     )
 
                                     // Show distance and heading to next waypoint
@@ -804,7 +1134,7 @@ fun RouteSegmentInfo(
             Spacer(modifier = Modifier.width(12.dp))
 
             Text(
-                text = String.format("%.1f NM", distanceNm),
+                text = "HDG ${String.format("%03.0f°", heading)}",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -813,7 +1143,7 @@ fun RouteSegmentInfo(
             Spacer(modifier = Modifier.width(16.dp))
 
             Text(
-                text = "HDG ${String.format("%03.0f°", heading)}",
+                text = String.format("%.1f NM", distanceNm),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -830,10 +1160,13 @@ fun WaypointItem(
     waypoint: LocationEntity,
     index: Int,
     totalCount: Int,
+    runways: List<RunwayEntity> = emptyList(),
+    isLocked: Boolean = false,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onRemove: () -> Unit,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onToggleLock: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier
@@ -847,40 +1180,40 @@ fun WaypointItem(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Reorder indicator (not draggable - use arrows instead)
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .border(
-                        width = 2.dp,
-                        color = MaterialTheme.colorScheme.primary,
-                        shape = CircleShape
-                    )
-                    .background(MaterialTheme.colorScheme.surface),
-                contentAlignment = Alignment.Center
+            // Lock/Unlock button
+            IconButton(
+                onClick = onToggleLock,
+                modifier = Modifier.size(36.dp)
             ) {
                 Icon(
-                    Icons.Default.Menu,
-                    contentDescription = "Reorder indicator",
-                    tint = MaterialTheme.colorScheme.primary,
+                    imageVector = if (isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
+                    contentDescription = if (isLocked) "Locked - position fixed" else "Unlocked - can be optimized",
+                    tint = if (isLocked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                     modifier = Modifier.size(20.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(4.dp))
 
             // Sequence number
             Box(
                 modifier = Modifier
                     .size(28.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
+                    .background(
+                        if (isLocked)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.secondary
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "${index + 1}",
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    color = if (isLocked)
+                        MaterialTheme.colorScheme.onPrimary
+                    else
+                        MaterialTheme.colorScheme.onSecondary,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp
                 )
@@ -905,6 +1238,146 @@ fun WaypointItem(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+
+                // Property icons
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Runway icon if location has runways
+                    if (runways.isNotEmpty()) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = CircleShape,
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.Flight,
+                                    contentDescription = "Has ${runways.size} runway(s)",
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+
+                        // Show ILS icon if any runway has ILS
+                        if (runways.any { !it.ilsFrequency.isNullOrEmpty() }) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.tertiaryContainer,
+                                shape = CircleShape,
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.Sensors,
+                                        contentDescription = "Has ILS",
+                                        modifier = Modifier.size(14.dp),
+                                        tint = MaterialTheme.colorScheme.onTertiaryContainer
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Marker type icon
+                    when {
+                        waypoint.markerType == "airport" -> {
+                            Surface(
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                shape = CircleShape,
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.LocalAirport,
+                                        contentDescription = "Airport",
+                                        modifier = Modifier.size(14.dp),
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                }
+                            }
+                        }
+                        waypoint.markerType == "waypoint" -> {
+                            Surface(
+                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                                shape = CircleShape,
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.Place,
+                                        contentDescription = "Waypoint",
+                                        modifier = Modifier.size(14.dp),
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                }
+                            }
+                        }
+                        waypoint.markerType.startsWith("tactical_") -> {
+                            // Tactical unit icon with coalition color
+                            val coalitionColor = when {
+                                waypoint.markerType.contains("blufor") || waypoint.coalition?.contains("blufor", ignoreCase = true) == true ->
+                                    Color(0xFF0080FF)
+                                waypoint.markerType.contains("opfor") || waypoint.coalition?.contains("opfor", ignoreCase = true) == true ->
+                                    Color(0xFFFF3030)
+                                waypoint.markerType.contains("neutral") || waypoint.coalition?.contains("neutral", ignoreCase = true) == true ->
+                                    Color(0xFFFFD700)
+                                else -> MaterialTheme.colorScheme.outline
+                            }
+
+                            Surface(
+                                color = coalitionColor.copy(alpha = 0.2f),
+                                shape = CircleShape,
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.Security,
+                                        contentDescription = "Tactical unit",
+                                        modifier = Modifier.size(14.dp),
+                                        tint = coalitionColor
+                                    )
+                                }
+                            }
+                        }
+                        waypoint.markerType == "target" -> {
+                            Surface(
+                                color = MaterialTheme.colorScheme.errorContainer,
+                                shape = CircleShape,
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.GpsFixed,
+                                        contentDescription = "Target",
+                                        modifier = Modifier.size(14.dp),
+                                        tint = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Static marker icon
+                    if (waypoint.isStatic == 1) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = CircleShape,
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.Lock,
+                                    contentDescription = "Static",
+                                    modifier = Modifier.size(12.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
             }
             
             // Up/Down buttons (for manual reorder)
@@ -1060,8 +1533,8 @@ fun drawRouteOnMap(
             val midLat = (loc1.latitude + loc2.latitude) / 2
             val midLon = (loc1.longitude + loc2.longitude) / 2
 
-            // Add label to text overlay
-            val labelText = String.format("%.1f NM @ %03.0f°", distNm, heading)
+            // Add label to text overlay (show heading first, then distance)
+            val labelText = String.format("HDG %03.0f° 	• %.1f NM", heading, distNm)
             textOverlay.addLabel(GeoPoint(midLat, midLon), labelText)
         }
     }
