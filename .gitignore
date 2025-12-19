@@ -45,4 +45,8 @@ scripts/MapDatabaseTools/leaflet/
 scripts/DCS-SCRIPTS-FOLDER-Experimental/security_audit.jsonl
 scripts/DCS-SCRIPTS-FOLDER-Experimental/security_audit.key
 
+# ECDH authorization files generated at runtime - keep them out of the repository
+scripts/DCS-SCRIPTS-FOLDER-Experimental/authorized_devices.json
+scripts/DCS-SCRIPTS-FOLDER-Experimental/ip_blacklist.json
+
 
