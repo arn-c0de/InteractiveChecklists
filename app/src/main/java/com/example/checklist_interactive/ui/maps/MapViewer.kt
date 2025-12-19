@@ -161,28 +161,61 @@ fun MapViewer(
     
     // Initialize tactical database and repositories (async to avoid blocking UI)
     var tacticalDb by remember { mutableStateOf<com.example.checklist_interactive.data.tactical.TacticalDatabase?>(null) }
+    var dbInitFailed by remember { mutableStateOf(false) }
+    var dbInitError by remember { mutableStateOf<String?>(null) }
     val dbReady = tacticalDb != null
 
     // Initialize DB off the main thread to avoid long blocking operations during composition
     LaunchedEffect(Unit) {
         // Don't block UI - perform DB init on IO
+        android.util.Log.d("MapViewer", "Starting TacticalDatabase initialization...")
         withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
-                val db = com.example.checklist_interactive.data.tactical.TacticalDatabase.getInstance(context, useExternalPath = false)
+                android.util.Log.d("MapViewer", "Calling TacticalDatabase.getInstance()...")
+                val db = kotlinx.coroutines.withTimeout(10000L) { // 10 second timeout
+                    com.example.checklist_interactive.data.tactical.TacticalDatabase.getInstance(context, useExternalPath = false)
+                }
+                android.util.Log.d("MapViewer", "TacticalDatabase.getInstance() completed successfully")
                 withContext(kotlinx.coroutines.Dispatchers.Main) {
                     tacticalDb = db
+                    android.util.Log.d("MapViewer", "TacticalDatabase assigned to state variable - DB ready!")
+                }
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                android.util.Log.e("MapViewer", "TacticalDatabase initialization timed out after 10 seconds", e)
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    dbInitFailed = true
+                    dbInitError = "Zeitüberschreitung beim Laden der Datenbank"
                 }
             } catch (e: Exception) {
                 android.util.Log.e("MapViewer", "Failed to initialize TacticalDatabase", e)
+                e.printStackTrace()
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    dbInitFailed = true
+                    dbInitError = e.message ?: "Unbekannter Fehler"
+                }
             }
         }
     }
 
     // Repositories and viewmodels are created when DB is available
-    val locationRepository = remember(tacticalDb) { tacticalDb?.let { com.example.checklist_interactive.data.tactical.LocationRepositoryImpl(it.locationDao()) } }
-    val routeRepository = remember(tacticalDb) { tacticalDb?.let { com.example.checklist_interactive.data.tactical.RouteRepositoryImpl(it.routeDao(), it.locationDao()) } }
+    val locationRepository = remember(tacticalDb) { 
+        tacticalDb?.let { 
+            android.util.Log.d("MapViewer", "Creating LocationRepository from tacticalDb")
+            com.example.checklist_interactive.data.tactical.LocationRepositoryImpl(it.locationDao()) 
+        }.also {
+            android.util.Log.d("MapViewer", "LocationRepository state: ${if (it != null) "READY" else "NULL"}")
+        }
+    }
+    val routeRepository = remember(tacticalDb) { 
+        tacticalDb?.let { 
+            com.example.checklist_interactive.data.tactical.RouteRepositoryImpl(it.routeDao(), it.locationDao()) 
+        }
+    }
     val markerRouteViewModel = remember(tacticalDb) { if (locationRepository != null && routeRepository != null) MarkerRouteViewModel(locationRepository, routeRepository) else null }
     val routeCreationViewModel = remember(tacticalDb) { if (routeRepository != null && locationRepository != null && tacticalDb != null) RouteCreationViewModel(routeRepository, locationRepository, tacticalDb!!.runwayDao()) else null }
+
+    // Combined ready state: DB AND repositories must be initialized
+    val repositoriesReady = dbReady && locationRepository != null && routeRepository != null
 
     // Load and restore visible routes from SharedPreferences
     LaunchedEffect(Unit) {
@@ -749,61 +782,87 @@ fun MapViewer(
                     // Map click handler for symbol placement
                     val mapEventsReceiver = object : org.osmdroid.events.MapEventsReceiver {
                         override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
+                            Log.d(TAG, "singleTapConfirmedHelper called at $p, pendingMoveMarkerId=$pendingMoveMarkerId, pendingSymbolPlacement=${pendingSymbolPlacement != null}")
+                            
                             p?.let { geoPoint ->
                                 // 1) If a move is pending, use this tap to set new coords for that marker
-                                    if (pendingMoveMarkerId != null) {
-                                        val moveId = pendingMoveMarkerId
-                                        scope.launch {
-                                            try {
-                                                val repo = locationRepository ?: return@launch
-                                                val loc = repo.getLocationById(moveId!!)
-                                                if (loc != null) {
-                                                    val updated = loc.copy(latitude = geoPoint.latitude, longitude = geoPoint.longitude)
-                                                    repo.updateLocation(updated)
-                                                    Log.d(TAG, "Moved marker id=$moveId to ${geoPoint.latitude},${geoPoint.longitude}")
-                                                }
-                                            } catch (e: Exception) {
-                                                Log.e(TAG, "Failed to move marker id=$moveId", e)
-                                            } finally {
-                                                MapActionBus.clear()
+                                if (pendingMoveMarkerId != null) {
+                                    val moveId = pendingMoveMarkerId
+                                    scope.launch {
+                                        try {
+                                            // Get current DB and create repository fresh to avoid stale captures
+                                            val db = tacticalDb
+                                            if (db == null) {
+                                                Log.e(TAG, "TacticalDatabase is null, cannot move marker")
+                                                return@launch
                                             }
+                                            val repo = com.example.checklist_interactive.data.tactical.LocationRepositoryImpl(db.locationDao())
+                                            val loc = repo.getLocationById(moveId!!)
+                                            if (loc != null) {
+                                                val updated = loc.copy(latitude = geoPoint.latitude, longitude = geoPoint.longitude)
+                                                repo.updateLocation(updated)
+                                                Log.d(TAG, "Moved marker id=$moveId to ${geoPoint.latitude},${geoPoint.longitude}")
+                                            }
+                                        } catch (e: Exception) {
+                                            Log.e(TAG, "Failed to move marker id=$moveId", e)
+                                        } finally {
+                                            MapActionBus.clear()
                                         }
-                                        return true
                                     }
+                                    return true
+                                }
 
-                                    // 2) Normal symbol placement flow
-                                    pendingSymbolPlacement?.let { (symbol, affiliation) ->
-                                        // Place military symbol at clicked location
-                                        scope.launch {
-                                            try {
-                                                val newLocation = com.example.checklist_interactive.data.tactical.LocationEntity(
-                                                    name = "${symbol.name} - ${java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}",
-                                                    latitude = geoPoint.latitude,
-                                                    longitude = geoPoint.longitude,
-                                                    markerType = "tactical_military",
-                                                    coalition = affiliation.name.lowercase(),
-                                                    symbolSet = symbol.symbolSet,
-                                                    symbolEntity = symbol.symbolEntity,
-                                                    symbolAffiliation = affiliation.name.lowercase(),
-                                                    symbolColor = String.format("#%06X", (0xFFFFFF and affiliation.color.hashCode())),
-                                                    icon = "ic_mapicon_${symbol.id}",
-                                                    description = "Military symbol: ${symbol.name}"
-                                                )
-                                                
-                                                val repo = locationRepository ?: return@launch
-                                                val insertedId = repo.saveLocation(newLocation)
-                                                Log.d(TAG, "Placed military symbol: ${symbol.name} at ${geoPoint.latitude}, ${geoPoint.longitude} (id=$insertedId)")
-                                                
-                                                // Clear pending placement and optionally set selectedLocation
-                                                pendingSymbolPlacement = null
-                                                // Optionally fetch the saved entity if needed
-                                                // selectedLocation = repo.getLocationById(insertedId.toInt())
-                                            } catch (e: Exception) {
-                                                Log.e(TAG, "Failed to place military symbol", e)
+                                // 2) Normal symbol placement flow
+                                val symbolPlacement = pendingSymbolPlacement
+                                if (symbolPlacement != null) {
+                                    val (symbol, affiliation) = symbolPlacement
+                                    Log.d(TAG, "Placing military symbol: ${symbol.name} at ${geoPoint.latitude}, ${geoPoint.longitude}")
+
+                                    // Convert Compose Color to hex string properly
+                                    val colorHex = String.format("#%08X", (affiliation.color.value.toLong() and 0xFFFFFFFF))
+
+                                    // Place military symbol at clicked location
+                                    scope.launch {
+                                        try {
+                                            val newLocation = com.example.checklist_interactive.data.tactical.LocationEntity(
+                                                name = "${symbol.name} - ${java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}",
+                                                latitude = geoPoint.latitude,
+                                                longitude = geoPoint.longitude,
+                                                markerType = "tactical_military",
+                                                coalition = affiliation.name.lowercase(),
+                                                symbolSet = symbol.symbolSet,
+                                                symbolEntity = symbol.symbolEntity,
+                                                symbolAffiliation = affiliation.name.lowercase(),
+                                                symbolColor = colorHex,
+                                                icon = "ic_mapicon_${symbol.id}",
+                                                description = "Military symbol: ${symbol.name}"
+                                            )
+
+                                            // Get current DB and create repository fresh to avoid stale captures
+                                            val db = tacticalDb
+                                            if (db == null) {
+                                                Log.e(TAG, "TacticalDatabase is null, cannot save marker")
+                                                // Notify user that DB is not ready and leave the placement pending so they can try again
+                                                try {
+                                                    android.widget.Toast.makeText(context, "Kartendatenbank noch nicht bereit — bitte erneut tippen.", android.widget.Toast.LENGTH_SHORT).show()
+                                                } catch (_: Throwable) {
+                                                    // ignore if Toast can't be shown (tests / preview)
+                                                }
+                                                return@launch
                                             }
+
+                                            val repo = com.example.checklist_interactive.data.tactical.LocationRepositoryImpl(db.locationDao())
+                                            val insertedId = repo.saveLocation(newLocation)
+                                            // Only clear the pending placement after save succeeds to avoid losing the user's intent
+                                            pendingSymbolPlacement = null
+
+                                            Log.d(TAG, "Successfully placed military symbol: ${symbol.name} at ${geoPoint.latitude}, ${geoPoint.longitude} (id=$insertedId)")
+                                        } catch (e: Exception) {
+                                            Log.e(TAG, "Failed to place military symbol", e)
                                         }
-                                        return true
                                     }
+                                    return true
+                                }
                             }
                             return false
                         }
@@ -1217,25 +1276,27 @@ fun MapViewer(
                 )
             }
             
-            // Add Military Symbol button
+            // Add Military Symbol button (disabled until DB is ready)
             FloatingActionButton(
-                onClick = { showMilitarySymbolPicker = true },
-                containerColor = if (pendingSymbolPlacement != null) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.tertiaryContainer
+                onClick = { if (repositoriesReady) showMilitarySymbolPicker = true },
+                containerColor = if (pendingSymbolPlacement != null) MaterialTheme.colorScheme.primaryContainer else if (repositoriesReady) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceVariant
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
-                    contentDescription = "Add Military Symbol"
+                    contentDescription = "Add Military Symbol",
+                    tint = if (repositoriesReady) LocalContentColor.current else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
                 )
             }
             
-            // Marker/Route management button
+            // Marker/Route management button (disabled until DB is ready)
             FloatingActionButton(
-                onClick = { showMarkerRouteManagement = true },
-                containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                onClick = { if (repositoriesReady) showMarkerRouteManagement = true },
+                containerColor = if (repositoriesReady) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceVariant
             ) {
                 Icon(
                     imageVector = Icons.Default.List,
-                    contentDescription = "Markers & Routes"
+                    contentDescription = "Markers & Routes",
+                    tint = if (repositoriesReady) LocalContentColor.current else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
                 )
             }
             
@@ -1603,7 +1664,88 @@ fun MapViewer(
         }
 
         // Connection status indicator (only show when DataPad enabled)
-        if (datapadEnabled && !isConnected) {
+        // Also show DB loading indicator if DB is not ready
+        if (dbInitFailed) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp)
+                    .clickable { 
+                        // Retry DB init on click
+                        dbInitFailed = false
+                        dbInitError = null
+                        scope.launch {
+                            withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                try {
+                                    android.util.Log.d(TAG, "Retrying TacticalDatabase initialization...")
+                                    val db = kotlinx.coroutines.withTimeout(10000L) {
+                                        com.example.checklist_interactive.data.tactical.TacticalDatabase.getInstance(context, useExternalPath = false)
+                                    }
+                                    withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                        tacticalDb = db
+                                        android.util.Log.d(TAG, "DB initialized successfully on retry")
+                                    }
+                                } catch (e: Exception) {
+                                    android.util.Log.e(TAG, "Retry failed", e)
+                                    withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                        dbInitFailed = true
+                                        dbInitError = e.message ?: "Unbekannter Fehler"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                color = MaterialTheme.colorScheme.errorContainer,
+                shape = MaterialTheme.shapes.medium
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "⚠️ Kartendatenbank Fehler",
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = dbInitError ?: "Unbekannt",
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        text = "Tippen zum erneuten Versuchen",
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
+        } else if (!dbReady) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                shape = MaterialTheme.shapes.medium
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Text(
+                        text = "Kartendatenbank wird geladen...",
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        } else if (datapadEnabled && !isConnected) {
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -1816,6 +1958,51 @@ fun MapViewer(
 
         // Add an unobtrusive reset button in the control column (see below) to restore FAB positions
     }
+    
+        // Pending symbol placement indicator
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+            if (pendingSymbolPlacement != null) {
+                Surface(
+                    modifier = Modifier
+                        .padding(bottom = 16.dp)
+                        .fillMaxWidth(0.9f),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = MaterialTheme.shapes.medium,
+                    tonalElevation = 6.dp
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Tap on the map to place ${pendingSymbolPlacement?.first?.name}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                        IconButton(onClick = { pendingSymbolPlacement = null }) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Cancel",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                }
+            }
+        }
     
     // Disable auto-center when user manually moves the map
     // Also use this effect to perform any pending center once the MapView is available

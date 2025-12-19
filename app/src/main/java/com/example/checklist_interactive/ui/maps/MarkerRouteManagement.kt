@@ -494,8 +494,8 @@ fun MarkerRouteManagementSheet(
                                 selectedTab = 1
                             },
                             onCenter = { loc ->
-                                // delegate to parent sheet's onCenter behavior
-                                onSetActiveRoute(loc) // keep existing behavior if desired; no-op otherwise
+                                // delegate to parent sheet's onCenter behavior (only center the map)
+                                onCenter(loc)
                             }
                         )
                     } else {
