@@ -40,6 +40,20 @@ except Exception:
     OPENAI_AVAILABLE = False
 
 
+def estimate_heading_from_name(name: Optional[str]) -> Optional[float]:
+    """Estimate runway heading from runway name (e.g., '12/30' -> 120.0)."""
+    import re
+    if not name:
+        return None
+    m = re.search(r"(\d{1,2})", name)
+    if not m:
+        return None
+    try:
+        return float(int(m.group(1)) * 10.0)
+    except Exception:
+        return None
+
+
 def open_in_editor(initial_content: str) -> Optional[str]:
     """Open initial_content in user's editor and return edited content as string (or None on cancel)"""
     editor = os.environ.get('EDITOR')
@@ -184,6 +198,8 @@ def cmd_add_runway(args: argparse.Namespace):
         # basic insert
         cur = db.conn.cursor()
         length_ft = int(round(args.length_m * 3.28084)) if args.length_m else None
+        # If heading not explicitly provided, estimate from runway name
+        heading_deg = args.heading_deg if args.heading_deg is not None else estimate_heading_from_name(args.name)
         cur.execute(
             """INSERT INTO runways (location_id, name, length_m, length_ft, width_m, width_ft, surface, heading_deg, ils_frequency, has_lighting, touchdown_start_lat, touchdown_start_lon, touchdown_end_lat, touchdown_end_lon, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
@@ -194,7 +210,7 @@ def cmd_add_runway(args: argparse.Namespace):
                 args.width_m,
                 int(round(args.width_m * 3.28084)) if args.width_m else None,
                 args.surface,
-                args.heading_deg,
+                heading_deg,
                 args.ils_frequency,
                 1 if args.has_lighting else 0,
                 args.touchdown_start_lat,
@@ -226,7 +242,12 @@ def cmd_edit_runway(args: argparse.Namespace):
             new_data = json.loads(edited)
         except Exception as e:
             print(f"Failed to parse JSON: {e}")
-            return
+            return        # If heading missing in edited JSON, try to estimate from the name
+        name_to_use = new_data.get('name', data.get('name'))
+        if 'heading_deg' not in new_data or new_data.get('heading_deg') in (None, ''):
+            est = estimate_heading_from_name(name_to_use)
+            if est is not None:
+                new_data['heading_deg'] = est
         # Build update
         set_clause = []
         params = []
@@ -300,6 +321,7 @@ def cmd_ai_suggest_runway(args: argparse.Namespace):
         for r in runways:
             length_m = r.get('length_m')
             length_ft = int(round(length_m * 3.28084)) if length_m else None
+            heading = r.get('heading') if r.get('heading') is not None else estimate_heading_from_name(r.get('name'))
             cur.execute(
                 "INSERT INTO runways (location_id, name, length_m, length_ft, width_m, surface, heading_deg, ils_frequency, has_lighting, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
@@ -309,7 +331,7 @@ def cmd_ai_suggest_runway(args: argparse.Namespace):
                     length_ft,
                     r.get('width_m'),
                     r.get('surface'),
-                    r.get('heading'),
+                    heading,
                     r.get('ils') or None,
                     1 if r.get('has_lighting') else 0,
                     r.get('notes') or None,
@@ -331,8 +353,25 @@ def cmd_import(args: argparse.Namespace):
         print(f"Imported {count} locations")
 
 
+def increment_db_version():
+    """Increment database user_version to trigger Android app update detection"""
+    db = MarkersDatabase()
+    cursor = db.conn.cursor()
+    cursor.execute("PRAGMA user_version")
+    current_version = cursor.fetchone()[0]
+    new_version = current_version + 1
+    cursor.execute(f"PRAGMA user_version = {new_version}")
+    db.conn.commit()
+    db.close()
+    print(f"\nDatabase version updated: {current_version} -> {new_version}")
+    print("(App will show update dialog on next start)")
+    return new_version
+
+
 def main(argv: Optional[List[str]] = None):
     p = argparse.ArgumentParser(prog='cli_db_editor')
+    p.add_argument('--no-version-bump', action='store_true',
+                   help='Do not increment database version after changes')
     sub = p.add_subparsers(dest='cmd')
 
     sp = sub.add_parser('list')
@@ -410,7 +449,14 @@ def main(argv: Optional[List[str]] = None):
     if not hasattr(args, 'func'):
         p.print_help()
         return
+
+    # Execute the command
     args.func(args)
+
+    # Auto-increment version for write operations (unless --no-version-bump is set)
+    write_commands = {'edit', 'set', 'delete', 'add-runway', 'edit-runway', 'delete-runway', 'import'}
+    if args.cmd in write_commands and not args.no_version_bump:
+        increment_db_version()
 
 
 if __name__ == '__main__':

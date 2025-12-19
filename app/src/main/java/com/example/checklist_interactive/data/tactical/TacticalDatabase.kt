@@ -215,18 +215,67 @@ abstract class TacticalDatabase : RoomDatabase() {
          */
         fun getInstance(context: Context, useExternalPath: Boolean = false): TacticalDatabase {
             return INSTANCE ?: synchronized(this) {
-                val instance = if (useExternalPath) {
-                    createExternalDatabase(context)
-                } else {
-                    createInternalDatabase(context)
+                // Attempt to create the database instance. If a pre-packaged DB schema mismatch is detected
+                // (IllegalStateException from RoomOpenHelper), attempt a safe recovery: delete the existing
+                // installed DB file and retry creation so the asset DB can be copied afresh.
+                val instance = try {
+                    if (useExternalPath) createExternalDatabase(context) else createInternalDatabase(context)
+                } catch (e: IllegalStateException) {
+                    android.util.Log.w("TacticalDatabase", "Schema mismatch when opening prepackaged DB, attempting recovery: ${'$'}e")
+
+                    try {
+                        val dbFile = context.getDatabasePath(DATABASE_NAME)
+                        if (dbFile.exists()) {
+                            android.util.Log.i("TacticalDatabase", "Deleting installed DB at ${'$'}{dbFile.absolutePath} to recover from schema mismatch")
+                            dbFile.delete()
+                        }
+                    } catch (ex: Exception) {
+                        android.util.Log.e("TacticalDatabase", "Failed to delete installed DB during recovery", ex)
+                    }
+
+                    // Retry creation (this should copy the asset DB into place)
+                    if (useExternalPath) createExternalDatabase(context) else createInternalDatabase(context)
                 }
-                INSTANCE = instance
+
+                // Validate by opening the writable DB now so schema mismatches are detected immediately
+                try {
+                    instance.openHelper.writableDatabase // forces Room to check identity
+                    INSTANCE = instance
+                } catch (e: IllegalStateException) {
+                    android.util.Log.w("TacticalDatabase", "Detected schema mismatch when validating DB, attempting recovery: ${'$'}e")
+                    try {
+                        instance.close()
+                    } catch (_: Exception) {
+                        // ignore
+                    }
+
+                    try {
+                        val dbFile = context.getDatabasePath(DATABASE_NAME)
+                        if (dbFile.exists()) {
+                            android.util.Log.i("TacticalDatabase", "Deleting installed DB at ${'$'}{dbFile.absolutePath} to recover from schema mismatch")
+                            dbFile.delete()
+                        }
+                    } catch (ex: Exception) {
+                        android.util.Log.e("TacticalDatabase", "Failed to delete installed DB during recovery", ex)
+                    }
+
+                    // Recreate the database (copy fresh asset) and validate again
+                    val recreated = if (useExternalPath) createExternalDatabase(context) else createInternalDatabase(context)
+                    try {
+                        recreated.openHelper.writableDatabase
+                        INSTANCE = recreated
+                    } catch (ex: Exception) {
+                        android.util.Log.e("TacticalDatabase", "Recovery failed - DB still invalid", ex)
+                        // As a last resort, rethrow so caller sees the error
+                        throw ex
+                    }
+                }
 
                 // Backfill legacy runways JSON from `locations.runways` into the separate `runways` table
                 // This runs in a background thread and only executes if the `runways` table is empty.
                 Thread {
                     try {
-                        val sqlite = instance.openHelper.writableDatabase
+                        val sqlite = INSTANCE!!.openHelper.writableDatabase
                         // Check if runways table already contains rows
                         var runwaysCount = 0
                         val cntCursor = sqlite.query("SELECT COUNT(*) FROM runways", emptyArray())
@@ -274,7 +323,7 @@ abstract class TacticalDatabase : RoomDatabase() {
                     }
                 }.start()
 
-                instance
+                INSTANCE!!
             }
         }
         
@@ -323,6 +372,19 @@ abstract class TacticalDatabase : RoomDatabase() {
             } else {
                 context.getDatabasePath(DATABASE_NAME).absolutePath
             }
+        }
+        
+        /**
+         * Recreate database instance (used for clean import)
+         */
+        fun recreateInstance(context: Context): TacticalDatabase {
+            try {
+                INSTANCE?.close()
+            } catch (e: Exception) {
+                // ignore close failures
+            }
+            INSTANCE = null
+            return getInstance(context)
         }
     }
 }
