@@ -807,6 +807,8 @@ fun RouteListItem(
     onEdit: (RouteEntity) -> Unit = {},
     onEditWaypoints: (Int) -> Unit = {}
 ) {
+    var showEditDialog by remember { mutableStateOf(false) }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -858,6 +860,21 @@ fun RouteListItem(
                 modifier = Modifier.padding(horizontal = 8.dp)
             )
 
+            // Color button (shows current color and opens full edit dialog)
+            IconButton(onClick = { showEditDialog = true }) {
+                val colorPreview = try {
+                    androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(route.color))
+                } catch (e: Exception) {
+                    androidx.compose.ui.graphics.Color.Gray
+                }
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(colorPreview)
+                )
+            }
+
             // Edit waypoints button
             IconButton(onClick = { onEditWaypoints(route.id) }) {
                 Icon(
@@ -875,6 +892,19 @@ fun RouteListItem(
                 )
             }
         }
+    }
+
+    // Edit dialog for route properties (name/description/color)
+    if (showEditDialog) {
+        RouteEditDialog(
+            route = route,
+            onDismiss = { showEditDialog = false },
+            onSave = { updated ->
+                showEditDialog = false
+                // propagate updated route to caller (ViewModel will persist)
+                onEdit(updated)
+            }
+        )
     }
 }
 
