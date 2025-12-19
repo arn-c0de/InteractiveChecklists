@@ -172,12 +172,7 @@ fun SettingsScreen(
     var contributorsJsonContent by remember { mutableStateOf("") }
     val contributors = remember { androidx.compose.runtime.mutableStateListOf<ContributorEntry>().apply { addAll(prefsManager.getContributors()) } }
 
-    // Collapsible section states
-    var tagsExpanded by remember { mutableStateOf(false) }
-    var markdownExpanded by remember { mutableStateOf(false) }
-    var sourcesExpanded by remember { mutableStateOf(false) }
-    var mapCacheExpanded by remember { mutableStateOf(false) }
-    var mapDbExpanded by remember { mutableStateOf(false) }
+    // Collapsible section states (kept local to each section to reduce recompositions)
 
     // Launcher for folder picker (SAF)
     val folderPicker = rememberLauncherForActivityResult(
@@ -274,150 +269,309 @@ fun SettingsScreen(
                 }
             }
 
-            // === Map Cache ===
+            // === Map Cache & Map Database ===
             item {
                 Spacer(modifier = Modifier.height(12.dp))
-                val mapCacheRotation by animateFloatAsState(targetValue = if (mapCacheExpanded) 180f else 0f)
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { mapCacheExpanded = !mapCacheExpanded },
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = stringResource(R.string.settings_clear_map_cache),
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowDown,
-                                contentDescription = if (mapCacheExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
-                                modifier = Modifier.rotate(mapCacheRotation)
-                            )
-                        }
 
-                        AnimatedVisibility(
-                            visible = mapCacheExpanded,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut()
-                        ) {
-                            Column {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = stringResource(R.string.settings_clear_map_cache_explain),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Button(
-                                    onClick = { showClearMapCacheConfirm = true },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    enabled = !isClearingMapCache,
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                                        contentColor = MaterialTheme.colorScheme.onErrorContainer
-                                    )
-                                ) {
-                                    if (isClearingMapCache) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(16.dp),
-                                                strokeWidth = 2.dp,
-                                                color = MaterialTheme.colorScheme.onErrorContainer
+                // Local expanded states (reduce top-level recompositions)
+                var mapCacheExpanded by remember { mutableStateOf(false) }
+                var mapDbExpanded by remember { mutableStateOf(false) }
+
+                // Shared rotation states for headers
+                val mapCacheRotation by animateFloatAsState(targetValue = if (mapCacheExpanded) 180f else 0f)
+                val mapDbRotation by animateFloatAsState(targetValue = if (mapDbExpanded) 180f else 0f)
+
+                BoxWithConstraints {
+                    val isNarrow = maxWidth < 560.dp
+
+                    if (isNarrow) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            // Map Cache card
+                            Card(modifier = Modifier.fillMaxWidth()) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { mapCacheExpanded = !mapCacheExpanded },
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.settings_clear_map_cache),
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Icon(
+                                            imageVector = Icons.Default.KeyboardArrowDown,
+                                            contentDescription = if (mapCacheExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
+                                            modifier = Modifier.rotate(mapCacheRotation)
+                                        )
+                                    }
+
+                                    AnimatedVisibility(
+                                        visible = mapCacheExpanded,
+                                        enter = expandVertically() + fadeIn(),
+                                        exit = shrinkVertically() + fadeOut()
+                                    ) {
+                                        Column {
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(
+                                                text = stringResource(R.string.settings_clear_map_cache_explain),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(stringResource(R.string.settings_processing))
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            Button(
+                                                onClick = { showClearMapCacheConfirm = true },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                enabled = !isClearingMapCache,
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                                )
+                                            ) {
+                                                if (isClearingMapCache) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        CircularProgressIndicator(
+                                                            modifier = Modifier.size(16.dp),
+                                                            strokeWidth = 2.dp,
+                                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text(stringResource(R.string.settings_processing))
+                                                    }
+                                                } else {
+                                                    Text(stringResource(R.string.settings_clear_map_cache))
+                                                }
+                                            }
                                         }
-                                    } else {
-                                        Text(stringResource(R.string.settings_clear_map_cache))
+                                    }
+                                }
+                            }
+
+                            // Map DB card
+                            Card(modifier = Modifier.fillMaxWidth()) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { mapDbExpanded = !mapDbExpanded },
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.settings_wipe_map_db_title),
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Icon(
+                                            imageVector = Icons.Default.KeyboardArrowDown,
+                                            contentDescription = if (mapDbExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
+                                            modifier = Modifier.rotate(mapDbRotation)
+                                        )
+                                    }
+
+                                    AnimatedVisibility(
+                                        visible = mapDbExpanded,
+                                        enter = expandVertically() + fadeIn(),
+                                        exit = shrinkVertically() + fadeOut()
+                                    ) {
+                                        Column {
+                                            // Auto-load versions when expanded
+                                            LaunchedEffect(mapDbExpanded) {
+                                                if (mapDbExpanded) vm.loadDbVersions()
+                                            }
+
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(
+                                                text = stringResource(R.string.settings_wipe_map_db_explain),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Spacer(modifier = Modifier.height(8.dp))
+
+                                            // DB version row
+                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                                                val assetV by vm.assetDbVersion.collectAsState()
+                                                val installedV by vm.installedDbVersion.collectAsState()
+                                                Text(text = stringResource(R.string.settings_internal_db_version, installedV), style = MaterialTheme.typography.bodySmall)
+                                                Spacer(modifier = Modifier.width(12.dp))
+                                                Text(text = stringResource(R.string.settings_asset_db_version, assetV), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                Spacer(modifier = Modifier.weight(1f))
+                                                IconButton(onClick = { vm.loadDbVersions() }) { Icon(Icons.Default.Refresh, contentDescription = null) }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            Button(
+                                                onClick = { showMapDbConfirm = true },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                enabled = !isMapImporting,
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                                )
+                                            ) {
+                                                if (isMapImporting) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        CircularProgressIndicator(
+                                                            modifier = Modifier.size(16.dp),
+                                                            strokeWidth = 2.dp,
+                                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text(stringResource(R.string.settings_processing))
+                                                    }
+                                                } else {
+                                                    Text(stringResource(R.string.settings_wipe_map_db_button))
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
-                }
-            }
+                    } else {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                            // Map Cache card
+                            Card(modifier = Modifier.weight(1f)) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { mapCacheExpanded = !mapCacheExpanded },
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.settings_clear_map_cache),
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Icon(
+                                            imageVector = Icons.Default.KeyboardArrowDown,
+                                            contentDescription = if (mapCacheExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
+                                            modifier = Modifier.rotate(mapCacheRotation)
+                                        )
+                                    }
 
-            // === Map Database (wipe & reimport) ===
-            item {
-                Spacer(modifier = Modifier.height(12.dp))
-                val mapDbRotation by animateFloatAsState(targetValue = if (mapDbExpanded) 180f else 0f)
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { mapDbExpanded = !mapDbExpanded },
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = stringResource(R.string.settings_wipe_map_db_title),
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowDown,
-                                contentDescription = if (mapDbExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
-                                modifier = Modifier.rotate(mapDbRotation)
-                            )
-                        }
-
-                        AnimatedVisibility(
-                            visible = mapDbExpanded,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut()
-                        ) {
-                            Column {
-                                // Auto-load versions when expanded
-                                LaunchedEffect(Unit) {
-                                    vm.loadDbVersions()
-                                }
-
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = stringResource(R.string.settings_wipe_map_db_explain),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                // DB version row
-                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                    val assetV by vm.assetDbVersion.collectAsState()
-                                    val installedV by vm.installedDbVersion.collectAsState()
-                                    Text(text = stringResource(R.string.settings_internal_db_version, installedV), style = MaterialTheme.typography.bodySmall)
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text(text = stringResource(R.string.settings_asset_db_version, assetV), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Spacer(modifier = Modifier.weight(1f))
-                                    IconButton(onClick = { vm.loadDbVersions() }) { Icon(Icons.Default.Refresh, contentDescription = null) }
-                                }
-
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Button(
-                                    onClick = { showMapDbConfirm = true },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    enabled = !isMapImporting,
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                                        contentColor = MaterialTheme.colorScheme.onErrorContainer
-                                    )
-                                ) {
-                                    if (isMapImporting) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(16.dp),
-                                                strokeWidth = 2.dp,
-                                                color = MaterialTheme.colorScheme.onErrorContainer
+                                    AnimatedVisibility(
+                                        visible = mapCacheExpanded,
+                                        enter = expandVertically() + fadeIn(),
+                                        exit = shrinkVertically() + fadeOut()
+                                    ) {
+                                        Column {
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(
+                                                text = stringResource(R.string.settings_clear_map_cache_explain),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(stringResource(R.string.settings_processing))
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            Button(
+                                                onClick = { showClearMapCacheConfirm = true },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                enabled = !isClearingMapCache,
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                                )
+                                            ) {
+                                                if (isClearingMapCache) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        CircularProgressIndicator(
+                                                            modifier = Modifier.size(16.dp),
+                                                            strokeWidth = 2.dp,
+                                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text(stringResource(R.string.settings_processing))
+                                                    }
+                                                } else {
+                                                    Text(stringResource(R.string.settings_clear_map_cache))
+                                                }
+                                            }
                                         }
-                                    } else {
-                                        Text(stringResource(R.string.settings_wipe_map_db_button))
+                                    }
+                                }
+                            }
+
+                            // Map DB card
+                            Card(modifier = Modifier.weight(1f)) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { mapDbExpanded = !mapDbExpanded },
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.settings_wipe_map_db_title),
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Icon(
+                                            imageVector = Icons.Default.KeyboardArrowDown,
+                                            contentDescription = if (mapDbExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
+                                            modifier = Modifier.rotate(mapDbRotation)
+                                        )
+                                    }
+
+                                    AnimatedVisibility(
+                                        visible = mapDbExpanded,
+                                        enter = expandVertically() + fadeIn(),
+                                        exit = shrinkVertically() + fadeOut()
+                                    ) {
+                                        Column {
+                                            // Auto-load versions when expanded
+                                            LaunchedEffect(mapDbExpanded) {
+                                                if (mapDbExpanded) vm.loadDbVersions()
+                                            }
+
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(
+                                                text = stringResource(R.string.settings_wipe_map_db_explain),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Spacer(modifier = Modifier.height(8.dp))
+
+                                            // DB version row
+                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                                                val assetV by vm.assetDbVersion.collectAsState()
+                                                val installedV by vm.installedDbVersion.collectAsState()
+                                                Text(text = stringResource(R.string.settings_internal_db_version, installedV), style = MaterialTheme.typography.bodySmall)
+                                                Spacer(modifier = Modifier.width(12.dp))
+                                                Text(text = stringResource(R.string.settings_asset_db_version, assetV), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                Spacer(modifier = Modifier.weight(1f))
+                                                IconButton(onClick = { vm.loadDbVersions() }) { Icon(Icons.Default.Refresh, contentDescription = null) }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            Button(
+                                                onClick = { showMapDbConfirm = true },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                enabled = !isMapImporting,
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                                )
+                                            ) {
+                                                if (isMapImporting) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        CircularProgressIndicator(
+                                                            modifier = Modifier.size(16.dp),
+                                                            strokeWidth = 2.dp,
+                                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text(stringResource(R.string.settings_processing))
+                                                    }
+                                                } else {
+                                                    Text(stringResource(R.string.settings_wipe_map_db_button))
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -570,6 +724,7 @@ fun SettingsScreen(
             }
 
             item {
+                var sourcesExpanded by remember { mutableStateOf(false) }
                 val sourcesRotation by animateFloatAsState(targetValue = if (sourcesExpanded) 180f else 0f)
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
@@ -694,6 +849,7 @@ fun SettingsScreen(
             }
 
             item {
+                var tagsExpanded by remember { mutableStateOf(false) }
                 val tagsRotation by animateFloatAsState(targetValue = if (tagsExpanded) 180f else 0f)
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
@@ -755,12 +911,20 @@ fun SettingsScreen(
                                     Text(stringResource(R.string.settings_import_reload_tags))
                                 }
                                 Spacer(modifier = Modifier.height(16.dp))
-                                // Tag statistics
-                                val tagStats = remember(tagReloadKey) {
-                                    val tags = fileManager.tagManager.loadFileTags()
-                                    val uniqueTags = tags.flatMap { it.tags }.toSet()
-                                    val filesWithTags = tags.count { it.tags.isNotEmpty() }
-                                    Pair(uniqueTags.size, filesWithTags)
+                                // Tag statistics (loaded off main thread)
+                                var tagStats by remember { mutableStateOf(Pair(0, 0)) }
+                                LaunchedEffect(tagReloadKey) {
+                                    val result = withContext(Dispatchers.IO) {
+                                        try {
+                                            val tags = fileManager.tagManager.loadFileTags()
+                                            val uniqueTags = tags.flatMap { it.tags }.toSet()
+                                            val filesWithTags = tags.count { it.tags.isNotEmpty() }
+                                            Pair(uniqueTags.size, filesWithTags)
+                                        } catch (e: Exception) {
+                                            Pair(0, 0)
+                                        }
+                                    }
+                                    tagStats = result
                                 }
                                 Text(
                                     text = stringResource(R.string.total_unique_tags, tagStats.first),
@@ -788,6 +952,7 @@ fun SettingsScreen(
             }
 
             item {
+                var markdownExpanded by remember { mutableStateOf(false) }
                 val markdownRotation by animateFloatAsState(targetValue = if (markdownExpanded) 180f else 0f)
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {

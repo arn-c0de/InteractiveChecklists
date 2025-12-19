@@ -441,7 +441,8 @@ class MarkersDatabase:
                 FOREIGN KEY(location_id) REFERENCES locations(id) ON DELETE CASCADE
             )
         """)
-        cursor.execute("CREATE INDEX IF NOT EXISTS index_runways_location ON runways(location_id)")
+        # Use Room's expected index name: index_<tablename>_<columnname>
+        cursor.execute("CREATE INDEX IF NOT EXISTS index_runways_location_id ON runways(location_id)")
         
         # Services table (v2)
         cursor.execute("""
@@ -454,8 +455,8 @@ class MarkersDatabase:
                 FOREIGN KEY(location_id) REFERENCES locations(id) ON DELETE CASCADE
             )
         """)
-        cursor.execute("CREATE INDEX IF NOT EXISTS index_services_location ON services(location_id)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS index_services_type ON services(service_type)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS index_services_location_id ON services(location_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS index_services_service_type ON services(service_type)")
         
         # Media table (v2)
         cursor.execute("""
@@ -470,7 +471,7 @@ class MarkersDatabase:
                 FOREIGN KEY(location_id) REFERENCES locations(id) ON DELETE CASCADE
             )
         """)
-        cursor.execute("CREATE INDEX IF NOT EXISTS index_media_location ON media(location_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS index_media_location_id ON media(location_id)")
         
         # Tags table (v2)
         cursor.execute("""
@@ -491,8 +492,8 @@ class MarkersDatabase:
                 FOREIGN KEY(tag_id) REFERENCES tags(id) ON DELETE CASCADE
             )
         """)
-        cursor.execute("CREATE INDEX IF NOT EXISTS index_location_tags_location ON location_tags(location_id)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS index_location_tags_tag ON location_tags(tag_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS index_location_tags_location_id ON location_tags(location_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS index_location_tags_tag_id ON location_tags(tag_id)")
         
         # Navaids table (v2)
         cursor.execute("""
@@ -512,7 +513,7 @@ class MarkersDatabase:
                 FOREIGN KEY(location_id) REFERENCES locations(id) ON DELETE SET NULL
             )
         """)
-        cursor.execute("CREATE INDEX IF NOT EXISTS index_navaids_location ON navaids(location_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS index_navaids_location_id ON navaids(location_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS index_navaids_type ON navaids(type)")
         cursor.execute("CREATE INDEX IF NOT EXISTS index_navaids_ident ON navaids(ident)")
         
@@ -527,9 +528,9 @@ class MarkersDatabase:
         cursor.execute("INSERT OR IGNORE INTO tags (name) VALUES ('refuel_point')")
         cursor.execute("INSERT OR IGNORE INTO tags (name) VALUES ('training_area')")
         
-        # Set database version (user_version pragma) - increment this when DB content changes significantly
-        # Android app will check this to detect updates
-        cursor.execute("PRAGMA user_version = 1")
+        # Set database version to 4 (matches Android Room database version)
+        # Version 4 includes: military symbols, is_static flag, all extended tables
+        cursor.execute("PRAGMA user_version = 4")
         
         self.conn.commit()
     

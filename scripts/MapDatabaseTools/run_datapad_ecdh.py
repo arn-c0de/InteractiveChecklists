@@ -31,8 +31,8 @@ def main():
     parser.add_argument('--sender-port', type=int, help='Port for ECDH handshake on sender (default: same as --port)')
     parser.add_argument('--device-id', help='Device ID for ECDH (auto-generated if not provided)')
     parser.add_argument('--device-name', default='Python DataPad', help='Device name for ECDH')
-    parser.add_argument('--psk', default='DCS_DataPad_Secret_Key_32BYTES!!', 
-                       help='Pre-shared key for non-ECDH mode')
+    parser.add_argument('--psk', default=None, 
+                       help='Pre-shared key for non-ECDH mode (32+ chars, base64). If not provided, loads from config/environment.')
     parser.add_argument('--allow-bind-all', action='store_true',
                        help='Allow binding to 0.0.0.0 (all interfaces)')
     

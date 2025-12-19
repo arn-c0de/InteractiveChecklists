@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FlightLand
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -52,6 +53,7 @@ import org.osmdroid.views.overlay.TilesOverlay
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.isSystemInDarkTheme
 
 /**
@@ -157,23 +159,30 @@ fun MapViewer(
     // Density for dp<->px conversions needed by effects below
     val density = androidx.compose.ui.platform.LocalDensity.current
     
-    // Initialize tactical database and repositories
-    // Initialize tactical database and repositories
-    val tacticalDb = remember { 
-        com.example.checklist_interactive.data.tactical.TacticalDatabase.getInstance(context, useExternalPath = false)
+    // Initialize tactical database and repositories (async to avoid blocking UI)
+    var tacticalDb by remember { mutableStateOf<com.example.checklist_interactive.data.tactical.TacticalDatabase?>(null) }
+    val dbReady = tacticalDb != null
+
+    // Initialize DB off the main thread to avoid long blocking operations during composition
+    LaunchedEffect(Unit) {
+        // Don't block UI - perform DB init on IO
+        withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val db = com.example.checklist_interactive.data.tactical.TacticalDatabase.getInstance(context, useExternalPath = false)
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    tacticalDb = db
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("MapViewer", "Failed to initialize TacticalDatabase", e)
+            }
+        }
     }
-    val locationRepository = remember { 
-        com.example.checklist_interactive.data.tactical.LocationRepositoryImpl(tacticalDb.locationDao())
-    }
-    val routeRepository = remember {
-        com.example.checklist_interactive.data.tactical.RouteRepositoryImpl(tacticalDb.routeDao(), tacticalDb.locationDao())
-    }
-    val markerRouteViewModel = remember {
-        MarkerRouteViewModel(locationRepository, routeRepository)
-    }
-    val routeCreationViewModel = remember {
-        RouteCreationViewModel(routeRepository, locationRepository, tacticalDb.runwayDao())
-    }
+
+    // Repositories and viewmodels are created when DB is available
+    val locationRepository = remember(tacticalDb) { tacticalDb?.let { com.example.checklist_interactive.data.tactical.LocationRepositoryImpl(it.locationDao()) } }
+    val routeRepository = remember(tacticalDb) { tacticalDb?.let { com.example.checklist_interactive.data.tactical.RouteRepositoryImpl(it.routeDao(), it.locationDao()) } }
+    val markerRouteViewModel = remember(tacticalDb) { if (locationRepository != null && routeRepository != null) MarkerRouteViewModel(locationRepository, routeRepository) else null }
+    val routeCreationViewModel = remember(tacticalDb) { if (routeRepository != null && locationRepository != null && tacticalDb != null) RouteCreationViewModel(routeRepository, locationRepository, tacticalDb!!.runwayDao()) else null }
 
     // Load and restore visible routes from SharedPreferences
     LaunchedEffect(Unit) {
@@ -183,15 +192,19 @@ fun MapViewer(
             ?.toSet() ?: emptySet()
 
         if (savedRouteIds.isNotEmpty()) {
-            markerRouteViewModel.setVisibleRoutes(savedRouteIds)
+            markerRouteViewModel?.setVisibleRoutes(savedRouteIds)
         }
     }
 
-    // Load runways for the selected location from the DB
-    LaunchedEffect(selectedLocation?.id) {
+    // Load runways for the selected location from the DB (only when DB is ready)
+    LaunchedEffect(selectedLocation?.id, dbReady) {
         val locId = selectedLocation?.id
+        if (!dbReady) {
+            selectedRunways = emptyList()
+            return@LaunchedEffect
+        }
         if (locId != null) {
-            tacticalDb.runwayDao().getRunwaysByLocation(locId).collect { list ->
+            tacticalDb!!.runwayDao().getRunwaysByLocation(locId).collect { list ->
                 selectedRunways = list
             }
         } else {
@@ -200,7 +213,7 @@ fun MapViewer(
     }
 
     // Observe visible routes and draw them on map
-    val visibleRouteIds by markerRouteViewModel.visibleRouteIds.collectAsState()
+    val visibleRouteIds by (markerRouteViewModel?.visibleRouteIds?.collectAsState(initial = emptySet()) ?: remember { mutableStateOf(emptySet<Int>()) })
 
     // Save visible routes to SharedPreferences when they change
     LaunchedEffect(visibleRouteIds) {
@@ -221,7 +234,7 @@ fun MapViewer(
         
         // Draw all visible routes
         visibleRouteIds.forEach { routeId ->
-            val routeData = routeRepository.getRouteWithWaypoints(routeId)
+            val routeData = routeRepository?.getRouteWithWaypoints(routeId)
             routeData?.let { data ->
                 val waypoints = data.waypoints.map { wpWithLoc ->
                     Triple(
@@ -740,10 +753,11 @@ fun MapViewer(
                                         val moveId = pendingMoveMarkerId
                                         scope.launch {
                                             try {
-                                                val loc = locationRepository.getLocationById(moveId!!)
+                                                val repo = locationRepository ?: return@launch
+                                                val loc = repo.getLocationById(moveId!!)
                                                 if (loc != null) {
                                                     val updated = loc.copy(latitude = geoPoint.latitude, longitude = geoPoint.longitude)
-                                                    locationRepository.updateLocation(updated)
+                                                    repo.updateLocation(updated)
                                                     Log.d(TAG, "Moved marker id=$moveId to ${geoPoint.latitude},${geoPoint.longitude}")
                                                 }
                                             } catch (e: Exception) {
@@ -774,13 +788,14 @@ fun MapViewer(
                                                     description = "Military symbol: ${symbol.name}"
                                                 )
                                                 
-                                                val insertedId = locationRepository.saveLocation(newLocation)
+                                                val repo = locationRepository ?: return@launch
+                                                val insertedId = repo.saveLocation(newLocation)
                                                 Log.d(TAG, "Placed military symbol: ${symbol.name} at ${geoPoint.latitude}, ${geoPoint.longitude} (id=$insertedId)")
                                                 
                                                 // Clear pending placement and optionally set selectedLocation
                                                 pendingSymbolPlacement = null
                                                 // Optionally fetch the saved entity if needed
-                                                // selectedLocation = locationRepository.getLocationById(insertedId.toInt())
+                                                // selectedLocation = repo.getLocationById(insertedId.toInt())
                                             } catch (e: Exception) {
                                                 Log.e(TAG, "Failed to place military symbol", e)
                                             }
@@ -974,9 +989,10 @@ fun MapViewer(
         }
         
         // Load and display markers from database
-        LaunchedEffect(mapView) {
-            if (mapView != null) {
-                locationRepository.getAllLocations().collect { markers ->
+        LaunchedEffect(mapView, locationRepository) {
+            if (mapView != null && locationRepository != null) {
+                val locFlow = locationRepository.getAllLocations()
+                locFlow.collect { markers ->
                     mapView?.let { mv ->
                         // Remove existing marker overlays (except position marker)
                         mv.overlays.removeAll { it is org.osmdroid.views.overlay.Marker && it != positionMarker }
@@ -984,242 +1000,135 @@ fun MapViewer(
                         markerToLocation.clear()
 
                         // Add markers to map
-                        markers.forEach { marker ->
+                        // Prepare icons and marker payloads off main thread to avoid UI jank
+                        data class PreparedMarker(val entity: com.example.checklist_interactive.data.tactical.LocationEntity, val icon: BitmapDrawable?)
+
+                        val prepared = withContext(kotlinx.coroutines.Dispatchers.Default) {
+                            markers.map { marker ->
+                                var markerIcon: BitmapDrawable? = null
+                                try {
+                                    if (marker.symbolEntity.isNotEmpty()) {
+                                        val resName = "ic_mapicon_${marker.symbolEntity}"
+                                        val iconResId = context.resources.getIdentifier(resName, "drawable", context.packageName)
+                                        if (iconResId != 0) {
+                                            val drawable = ContextCompat.getDrawable(context, iconResId)?.mutate()
+                                            drawable?.let { d ->
+                                                val affiliationColor = when (marker.symbolAffiliation.lowercase()) {
+                                                    "friendly" -> android.graphics.Color.parseColor("#00A8FF")
+                                                    "hostile" -> android.graphics.Color.parseColor("#FF4444")
+                                                    "neutral" -> android.graphics.Color.parseColor("#00FF00")
+                                                    "unknown" -> android.graphics.Color.parseColor("#FFFF80")
+                                                    else -> try { if (marker.symbolColor.isNotEmpty()) android.graphics.Color.parseColor(marker.symbolColor) else android.graphics.Color.parseColor("#FFFF80") } catch (_: Exception) { android.graphics.Color.parseColor("#FFFF80") }
+                                                }
+                                                val bitmap = android.graphics.Bitmap.createBitmap(64, 64, android.graphics.Bitmap.Config.ARGB_8888)
+                                                val canvas = android.graphics.Canvas(bitmap)
+                                                d.setBounds(0, 0, 64, 64)
+                                                val colorFilter = android.graphics.PorterDuffColorFilter(affiliationColor, android.graphics.PorterDuff.Mode.SRC_ATOP)
+                                                d.colorFilter = colorFilter
+                                                d.draw(canvas)
+                                                markerIcon = BitmapDrawable(context.resources, bitmap)
+                                            }
+                                        }
+                                    }
+                                } catch (_: Exception) { }
+
+                                try {
+                                    if (markerIcon == null && marker.markerType == "airport") {
+                                        val iconResId = context.resources.getIdentifier("ic_mapicon_static_airport", "drawable", context.packageName)
+                                        if (iconResId != 0) {
+                                            val drawable = ContextCompat.getDrawable(context, iconResId)?.mutate()
+                                            drawable?.let { d ->
+                                                val bitmap = android.graphics.Bitmap.createBitmap(64, 64, android.graphics.Bitmap.Config.ARGB_8888)
+                                                val canvas = android.graphics.Canvas(bitmap)
+                                                d.setBounds(0, 0, 64, 64)
+                                                d.draw(canvas)
+                                                markerIcon = BitmapDrawable(context.resources, bitmap)
+                                            }
+                                        }
+                                    }
+                                } catch (_: Exception) { }
+
+                                try {
+                                    if (markerIcon == null && marker.icon.isNotEmpty() && marker.icon != "default") {
+                                        val iconName = if (marker.icon.startsWith("ic_mapicon_")) marker.icon else "ic_mapicon_${marker.icon}"
+                                        var iconResId = context.resources.getIdentifier(iconName, "drawable", context.packageName)
+                                        if (iconResId == 0) iconResId = context.resources.getIdentifier(marker.icon, "drawable", context.packageName)
+                                        if (iconResId != 0) {
+                                            val drawable = ContextCompat.getDrawable(context, iconResId)?.mutate()
+                                            drawable?.let { d ->
+                                                val bitmap = android.graphics.Bitmap.createBitmap(64, 64, android.graphics.Bitmap.Config.ARGB_8888)
+                                                val canvas = android.graphics.Canvas(bitmap)
+                                                d.setBounds(0, 0, 64, 64)
+                                                d.draw(canvas)
+                                                markerIcon = BitmapDrawable(context.resources, bitmap)
+                                            }
+                                        }
+                                    }
+                                } catch (_: Exception) { }
+
+                                if (markerIcon == null) {
+                                    val bitmap = android.graphics.Bitmap.createBitmap(48, 48, android.graphics.Bitmap.Config.ARGB_8888)
+                                    val canvas = android.graphics.Canvas(bitmap)
+                                    val paint = android.graphics.Paint().apply { isAntiAlias = true; color = android.graphics.Color.RED; style = android.graphics.Paint.Style.FILL }
+                                    val strokePaint = android.graphics.Paint().apply { isAntiAlias = true; color = android.graphics.Color.WHITE; style = android.graphics.Paint.Style.STROKE; strokeWidth = 4f }
+                                    canvas.drawCircle(24f, 24f, 18f, paint)
+                                    canvas.drawCircle(24f, 24f, 18f, strokePaint)
+                                    val xPaint = android.graphics.Paint().apply { isAntiAlias = true; color = android.graphics.Color.WHITE; style = android.graphics.Paint.Style.STROKE; strokeWidth = 3f }
+                                    canvas.drawLine(12f, 12f, 36f, 36f, xPaint)
+                                    canvas.drawLine(36f, 12f, 12f, 36f, xPaint)
+                                    markerIcon = BitmapDrawable(context.resources, bitmap)
+                                }
+
+                                PreparedMarker(marker, markerIcon)
+                            }
+                        }
+
+                        // Apply prepared markers on main thread
+                        prepared.forEach { p ->
+                            val marker = p.entity
                             val osmMarker = org.osmdroid.views.overlay.Marker(mv).apply {
                                 position = GeoPoint(marker.latitude, marker.longitude)
                                 title = marker.name
                                 snippet = buildString {
                                     append("Type: ${marker.markerType}")
-                                    if (marker.coalition != null) {
-                                        append("\nCoalition: ${marker.coalition}")
-                                    }
+                                    if (marker.coalition != null) append("\nCoalition: ${marker.coalition}")
                                     if (marker.markerType == "tactical_military") {
-                                        if (marker.symbolEntity.isNotEmpty()) {
-                                            append("\nSymbol: ${marker.symbolEntity}")
-                                        }
-                                        if (marker.symbolAffiliation.isNotEmpty()) {
-                                            append("\nAffiliation: ${marker.symbolAffiliation}")
-                                        }
+                                        if (marker.symbolEntity.isNotEmpty()) append("\nSymbol: ${marker.symbolEntity}")
+                                        if (marker.symbolAffiliation.isNotEmpty()) append("\nAffiliation: ${marker.symbolAffiliation}")
                                     }
-                                    if (marker.description.isNotEmpty()) {
-                                        append("\n${marker.description}")
-                                    }
+                                    if (marker.description.isNotEmpty()) append("\n${marker.description}")
                                 }
-                                
-                                // Set marker icon based on type
                                 setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_BOTTOM)
 
-                                // Attach LocationEntity to marker and keep mapping so we can find it from touch coords reliably
-                                try {
-                                    this.setRelatedObject(marker)
-                                } catch (_: Throwable) {
-                                    // ignore if API not available
-                                }
-                                try {
-                                    markerToLocation[this] = marker
-                                } catch (_: Throwable) {
-                                    // ignore mapping failures
-                                }
+                                try { this.setRelatedObject(marker) } catch (_: Throwable) { }
+                                try { markerToLocation[this] = marker } catch (_: Throwable) { }
 
-                                // Different colors for different types
-                                val markerColor = when {
-                                    marker.markerType == "airport" -> android.graphics.Color.parseColor("#8B4513")
-                                    marker.markerType == "waypoint" -> android.graphics.Color.parseColor("#FFA500")
-                                    marker.markerType.startsWith("tactical_blufor") -> android.graphics.Color.parseColor("#00A8FF")
-                                    marker.markerType.startsWith("tactical_opfor") -> android.graphics.Color.parseColor("#FF4444")
-                                    marker.markerType == "target" -> android.graphics.Color.parseColor("#FF0000")
-                                    marker.markerType == "threat" -> android.graphics.Color.parseColor("#FF0000")
-                                    else -> android.graphics.Color.parseColor("#9370DB")
-                                }
-                                
-                                // Create marker icon - priority: symbolEntity > airport default > icon field > NO FALLBACK
-                                var markerIcon: BitmapDrawable? = null
-                                try {
-                                    // 1. Try symbolEntity first (for ALL markers with symbolEntity set)
-                                    if (markerIcon == null && marker.symbolEntity.isNotEmpty()) {
-                                        try {
-                                            // Dynamic drawable lookup by resource name (ic_mapicon_<entity>)
-                                            val resName = "ic_mapicon_${marker.symbolEntity}"
-                                            val iconResId = context.resources.getIdentifier(resName, "drawable", context.packageName)
-                                            if (iconResId != 0) {
-                                                val drawable = ContextCompat.getDrawable(context, iconResId)?.mutate()
-                                                drawable?.let { d ->
-                                                    // Apply affiliation color to the icon
-                                                    val affiliationColor = when (marker.symbolAffiliation.lowercase()) {
-                                                        "friendly" -> android.graphics.Color.parseColor("#00A8FF")  // Blue
-                                                        "hostile" -> android.graphics.Color.parseColor("#FF4444")    // Red
-                                                        "neutral" -> android.graphics.Color.parseColor("#00FF00")    // Green
-                                                        "unknown" -> android.graphics.Color.parseColor("#FFFF80")    // Yellow
-                                                        else -> {
-                                                            // Try to parse symbolColor if available
-                                                            try {
-                                                                if (marker.symbolColor.isNotEmpty()) {
-                                                                    android.graphics.Color.parseColor(marker.symbolColor)
-                                                                } else {
-                                                                    android.graphics.Color.parseColor("#FFFF80") // Default yellow
-                                                                }
-                                                            } catch (e: Exception) {
-                                                                android.graphics.Color.parseColor("#FFFF80") // Default yellow
-                                                            }
-                                                        }
-                                                    }
-                                                    
-                                                    // Create bitmap and apply color filter to colorize the fill
-                                                    val bitmap = android.graphics.Bitmap.createBitmap(64, 64, android.graphics.Bitmap.Config.ARGB_8888)
-                                                    val canvas = android.graphics.Canvas(bitmap)
-                                                    d.setBounds(0, 0, 64, 64)
-                                                    
-                                                    // Apply ColorFilter to replace the fill color with affiliation color
-                                                    val colorFilter = android.graphics.PorterDuffColorFilter(
-                                                        affiliationColor,
-                                                        android.graphics.PorterDuff.Mode.SRC_ATOP
-                                                    )
-                                                    d.colorFilter = colorFilter
-                                                    
-                                                    d.draw(canvas)
-                                                    markerIcon = BitmapDrawable(context.resources, bitmap)
-                                                    Log.d(TAG, "Loaded icon for symbolEntity: ${marker.symbolEntity} with affiliation ${marker.symbolAffiliation} (color=${String.format("#%06X", 0xFFFFFF and affiliationColor)})")
-                                                }
-                                            } else {
-                                                Log.w(TAG, "No drawable found for symbolEntity: ${marker.symbolEntity} (tried resName=$resName)")
-                                            }
-                                        } catch (e: Exception) {
-                                            Log.e(TAG, "Failed to load symbolEntity icon: ${marker.symbolEntity}", e)
-                                        }
-                                    }
-                                    
-                                    // 2. For airports, use static airport icon if no symbolEntity icon was loaded
-                                    if (markerIcon == null && marker.markerType == "airport") {
-                                        try {
-                                            val iconResId = context.resources.getIdentifier("ic_mapicon_static_airport", "drawable", context.packageName)
-                                            if (iconResId != 0) {
-                                                val drawable = ContextCompat.getDrawable(context, iconResId)?.mutate()
-                                                drawable?.let { d ->
-                                                    val bitmap = android.graphics.Bitmap.createBitmap(64, 64, android.graphics.Bitmap.Config.ARGB_8888)
-                                                    val canvas = android.graphics.Canvas(bitmap)
-                                                    d.setBounds(0, 0, 64, 64)
-                                                    d.draw(canvas)
-                                                    markerIcon = BitmapDrawable(context.resources, bitmap)
-                                                    Log.d(TAG, "Loaded default airport icon for: ${marker.name}")
-                                                }
-                                            }
-                                        } catch (e: Exception) {
-                                            Log.e(TAG, "Failed to load airport icon", e)
-                                        }
-                                    }
-                                    
-                                    // 3. Try icon field if available (for custom icons) - add ic_mapicon_ prefix if not present
-                                    if (markerIcon == null && marker.icon.isNotEmpty() && marker.icon != "default") {
-                                        try {
-                                            // Try with ic_mapicon_ prefix first if not already present
-                                            val iconName = if (marker.icon.startsWith("ic_mapicon_")) marker.icon else "ic_mapicon_${marker.icon}"
-                                            val iconResId = context.resources.getIdentifier(iconName, "drawable", context.packageName)
-                                            if (iconResId != 0) {
-                                                val drawable = ContextCompat.getDrawable(context, iconResId)?.mutate()
-                                                drawable?.let { d ->
-                                                    // Don't use setTint() - render the icon as-is with its original colors
-                                                    val bitmap = android.graphics.Bitmap.createBitmap(64, 64, android.graphics.Bitmap.Config.ARGB_8888)
-                                                    val canvas = android.graphics.Canvas(bitmap)
-                                                    d.setBounds(0, 0, 64, 64)
-                                                    d.draw(canvas)
-                                                    markerIcon = BitmapDrawable(context.resources, bitmap)
-                                                    Log.d(TAG, "Loaded icon from icon field: ${marker.icon} (resolved to $iconName, resId=$iconResId)")
-                                                }
-                                            } else {
-                                                // Try without prefix as fallback
-                                                val iconResId2 = context.resources.getIdentifier(marker.icon, "drawable", context.packageName)
-                                                if (iconResId2 != 0) {
-                                                    val drawable = ContextCompat.getDrawable(context, iconResId2)?.mutate()
-                                                    drawable?.let { d ->
-                                                        val bitmap = android.graphics.Bitmap.createBitmap(64, 64, android.graphics.Bitmap.Config.ARGB_8888)
-                                                        val canvas = android.graphics.Canvas(bitmap)
-                                                        d.setBounds(0, 0, 64, 64)
-                                                        d.draw(canvas)
-                                                        markerIcon = BitmapDrawable(context.resources, bitmap)
-                                                        Log.d(TAG, "Loaded icon from icon field (no prefix): ${marker.icon} (resId=$iconResId2)")
-                                                    }
-                                                } else {
-                                                    Log.w(TAG, "No drawable found for icon field: ${marker.icon} (tried $iconName and ${marker.icon})")
-                                                }
-                                            }
-                                        } catch (e: Exception) {
-                                            Log.e(TAG, "Failed to load icon from icon field: ${marker.icon}", e)
-                                        }
-                                    }
-                                    
-                                    // NO FALLBACK - if icon is not found, show error
-                                    if (markerIcon == null) {
-                                        Log.e(TAG, "FAILED TO LOAD ICON for marker: ${marker.name} (type=${marker.markerType}, symbolEntity=${marker.symbolEntity}, icon=${marker.icon})")
-                                        // Create red error marker to make it obvious
-                                        val bitmap = android.graphics.Bitmap.createBitmap(48, 48, android.graphics.Bitmap.Config.ARGB_8888)
-                                        val canvas = android.graphics.Canvas(bitmap)
-                                        val paint = android.graphics.Paint().apply {
-                                            isAntiAlias = true
-                                            color = android.graphics.Color.RED
-                                            style = android.graphics.Paint.Style.FILL
-                                        }
-                                        val strokePaint = android.graphics.Paint().apply {
-                                            isAntiAlias = true
-                                            color = android.graphics.Color.WHITE
-                                            style = android.graphics.Paint.Style.STROKE
-                                            strokeWidth = 4f
-                                        }
-                                        canvas.drawCircle(24f, 24f, 18f, paint)
-                                        canvas.drawCircle(24f, 24f, 18f, strokePaint)
-                                        // Draw X in the middle
-                                        val xPaint = android.graphics.Paint().apply {
-                                            isAntiAlias = true
-                                            color = android.graphics.Color.WHITE
-                                            style = android.graphics.Paint.Style.STROKE
-                                            strokeWidth = 3f
-                                        }
-                                        canvas.drawLine(12f, 12f, 36f, 36f, xPaint)
-                                        canvas.drawLine(36f, 12f, 12f, 36f, xPaint)
-                                        markerIcon = BitmapDrawable(context.resources, bitmap)
-                                    }
-                                    
-                                    // Set the icon
-                                    icon = markerIcon
-                                } catch (e: Exception) {
-                                    Log.e(TAG, "Failed to set marker icon for ${marker.name}", e)
-                                    // Use default marker
-                                }
+                                icon = p.icon
                             }
-
-
 
                             mv.overlays.add(osmMarker)
 
-                            // Attach click and long-press listeners to marker
+                            // Attach click listener
                             osmMarker.setOnMarkerClickListener(object : org.osmdroid.views.overlay.Marker.OnMarkerClickListener {
                                 override fun onMarkerClick(markerView: org.osmdroid.views.overlay.Marker?, mapView: org.osmdroid.views.MapView?): Boolean {
-                                    // Suppress short click if it immediately followed a long-press on the same marker
                                     if (lastLongPressedMarkerId == marker.id && System.currentTimeMillis() - lastLongPressTime < 1000L) {
                                         lastLongPressedMarkerId = null
                                         return true
                                     }
 
-                                    // Short click: show marker details
                                     selectedLocation = marker
                                     showMarkerRouteManagement = true
 
                                     (context as? android.app.Activity)?.runOnUiThread {
                                         lastProgrammaticMove.value = System.currentTimeMillis()
-                                        try {
-                                            markerView?.let { mv2 -> mapView?.controller?.animateTo(mv2.position) }
-                                            mapView?.invalidate()
-                                        } catch (_: Exception) {}
+                                        try { markerView?.let { mv2 -> mapView?.controller?.animateTo(mv2.position) }; mapView?.invalidate() } catch (_: Exception) {}
                                     }
 
                                     return true
                                 }
                             })
-
-                            // TODO: Implement long press listener for radial menu
-                            // osmdroid doesn't have built-in long press support for markers
-                            // Consider implementing using GestureDetector or custom touch handling
                         }
-                        
+
                         mv.invalidate()
                         Log.d(TAG, "Loaded ${markers.size} markers onto map")
                     }
@@ -1228,6 +1137,10 @@ fun MapViewer(
         }
         
         // Control overlay
+        // Shared trigger for resetting FAB positions (moved here so both the control buttons
+        // and the DraggableFab instances can access it)
+        var fabLayoutResetTrigger by remember { mutableStateOf(0) }
+
         Column(
             modifier = Modifier
                 .align(Alignment.TopEnd)
@@ -1351,6 +1264,22 @@ fun MapViewer(
                     imageVector = if (mapRotationMode == 1) Icons.Default.Flight else Icons.Default.Explore,
                     contentDescription = "Toggle map rotation (North / HDG)"
                 )
+            }
+
+            // Reset FAB positions (useful when a FAB was dragged off or stored position moved)
+            FloatingActionButton(
+                onClick = {
+                    try {
+                        prefsManager.resetPdfViewerLayout()
+                    } catch (e: Exception) { android.util.Log.w(TAG, "Failed to reset FAB prefs: ${e.message}") }
+                    // force re-read of saved positions for the DraggableFabs
+                    try { fabLayoutResetTrigger = fabLayoutResetTrigger + 1 } catch (_: Throwable) {}
+                    // quick feedback
+                    android.widget.Toast.makeText(context, "FAB-Positionen zurückgesetzt", android.widget.Toast.LENGTH_SHORT).show()
+                },
+                containerColor = MaterialTheme.colorScheme.secondaryContainer
+            ) {
+                Icon(imageVector = Icons.Default.Refresh, contentDescription = "Reset FAB positions")
             }
         }
 
@@ -1752,7 +1681,7 @@ fun MapViewer(
             // Optionally resolve name for nicer text
             LaunchedEffect(pendingMoveMarkerId) {
                 pendingMoveTargetName = try {
-                    locationRepository.getLocationById(pendingMoveMarkerId!!)?.name
+                    locationRepository?.getLocationById(pendingMoveMarkerId!!)?.name
                 } catch (_: Exception) {
                     null
                 }
@@ -1842,40 +1771,48 @@ fun MapViewer(
         val prefsManager = remember { com.example.checklist_interactive.data.prefs.PreferencesManager(context) }
         val screenWidth = screenWidthPx
         val screenHeight = effectiveScreenHeightPx
+        // Uses the shared `fabLayoutResetTrigger` declared above in the control overlay
 
+        // QuickNote FAB (wrapped in key so it re-reads prefs when we reset them)
         if (quickNoteManager != null) {
-            DraggableFab(
-                name = "map_quicknote_fab",
-                prefsManager = prefsManager,
-                screenWidthPx = screenWidth,
-                screenHeightPx = screenHeight,
-                fabSizePx = fabSizePx,
-                defaultX = 0.85f,
-                defaultY = 0.75f,
-                visible = true,
-                onClick = { showQuickAccess = true },
-                content = { Icon(Icons.AutoMirrored.Filled.Note, contentDescription = stringResource(R.string.quick_notes_title)) },
-                marginPx = fabMarginPx
-            )
+            key(fabLayoutResetTrigger) {
+                DraggableFab(
+                    name = "map_quicknote_fab",
+                    prefsManager = prefsManager,
+                    screenWidthPx = screenWidth,
+                    screenHeightPx = screenHeight,
+                    fabSizePx = fabSizePx,
+                    defaultX = 0.85f,
+                    defaultY = 0.75f,
+                    visible = true,
+                    onClick = { showQuickAccess = true },
+                    content = { Icon(Icons.AutoMirrored.Filled.Note, contentDescription = stringResource(R.string.quick_notes_title)) },
+                    marginPx = fabMarginPx
+                )
+            }
         }
 
         val datapadManager = LocalDataPadManager.current
         val datapadEnabled by datapadManager.isEnabled.collectAsState()
 
-        DraggableFab(
-            name = "map_datapad_fab",
-            prefsManager = prefsManager,
-            screenWidthPx = screenWidth,
-            screenHeightPx = screenHeight,
-            fabSizePx = fabSizePx,
-            defaultX = 0.85f,
-            defaultY = 0.85f,
-            visible = datapadEnabled,
-            onClick = { if (datapadEnabled) showDataPad = true },
+        key(fabLayoutResetTrigger) {
+            DraggableFab(
+                name = "map_datapad_fab",
+                prefsManager = prefsManager,
+                screenWidthPx = screenWidth,
+                screenHeightPx = screenHeight,
+                fabSizePx = fabSizePx,
+                defaultX = 0.85f,
+                defaultY = 0.65f,
+                visible = datapadEnabled,
+                onClick = { if (datapadEnabled) showDataPad = true },
 
-            content = { Icon(Icons.Default.Flight, contentDescription = stringResource(R.string.datapad_title)) },
-            marginPx = fabMarginPx
-        )
+                content = { Icon(Icons.Default.Flight, contentDescription = stringResource(R.string.datapad_title)) },
+                marginPx = fabMarginPx
+            )
+        }
+
+        // Add an unobtrusive reset button in the control column (see below) to restore FAB positions
     }
     
     // Disable auto-center when user manually moves the map
@@ -2103,7 +2040,8 @@ fun MapViewer(
                     onClick = {
                         radialMenuMarker?.let { marker ->
                             scope.launch {
-                                locationRepository.deleteLocation(marker.id)
+                                val repo = locationRepository ?: return@launch
+                                repo.deleteLocation(marker.id)
                             }
                         }
                     }
@@ -2121,107 +2059,116 @@ fun MapViewer(
     
     // Marker/Route Management Sheet (with integrated marker details)
     if (showMarkerRouteManagement) {
-        MarkerRouteManagementSheet(
-            viewModel = markerRouteViewModel,
-            onDismiss = { 
-                showMarkerRouteManagement = false
-                selectedLocation = null
-            },
-            onMarkerClick = { marker ->
-                // Update selected location to show details in tab
-                selectedLocation = marker
-            },
-            onRouteClick = { route ->
-                // Load and display route on map
-                scope.launch {
-                    val routeData = routeRepository.getRouteWithWaypoints(route.id)
-                    routeData?.let { data ->
-                        // Draw route on map
-                        val waypoints = data.waypoints.map { wpWithLoc ->
-                            Triple(
-                                wpWithLoc.location,
-                                wpWithLoc.waypoint.distanceNm,
-                                wpWithLoc.waypoint.headingMag
-                            )
-                        }
-
-                        // Parse route color
-                        val routeColor = try {
-                            android.graphics.Color.parseColor(data.route.color)
-                        } catch (e: Exception) {
-                            android.graphics.Color.parseColor("#00A8FF") // Default blue
-                        }
-
-                        mapView?.let { mv ->
-                            drawRouteOnMap(mv, waypoints, routeColor)
-                            // Center on first waypoint
-                            if (waypoints.isNotEmpty()) {
-                                mv.controller.animateTo(
-                                    GeoPoint(waypoints[0].first.latitude, waypoints[0].first.longitude)
+        markerRouteViewModel?.let { vm ->
+            MarkerRouteManagementSheet(
+                viewModel = vm,
+                onDismiss = { 
+                    showMarkerRouteManagement = false
+                    selectedLocation = null
+                },
+                onMarkerClick = { marker ->
+                    // Update selected location to show details in tab
+                    selectedLocation = marker
+                },
+                onRouteClick = { route ->
+                    // Load and display route on map
+                    scope.launch {
+                        val repo = routeRepository ?: return@launch
+                        val routeData = repo.getRouteWithWaypoints(route.id)
+                        routeData?.let { data ->
+                            // Draw route on map
+                            val waypoints = data.waypoints.map { wpWithLoc ->
+                                Triple(
+                                    wpWithLoc.location,
+                                    wpWithLoc.waypoint.distanceNm,
+                                    wpWithLoc.waypoint.headingMag
                                 )
+                            }
+
+                            // Parse route color
+                            val routeColor = try {
+                                android.graphics.Color.parseColor(data.route.color)
+                            } catch (e: Exception) {
+                                android.graphics.Color.parseColor("#00A8FF") // Default blue
+                            }
+
+                            mapView?.let { mv ->
+                                drawRouteOnMap(mv, waypoints, routeColor)
+                                // Center on first waypoint
+                                if (waypoints.isNotEmpty()) {
+                                    mv.controller.animateTo(
+                                        GeoPoint(waypoints[0].first.latitude, waypoints[0].first.longitude)
+                                    )
+                                }
                             }
                         }
                     }
+                    showMarkerRouteManagement = false
+                },
+                onCreateRoute = {
+                    showMarkerRouteManagement = false
+                    routeCreationViewModel?.let { rvm ->
+                        rvm.startRouteCreation()
+                        showRouteCreation = true
+                    }
+                },
+                onCenter = { location ->
+                    // Center map on provided location
+                    mapView?.let { mv ->
+                        mv.controller.animateTo(GeoPoint(location.latitude, location.longitude))
+                    }
+                },
+                selectedMarker = selectedLocation,
+                selectedRunways = selectedRunways,
+                onSetActiveRoute = { location ->
+                    activeNavigationTarget = location
+                    // Auto-center disabled so user can see the full route
+                    autoCenter = false
+                    // Optionally close the sheet
+                    showMarkerRouteManagement = false
+                },
+                onEditRouteWaypoints = { routeId ->
+                    // Open RouteCreationSheet in edit mode
+                    routeCreationViewModel?.let { rvm ->
+                        rvm.startRouteEditing(routeId)
+                        showMarkerRouteManagement = false
+                        showRouteCreation = true
+                    }
                 }
-                showMarkerRouteManagement = false
-            },
-            onCreateRoute = {
-                showMarkerRouteManagement = false
-                routeCreationViewModel.startRouteCreation()
-                showRouteCreation = true
-            },
-            onCenter = { location ->
-                // Center map on provided location
-                mapView?.let { mv ->
-                    mv.controller.animateTo(GeoPoint(location.latitude, location.longitude))
-                }
-            },
-            selectedMarker = selectedLocation,
-            selectedRunways = selectedRunways,
-            onSetActiveRoute = { location ->
-                activeNavigationTarget = location
-                // Auto-center disabled so user can see the full route
-                autoCenter = false
-                // Optionally close the sheet
-                showMarkerRouteManagement = false
-            },
-            onEditRouteWaypoints = { routeId ->
-                // Open RouteCreationSheet in edit mode
-                routeCreationViewModel.startRouteEditing(routeId)
-                showMarkerRouteManagement = false
-                showRouteCreation = true
-            }
-        )
+            )
+        }
     }
     
     // Route Creation Sheet
     if (showRouteCreation) {
-        RouteCreationSheet(
-            viewModel = routeCreationViewModel,
-            onDismiss = {
-                showRouteCreation = false
-                routeCreationViewModel.cancelRouteCreation()
-            },
-            onWaypointClick = { location ->
-                // Center map on waypoint
-                mapView?.controller?.animateTo(GeoPoint(location.latitude, location.longitude))
-            },
-            onRouteFinished = { routeId ->
-                // Force refresh the route on the map
-                scope.launch {
-                    val currentVisibleIds = markerRouteViewModel.visibleRouteIds.value
-                    if (currentVisibleIds.contains(routeId)) {
-                        // Route is already visible - toggle off and on to force redraw
-                        markerRouteViewModel.toggleRouteVisibility(routeId)
-                        kotlinx.coroutines.delay(50)
-                        markerRouteViewModel.toggleRouteVisibility(routeId)
-                    } else {
-                        // Route is not visible - make it visible
-                        markerRouteViewModel.toggleRouteVisibility(routeId)
+        routeCreationViewModel?.let { vm ->
+            RouteCreationSheet(
+                viewModel = vm,
+                onDismiss = {
+                    showRouteCreation = false
+                    vm.cancelRouteCreation()
+                },
+                onWaypointClick = { location ->
+                    // Center map on waypoint
+                    mapView?.controller?.animateTo(GeoPoint(location.latitude, location.longitude))
+                },
+                onRouteFinished = { routeId ->
+                    // Force refresh the route on the map
+                    scope.launch {
+                        val currentVisibleIds = markerRouteViewModel?.visibleRouteIds?.value ?: emptySet()
+                        if (currentVisibleIds.contains(routeId)) {
+                            // Route is already visible - toggle off and on to force redraw
+                            markerRouteViewModel?.toggleRouteVisibility(routeId)
+                            kotlinx.coroutines.delay(50)
+                            markerRouteViewModel?.toggleRouteVisibility(routeId)
+                        } else {
+                            // Route is not visible - make it visible
+                            markerRouteViewModel?.toggleRouteVisibility(routeId)
+                        }
                     }
                 }
-            }
-        )
+            )
+        }
     }
     
     DisposableEffect(Unit) {

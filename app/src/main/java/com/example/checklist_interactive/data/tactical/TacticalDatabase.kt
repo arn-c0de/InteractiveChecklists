@@ -49,20 +49,59 @@ abstract class TacticalDatabase : RoomDatabase() {
          */
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Add new columns to locations
-                db.execSQL("ALTER TABLE locations ADD COLUMN elevation_ft INTEGER DEFAULT 0")
-                db.execSQL("ALTER TABLE locations ADD COLUMN country TEXT")
-                db.execSQL("ALTER TABLE locations ADD COLUMN region TEXT")
-                db.execSQL("ALTER TABLE locations ADD COLUMN timezone TEXT")
-                db.execSQL("ALTER TABLE locations ADD COLUMN source TEXT")
-                db.execSQL("ALTER TABLE locations ADD COLUMN verified INTEGER DEFAULT 0")
-                db.execSQL("ALTER TABLE locations ADD COLUMN last_verified_at TEXT")
-                db.execSQL("ALTER TABLE locations ADD COLUMN created_at TEXT")
-                db.execSQL("ALTER TABLE locations ADD COLUMN updated_at TEXT")
-                db.execSQL("ALTER TABLE locations ADD COLUMN deleted_at TEXT")
-                db.execSQL("ALTER TABLE locations ADD COLUMN geom TEXT")
-                db.execSQL("ALTER TABLE locations ADD COLUMN elevation_source TEXT")
-                db.execSQL("ALTER TABLE locations ADD COLUMN elevation_accuracy_m REAL")
+                // Helper function to check if column exists
+                fun columnExists(tableName: String, columnName: String): Boolean {
+                    db.query("PRAGMA table_info($tableName)").use { cursor ->
+                        val nameIndex = cursor.getColumnIndex("name")
+                        while (cursor.moveToNext()) {
+                            if (cursor.getString(nameIndex) == columnName) {
+                                return true
+                            }
+                        }
+                    }
+                    return false
+                }
+
+                // Add new columns to locations (only if they don't exist)
+                if (!columnExists("locations", "elevation_ft")) {
+                    db.execSQL("ALTER TABLE locations ADD COLUMN elevation_ft INTEGER DEFAULT 0")
+                }
+                if (!columnExists("locations", "country")) {
+                    db.execSQL("ALTER TABLE locations ADD COLUMN country TEXT")
+                }
+                if (!columnExists("locations", "region")) {
+                    db.execSQL("ALTER TABLE locations ADD COLUMN region TEXT")
+                }
+                if (!columnExists("locations", "timezone")) {
+                    db.execSQL("ALTER TABLE locations ADD COLUMN timezone TEXT")
+                }
+                if (!columnExists("locations", "source")) {
+                    db.execSQL("ALTER TABLE locations ADD COLUMN source TEXT")
+                }
+                if (!columnExists("locations", "verified")) {
+                    db.execSQL("ALTER TABLE locations ADD COLUMN verified INTEGER DEFAULT 0")
+                }
+                if (!columnExists("locations", "last_verified_at")) {
+                    db.execSQL("ALTER TABLE locations ADD COLUMN last_verified_at TEXT")
+                }
+                if (!columnExists("locations", "created_at")) {
+                    db.execSQL("ALTER TABLE locations ADD COLUMN created_at TEXT")
+                }
+                if (!columnExists("locations", "updated_at")) {
+                    db.execSQL("ALTER TABLE locations ADD COLUMN updated_at TEXT")
+                }
+                if (!columnExists("locations", "deleted_at")) {
+                    db.execSQL("ALTER TABLE locations ADD COLUMN deleted_at TEXT")
+                }
+                if (!columnExists("locations", "geom")) {
+                    db.execSQL("ALTER TABLE locations ADD COLUMN geom TEXT")
+                }
+                if (!columnExists("locations", "elevation_source")) {
+                    db.execSQL("ALTER TABLE locations ADD COLUMN elevation_source TEXT")
+                }
+                if (!columnExists("locations", "elevation_accuracy_m")) {
+                    db.execSQL("ALTER TABLE locations ADD COLUMN elevation_accuracy_m REAL")
+                }
                 
                 // Backfill elevation_ft from elevation_m
                 db.execSQL("UPDATE locations SET elevation_ft = ROUND(COALESCE(elevation_m, 0) * 3.28084)")
@@ -93,7 +132,10 @@ abstract class TacticalDatabase : RoomDatabase() {
                         FOREIGN KEY(location_id) REFERENCES locations(id) ON DELETE CASCADE
                     )
                 """)
-                db.execSQL("CREATE INDEX IF NOT EXISTS idx_runways_location ON runways(location_id)")
+                // Drop old incorrectly named index if it exists
+                db.execSQL("DROP INDEX IF EXISTS idx_runways_location")
+                // Create index with Room's expected name
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_runways_location_id ON runways(location_id)")
                 
                 // Create services table
                 db.execSQL("""
@@ -106,8 +148,10 @@ abstract class TacticalDatabase : RoomDatabase() {
                         FOREIGN KEY(location_id) REFERENCES locations(id) ON DELETE CASCADE
                     )
                 """)
-                db.execSQL("CREATE INDEX IF NOT EXISTS idx_services_location ON services(location_id)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS idx_services_type ON services(service_type)")
+                db.execSQL("DROP INDEX IF EXISTS idx_services_location")
+                db.execSQL("DROP INDEX IF EXISTS idx_services_type")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_services_location_id ON services(location_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_services_service_type ON services(service_type)")
                 
                 // Create media table
                 db.execSQL("""
@@ -122,7 +166,8 @@ abstract class TacticalDatabase : RoomDatabase() {
                         FOREIGN KEY(location_id) REFERENCES locations(id) ON DELETE CASCADE
                     )
                 """)
-                db.execSQL("CREATE INDEX IF NOT EXISTS idx_media_location ON media(location_id)")
+                db.execSQL("DROP INDEX IF EXISTS idx_media_location")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_media_location_id ON media(location_id)")
                 
                 // Create tags table
                 db.execSQL("""
@@ -131,7 +176,8 @@ abstract class TacticalDatabase : RoomDatabase() {
                         name TEXT NOT NULL UNIQUE
                     )
                 """)
-                db.execSQL("CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name)")
+                db.execSQL("DROP INDEX IF EXISTS idx_tags_name")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_tags_name ON tags(name)")
                 
                 // Create location_tags join table
                 db.execSQL("""
@@ -143,8 +189,10 @@ abstract class TacticalDatabase : RoomDatabase() {
                         FOREIGN KEY(tag_id) REFERENCES tags(id) ON DELETE CASCADE
                     )
                 """)
-                db.execSQL("CREATE INDEX IF NOT EXISTS idx_location_tags_location ON location_tags(location_id)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS idx_location_tags_tag ON location_tags(tag_id)")
+                db.execSQL("DROP INDEX IF EXISTS idx_location_tags_location")
+                db.execSQL("DROP INDEX IF EXISTS idx_location_tags_tag")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_location_tags_location_id ON location_tags(location_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_location_tags_tag_id ON location_tags(tag_id)")
                 
                 // Create navaids table
                 db.execSQL("""
@@ -164,14 +212,23 @@ abstract class TacticalDatabase : RoomDatabase() {
                         FOREIGN KEY(location_id) REFERENCES locations(id) ON DELETE SET NULL
                     )
                 """)
-                db.execSQL("CREATE INDEX IF NOT EXISTS idx_navaids_location ON navaids(location_id)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS idx_navaids_type ON navaids(type)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS idx_navaids_ident ON navaids(ident)")
+                db.execSQL("DROP INDEX IF EXISTS idx_navaids_location")
+                db.execSQL("DROP INDEX IF EXISTS idx_navaids_type")
+                db.execSQL("DROP INDEX IF EXISTS idx_navaids_ident")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_navaids_location_id ON navaids(location_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_navaids_type ON navaids(type)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_navaids_ident ON navaids(ident)")
                 
-                // Create new indices on locations
-                db.execSQL("CREATE INDEX IF NOT EXISTS idx_locations_icao ON locations(icao)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS idx_locations_country ON locations(country)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS idx_locations_verified ON locations(verified)")
+                // Create new indices on locations - use Room's auto-generated naming convention
+                // Room generates index names as: index_<tablename>_<column(s)>
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_locations_icao ON locations(icao)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_locations_country ON locations(country)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_locations_verified ON locations(verified)")
+                
+                // Drop old indices with idx_ prefix if they exist (from earlier versions)
+                db.execSQL("DROP INDEX IF EXISTS idx_locations_icao")
+                db.execSQL("DROP INDEX IF EXISTS idx_locations_country")
+                db.execSQL("DROP INDEX IF EXISTS idx_locations_verified")
                 
                 // Insert sample tags
                 db.execSQL("INSERT OR IGNORE INTO tags (name) VALUES ('airbase')")
@@ -189,21 +246,61 @@ abstract class TacticalDatabase : RoomDatabase() {
         // Migration from v2 to v3: add military symbol columns
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE locations ADD COLUMN symbol_set TEXT NOT NULL DEFAULT ''")
-                db.execSQL("ALTER TABLE locations ADD COLUMN symbol_entity TEXT NOT NULL DEFAULT ''")
-                db.execSQL("ALTER TABLE locations ADD COLUMN symbol_size TEXT NOT NULL DEFAULT ''")
-                db.execSQL("ALTER TABLE locations ADD COLUMN symbol_affiliation TEXT NOT NULL DEFAULT 'unknown'")
-                db.execSQL("ALTER TABLE locations ADD COLUMN symbol_color TEXT NOT NULL DEFAULT '#FFFF80'")
-                db.execSQL("ALTER TABLE locations ADD COLUMN symbol_modifier TEXT NOT NULL DEFAULT ''")
+                // Helper function to check if column exists
+                fun columnExists(tableName: String, columnName: String): Boolean {
+                    db.query("PRAGMA table_info($tableName)").use { cursor ->
+                        val nameIndex = cursor.getColumnIndex("name")
+                        while (cursor.moveToNext()) {
+                            if (cursor.getString(nameIndex) == columnName) {
+                                return true
+                            }
+                        }
+                    }
+                    return false
+                }
+
+                if (!columnExists("locations", "symbol_set")) {
+                    db.execSQL("ALTER TABLE locations ADD COLUMN symbol_set TEXT NOT NULL DEFAULT ''")
+                }
+                if (!columnExists("locations", "symbol_entity")) {
+                    db.execSQL("ALTER TABLE locations ADD COLUMN symbol_entity TEXT NOT NULL DEFAULT ''")
+                }
+                if (!columnExists("locations", "symbol_size")) {
+                    db.execSQL("ALTER TABLE locations ADD COLUMN symbol_size TEXT NOT NULL DEFAULT ''")
+                }
+                if (!columnExists("locations", "symbol_affiliation")) {
+                    db.execSQL("ALTER TABLE locations ADD COLUMN symbol_affiliation TEXT NOT NULL DEFAULT 'unknown'")
+                }
+                if (!columnExists("locations", "symbol_color")) {
+                    db.execSQL("ALTER TABLE locations ADD COLUMN symbol_color TEXT NOT NULL DEFAULT '#FFFF80'")
+                }
+                if (!columnExists("locations", "symbol_modifier")) {
+                    db.execSQL("ALTER TABLE locations ADD COLUMN symbol_modifier TEXT NOT NULL DEFAULT ''")
+                }
             }
         }
         
         // Migration from v3 to v4: add is_static column for static markers (airports, installations)
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE locations ADD COLUMN is_static INTEGER NOT NULL DEFAULT 0")
-                // Mark airports as static automatically
-                db.execSQL("UPDATE locations SET is_static = 1 WHERE marker_type = 'airport'")
+                // Helper function to check if column exists
+                fun columnExists(tableName: String, columnName: String): Boolean {
+                    db.query("PRAGMA table_info($tableName)").use { cursor ->
+                        val nameIndex = cursor.getColumnIndex("name")
+                        while (cursor.moveToNext()) {
+                            if (cursor.getString(nameIndex) == columnName) {
+                                return true
+                            }
+                        }
+                    }
+                    return false
+                }
+
+                if (!columnExists("locations", "is_static")) {
+                    db.execSQL("ALTER TABLE locations ADD COLUMN is_static INTEGER NOT NULL DEFAULT 0")
+                    // Mark airports as static automatically
+                    db.execSQL("UPDATE locations SET is_static = 1 WHERE marker_type = 'airport'")
+                }
             }
         }
         

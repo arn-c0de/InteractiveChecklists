@@ -87,11 +87,14 @@ class SettingsDialog(QDialog):
         ip_layout.addWidget(self.ip_edit)
         layout.addLayout(ip_layout)
         
-        # Pre-Shared Key
+        # Pre-Shared Key (only for non-ECDH mode)
         key_layout = QHBoxLayout()
-        key_layout.addWidget(QLabel("Pre-Shared Key (32 chars):"))
-        self.key_edit = QLineEdit(self.receiver.pre_shared_key.decode('utf-8'))
+        self.psk_label = QLabel("Pre-Shared Key (32 chars):")
+        key_layout.addWidget(self.psk_label)
+        psk_value = self.receiver.pre_shared_key.decode('utf-8') if self.receiver.pre_shared_key else ""
+        self.key_edit = QLineEdit(psk_value)
         self.key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.key_edit.setPlaceholderText("Not needed when using ECDH")
         key_layout.addWidget(self.key_edit)
         layout.addLayout(key_layout)
         
@@ -187,13 +190,26 @@ class SettingsDialog(QDialog):
         button_layout.addWidget(cancel_btn)
         button_layout.addWidget(save_btn)
         layout.addLayout(button_layout)
-        
+
         self.setLayout(layout)
+
+        # Set initial state of PSK field based on ECDH checkbox
+        self._on_ecdh_toggled(self.ecdh_checkbox.isChecked())
     
     def _on_ecdh_toggled(self, checked: bool):
         """Enable/disable ECDH fields based on checkbox"""
         self.sender_ip_edit.setEnabled(checked)
         self.device_name_edit.setEnabled(checked)
+        self.sender_port_edit.setEnabled(checked)
+
+        # Disable PSK field when ECDH is enabled
+        self.key_edit.setEnabled(not checked)
+        self.psk_label.setEnabled(not checked)
+
+        if checked:
+            self.key_edit.setStyleSheet("background-color: #2a2a2a; color: #666;")
+        else:
+            self.key_edit.setStyleSheet("")
     
     def _copy_pubkey(self):
         """Copy public key to clipboard"""
@@ -217,14 +233,15 @@ class SettingsDialog(QDialog):
             if port < 1024 or port > 65535:
                 QMessageBox.warning(self, "Invalid Port", "Port must be between 1024 and 65535")
                 return
-            
-            key = self.key_edit.text()
-            if len(key) != 32:
-                QMessageBox.warning(self, "Invalid Key", "Pre-shared key must be exactly 32 characters")
-                return
-            
+
             # ECDH settings
             use_ecdh = self.ecdh_checkbox.isChecked()
+
+            # Validate PSK only if NOT using ECDH
+            key = self.key_edit.text() if not use_ecdh else None
+            if not use_ecdh and key and len(key) != 32:
+                QMessageBox.warning(self, "Invalid Key", "Pre-shared key must be exactly 32 characters (not needed for ECDH mode)")
+                return
             sender_ip = self.sender_ip_edit.text() if use_ecdh else None
             device_name = self.device_name_edit.text() if use_ecdh else "Python DataPad"
             
@@ -328,6 +345,7 @@ class DataPadGUI(QMainWindow):
             port=config.get('port', 5010),
             bind_ip=bind_ip,
             allow_bind_all=allow_bind_all,
+            pre_shared_key=config.get('pre_shared_key') if not config.get('useEcdh', False) else None,
             use_ecdh=config.get('useEcdh', False),
             sender_ip=config.get('senderIp') if config.get('useEcdh') else None,
             sender_port=config.get('senderPort'),
@@ -952,9 +970,21 @@ class DataPadGUI(QMainWindow):
     def start_coordinate_picking(self, dialog):
         """Start coordinate picking mode for a dialog"""
         if not self.webview:
+            try:
+                dialog.setEnabled(True)
+            except Exception:
+                pass
             return
 
         try:
+            # Stop any previous coordinate picking session
+            if hasattr(self, 'coordinate_pick_timer') and self.coordinate_pick_timer:
+                try:
+                    self.coordinate_pick_timer.stop()
+                    self.coordinate_pick_timer = None
+                except Exception:
+                    pass
+
             # Store reference to the dialog
             self.coordinate_pick_dialog = dialog
 
@@ -964,6 +994,8 @@ class DataPadGUI(QMainWindow):
                 self._call_js_when_ready('startCoordinatePicking', js)
             except Exception as e:
                 print(f"Error starting coordinate picking (JS): {e}")
+                dialog.setEnabled(True)
+                return
 
             # Start polling for picked coordinates
             self.coordinate_pick_timer = QTimer()
@@ -972,6 +1004,81 @@ class DataPadGUI(QMainWindow):
 
         except Exception as e:
             print(f"Error starting coordinate picking: {e}")
+            try:
+                dialog.setEnabled(True)
+            except Exception:
+                pass
+
+    def poll_picked_coordinate(self):
+        """Poll for picked coordinate from map"""
+        if not hasattr(self, 'coordinate_pick_dialog') or not self.coordinate_pick_dialog:
+            if hasattr(self, 'coordinate_pick_timer') and self.coordinate_pick_timer:
+                try:
+                    self.coordinate_pick_timer.stop()
+                except Exception:
+                    pass
+            return
+
+        if not self.webview:
+            return
+
+        try:
+            # Get picked coordinate from JavaScript
+            try:
+                self._call_js_when_ready('getPickedCoordinate', "getPickedCoordinate();", result_callback=self.process_picked_coordinate)
+            except Exception as e:
+                print(f"Error polling picked coordinate (JS): {e}")
+        except Exception as e:
+            print(f"Error polling picked coordinate: {e}")
+
+    def process_picked_coordinate(self, coord_json: str):
+        """Process picked coordinate from map"""
+        if not coord_json:
+            return
+
+        try:
+            import json
+            coord = json.loads(coord_json)
+            if not coord:
+                return
+
+            lat = coord['lat']
+            lon = coord['lon']
+
+            print(f"Coordinate picked: {lat:.6f}, {lon:.6f}")
+
+            # Stop polling
+            try:
+                if hasattr(self, 'coordinate_pick_timer') and self.coordinate_pick_timer:
+                    self.coordinate_pick_timer.stop()
+                    self.coordinate_pick_timer = None
+            except Exception as e:
+                print(f"Error stopping coordinate_pick_timer: {e}")
+
+            # Stop coordinate picking mode in map
+            if self.webview:
+                try:
+                    js = "stopCoordinatePicking();"
+                    self._call_js_when_ready('stopCoordinatePicking', js)
+                except Exception as e:
+                    print(f"Error stopping coordinate picking (JS): {e}")
+
+            # Pass coordinates to dialog
+            if hasattr(self, 'coordinate_pick_dialog') and self.coordinate_pick_dialog:
+                try:
+                    self.coordinate_pick_dialog.set_coordinates(lat, lon)
+                except Exception as e:
+                    print(f"Error setting coordinates on dialog: {e}")
+                finally:
+                    # Ensure dialog re-enabled and reference cleared
+                    try:
+                        self.coordinate_pick_dialog.setEnabled(True)
+                    except Exception:
+                        pass
+                    self.coordinate_pick_dialog = None
+
+        except Exception as e:
+            print(f"Error processing picked coordinate: {e}")
 
     def poll_picked_coordinate(self):
         """Poll for picked coordinate from map"""
