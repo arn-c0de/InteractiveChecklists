@@ -19,6 +19,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -240,6 +243,42 @@ fun DataPadSettingsDialog(
                             )
                         }
                     }
+
+                    // Show Base64 Public Key with copy action
+                    val clipboard = LocalClipboardManager.current
+                    var copiedPublicKey by remember { mutableStateOf(false) }
+                    val publicKey = try { manager.getPublicKey() } catch (_: Throwable) { "" }
+
+                    OutlinedTextField(
+                        value = publicKey,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Public Key (Base64)") },
+                        singleLine = false,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 56.dp, max = 160.dp),
+                        trailingIcon = {
+                            IconButton(onClick = {
+                                if (publicKey.isNotEmpty()) {
+                                    clipboard.setText(AnnotatedString(publicKey))
+                                    copiedPublicKey = true
+                                }
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = "Copy public key"
+                                )
+                            }
+                        },
+                        supportingText = {
+                            if (copiedPublicKey) {
+                                Text("Public key copied to clipboard ✅")
+                            } else {
+                                Text("Copy this Base64 public key into the server\'s authorized_devices.json entry")
+                            }
+                        }
+                    )
                 }
                 
                 HorizontalDivider()
@@ -337,23 +376,6 @@ fun DataPadSettingsDialog(
                         )
                     }
                 }
-
-                // Warn if current key is still the default (encourage changing it)
-                if (currentKey == "DCS_DataPad_Secret_Key_32BYTES!!") {
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = stringResource(R.string.datapad_default_key_warning),
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(12.dp),
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    }
-                }
                 
                 HorizontalDivider()
                 
@@ -367,12 +389,15 @@ fun DataPadSettingsDialog(
                     }
 
                     TextButton(onClick = {
-                        // Reset to default key (manager will replace empty with default)
-                        keyText = ""
+                        // Generate new random PSK
+                        val newRandomKey = java.util.Base64.getEncoder().encodeToString(
+                            java.security.SecureRandom().generateSeed(32)
+                        )
+                        keyText = newRandomKey
                         showKeyWarning = false
-                        manager.updatePreSharedKey("")
+                        manager.updatePreSharedKey(newRandomKey)
                     }) {
-                        Text(stringResource(R.string.datapad_settings_reset_key))
+                        Text(stringResource(R.string.datapad_settings_generate_key))
                     }
                     
                     Button(

@@ -34,9 +34,69 @@ except ImportError:
 DEFAULT_UDP_PORT = 5010
 # Default to localhost for safety; binding to all interfaces (0.0.0.0) is potentially unsafe.
 DEFAULT_BIND_IP = "127.0.0.1"  # Listen on localhost by default
-DEFAULT_PRE_SHARED_KEY = "DCS_DataPad_Secret_Key_32BYTES!!"
 BUFFER_SIZE = 4096
 SOCKET_TIMEOUT = 1.0
+
+# PSK configuration
+_PSK_CONFIG_FILE = "datapad_config.json"
+
+
+def load_psk_from_config() -> Optional[bytes]:
+    """Load PSK from configuration file or environment variable
+    
+    Priority:
+    1. Environment variable DATAPAD_PSK (base64 encoded)
+    2. Configuration file datapad_config.json
+    3. Generate new random PSK
+    
+    Returns: 32-byte PSK
+    """
+    import os
+    import json
+    import base64
+    import secrets
+    
+    # Try environment variable first
+    psk_env = os.environ.get('DATAPAD_PSK')
+    if psk_env:
+        try:
+            psk_bytes = base64.b64decode(psk_env)
+            if len(psk_bytes) >= 32:
+                logger.info("✓ Loaded PSK from environment variable")
+                return psk_bytes[:32]
+        except Exception as e:
+            logger.error(f"❌ Failed to decode PSK from environment: {e}")
+    
+    # Try config file
+    if os.path.exists(_PSK_CONFIG_FILE):
+        try:
+            with open(_PSK_CONFIG_FILE, 'r') as f:
+                config = json.load(f)
+                psk_b64 = config.get('pre_shared_key')
+                if psk_b64:
+                    psk_bytes = base64.b64decode(psk_b64)
+                    if len(psk_bytes) >= 32:
+                        logger.info(f"✓ Loaded PSK from config file: {_PSK_CONFIG_FILE}")
+                        return psk_bytes[:32]
+        except Exception as e:
+            logger.error(f"❌ Failed to load PSK from config: {e}")
+    
+    # Generate random PSK
+    logger.warning("⚠️ No PSK found - generating random PSK")
+    psk_bytes = secrets.token_bytes(32)
+    psk_b64 = base64.b64encode(psk_bytes).decode('utf-8')
+    logger.warning(f"Generated PSK: {psk_b64}")
+    logger.warning("⚠️ SAVE THIS KEY for the Android app!")
+    
+    # Offer to save
+    try:
+        with open(_PSK_CONFIG_FILE, 'w') as f:
+            json.dump({'pre_shared_key': psk_b64}, f, indent=2)
+        logger.info(f"✓ Saved PSK to {_PSK_CONFIG_FILE}")
+    except Exception as e:
+        logger.error(f"❌ Failed to save PSK: {e}")
+    
+    return psk_bytes
 
 
 @dataclass
@@ -196,9 +256,9 @@ class FlightData:
 class DataPadReceiver:
     """UDP receiver for encrypted flight data from DCS"""
     
-    def __init__(self, port: int = DEFAULT_UDP_PORT, 
+    def __init__(self, port: int = DEFAULT_UDP_PORT,
                  bind_ip: str = DEFAULT_BIND_IP,
-                 pre_shared_key: str = DEFAULT_PRE_SHARED_KEY,
+                 pre_shared_key: Optional[str] = None,
                  allow_bind_all: bool = False,
                  use_ecdh: bool = False,
                  sender_ip: Optional[str] = None,
@@ -207,7 +267,8 @@ class DataPadReceiver:
                  device_name: str = "Python DataPad"):
         self.port = port
         self.bind_ip = bind_ip
-        self.pre_shared_key = pre_shared_key.encode('utf-8')
+        # PSK is only needed for non-ECDH mode
+        self.pre_shared_key = pre_shared_key.encode('utf-8') if pre_shared_key else None
         self.allow_bind_all = allow_bind_all  # must be explicitly set to allow binding to 0.0.0.0
         
         # ECDH support
@@ -245,7 +306,11 @@ class DataPadReceiver:
             
             if not self.sender_ip:
                 logging.warning("⚠️ ECDH enabled but no sender_ip specified - handshake will fail")
-        
+        else:
+            # PSK mode - validate that PSK is provided
+            if not self.pre_shared_key:
+                raise ValueError("pre_shared_key is required when use_ecdh=False. Please provide a PSK or enable ECDH mode.")
+
         self.socket: Optional[socket.socket] = None
         self.running = False
         self.receive_thread: Optional[threading.Thread] = None

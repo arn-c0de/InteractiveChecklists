@@ -41,8 +41,8 @@ def caucasus_samples():
         # Georgia
         Location(
             name="Tbilisi Intl",
-            latitude=41.6692,
-            longitude=44.9544,
+            latitude=41.668023,
+            longitude=44.952493,
             marker_type=MarkerType.AIRPORT.value,
             icao="UGTB",
             iata="TBS",
@@ -55,8 +55,8 @@ def caucasus_samples():
         ),
         Location(
             name="Batumi Intl",
-            latitude=41.6100,
-            longitude=41.5911,
+            latitude=41.609795,
+            longitude=41.600418,
             marker_type=MarkerType.AIRPORT.value,
             icao="UGSB",
             iata="BUS",
@@ -76,8 +76,8 @@ def caucasus_samples():
             icao="URKA",
             iata="AAQ",
             elevation_m=53.0,
-            runways=[Runway(name="06/24", length_m=2800, width_m=45, heading=60.0, surface="asphalt")],
-            frequencies={"tower":121.0},
+            runways=[Runway(name="04/22", length_m=2800, width_m=45, heading=45.0, surface="asphalt")],
+            frequencies={"tower":121.0, "tower_secondary":250.0},
             country="Russia",
             tags=["civilian"],
             source="OurAirports / DCS-World MAP"
@@ -98,8 +98,8 @@ def caucasus_samples():
         ),
         Location(
             name="Gelendzhik",
-            latitude=44.5750,
-            longitude=38.0803,
+            latitude=44.58197,
+            longitude=38.012781,
             marker_type=MarkerType.AIRPORT.value,
             icao="URKG",
             iata="GDZ",
@@ -112,8 +112,8 @@ def caucasus_samples():
         ),
         Location(
             name="Krasnodar – Pashkovsky",
-            latitude=45.0355,
-            longitude=39.1707,
+            latitude=45.034108,
+            longitude=39.187031,
             marker_type=MarkerType.AIRPORT.value,
             icao="URKK",
             iata="KRR",
@@ -126,8 +126,8 @@ def caucasus_samples():
         ),
         Location(
             name="Krasnodar – Center",
-            latitude=45.0360,
-            longitude=38.9830,
+            latitude=45.084157,
+            longitude=38.944602,
             marker_type=MarkerType.AIRPORT.value,
             icao="URKI",
             elevation_m=15.0,
@@ -139,8 +139,8 @@ def caucasus_samples():
         ),
         Location(
             name="Krymsk",
-            latitude=44.9272,
-            longitude=38.0569,
+            latitude=44.962824,
+            longitude=37.998877,
             marker_type=MarkerType.AIRPORT.value,
             icao="URKW",
             elevation_m=40.0,
@@ -152,8 +152,8 @@ def caucasus_samples():
         ),
         Location(
             name="Maykop – Khanskaya",
-            latitude=44.6527,
-            longitude=40.1683,
+            latitude=44.679487,
+            longitude=40.035982,
             marker_type=MarkerType.AIRPORT.value,
             icao="URKH",
             elevation_m=70.0,
@@ -165,13 +165,13 @@ def caucasus_samples():
         ),
         Location(
             name="Mozdok (Mozdok Air Base)",
-            latitude=43.7719,
-            longitude=44.6475,
+            latitude=43.78764,
+            longitude=44.602346,
             marker_type=MarkerType.AIRPORT.value,
             icao="URMF",
             iata="",
             elevation_m=1100.0,
-            runways=[Runway(name="26/08", length_m=3000, width_m=45, heading=40.0, surface="asphalt")],
+            runways=[Runway(name="26/08", length_m=3000, width_m=45, heading=80.0, surface="asphalt")],
             frequencies={"tower":137.0, "tower_secondary":266.0},
             country="Russia",
             tags=["airbase"],
@@ -179,8 +179,8 @@ def caucasus_samples():
         ),
         Location(
             name="Nalchik",
-            latitude=43.5383,
-            longitude=43.6428,
+            latitude=43.512923,
+            longitude=43.636687,
             marker_type=MarkerType.AIRPORT.value,
             icao="URMN",
             iata="NAL",
@@ -207,8 +207,8 @@ def caucasus_samples():
         ),
         Location(
             name="Sochi – Adler",
-            latitude=43.4499,
-            longitude=39.9566,
+            latitude=43.449866,
+            longitude=39.956256,
             marker_type=MarkerType.AIRPORT.value,
             icao="URSS",
             iata="AER",
@@ -225,8 +225,8 @@ def caucasus_samples():
         # Additional Caucasus small/field airstrips
         Location(
             name="Senaki – Kolkhi",
-            latitude=42.2586,
-            longitude=42.2309,
+            latitude=42.240226,
+            longitude=42.049055,
             marker_type=MarkerType.AIRPORT.value,
             icao="UGKS",
             elevation_m=20.0,
@@ -238,8 +238,8 @@ def caucasus_samples():
         ),
         Location(
             name="Kutaisi – Kopitnari",
-            latitude=42.1750,
-            longitude=42.4828,
+            latitude=42.176826,
+            longitude=42.482457,
             marker_type=MarkerType.AIRPORT.value,
             icao="UGKO",
             iata="KUT",
@@ -252,14 +252,15 @@ def caucasus_samples():
         ),
         Location(
             name="Gudauta",
-            latitude=43.1000,
-            longitude=40.7180,
+            latitude=43.105182,
+            longitude=40.578432,
             marker_type=MarkerType.AIRPORT.value,
             icao="UGAD",
             elevation_m=150.0,
             # Disused / limited public data — runway present but status uncertain
             # Heading estimated from runway name "12/30" -> 120° (unverified)
-            runways=[Runway(name="15/33", length_m=None, width_m=None, heading=150.0, surface="concrete", ils=False)],
+            runways=[Runway(name="15/33", length_m=None, width_m=None, heading=150.0,
+                             surface="concrete", ils=False)],
             frequencies={"tower":"130.0 MHz", "tower_secondary":259.0},
             country="Abkhazia",
             tags=["military"],
@@ -267,8 +268,8 @@ def caucasus_samples():
         ),
         Location(
             name="Kobuleti",
-            latitude=41.7850,
-            longitude=41.7920,
+            latitude=41.929198,
+            longitude=41.864369,
             marker_type=MarkerType.AIRPORT.value,
             icao="UG5X",
             elevation_m=5.0,
@@ -281,17 +282,31 @@ def caucasus_samples():
         ),
         Location(
             name="Vaziani",
-            latitude=41.8414,
-            longitude=44.6797,
+            latitude=41.628275,
+            longitude=45.030899,
             marker_type=MarkerType.AIRPORT.value,
             icao="UG27",
             elevation_m=445.0,
             # Former Soviet airfield — runway length approximated from OurAirports/imagery
-            runways=[Runway(name="11/29", length_m=3000, width_m=45, heading=110.0, surface="concrete", ils=False)],
+            runways=[Runway(name="13/31", length_m=3000, width_m=45, heading=135.0, surface="concrete", ils=False)],
             frequencies={"tower":"140.0 MHz", "tower_secondary":269.0},
             country="Georgia",
             tags=["military"],
             source="OurAirports / DCS-World MAP"
+        ),
+        Location(
+            name="Soganlug",
+            latitude=41.649106,
+            longitude=44.936464,
+            marker_type=MarkerType.AIRPORT.value,
+            icao="",
+            elevation_m=445.0,
+            # Copied from Vaziani and shifted slightly west
+            runways=[Runway(name="14/32", length_m=2400, width_m=45, heading=140.0, surface="concrete", ils=False)],
+            frequencies={"tower":"139.0 MHz", "tower_secondary":268.0},
+            country="Georgia",
+            tags=["military"],
+            source="Derived from Vaziani"
         ),
     ]
 
@@ -307,23 +322,9 @@ def caucasus_samples():
     return samples
 
 
-def increment_db_version(db):
-    """Increment database user_version to trigger Android app update detection"""
-    cursor = db.conn.cursor()
-    cursor.execute("PRAGMA user_version")
-    current_version = cursor.fetchone()[0]
-    new_version = current_version + 1
-    cursor.execute(f"PRAGMA user_version = {new_version}")
-    db.conn.commit()
-    print(f"\nDatabase version updated: {current_version} -> {new_version}")
-    print("(App will show update dialog on next start)")
-    return new_version
-
-
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--replace', action='store_true', help='Delete existing location content before inserting samples')
-    p.add_argument('--no-version-bump', action='store_true', help='Do not increment database version after changes')
     args = p.parse_args()
 
     db = MarkersDatabase()
@@ -354,11 +355,6 @@ def main():
 
     print(f"\nInserted {inserted} sample locations")
     print(f"Total locations now: {len(db.get_all_locations())}")
-
-    # Automatically increment version unless --no-version-bump is specified
-    if not args.no_version_bump:
-        increment_db_version(db)
-
     db.close()
 
 

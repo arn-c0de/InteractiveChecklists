@@ -28,9 +28,6 @@ except Exception:
 
 logger = logging.getLogger(__name__)
 
-# Pre-shared key for handshake message encryption (must match sender)
-DEFAULT_PSK = b'DCS_DataPad_Secret_Key_32BYTES!!'
-
 
 @dataclass
 class ECDHSession:
@@ -56,10 +53,9 @@ class ECDHClient:
     Uses JSON-based protocol compatible with crypto_handshake.py SessionManager
     """
     
-    def __init__(self, device_id: str, device_name: str = "Python DataPad", psk: bytes = DEFAULT_PSK, private_key_pem: Optional[str] = None):
+    def __init__(self, device_id: str, device_name: str = "Python DataPad", private_key_pem: Optional[str] = None):
         self.device_id = device_id
         self.device_name = device_name
-        self.psk = psk
         
         # Load provided private key PEM OR generate new key
         if private_key_pem:
