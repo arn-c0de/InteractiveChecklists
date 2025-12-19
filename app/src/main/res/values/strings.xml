@@ -314,6 +314,19 @@
     <string name="settings_clear_map_cache_message">This will delete all downloaded map tiles (osmdroid cache). Continue?</string>
     <string name="msg_map_cache_cleared">Map cache cleared</string>
     <string name="msg_map_cache_clear_failed">Failed to clear map cache: %1$s</string>
+
+    <!-- MAP DB WIPE/REIMPORT -->
+    <string name="settings_wipe_map_db_title">Wipe &amp; Reimport Map DB</string>
+    <string name="settings_wipe_map_db_explain">Delete the internal map database and re-import the packaged map_data.db from app assets. Use this to refresh markers and map details.</string>
+    <string name="settings_wipe_map_db_button">Wipe &amp; Reimport map_data.db</string>
+    <string name="settings_wipe_map_db_confirm_title">Reimport Map Database?</string>
+    <string name="settings_wipe_map_db_confirm_message">This will delete the internal map database and re-import the packaged database. The app will restart to reload map data. Continue?</string>
+    <string name="msg_map_db_reimported">Map database reimported — restarting…</string>
+    <string name="msg_map_db_reimport_failed">Failed to reimport map DB: %1$s</string>
+    <string name="msg_map_db_backup_created">Map DB backup created: %1$s</string>
+    <string name="settings_internal_db_version">Internal DB version: %1$d</string>
+    <string name="settings_asset_db_version">Packaged (asset) DB version: %1$d</string>
+
     <string name="map_select_layer">Select a map layer:</string>
     <string name="map_aviation_charts_note">Note: Aviation sectional charts require additional configuration. See docs/technical/AVIATION_MAPS.md</string>
     <string name="map_note_aviation_charts">Note: Aviation sectional charts require additional configuration. See docs/technical/AVIATION_MAPS.md</string>
@@ -750,5 +763,18 @@
     <string name="export">@string/action_export</string>
     <string name="loading">@string/status_loading</string>
     <string name="use_unified_viewer_for_pdf">@string/pdf_use_unified_viewer</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- DATABASE UPDATE -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="db_update_title">Database Update Available</string>
+    <string name="db_update_message">A new version of the airport/location database is available.\n\nCurrent version: %1$d\nNew version: %2$d</string>
+    <string name="db_update_options">Choose how to update:</string>
+    <string name="db_update_option_merge">Merge: Import new locations while keeping your existing data</string>
+    <string name="db_update_option_clean">Clean Import: Wipe internal database and import all data from new version (recommended for major updates)</string>
+    <string name="db_update_option_skip">Skip: Don\'t import now (can be triggered manually later)</string>
+    <string name="db_update_btn_merge">Merge</string>
+    <string name="db_update_btn_clean">Clean Import</string>
+    <string name="db_update_btn_skip">Skip</string>
 
 </resources>
