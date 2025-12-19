@@ -112,7 +112,7 @@ class SettingsDialog(QDialog):
         sender_port_layout.addWidget(self.sender_port_edit)
         ecdh_layout.addLayout(sender_port_layout)
         
-        # Device ID (read-only, auto-loaded) with copy button
+        # Device ID (read-only, auto-loaded) with copy and reset buttons
         device_id_layout = QHBoxLayout()
         device_id_layout.addWidget(QLabel("Device ID:"))
         device_id_value = persistent_device['deviceId'] if persistent_device else 'Auto-generated on first start'
@@ -125,9 +125,14 @@ class SettingsDialog(QDialog):
         copy_id_btn.setToolTip("Copy full Device ID to clipboard")
         copy_id_btn.clicked.connect(self._copy_device_id)
         device_id_layout.addWidget(copy_id_btn)
+        # Reset Identity button: regenerates device id + key (will restart receiver)
+        reset_btn = QPushButton("Reset Identity")
+        reset_btn.setToolTip("Generate a new device ID and key (requires adding the new device on sender)")
+        reset_btn.clicked.connect(self.reset_identity)
+        device_id_layout.addWidget(reset_btn)
         ecdh_layout.addLayout(device_id_layout)
         
-        # Public Key (read-only, for copy)
+        # Public Key (read-only, for copy) - may be absent if no persistent device yet
         if persistent_device:
             pubkey_layout = QHBoxLayout()
             pubkey_layout.addWidget(QLabel("Public Key:"))
@@ -140,6 +145,11 @@ class SettingsDialog(QDialog):
             copy_btn.clicked.connect(self._copy_pubkey)
             pubkey_layout.addWidget(copy_btn)
             ecdh_layout.addLayout(pubkey_layout)
+        else:
+            self.pubkey_b64 = None
+            self.pubkey_label = None
+            # keep reference to ecdh_layout for adding pubkey widgets later
+        self.ecdh_layout = ecdh_layout
         
         # Device Name
         device_name_layout = QHBoxLayout()
@@ -184,7 +194,128 @@ class SettingsDialog(QDialog):
         from PySide6.QtWidgets import QApplication
         QApplication.clipboard().setText(self.device_id_edit.text())
         QMessageBox.information(self, "Copied", "Device ID copied to clipboard!")
-        
+
+    def reset_identity(self):
+        """Reset the persistent device identity: generate new key + device id and restart receiver"""
+        try:
+            from network.ecdh_device import reset_device, get_public_key_b64_from_pem, _is_windows
+            from network.datapad_receiver import DataPadReceiver
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Required modules missing: {e}")
+            return
+
+        resp = QMessageBox.question(
+            self,
+            "Reset Identity",
+            "This will generate a new Device ID and private key.\nYou will need to add the new device's public key to the sender's authorized_devices.json. Continue?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if resp != QMessageBox.Yes:
+            return
+
+        password = None
+        # On non-Windows, ask user for a new password to protect the key
+        if not _is_windows():
+            dlg = QDialog(self)
+            dlg.setWindowTitle("Password for new device key")
+            v = QVBoxLayout(dlg)
+            v.addWidget(QLabel("Enter password for the new device key (min 8 chars):"))
+            pw = QLineEdit()
+            pw.setEchoMode(QLineEdit.Password)
+            v.addWidget(pw)
+            v.addWidget(QLabel("Confirm password:"))
+            pw2 = QLineEdit()
+            pw2.setEchoMode(QLineEdit.Password)
+            v.addWidget(pw2)
+            btns = QHBoxLayout()
+            cancel = QPushButton("Cancel")
+            ok = QPushButton("OK")
+            cancel.clicked.connect(dlg.reject)
+            ok.clicked.connect(dlg.accept)
+            btns.addWidget(cancel)
+            btns.addWidget(ok)
+            v.addLayout(btns)
+
+            if dlg.exec() != QDialog.Accepted:
+                return
+            password = pw.text().strip()
+            if len(password) < 8 or password != pw2.text():
+                QMessageBox.warning(self, "Invalid Password", "Passwords must match and be at least 8 characters long.")
+                return
+
+        # Perform reset (removes old device file and creates a new one)
+        try:
+            device = reset_device(password=password)
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Failed to reset identity: {e}")
+            return
+
+        device_id = device['deviceId']
+        pubkey = get_public_key_b64_from_pem(device['privateKeyPem'])
+
+        # Update UI
+        self.device_id_edit.setText(device_id)
+        if self.pubkey_label:
+            self.pubkey_label.setText(pubkey)
+        else:
+            pubkey_layout = QHBoxLayout()
+            pubkey_layout.addWidget(QLabel("Public Key:"))
+            self.pubkey_b64 = pubkey
+            self.pubkey_label = QLineEdit(pubkey)
+            self.pubkey_label.setReadOnly(True)
+            self.pubkey_label.setStyleSheet("font-family: monospace; font-size: 9pt;")
+            pubkey_layout.addWidget(self.pubkey_label)
+            copy_btn = QPushButton("Copy")
+            copy_btn.clicked.connect(self._copy_pubkey)
+            pubkey_layout.addWidget(copy_btn)
+            # append to ECDH layout
+            if hasattr(self, 'ecdh_layout'):
+                self.ecdh_layout.addLayout(pubkey_layout)
+
+        # Restart receiver with updated identity
+        try:
+            port = int(self.port_edit.text())
+            if port < 1024 or port > 65535:
+                raise ValueError("Port out of range")
+
+            sender_ip = self.sender_ip_edit.text().strip()
+            device_name = self.device_name_edit.text().strip() or "Python DataPad"
+
+            # Stop old receiver
+            self.receiver.stop()
+
+            new_receiver = DataPadReceiver(
+                port=port,
+                bind_ip='0.0.0.0',
+                allow_bind_all=True,
+                sender_ip=sender_ip or None,
+                sender_port=self.config.get('senderPort'),
+                device_id=device_id,
+                device_name=device_name
+            )
+
+            # Copy callbacks
+            new_receiver.data_callbacks = self.receiver.data_callbacks
+            new_receiver.connection_callbacks = self.receiver.connection_callbacks
+
+            # Replace receiver in parent
+            if hasattr(self.parent(), 'receiver'):
+                setattr(self.parent(), 'receiver', new_receiver)
+
+            new_receiver.start()
+
+            QMessageBox.information(
+                self,
+                "Identity Reset",
+                f"New Device ID: {device_id}\n\nPublic Key: {pubkey[:32]}...\n\n⚠️ Add this device to authorized_devices.json on sender:\n{sender_ip}"
+            )
+
+            self.accept()
+
+        except Exception as e:
+            QMessageBox.warning(self, "Warning", f"Identity was reset, but restarting the receiver failed: {e}. Please restart the DataPad application manually.")
+            return
+
     def save_and_restart(self):
         """Save settings and restart receiver (ECDH-only mode)"""
         try:

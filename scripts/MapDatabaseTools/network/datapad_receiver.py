@@ -286,20 +286,41 @@ class DataPadReceiver:
         Format: nonce (12 bytes) + ciphertext + tag (16 bytes)
         Note: Handshake messages are sent in PLAINTEXT
 
+        Security: Validate GCM nonce before attempting decryption to prevent replay attacks.
+
         Args:
             encrypted_data: Encrypted payload
-            sender_addr: (IP, port) tuple of sender (unused in ECDH mode, kept for compatibility)
+            sender_addr: (IP, port) tuple of sender (used for per-client nonce tracking)
         """
         try:
-            # ECDH-only mode
+            # Basic sanity check: must contain at least nonce (12) + tag (16)
+            if not encrypted_data or len(encrypted_data) < (12 + 16):
+                logging.warning("Encrypted data too short to contain nonce and tag")
+                return None
+
+            # Extract nonce (first 12 bytes) and validate it to prevent replay attacks
+            nonce = encrypted_data[:12]
+
+            # Expecting server-sent packets (DCS) to use sender id 0x01
+            try:
+                valid = default_gcm_nonce_manager.validate_nonce(nonce, expected_sender=0x01, client_addr=sender_addr)
+            except Exception as e:
+                logging.error(f"Nonce validation error for {sender_addr}: {e}")
+                return None
+
+            if not valid:
+                logging.warning(f"Discarding packet from {sender_addr}: invalid or replayed nonce")
+                return None
+
+            # ECDH-only mode: perform the actual decryption
             if self.ecdh_client:
                 return self.ecdh_client.decrypt_payload(encrypted_data)
             else:
-                print("No ECDH client available for decryption")
+                logging.warning("No ECDH client available for decryption")
                 return None
 
         except Exception as e:
-            print(f"Decryption failed: {e}")
+            logging.error(f"Decryption failed: {e}")
             return None
     
     def get_local_ip(self) -> str:
