@@ -26,31 +26,22 @@ def main():
     parser = argparse.ArgumentParser(description="DataPad Receiver with ECDH support")
     parser.add_argument('--port', type=int, default=5010, help='UDP port to listen on (default: 5010)')
     parser.add_argument('--bind-ip', default='127.0.0.1', help='IP address to bind to (default: 127.0.0.1)')
-    parser.add_argument('--use-ecdh', action='store_true', help='Enable ECDH handshake mode')
-    parser.add_argument('--sender-ip', help='IP address of DCS sender (required for ECDH)')
+    parser.add_argument('--sender-ip', required=True, help='IP address of DCS sender (required for ECDH)')
     parser.add_argument('--sender-port', type=int, help='Port for ECDH handshake on sender (default: same as --port)')
     parser.add_argument('--device-id', help='Device ID for ECDH (auto-generated if not provided)')
     parser.add_argument('--device-name', default='Python DataPad', help='Device name for ECDH')
-    parser.add_argument('--psk', default=None, 
-                       help='Pre-shared key for non-ECDH mode (32+ chars, base64). If not provided, loads from config/environment.')
     parser.add_argument('--allow-bind-all', action='store_true',
                        help='Allow binding to 0.0.0.0 (all interfaces)')
     
     args = parser.parse_args()
     
-    # Validate ECDH requirements
-    if args.use_ecdh and not args.sender_ip:
-        print("❌ Error: --sender-ip is required when using --use-ecdh")
-        sys.exit(1)
-    
     # Create receiver
     receiver = DataPadReceiver(
         port=args.port,
         bind_ip=args.bind_ip,
-        pre_shared_key=args.psk,
         show_sensitive=False,
         allow_bind_all=args.allow_bind_all,
-        use_ecdh=args.use_ecdh,
+        use_ecdh=True,
         sender_ip=args.sender_ip,
         sender_port=args.sender_port,
         device_id=args.device_id,
@@ -79,17 +70,14 @@ def main():
     print("DataPad Receiver with ECDH Support")
     print("="*60)
     
-    if args.use_ecdh:
-        print(f"🔐 ECDH Mode: ENABLED")
-        print(f"📡 Sender IP: {args.sender_ip}")
-        if args.sender_port:
-            print(f"🔌 Sender Handshake Port: {args.sender_port}")
-        print(f"📱 Device Name: {args.device_name}")
-        if args.device_id:
-            print(f"🔑 Device ID: {args.device_id}")
-    else:
-        print(f"🔓 Pre-Shared Key Mode")
-    
+    print(f"🔐 ECDH Mode: ENABLED")
+    print(f"📡 Sender IP: {args.sender_ip}")
+    if args.sender_port:
+        print(f"🔌 Sender Handshake Port: {args.sender_port}")
+    print(f"📱 Device Name: {args.device_name}")
+    if args.device_id:
+        print(f"🔑 Device ID: {args.device_id}")
+
     print(f"🌐 Listen Port: {args.port}")
     print(f"🔌 Bind IP: {args.bind_ip}")
     print("="*60 + "\n")

@@ -1,12 +1,12 @@
-python forward_parsed_udp.py --repeat-last --interval 3 --host 192.168.178.131 --port 5010 --verbose
+ECDH Mode (PSK removed - ECDH is now required)
 
 ________________________________________________________________________________________
 
 ECDH with APP
 
-python forward_parsed_udp.py --repeat-last --interval 3 --host 192.168.178.131 --port 5010 --verbose --use-handshake --authorized-devices authorized_devices.json --bind-ip 192.168.178.100
+python forward_parsed_udp.py --repeat-last --interval 3 --host 192.168.178.131 --port 5010 --verbose --authorized-devices authorized_devices.json --bind-ip 192.168.178.100
 ________________________________________________________________________________________
 
 Map-Tools
 
-python forward_parsed_udp.py --repeat-last --interval 3 --host 192.168.178.100 --port 5010 --verbose --use-handshake --authorized-devices authorized_devices.json --bind-ip 192.168.178.100 --handshake-port 5011
+python forward_parsed_udp.py --repeat-last --interval 3 --host 192.168.178.100 --port 5010 --verbose  --authorized-devices authorized_devices.json --bind-ip 192.168.178.100 --handshake-port 5011

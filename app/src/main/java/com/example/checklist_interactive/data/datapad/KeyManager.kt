@@ -29,9 +29,6 @@ class KeyManager(private val context: Context) {
         // HKDF parameters
         private const val HKDF_INFO = "DataPad-Session-Key"
         private const val AES_KEY_SIZE = 32 // 256 bits
-
-        // Symmetric key alias for PSK storage
-        private const val SYM_KEY_ALIAS = "datapad_psk_key"
     }
     
     private val keyStore: KeyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply {
@@ -243,110 +240,6 @@ class KeyManager(private val context: Context) {
         }
 
         return okm
-    }
-
-    // --- New symmetric key helpers for secure PSK storage ---
-
-    private fun ensureSymmetricKeyExists(alias: String = SYM_KEY_ALIAS) {
-        try {
-            if (keyStore.containsAlias(alias)) return
-            val keyGen = javax.crypto.KeyGenerator.getInstance(
-                KeyProperties.KEY_ALGORITHM_AES,
-                ANDROID_KEYSTORE
-            )
-            val spec = KeyGenParameterSpec.Builder(
-                alias,
-                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
-            ).apply {
-                setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                setKeySize(256)
-                setUserAuthenticationRequired(false)
-                setRandomizedEncryptionRequired(true)
-            }.build()
-            keyGen.init(spec)
-            keyGen.generateKey()
-            Log.d(TAG, "Generated symmetric key for PSK storage: $alias")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error creating symmetric key: ${e.message}", e)
-            throw e
-        }
-    }
-
-    /**
-     * Encrypt a secret with a KeyStore-backed AES-GCM key and return Base64(iv + ciphertext)
-     */
-    fun encryptSecretForStorage(secret: String, alias: String = SYM_KEY_ALIAS): String {
-        ensureSymmetricKeyExists(alias)
-        val key = keyStore.getKey(alias, null) as javax.crypto.SecretKey
-        val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, key)
-        val iv = cipher.iv
-        val ciphertext = cipher.doFinal(secret.toByteArray(Charsets.UTF_8))
-        return Base64.getEncoder().encodeToString(iv + ciphertext)
-    }
-
-    /**
-     * Decrypt a Base64(iv + ciphertext) produced by encryptSecretForStorage
-     */
-    fun decryptSecretFromStorage(encoded: String, alias: String = SYM_KEY_ALIAS): String? {
-        return try {
-            val key = keyStore.getKey(alias, null) as? javax.crypto.SecretKey ?: return null
-            val data = Base64.getDecoder().decode(encoded)
-            if (data.size < 12) return null
-            val iv = data.copyOfRange(0, 12)
-            val ciphertext = data.copyOfRange(12, data.size)
-            val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
-            val gcmSpec = javax.crypto.spec.GCMParameterSpec(128, iv)
-            cipher.init(javax.crypto.Cipher.DECRYPT_MODE, key, gcmSpec)
-            val plain = cipher.doFinal(ciphertext)
-            String(plain, Charsets.UTF_8)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error decrypting secret from KeyStore: ${e.message}", e)
-            null
-        }
-    }
-
-    /**
-     * Generate a cryptographically secure random PSK (32 bytes for AES-256)
-     * Uses SecureRandom for high-entropy key generation
-     */
-    fun generateSecureRandomPsk(): String {
-        val secureRandom = SecureRandom()
-        val keyBytes = ByteArray(32) // 256 bits for AES-256
-        secureRandom.nextBytes(keyBytes)
-        
-        // Convert to base64 for storage and transmission
-        return Base64.getEncoder().encodeToString(keyBytes)
-    }
-    
-    /**
-     * Validate that a PSK meets minimum security requirements
-     * Returns null if valid, error message if invalid
-     */
-    fun validatePsk(psk: String): String? {
-        if (psk.isEmpty()) return "PSK cannot be empty"
-        
-        // Decode from base64 or use raw bytes
-        val keyBytes = try {
-            Base64.getDecoder().decode(psk)
-        } catch (e: Exception) {
-            // Not base64, use UTF-8 bytes
-            psk.toByteArray(Charsets.UTF_8)
-        }
-        
-        // Minimum 32 bytes (256 bits) for AES-256
-        if (keyBytes.size < 32) {
-            return "PSK must be at least 32 bytes (256 bits) - current: ${keyBytes.size} bytes"
-        }
-        
-        // Check entropy (basic check for all-same bytes)
-        val uniqueBytes = keyBytes.toSet().size
-        if (uniqueBytes < 8) {
-            return "PSK has insufficient entropy (too many repeated bytes)"
-        }
-        
-        return null // Valid
     }
 
     /**

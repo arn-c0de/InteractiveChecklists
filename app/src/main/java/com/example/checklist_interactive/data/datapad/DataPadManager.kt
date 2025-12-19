@@ -29,50 +29,17 @@ class DataPadManager(private val context: Context) {
         private const val DEFAULT_UDP_PORT = 5010
         private const val BUFFER_SIZE = 4096
         private const val SOCKET_TIMEOUT_MS = 1000
-        
+
         private const val PREFS_NAME = "datapad_settings"
         private const val KEY_UDP_PORT = "udp_port"
         private const val KEY_BIND_IP = "bind_ip"
-        private const val KEY_PRE_SHARED_KEY = "pre_shared_key"
         private const val KEY_ENABLED = "enabled"
-        private const val KEY_USE_ECDH = "use_ecdh"
         private const val KEY_DEVICE_NAME = "device_name"
         // Persist last transient reception state (true if receiver was running when app exited)
         private const val KEY_LAST_RUNNING = "last_running"
-        private const val KEY_PSK_INITIALIZED = "psk_initialized"
-        private const val KEY_SECURITY_WARNING_SHOWN = "security_warning_shown"
-        
+
         // Handshake timeout
         private const val HANDSHAKE_TIMEOUT_MS = 10000L
-        
-        /**
-         * Decrypt AES-GCM encrypted data
-         * Format: nonce (12 bytes) + ciphertext + tag (16 bytes)
-         */
-        private fun decryptPayload(encryptedData: ByteArray, key: ByteArray): ByteArray? {
-            return try {
-                if (encryptedData.size < 28) { // 12 (nonce) + 16 (tag) minimum
-                    Log.e(TAG, "Encrypted data too short: ${encryptedData.size} bytes")
-                    return null
-                }
-                
-                // Extract nonce (first 12 bytes)
-                val nonce = encryptedData.copyOfRange(0, 12)
-                // Extract ciphertext + tag (remaining bytes)
-                val ciphertext = encryptedData.copyOfRange(12, encryptedData.size)
-                
-                // Initialize AES-GCM cipher
-                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-                val keySpec = SecretKeySpec(key, "AES")
-                val gcmSpec = GCMParameterSpec(128, nonce) // 128-bit authentication tag
-                
-                cipher.init(Cipher.DECRYPT_MODE, keySpec, gcmSpec)
-                cipher.doFinal(ciphertext)
-            } catch (e: Exception) {
-                Log.e(TAG, "Decryption failed: ${e.message}", e)
-                null
-            }
-        }
     }
     
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -110,16 +77,7 @@ class DataPadManager(private val context: Context) {
     
     private val _bindIp = MutableStateFlow(prefs.getString(KEY_BIND_IP, "") ?: "")
     val bindIp: StateFlow<String> = _bindIp.asStateFlow()
-    
-    private val _preSharedKey = MutableStateFlow("")
-    val preSharedKey: StateFlow<String> = _preSharedKey.asStateFlow()
-    
-    private val _securityStatus = MutableStateFlow<SecurityStatus>(SecurityStatus.Uninitialized)
-    val securityStatus: StateFlow<SecurityStatus> = _securityStatus.asStateFlow()
-    
-    private val _useEcdh = MutableStateFlow(prefs.getBoolean(KEY_USE_ECDH, false))
-    val useEcdh: StateFlow<Boolean> = _useEcdh.asStateFlow()
-    
+
     private val _deviceName = MutableStateFlow(prefs.getString(KEY_DEVICE_NAME, "Android Tablet") ?: "Android Tablet")
     val deviceName: StateFlow<String> = _deviceName.asStateFlow()
 
@@ -131,7 +89,7 @@ class DataPadManager(private val context: Context) {
 
     // ECDH components
     private val keyManager = KeyManager(context)
-    private var encryptionProvider: EncryptionProvider? = null
+    private var encryptionProvider: EcdhEncryption? = null
     private var currentSession: SessionInfo? = null
     private val pendingHandshakeResponses = java.util.concurrent.ConcurrentHashMap<String, CompletableDeferred<HandshakeMessage>>()
     private val handshakeLock = kotlinx.coroutines.sync.Mutex()
@@ -143,22 +101,23 @@ class DataPadManager(private val context: Context) {
 
     // Restore last transient running state if the user had reception running previously
     init {
-        // Load or migrate PSK into secure storage (must happen first)
-        migrateAndLoadPreSharedKey()
-        
         // Update device IP address
         _deviceIpAddress.value = getLocalIpAddress()
-        
-        // Validate security configuration
-        validateSecurityConfiguration()
-        
+
+        // Ensure device key pair exists for ECDH
+        try {
+            keyManager.getOrCreateDeviceKeyPair()
+            Log.i(TAG, "Device key pair ensured for ECDH mode")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to generate/ensure device key pair: ${e.message}", e)
+        }
+
         val lastRunning = prefs.getBoolean(KEY_LAST_RUNNING, false)
         val enabled = prefs.getBoolean(KEY_ENABLED, false)
         udpLogD("Init: KEY_LAST_RUNNING=$lastRunning, KEY_ENABLED=$enabled")
-        udpLogD("Security status: ${_securityStatus.value.getDescription()}")
-        
-        // Only auto-start if security is valid, user previously had reception running AND the Settings-enabled flag is set
-        if (lastRunning && enabled && _securityStatus.value.isSecure()) {
+
+        // Only auto-start if user previously had reception running AND the Settings-enabled flag is set
+        if (lastRunning && enabled) {
             udpLogD("Restoring running receiver on init")
             scope.launch {
                 startInternal(ignoreEnabledCheck = true)
@@ -166,81 +125,9 @@ class DataPadManager(private val context: Context) {
         } else {
             // Ensure runtime state matches persisted preference
             _isRunning.value = false
-            
-            if (!_securityStatus.value.isSecure()) {
-                Log.w(TAG, "⚠️ Auto-start blocked: ${_securityStatus.value.getDescription()}")
-            }
         }
     }
-    
-    // Migrate plaintext PSK (if any) into KeyStore-encrypted storage and load it into runtime state
-    // If no PSK exists, generate a secure random one
-    private fun migrateAndLoadPreSharedKey() {
-        val storedEncrypted = prefs.getString(KEY_PRE_SHARED_KEY, null)
-        val isPskInitialized = prefs.getBoolean(KEY_PSK_INITIALIZED, false)
-        
-        if (storedEncrypted != null) {
-            // Already encrypted in KeyStore - decrypt and load
-            val decrypted = keyManager.decryptSecretFromStorage(storedEncrypted)
-            if (decrypted != null) {
-                _preSharedKey.value = decrypted
-                _securityStatus.value = SecurityStatus.PskConfigured
-                Log.d(TAG, "Loaded encrypted PSK from KeyStore")
-                return
-            } else {
-                // Decryption failed - might be corrupted, regenerate
-                Log.w(TAG, "Failed to decrypt stored PSK - generating new random PSK")
-            }
-        }
-        
-        // No stored key or decryption failed - generate a secure random PSK
-        if (!isPskInitialized) {
-            val randomPsk = keyManager.generateSecureRandomPsk()
-            _preSharedKey.value = randomPsk
-            _securityStatus.value = SecurityStatus.PskRandomGenerated
-            
-            // Encrypt and save to SharedPreferences
-            try {
-                val encrypted = keyManager.encryptSecretForStorage(randomPsk)
-                prefs.edit()
-                    .putString(KEY_PRE_SHARED_KEY, encrypted)
-                    .putBoolean(KEY_PSK_INITIALIZED, true)
-                    .apply()
-                Log.i(TAG, "Generated and stored secure random PSK (32 bytes)")
-                Log.w(TAG, "⚠️ SECURITY: Auto-generated PSK - Recommended: Use ECDH mode or set custom PSK")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to encrypt PSK for storage: ${e.message}", e)
-                _securityStatus.value = SecurityStatus.Error("PSK storage failed")
-            }
-        }
-    }
-    
-    /**
-     * Validate current security configuration
-     */
-    private fun validateSecurityConfiguration() {
-        if (_useEcdh.value) {
-            _securityStatus.value = SecurityStatus.EcdhSecure
-            return
-        }
-        
-        // Validate PSK if not using ECDH
-        val psk = _preSharedKey.value
-        if (psk.isEmpty()) {
-            _securityStatus.value = SecurityStatus.Error("No PSK configured")
-            Log.e(TAG, "Security validation failed: No PSK configured")
-            return
-        }
-        
-        // Validate PSK strength
-        val validationError = keyManager.validatePsk(psk)
-        if (validationError != null) {
-            _securityStatus.value = SecurityStatus.Error(validationError)
-            Log.e(TAG, "Security validation failed: $validationError")
-            return
-        }
-    }
-    
+
     // Helper functions to gate UDP-related logs when disabled
     private fun udpLogD(message: String) {
         if (_isEnabled.value) Log.d(TAG, message)
@@ -288,17 +175,7 @@ class DataPadManager(private val context: Context) {
             udpLogD("Start requested but receiver is disabled")
             return
         }
-        
-        // SECURITY: Validate configuration before starting
-        validateSecurityConfiguration()
-        if (!_securityStatus.value.isSecure()) {
-            Log.e(TAG, "❌ Cannot start: ${_securityStatus.value.getDescription()}")
-            _securityStatus.value.getRecommendation()?.let { recommendation ->
-                Log.w(TAG, "💡 Recommendation: $recommendation")
-            }
-            return
-        }
-        
+
         isStarted = true
         _isRunning.value = true
 
@@ -319,12 +196,8 @@ class DataPadManager(private val context: Context) {
                 }
                 udpLogD("UDP socket opened on ${if (bindAddress.isNotEmpty()) bindAddress else "0.0.0.0"}:$port")
 
-                // Initialize encryption provider based on mode
-                encryptionProvider = if (_useEcdh.value) {
-                    null // Will be set after handshake
-                } else {
-                    PskEncryption(_preSharedKey.value)
-                }
+                // Initialize encryption provider after ECDH handshake
+                encryptionProvider = null // Will be set after handshake
 
                 // Get and log device IP
                 val deviceIp = getLocalIpAddress()
@@ -355,42 +228,39 @@ class DataPadManager(private val context: Context) {
                 udpLogD("Socket local port: ${udpSocket?.localPort}")
                 udpLogD("Waiting for UDP packets on ${if (_bindIp.value.isNotEmpty()) _bindIp.value else deviceIp}:${_udpPort.value}...")
 
-                // If ECDH mode, perform handshake in background (concurrently with receive loop)
-                if (_useEcdh.value) {
-                    // Launch handshake and keep a reference so it can be cancelled if user disables receiver
-                    handshakeJob = scope.launch {
-                        try {
-                            // Abort early if receiver was disabled while scheduling
-                            if (!_isEnabled.value && !ignoreEnabledCheck) {
-                                udpLogD("Handshake aborted: receiver disabled")
-                                return@launch
-                            }
-
-                            _handshakeStatus.value = "Initiating handshake..."
-                            val success = performHandshake()
-
-                            if (!_isEnabled.value && !ignoreEnabledCheck) {
-                                // If user disabled receiver during handshake, ensure we stop and clear state
-                                udpLogD("Handshake aborted after running: receiver disabled")
-                                stop()
-                                return@launch
-                            }
-
-                            if (!success) {
-                                _handshakeStatus.value = "Handshake failed"
-                                udpLogE("Handshake failed, stopping")
-                                stop()
-                            } else {
-                                _handshakeStatus.value = "Handshake successful"
-                            }
-                        } catch (e: Exception) {
-                            _handshakeStatus.value = "Handshake error: ${e.message}"
-                            udpLogE("Handshake error: ${e.message}", e)
-                            stop()
-                        } finally {
-                            // Clear reference when done
-                            handshakeJob = null
+                // Perform ECDH handshake in background (concurrently with receive loop)
+                handshakeJob = scope.launch {
+                    try {
+                        // Abort early if receiver was disabled while scheduling
+                        if (!_isEnabled.value && !ignoreEnabledCheck) {
+                            udpLogD("Handshake aborted: receiver disabled")
+                            return@launch
                         }
+
+                        _handshakeStatus.value = "Initiating handshake..."
+                        val success = performHandshake()
+
+                        if (!_isEnabled.value && !ignoreEnabledCheck) {
+                            // If user disabled receiver during handshake, ensure we stop and clear state
+                            udpLogD("Handshake aborted after running: receiver disabled")
+                            stop()
+                            return@launch
+                        }
+
+                        if (!success) {
+                            _handshakeStatus.value = "Handshake failed"
+                            udpLogE("Handshake failed, stopping")
+                            stop()
+                        } else {
+                            _handshakeStatus.value = "Handshake successful"
+                        }
+                    } catch (e: Exception) {
+                        _handshakeStatus.value = "Handshake error: ${e.message}"
+                        udpLogE("Handshake error: ${e.message}", e)
+                        stop()
+                    } finally {
+                        // Clear reference when done
+                        handshakeJob = null
                     }
                 }
 
@@ -403,76 +273,8 @@ class DataPadManager(private val context: Context) {
                         val receivedData = packet.data.copyOfRange(0, packet.length)
                         udpLogD("UDP packet received (${packet.length} bytes) from ${packet.address.hostAddress}:${packet.port}")
 
-                        // SECURITY FIX: Only accept plaintext handshake messages DURING handshake phase
-                        // CRITICAL: After session is established, ALL messages MUST be encrypted
-                        // Note: encryptionProvider is set AFTER Ack is received (line 570), not when currentSession is set
-                        val isHandshakePhase = _useEcdh.value && encryptionProvider == null
-
-                        if (isHandshakePhase) {
-                            // ONLY during ECDH handshake: Try to parse as PLAINTEXT handshake message
-                            // Handshake messages are NEVER encrypted for proper ECDH Perfect Forward Secrecy
-                            try {
-                                val plaintextMessage = String(receivedData, Charsets.UTF_8)
-                                if (plaintextMessage.contains("\"type\":") &&
-                                    (plaintextMessage.contains("ServerHello") ||
-                                     plaintextMessage.contains("Ack") ||
-                                     plaintextMessage.contains("Error"))) {
-                                    // This is a handshake response - handle as PLAINTEXT
-                                    udpLogD("📥 Received handshake message (PLAINTEXT): ${plaintextMessage.take(100)}")
-                                    handleIncomingMessage(plaintextMessage, packet.address, packet.port)
-                                    continue // Skip decryption for handshake messages
-                                }
-                            } catch (e: Exception) {
-                                // Not a valid UTF-8 string, probably encrypted data - continue to decryption
-                            }
-                        }
-
-                        // SECURITY FIX: Enforce encryption - NO plaintext fallback!
-                        // Use the configured encryption provider (PSK or ECDH session key)
-                        val provider = encryptionProvider
-                        val decryptedData = if (provider != null) {
-                            // Use configured encryption provider
-                            provider.decrypt(receivedData)
-                        } else if (!_useEcdh.value) {
-                            // ONLY in PSK mode: fallback to PSK if no provider set
-                            val keyBytes = _preSharedKey.value.toByteArray(Charsets.UTF_8)
-                            decryptPayload(receivedData, keyBytes)
-                        } else {
-                            // ECDH mode but no session key: REJECT
-                            null
-                        }
-
-                        if (decryptedData != null) {
-                            val message = String(decryptedData, Charsets.UTF_8)
-
-                            // SECURITY: Avoid logging decrypted payload contents (may contain sensitive info).
-                            // Log only safe metadata (length and encryption method) to aid debugging without exposing data.
-                            val method = provider?.getMethod() ?: if (!_useEcdh.value) "PSK" else "ECDH"
-                            udpLogD("Received decrypted message (length=${message.length} bytes, method=$method)")
-
-                            // Parse as flight data
-                            try {
-                                val data = json.decodeFromString<FlightData>(message)
-
-                                // If ECDH mode, verify we have active session
-                                if (_useEcdh.value && currentSession == null) {
-                                    udpLogE("Received flight data but no active session - rejecting")
-                                } else {
-                                    _flightData.value = data
-                                    _lastUpdateTime.value = System.currentTimeMillis()
-                                    _isConnected.value = true
-                                    currentSession?.let {
-                                        udpLogD("✅ Received encrypted flight data: ${data.aircraft} at ${data.altitude}m (session: ${it.sessionId.take(8)}...)")
-                                    } ?: udpLogD("✅ Received encrypted flight data: ${data.aircraft} at ${data.altitude}m")
-                                }
-                            } catch (e: Exception) {
-                                udpLogE("Failed to parse flight data: ${e.message}", e)
-                                udpLogE("Raw message: $message")
-                            }
-                        } else {
-                            // SECURITY: Decryption failed - REJECT packet (no plaintext fallback!)
-                            udpLogE("❌ Failed to decrypt packet - rejecting (encryption enforced)")
-                        }
+                        // Handle all incoming messages through a unified handler
+                        handleIncomingMessage(receivedData, packet.address, packet.port)
 
                     } catch (e: SocketTimeoutException) {
                         // Timeout is normal, check connection status
@@ -566,45 +368,6 @@ class DataPadManager(private val context: Context) {
             restart()
         }
     }
-    
-    /**
-     * Update Pre-Shared Key for AES-GCM decryption
-     * Validates key strength and updates security status
-     */
-    fun updatePreSharedKey(newKey: String) {
-        if (newKey.isEmpty()) {
-            Log.w(TAG, "Cannot set empty PSK")
-            _securityStatus.value = SecurityStatus.Error("PSK cannot be empty")
-            return
-        }
-        
-        // Validate PSK strength
-        val validationError = keyManager.validatePsk(newKey)
-        if (validationError != null) {
-            Log.w(TAG, "PSK validation failed: $validationError")
-            _securityStatus.value = SecurityStatus.Error(validationError)
-            return
-        }
-        
-        try {
-            val encrypted = keyManager.encryptSecretForStorage(newKey)
-            prefs.edit()
-                .putString(KEY_PRE_SHARED_KEY, encrypted)
-                .putBoolean(KEY_PSK_INITIALIZED, true)
-                .apply()
-            _preSharedKey.value = newKey
-            _securityStatus.value = SecurityStatus.PskConfigured
-            Log.i(TAG, "✓ PSK updated and stored securely")
-            
-            // Restart connection if running
-            if (isStarted) {
-                restart()
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error storing PSK securely: ${e.message}", e)
-            _securityStatus.value = SecurityStatus.Error("PSK storage failed")
-        }
-    }
 
     /**
      * Enable or disable the UDP receiver. When disabled, the socket is closed and no UDP logs will be emitted.
@@ -630,32 +393,6 @@ class DataPadManager(private val context: Context) {
         prefs.edit().putString(KEY_DEVICE_NAME, newName).apply()
         _deviceName.value = newName
     }
-    
-    /**
-     * Enable or disable ECDH handshake mode
-     */
-    fun setUseEcdh(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_USE_ECDH, enabled).apply()
-        _useEcdh.value = enabled
-        
-        // If enabling ECDH, ensure device key pair exists (generate if needed)
-        if (enabled) {
-            try {
-                keyManager.getOrCreateDeviceKeyPair()
-                Log.i(TAG, "Device key pair ensured for ECDH mode")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to generate/ensure device key pair: ${'$'}{e.message}", e)
-                _securityStatus.value = SecurityStatus.Error("ECDH key generation failed")
-            }
-        }
-
-        // Update security status
-        validateSecurityConfiguration()
-        
-        if (isStarted) {
-            restart()
-        }
-    }
 
     /**
      * Set server IP address for unicast handshake (more secure than broadcast)
@@ -664,7 +401,7 @@ class DataPadManager(private val context: Context) {
     fun updateServerIp(serverIp: String) {
         prefs.edit().putString("server_ip", serverIp).apply()
         _serverIp.value = serverIp
-        if (isStarted && _useEcdh.value) {
+        if (isStarted) {
             restart()
         }
     }
@@ -899,30 +636,60 @@ class DataPadManager(private val context: Context) {
     
     /**
      * Handle incoming UDP messages and route to appropriate handler
-     * Handshake messages are received in PLAINTEXT (no PSK encryption)
+     * Handshake messages are received in PLAINTEXT
      */
-    private fun handleIncomingMessage(message: String, address: InetAddress, port: Int) {
+    private fun handleIncomingMessage(data: ByteArray, address: InetAddress, port: Int) {
+        // Try parsing as PLAINTEXT (for handshake) first
         try {
-            // Try to parse as different message types (handle both compact and formatted JSON)
-            // Note: Handshake messages (ServerHello, Ack) are in PLAINTEXT
-            when {
-                message.contains("ServerHello") -> {
-                    val serverHello = json.decodeFromString<ServerHello>(message)
-                    udpLogD("📥 Received ServerHello, completing handshake deferred")
-                    pendingHandshakeResponses["ServerHello"]?.complete(serverHello)
-                }
-                message.contains("\"Ack\"") -> {
-                    val ack = json.decodeFromString<Ack>(message)
-                    udpLogD("📥 Received Ack, completing handshake deferred")
-                    pendingHandshakeResponses["Ack"]?.complete(ack)
-                }
-                message.contains("\"Error\"") -> {
-                    val error = json.decodeFromString<HandshakeError>(message)
-                    udpLogE("Server error: ${error.error} - ${error.message}")
-                }
+            val plaintextMessage = String(data, Charsets.UTF_8)
+            if (plaintextMessage.contains("ServerHello")) {
+                val serverHello = json.decodeFromString<ServerHello>(plaintextMessage)
+                udpLogD("📥 Received ServerHello, completing handshake deferred")
+                pendingHandshakeResponses["ServerHello"]?.complete(serverHello)
+                return
+            }
+            if (plaintextMessage.contains("\"Ack\"")) {
+                val ack = json.decodeFromString<Ack>(plaintextMessage)
+                udpLogD("📥 Received Ack, completing handshake deferred")
+                pendingHandshakeResponses["Ack"]?.complete(ack)
+                return
+            }
+            if (plaintextMessage.contains("\"Error\"")) {
+                val error = json.decodeFromString<HandshakeError>(plaintextMessage)
+                udpLogE("Server error: ${error.error} - ${error.message}")
+                return
             }
         } catch (e: Exception) {
-            udpLogE("Error handling incoming message: ${e.message}", e)
+            // Not a valid plaintext handshake message, proceed to decryption
+        }
+
+        // If not a handshake message, assume it's encrypted flight data
+        val provider = encryptionProvider
+        val decryptedData = provider?.decrypt(data)
+
+        if (decryptedData != null) {
+            val message = String(decryptedData, Charsets.UTF_8)
+            val method = provider.getMethod()
+            udpLogD("Received decrypted message (length=${message.length} bytes, method=$method)")
+
+            try {
+                val flightData = json.decodeFromString<FlightData>(message)
+                if (currentSession == null) {
+                    udpLogE("Received flight data but no active session - rejecting")
+                } else {
+                    _flightData.value = flightData
+                    _lastUpdateTime.value = System.currentTimeMillis()
+                    _isConnected.value = true
+                    currentSession?.let {
+                        udpLogD("✅ Received encrypted flight data: ${flightData.aircraft} at ${flightData.altitude}m (session: ${it.sessionId.take(8)}...)")
+                    } ?: udpLogD("✅ Received encrypted flight data: ${flightData.aircraft} at ${flightData.altitude}m")
+                }
+            } catch (e: Exception) {
+                udpLogE("Failed to parse flight data: ${e.message}", e)
+                udpLogE("Raw message: $message")
+            }
+        } else {
+            udpLogE("❌ Failed to decrypt packet - rejecting (encryption enforced)")
         }
     }
     
@@ -950,19 +717,4 @@ class DataPadManager(private val context: Context) {
      * Export device public key as Base64 string (for adding to server's authorized list)
      */
     fun getPublicKey(): String = keyManager.exportPublicKey()
-    
-    /**
-     * Get security recommendation based on current status
-     */
-    fun getSecurityRecommendation(): String? = _securityStatus.value.getRecommendation()
-    
-    /**
-     * Get user-friendly security status description
-     */
-    fun getSecurityDescription(): String = _securityStatus.value.getDescription()
-    
-    /**
-     * Check if current configuration is secure
-     */
-    fun isSecurelyConfigured(): Boolean = _securityStatus.value.isSecure()
 }
