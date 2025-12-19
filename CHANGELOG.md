@@ -1,7 +1,30 @@
 # Changelog
 
 All relevant changes are summarized here by version.
+
+## [1.0.15] - 2025-12-19
+
 ## [1.0.14] - 2025-12-18
+### Added
+- **Map improvements:** marker popups with detailed info, route display and waypoint routing, rotation-aware markers, MGRS support, map tools (compass, range/ruler, map tools UI), and new base icons/symbol sets.
+- **Python MapDatabaseTools integration:** app and tools can now share the same database (shared .db integration) so markers and icons can be authored/loaded by the Python tools.
+- **DataPad UI:** DataPad connection status is now visible in the flight mini-status bar.
+
+### Changed
+- **Maps & visualization:** marker editing and visualization improvements, routing and waypoint fixes, player icon rotation and map rotation handling, runway heading fixes, and dynamic icon loading for map icons.
+- **Scripts:** runtime ECDH files (e.g., `authorized_devices.json`, `ip_blacklist.json`) are now ignored and template generation is relied upon at startup.
+
+### Fixed
+- **Forwarder / DataPad:** fixed empty-parse handling and several stability issues in the forwarder and DataPad integrations.
+- **Database & install:** multiple DB fixes and fresh-install fixes to improve robustness.
+- **Map bugs:** marker edit fixes, map view and routing display fixes, position timestamp validation and other stability fixes.
+- **Misc:** removed sensitive audit files from the repository and other housekeeping fixes.
+
+### Security
+- **Hardened telemetry/forwarder:** added nonce and replay protection, per-client nonce management and nonce-prefix validation, public-key validation, stronger replay protection, audit-log fixes, whitelist/blacklist handling, auth for rate-limiting, session timeouts, encryption provider fixes, and reduced sensitive logging.
+
+### Docs
+- **Documentation updates:** roadmap and README updated with Map and DataPad details; MapDatabaseTools and DataPad docs improved.
 
 ## [1.0.13] - 2025-12-17
 ### Added
