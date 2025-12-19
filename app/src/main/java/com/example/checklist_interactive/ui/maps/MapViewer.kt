@@ -604,20 +604,34 @@ fun MapViewer(
                                                         val loc = markerToLocation[nm] ?: try { nm.relatedObject as? com.example.checklist_interactive.data.tactical.LocationEntity } catch (_: Throwable) { null }
                                                         val point = android.graphics.Point()
                                                         projection.toPixels(nm.position, point)
-                                                        // Convert MapView-local pixels to screen coordinates
+                                                        // Convert MapView-local pixels to window coordinates (use InWindow so Compose Popup positions match)
                                                         try {
                                                             val mapLoc = IntArray(2)
-                                                            // `map` was an undefined identifier here; use the enclosing MapView instance. Inside the `apply` block the MapView receiver is `this@apply`.
-                                                            this@apply.getLocationOnScreen(mapLoc)
-                                                            val screenX = mapLoc[0] + point.x
-                                                            val screenY = mapLoc[1] + point.y
-                                                            Log.d(TAG, "nearestMarker=${nm.title} locFound=${loc != null} mapLoc=(${mapLoc[0]},${mapLoc[1]}) point=(${point.x},${point.y}) screen=(${screenX},${screenY})")
+                                                            // Use getLocationInWindow so coords align with the Compose window origin (Popup uses window coordinates)
+                                                            this@apply.getLocationInWindow(mapLoc)
+                                                            // Base screen coordinates at the marker anchor (map window origin + projected point)
+                                                            val rawScreenX = mapLoc[0] + point.x
+                                                            val rawScreenY = mapLoc[1] + point.y
+
+                                                            // If the marker has an icon, compute its visual center so the radial menu appears centered over the icon
+                                                            val iconWidth = try { nm.icon?.intrinsicWidth ?: 0 } catch (_: Throwable) { 0 }
+                                                            val iconHeight = try { nm.icon?.intrinsicHeight ?: 0 } catch (_: Throwable) { 0 }
+
+                                                            // Adjust X to center horizontally on icon (anchor may be CENTER or CENTER/BOTTOM)
+                                                            val adjX = rawScreenX - (iconWidth / 2)
+                                                            // Adjust Y to the icon center; if anchor was BOTTOM the rawScreenY is at bottom of icon
+                                                            // Subtract half the icon height to get to visual center, and add a small upward offset so the menu doesn't overlap the marker
+                                                            val extraUpPx = with(density) { 6.dp.toPx().toInt() }
+                                                            val adjY = rawScreenY - (iconHeight / 2) - extraUpPx
+
+                                                            Log.d(TAG, "nearestMarker=${nm.title} locFound=${loc != null} mapLoc=(${mapLoc[0]},${mapLoc[1]}) point=(${point.x},${point.y}) raw=(${rawScreenX},${rawScreenY}) icon=(${iconWidth}x${iconHeight}) adj=(${adjX},${adjY})")
+
                                                             if (loc != null) {
-                                                                // Show radial menu at marker screen coordinates
+                                                                // Show radial menu at adjusted coordinates (centered on marker icon)
                                                                 scope.launch {
                                                                     radialMenuMarker = loc
-                                                                    radialMenuX = screenX
-                                                                    radialMenuY = screenY
+                                                                    radialMenuX = adjX
+                                                                    radialMenuY = adjY
                                                                     radialMenuVisible = true
                                                                     lastLongPressedMarkerId = loc.id
                                                                     lastLongPressTime = System.currentTimeMillis()
@@ -1579,6 +1593,12 @@ fun MapViewer(
                 showMarkerRouteManagement = false
                 routeCreationViewModel.startRouteCreation()
                 showRouteCreation = true
+            },
+            onCenter = { location ->
+                // Center map on provided location
+                mapView?.let { mv ->
+                    mv.controller.animateTo(GeoPoint(location.latitude, location.longitude))
+                }
             },
             selectedMarker = selectedLocation,
             selectedRunways = selectedRunways,

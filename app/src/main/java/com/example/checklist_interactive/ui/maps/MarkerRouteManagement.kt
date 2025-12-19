@@ -3,7 +3,12 @@ package com.example.checklist_interactive.ui.maps
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,11 +22,14 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.AssistChip
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalView
@@ -29,6 +37,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.WindowInsetsCompat
+import android.view.View
 import kotlinx.coroutines.isActive
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -163,26 +172,54 @@ fun MarkerRouteManagementSheet(
     onMarkerClick: (LocationEntity) -> Unit,
     onRouteClick: (RouteEntity) -> Unit,
     onCreateRoute: () -> Unit,
+    onCenter: (LocationEntity) -> Unit = {},
     selectedMarker: LocationEntity? = null,
     selectedRunways: List<RunwayEntity> = emptyList(),
     onSetActiveRoute: (LocationEntity) -> Unit = {}
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val markerGroups by viewModel.markerGroups.collectAsState()
     val expandedGroups by viewModel.expandedGroups.collectAsState()
     val allRoutes by viewModel.allRoutes.collectAsState()
     // New tab order: 0=Details, 1=Markers (default), 2=Routes
     var selectedTab by remember { mutableStateOf(if (selectedMarker != null) 0 else 1) }
     val view = LocalView.current
-    
+
+    // Persisted sheet fraction + opacity like DataPadPopup
+    val prefs = context.getSharedPreferences("map_objects_prefs", android.content.Context.MODE_PRIVATE)
+    val KEY_SHEET_FRACTION = "map_objects_sheet_fraction"
+    val savedFraction = prefs.getFloat(KEY_SHEET_FRACTION, 0.6f)
+    val sheetMin = 0.25f
+    val sheetMax = 0.95f
+    var sheetFraction by rememberSaveable { mutableStateOf(savedFraction.coerceIn(sheetMin, sheetMax)) }
+
+    val KEY_SHEET_OPACITY = "map_objects_sheet_opacity"
+    val savedOpacity = prefs.getFloat(KEY_SHEET_OPACITY, 1.0f)
+    var sheetOpacity by rememberSaveable { mutableStateOf(savedOpacity.coerceIn(0.25f, 1.0f)) }
+    var showOpacitySlider by remember { mutableStateOf(false) }
+
+    // Persist opacity when changed
+    LaunchedEffect(sheetOpacity) {
+        prefs.edit().putFloat(KEY_SHEET_OPACITY, sheetOpacity).apply()
+    }
+
     // Update tab when selectedMarker changes -> show Details when a marker is selected
     LaunchedEffect(selectedMarker) {
         if (selectedMarker != null) {
             selectedTab = 0
         }
     }
-    
+
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { true }
+    )
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val sheetHeightDp = (configuration.screenHeightDp.toFloat() * sheetFraction).dp
+
     // Force immersive fullscreen mode continuously while bottom sheet is shown
-    LaunchedEffect(Unit) {
+    LaunchedEffect(sheetState.currentValue) {
         val activity = view.context as? android.app.Activity
         val window = activity?.window
 
@@ -218,38 +255,178 @@ fun MarkerRouteManagementSheet(
             }
         }
 
-        // Keep applying continuously to override ModalBottomSheet's behavior
-        while (isActive) {
-            hideSystemUI()
-            kotlinx.coroutines.delay(750L)
+        // Keep applying occasionally to override ModalBottomSheet's behavior only while the sheet is visible
+        if (sheetState.isVisible) {
+            while (isActive && sheetState.isVisible) {
+                hideSystemUI()
+                kotlinx.coroutines.delay(750L)
+            }
         }
     }
-    
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        modifier = Modifier.fillMaxHeight(0.8f)
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = sheetOpacity)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp)
-        ) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Map Objects",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, "Close")
+        // Try to hide the system UI inside the dialog window that hosts the sheet.
+        val dialogView = LocalView.current
+
+        // Immediately attempt to hide system UI before first draw to avoid flash.
+        DisposableEffect(dialogView) {
+            val dialogWindow = (dialogView.context as? android.app.Activity)?.window
+            val controller = dialogWindow?.let { WindowCompat.getInsetsController(it, dialogView) }
+            // Also set old-style flags for older API's
+            @Suppress("DEPRECATION")
+            dialogView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_FULLSCREEN
+                    or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            )
+
+            val preDrawListener = object : android.view.ViewTreeObserver.OnPreDrawListener {
+                override fun onPreDraw(): Boolean {
+                    controller?.hide(WindowInsetsCompat.Type.systemBars())
+                    try {
+                        controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    } catch (_: Throwable) {
+                    }
+                    dialogView.viewTreeObserver.removeOnPreDrawListener(this)
+                    return true
                 }
             }
+            dialogView.viewTreeObserver.addOnPreDrawListener(preDrawListener)
+            val attachListener = object : View.OnAttachStateChangeListener {
+                override fun onViewAttachedToWindow(v: View) {
+                    val vWindow = (v.context as? android.app.Activity)?.window
+                    val c = vWindow?.let { WindowCompat.getInsetsController(it, v) }
+                    c?.hide(WindowInsetsCompat.Type.systemBars())
+                    try {
+                        c?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    } catch (_: Throwable) {
+                    }
+                    @Suppress("DEPRECATION")
+                    v.systemUiVisibility = (
+                        View.SYSTEM_UI_FLAG_FULLSCREEN
+                            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                            or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    )
+                }
+
+                override fun onViewDetachedFromWindow(v: View) {}
+            }
+            dialogView.addOnAttachStateChangeListener(attachListener)
+            onDispose {
+                try {
+                    dialogView.viewTreeObserver.removeOnPreDrawListener(preDrawListener)
+                    dialogView.removeOnAttachStateChangeListener(attachListener)
+                } catch (_: Throwable) {
+                }
+            }
+        }
+
+        // Also keep ensuring hide while it's visible (loop for resilience).
+        LaunchedEffect(dialogView, sheetState.isVisible) {
+            if (sheetState.isVisible) {
+                val dialogWindow = (dialogView.context as? android.app.Activity)?.window
+                val dialogController = dialogWindow?.let { WindowCompat.getInsetsController(it, dialogView) }
+                while (isActive && sheetState.isVisible) {
+                    dialogController?.hide(WindowInsetsCompat.Type.systemBars())
+                    kotlinx.coroutines.delay(750L)
+                }
+            }
+        }
+
+        Box(modifier = Modifier
+            .fillMaxWidth()
+            .height(sheetHeightDp)
+            .padding(horizontal = 16.dp)
+        ) {
+            // Drag handle at top (drag vertically to resize and swipe down from the handle to dismiss)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(28.dp)
+                    .pointerInput(Unit) {
+                        var dragAccum = 0f
+                        detectDragGestures(
+                            onDragStart = { dragAccum = 0f },
+                            onDrag = { change: androidx.compose.ui.input.pointer.PointerInputChange, dragAmount: androidx.compose.ui.geometry.Offset ->
+                                // accumulate vertical displacement (positive = downward)
+                                dragAccum += dragAmount.y
+                                val screenPx = with(density) { configuration.screenHeightDp.dp.toPx() }
+                                val fracDelta = dragAmount.y / screenPx
+                                sheetFraction = (sheetFraction - fracDelta).coerceIn(sheetMin, sheetMax)
+                            },
+                            onDragEnd = {
+                                // persist saved fraction
+                                prefs.edit().putFloat(KEY_SHEET_FRACTION, sheetFraction).apply()
+                                // If user swiped down sufficiently on the handle, dismiss the sheet
+                                val threshold = with(density) { 64.dp.toPx() } // about 64dp downward to dismiss
+                                if (dragAccum > threshold) {
+                                    onDismiss()
+                                }
+                                dragAccum = 0f
+                            },
+                            onDragCancel = {
+                                dragAccum = 0f
+                            }
+                        )
+                    },
+                contentAlignment = Alignment.TopCenter
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(top = 6.dp)
+                        .size(width = 64.dp, height = 6.dp)
+                        .background(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f), shape = MaterialTheme.shapes.small)
+                )
+            }
+
+            // Main content
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Map Objects",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        FilledTonalIconButton(onClick = { showOpacitySlider = !showOpacitySlider }, modifier = Modifier.padding(end = 8.dp)) {
+                            Text(text = "${(sheetOpacity * 100).toInt()}%", style = MaterialTheme.typography.labelMedium)
+                        }
+
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Default.Close, contentDescription = "Close")
+                        }
+                    }
+                }
+
+                AnimatedVisibility(visible = showOpacitySlider, enter = androidx.compose.animation.fadeIn(), exit = androidx.compose.animation.fadeOut()) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 8.dp)) {
+                        Text(text = "Transparency: ${(sheetOpacity * 100).toInt()}%", style = MaterialTheme.typography.labelSmall)
+                        Slider(
+                            value = sheetOpacity,
+                            onValueChange = { sheetOpacity = it },
+                            valueRange = 0.25f..1.0f,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
             
             // Tabs (reordered: Details | Markers | Routes)
             TabRow(selectedTabIndex = selectedTab) {
@@ -291,6 +468,10 @@ fun MarkerRouteManagementSheet(
                             onDelete = { markerId ->
                                 viewModel.deleteMarker(markerId)
                                 selectedTab = 1
+                            },
+                            onCenter = { loc ->
+                                // delegate to parent sheet's onCenter behavior
+                                onSetActiveRoute(loc) // keep existing behavior if desired; no-op otherwise
                             }
                         )
                     } else {
@@ -329,6 +510,7 @@ fun MarkerRouteManagementSheet(
                 )
             }
         }
+    }
     }
 }
 
@@ -650,10 +832,13 @@ fun MarkerDetailsContent(
     onClose: () -> Unit,
     onSetRoute: (LocationEntity) -> Unit = {},
     onEdit: (LocationEntity) -> Unit = {},
-    onDelete: (Int) -> Unit = {}
+    onDelete: (Int) -> Unit = {},
+    onCenter: (LocationEntity) -> Unit = {}
 ) {
     var showEditDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    // Context required for DB operations invoked from nested lambdas
+    val context = androidx.compose.ui.platform.LocalContext.current
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -859,6 +1044,21 @@ fun MarkerDetailsContent(
                 } else {
                     Spacer(modifier = Modifier.weight(1f))
                 }
+
+                // Center button
+                OutlinedButton(
+                    onClick = {
+                        // Center the map on this marker and close sheet
+
+                        onCenter(location)
+                        onClose()
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.MyLocation, contentDescription = "Center on map")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Center")
+                }
                 
                 // Delete button
                 OutlinedButton(
@@ -887,10 +1087,31 @@ fun MarkerDetailsContent(
     if (showEditDialog) {
         LocationEditDialog(
             location = location,
+            runways = runways,
             onDismiss = { showEditDialog = false },
             onSave = { updatedLocation ->
                 onEdit(updatedLocation)
                 showEditDialog = false
+            },
+            onSaveRunways = { updatedRunways ->
+                // Persist runway changes: insert new, update existing, delete removed
+                val td = com.example.checklist_interactive.data.tactical.TacticalDatabase.getInstance(context, useExternalPath = false)
+                val dao = td.runwayDao()
+                // Determine existing and updated ids
+                val existingIds = runways.mapNotNull { it.id }.toSet()
+                val updatedIds = updatedRunways.mapNotNull { it.id }.toSet()
+                val toDelete = existingIds - updatedIds
+                toDelete.forEach { id -> dao.deleteRunwayById(id) }
+
+                updatedRunways.forEach { rw ->
+                    if ((rw.id ?: 0) == 0) {
+                        // Insert new runway and ensure locationId is set
+                        val insertRw = rw.copy(locationId = location.id ?: 0)
+                        dao.insertRunway(insertRw)
+                    } else {
+                        dao.updateRunway(rw)
+                    }
+                }
             }
         )
     }
@@ -931,17 +1152,39 @@ fun MarkerDetailsContent(
 @Composable
 fun LocationEditDialog(
     location: LocationEntity,
+    runways: List<RunwayEntity> = emptyList(),
     onDismiss: () -> Unit,
-    onSave: (LocationEntity) -> Unit
+    onSave: (LocationEntity) -> Unit,
+    onSaveRunways: suspend (List<RunwayEntity>) -> Unit = {}
 ) {
     var name by remember { mutableStateOf(location.name) }
     var latitude by remember { mutableStateOf(location.latitude.toString()) }
     var longitude by remember { mutableStateOf(location.longitude.toString()) }
+
+    // Derived validation for numeric fields
+    val latValid = latitude.toDoubleOrNull() != null
+    val lonValid = longitude.toDoubleOrNull() != null
     var markerType by remember { mutableStateOf(location.markerType) }
     var coalition by remember { mutableStateOf(location.coalition ?: "") }
     var icon by remember { mutableStateOf(location.icon) }
     var description by remember { mutableStateOf(location.description) }
-    
+
+    // Editable runway state
+    val editRunways = remember { mutableStateListOf<RunwayEntity>().apply { addAll(runways) } }
+    val scope = rememberCoroutineScope()
+
+    // Overall runways validity (used to enable Save)
+    val runwaysValid by remember(editRunways) {
+        derivedStateOf {
+            editRunways.all { rw ->
+                val lenOk = rw.lengthM == null || rw.lengthM >= 0
+                val widOk = rw.widthM == null || rw.widthM >= 0
+                val hdgOk = rw.headingDeg == null || (rw.headingDeg.isFinite() && rw.headingDeg >= 0.0 && rw.headingDeg < 360.0)
+                val ilsOk = rw.ilsFrequency.isNullOrBlank() || (rw.ilsFrequency.toDoubleOrNull()?.let { it in 108.0..137.0 } ?: false)
+                lenOk && widOk && hdgOk && ilsOk
+            }
+        }
+    }    
     // NATO symbol fields
     var symbolSet by remember { mutableStateOf(location.symbolSet) }
     var symbolEntity by remember { mutableStateOf(location.symbolEntity) }
@@ -951,6 +1194,9 @@ fun LocationEditDialog(
     
     // Static marker flag
     var isStatic by remember { mutableStateOf(location.isStatic == 1) }
+    // Show/hide airport fields; auto-expands when marker becomes static
+    var showAirportFields by remember { mutableStateOf(isStatic) }
+    LaunchedEffect(isStatic) { showAirportFields = isStatic }
     
     // Airport fields
     var icao by remember { mutableStateOf(location.icao ?: "") }
@@ -962,6 +1208,12 @@ fun LocationEditDialog(
     var threatLevel by remember { mutableStateOf(location.threatLevel?.toString() ?: "") }
     var unitType by remember { mutableStateOf(location.unitType ?: "") }
     var strength by remember { mutableStateOf(location.strength?.toString() ?: "") }
+
+    // validation for numeric tactical fields
+    val threatLevelInt = threatLevel.toIntOrNull()
+    val threatLevelError = threatLevel.isNotBlank() && (threatLevelInt == null || threatLevelInt !in 0..10)
+    val strengthInt = strength.toIntOrNull()
+    val strengthError = strength.isNotBlank() && (strengthInt == null || strengthInt < 0)
     
     // Geography & admin
     var country by remember { mutableStateOf(location.country ?: "") }
@@ -1045,13 +1297,15 @@ fun LocationEditDialog(
                             value = latitude,
                             onValueChange = { latitude = it },
                             label = { Text("Latitude *") },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberDecimal)
                         )
                         OutlinedTextField(
                             value = longitude,
                             onValueChange = { longitude = it },
                             label = { Text("Longitude *") },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberDecimal)
                         )
                     }
                     
@@ -1184,48 +1438,206 @@ fun LocationEditDialog(
                     }
                     
                     HorizontalDivider()
-                    
-                    // Airport section
-                    Text("Airport Fields", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(
-                            value = icao,
-                            onValueChange = { icao = it.uppercase() },
-                            label = { Text("ICAO") },
-                            placeholder = { Text("EDDF") },
-                            modifier = Modifier.weight(1f)
-                        )
-                        OutlinedTextField(
-                            value = iata,
-                            onValueChange = { iata = it.uppercase() },
-                            label = { Text("IATA") },
-                            placeholder = { Text("FRA") },
-                            modifier = Modifier.weight(1f)
-                        )
-                        OutlinedTextField(
-                            value = elevationM,
-                            onValueChange = { elevationM = it },
-                            label = { Text("Elevation (m)") },
-                            placeholder = { Text("100") },
-                            modifier = Modifier.weight(1f)
-                        )
+
+                    // Airport section (hidden by default unless marker is static)
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Airport Fields", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.weight(1f))
+                        IconButton(onClick = { showAirportFields = !showAirportFields }) {
+                            Icon(
+                                imageVector = if (showAirportFields) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                contentDescription = if (showAirportFields) "Collapse airport fields" else "Expand airport fields"
+                            )
+                        }
                     }
-                    
-                    OutlinedTextField(
-                        value = frequencies,
-                        onValueChange = { frequencies = it },
-                        label = { Text("Frequencies (JSON)") },
-                        placeholder = { Text("{\"tower\":\"118.5\", \"ground\":\"121.9\"}") },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 2
-                    )
-                    
+
+                    AnimatedVisibility(
+                        visible = showAirportFields,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Column {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedTextField(
+                                    value = icao,
+                                    onValueChange = { icao = it.uppercase() },
+                                    label = { Text("ICAO") },
+                                    placeholder = { Text("EDDF") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                OutlinedTextField(
+                                    value = iata,
+                                    onValueChange = { iata = it.uppercase() },
+                                    label = { Text("IATA") },
+                                    placeholder = { Text("FRA") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                OutlinedTextField(
+                                    value = elevationM,
+                                    onValueChange = { elevationM = it.filter { ch -> ch.isDigit() } },
+                                    label = { Text("Elevation (m)") },
+                                    placeholder = { Text("100") },
+                                    modifier = Modifier.weight(1f),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                )
+                            }
+
+                            OutlinedTextField(
+                                value = frequencies,
+                                onValueChange = { frequencies = it },
+                                label = { Text("Frequencies (JSON)") },
+                                placeholder = { Text("{\"tower\":\"118.5\", \"ground\":\"121.9\"}") },
+                                modifier = Modifier.fillMaxWidth(),
+                                minLines = 2
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Runways (editable)
+                            Text("Runways", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                editRunways.forEachIndexed { idx, rw ->
+                                    Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                OutlinedTextField(
+                                                    value = rw.name,
+                                                    onValueChange = { v -> editRunways[idx] = rw.copy(name = v) },
+                                                    label = { Text("Name") },
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                                IconButton(onClick = { editRunways.removeAt(idx) }) {
+                                                    Icon(Icons.Default.Delete, contentDescription = "Remove runway")
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(6.dp))
+
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                OutlinedTextField(
+                                                    value = rw.lengthM?.toString() ?: "",
+                                                    onValueChange = { v -> editRunways[idx] = rw.copy(lengthM = v.toIntOrNull()) },
+                                                    label = { Text("Length (m)") },
+                                                    modifier = Modifier.weight(1f),
+                                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                                )
+
+                                                OutlinedTextField(
+                                                    value = rw.widthM?.toString() ?: "",
+                                                    onValueChange = { v -> editRunways[idx] = rw.copy(widthM = v.toIntOrNull()) },
+                                                    label = { Text("Width (m)") },
+                                                    modifier = Modifier.weight(1f),
+                                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                                )
+                                            }
+
+                                            Spacer(modifier = Modifier.height(6.dp))
+
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                OutlinedTextField(
+                                                    value = rw.surface ?: "",
+                                                    onValueChange = { v -> editRunways[idx] = rw.copy(surface = v) },
+                                                    label = { Text("Surface") },
+                                                    modifier = Modifier.weight(1f)
+                                                )
+
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    OutlinedTextField(
+                                                        value = rw.ilsFrequency ?: "",
+                                                        onValueChange = { v ->
+                                                            // allow digits and a single dot, limit to two decimals
+                                                            var filtered = v.filter { ch -> ch.isDigit() || ch == '.' }
+                                                            val parts = filtered.split('.')
+                                                            filtered = if (parts.size > 1) parts[0] + "." + parts[1].take(2) else parts[0]
+                                                            editRunways[idx] = rw.copy(ilsFrequency = filtered)
+                                                        },
+                                                        label = { Text("ILS (MHz)") },
+                                                        placeholder = { Text("118.50") },
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberDecimal)
+                                                    )
+                                                    val ilsNum = rw.ilsFrequency?.toDoubleOrNull()
+                                                    if (rw.ilsFrequency.isNullOrBlank()) {
+                                                        Text(text = "Range: 108.00–137.00 MHz", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                                                    } else if (ilsNum == null) {
+                                                        Text(text = "Invalid format", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                                    } else if (ilsNum < 108.0 || ilsNum > 137.0) {
+                                                        Text(text = "Out of range (108.00–137.00)", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                                    } else {
+                                                        Text(text = "OK", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+                                                    }
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(6.dp))
+
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    OutlinedTextField(
+                                                        value = rw.headingDeg?.toString() ?: "",
+                                                        onValueChange = { v ->
+                                                            // allow numeric input and decimal
+                                                            val filtered = v.filter { ch -> ch.isDigit() || ch == '.' }
+                                                            editRunways[idx] = rw.copy(headingDeg = filtered.toDoubleOrNull())
+                                                        },
+                                                        label = { Text("Heading (deg)") },
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberDecimal)
+                                                    )
+                                                    val headingErr = rw.headingDeg?.let { !(it.isFinite() && it >= 0.0 && it < 360.0) } ?: false
+                                                    if (headingErr) {
+                                                        Text(text = "Heading must be 0–359.9°", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                                    } else {
+                                                        Text(text = "0–359.9°", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                                                    }
+                                                }
+
+                                                Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                                                    Checkbox(checked = (rw.hasLighting ?: 0) == 1, onCheckedChange = { checked -> editRunways[idx] = rw.copy(hasLighting = if (checked) 1 else 0) })
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Text("Lighting")
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(6.dp))
+
+                                            OutlinedTextField(
+                                                value = rw.notes ?: "",
+                                                onValueChange = { v -> editRunways[idx] = rw.copy(notes = v) },
+                                                label = { Text("Notes") },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                minLines = 1
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                                    TextButton(onClick = {
+                                        // Add a new (unsaved) runway
+                                        val newRw = RunwayEntity(id = 0, locationId = location.id ?: 0, name = "New RWY")
+                                        editRunways.add(newRw)
+                                    }) {
+                                        Icon(Icons.Default.Add, contentDescription = null)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Add Runway")
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+
                     HorizontalDivider()
-                    
+
                     // Tactical section
                     Text("Tactical Fields", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    
+
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
                             value = unitType,
@@ -1234,20 +1646,34 @@ fun LocationEditDialog(
                             placeholder = { Text("Infantry, Armor, etc.") },
                             modifier = Modifier.weight(1f)
                         )
-                        OutlinedTextField(
-                            value = threatLevel,
-                            onValueChange = { threatLevel = it },
-                            label = { Text("Threat Level") },
-                            placeholder = { Text("0-10") },
-                            modifier = Modifier.weight(1f)
-                        )
-                        OutlinedTextField(
-                            value = strength,
-                            onValueChange = { strength = it },
-                            label = { Text("Strength") },
-                            placeholder = { Text("Number of units") },
-                            modifier = Modifier.weight(1f)
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            OutlinedTextField(
+                                value = threatLevel,
+                                onValueChange = { threatLevel = it.filter { ch -> ch.isDigit() } },
+                                label = { Text("Threat Level") },
+                                placeholder = { Text("0-10") },
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            )
+                            Text(text = "Range: 0–10", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                            if (threatLevelError) {
+                                Text(text = "Must be an integer between 0 and 10", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            OutlinedTextField(
+                                value = strength,
+                                onValueChange = { strength = it.filter { ch -> ch.isDigit() } },
+                                label = { Text("Strength") },
+                                placeholder = { Text("Number of units") },
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            )
+                            Text(text = "Enter number of units", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                            if (strengthError) {
+                                Text(text = "Must be a non-negative integer", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
                     }
                     
                     HorizontalDivider()
@@ -1321,7 +1747,7 @@ fun LocationEditDialog(
                             // Validate and save
                             val lat = latitude.toDoubleOrNull() ?: location.latitude
                             val lon = longitude.toDoubleOrNull() ?: location.longitude
-                            
+
                             val updatedLocation = location.copy(
                                 name = name.takeIf { it.isNotBlank() } ?: location.name,
                                 latitude = lat,
@@ -1349,11 +1775,19 @@ fun LocationEditDialog(
                                 source = source.takeIf { it.isNotBlank() },
                                 tags = tags.takeIf { it.isNotBlank() }
                             )
-                            
-                            onSave(updatedLocation)
+
+                            // Save runways first (suspend) then location
+                            scope.launch {
+                                try {
+                                    onSaveRunways(editRunways.toList())
+                                } catch (e: Exception) {
+                                    android.util.Log.e("LocationEditDialog", "Failed to save runways", e)
+                                }
+                                onSave(updatedLocation)
+                            }
                         },
                         modifier = Modifier.weight(1f),
-                        enabled = name.isNotBlank() && latitude.toDoubleOrNull() != null && longitude.toDoubleOrNull() != null
+                        enabled = name.isNotBlank() && latValid && lonValid && !threatLevelError && !strengthError && runwaysValid
                     ) {
                         Text("Save")
                     }
