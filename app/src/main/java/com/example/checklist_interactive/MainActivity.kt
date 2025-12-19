@@ -161,6 +161,13 @@ class MainActivity : ComponentActivity() {
                 }
             }
             
+            // Database update manager - checks for new DB version on startup
+            val databaseUpdateManager = remember {
+                com.example.checklist_interactive.data.tactical.DatabaseUpdateManager(this@MainActivity).also {
+                    it.checkForDatabaseUpdate()
+                }
+            }
+            
             // Clean up DataPadManager on disposal
             androidx.compose.runtime.DisposableEffect(Unit) {
                 onDispose {
@@ -177,6 +184,29 @@ class MainActivity : ComponentActivity() {
                 Scaffold(modifier = Modifier.fillMaxSize(), topBar = { FlightMiniStatusBar(noteManager = quickNoteManager) }) { innerPadding ->
                     Box(modifier = Modifier.padding(innerPadding)) {
                     var refreshTrigger by remember { mutableStateOf(0) }
+
+                    // Database update dialog (shows when new DB version detected)
+                    if (databaseUpdateManager.showUpdateDialog.value) {
+                        com.example.checklist_interactive.ui.tactical.DatabaseUpdateDialog(
+                            assetVersion = databaseUpdateManager.assetDbVersion.value,
+                            currentVersion = databaseUpdateManager.currentDbVersion.value,
+                            onMerge = {
+                                databaseUpdateManager.importDatabaseMerge {
+                                    // Refresh UI after merge
+                                    refreshTrigger++
+                                }
+                            },
+                            onClean = {
+                                databaseUpdateManager.importDatabaseClean {
+                                    // Refresh UI after clean import
+                                    refreshTrigger++
+                                }
+                            },
+                            onDismiss = {
+                                databaseUpdateManager.dismissDialog()
+                            }
+                        )
+                    }
                     // reuse pre-created instances so state is consistent and restoration happened already
                     val fileManager = remember { preFileManager }
                     val repository = remember { ChecklistRepository(this@MainActivity) }
@@ -488,7 +518,8 @@ class MainActivity : ComponentActivity() {
                                 onTabsReordered = { from, to ->
                                     tabManager.moveTab(from, to)
                                 },
-                                onInternalFileViewerOpen = { showFileList = true }
+                                onInternalFileViewerOpen = { showFileList = true },
+                                onSettings = { showSettings = true }
                             ) { tabInfo ->
                                 // Render appropriate viewer based on tab content type
                                 when (tabInfo.content) {
@@ -566,6 +597,8 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 }
+                
+
             }
         }
     }

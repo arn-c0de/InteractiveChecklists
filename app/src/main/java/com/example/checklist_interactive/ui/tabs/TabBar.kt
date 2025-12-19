@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -59,6 +60,7 @@ fun TabBar(
     onNewTab: () -> Unit,
     onInternalFileViewerOpen: () -> Unit = {},
     onTabsReordered: (fromIndex: Int, toIndex: Int) -> Unit = { _, _ -> },
+    onSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -200,6 +202,20 @@ fun TabBar(
                     }
                 }
             }
+
+            // Settings button at top-right
+            Spacer(modifier = Modifier.width(4.dp))
+            IconButton(
+                onClick = onSettings,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = stringResource(R.string.nav_settings),
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
         }
     }
 }
@@ -323,6 +339,7 @@ fun TabbedDocumentViewer(
     onNewTab: () -> Unit,
     onInternalFileViewerOpen: () -> Unit = {},
     onTabsReordered: (fromIndex: Int, toIndex: Int) -> Unit = { _, _ -> },
+    onSettings: () -> Unit = {},
     isScreenLocked: Boolean = false,
     modifier: Modifier = Modifier,
     content: @Composable (TabManager.TabInfo) -> Unit
@@ -457,6 +474,7 @@ fun TabbedDocumentViewer(
             onNewTab = onNewTab,
             onInternalFileViewerOpen = onInternalFileViewerOpen,
             onTabsReordered = onTabsReordered,
+            onSettings = onSettings,
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)

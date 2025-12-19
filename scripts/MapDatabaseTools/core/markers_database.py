@@ -527,6 +527,10 @@ class MarkersDatabase:
         cursor.execute("INSERT OR IGNORE INTO tags (name) VALUES ('refuel_point')")
         cursor.execute("INSERT OR IGNORE INTO tags (name) VALUES ('training_area')")
         
+        # Set database version (user_version pragma) - increment this when DB content changes significantly
+        # Android app will check this to detect updates
+        cursor.execute("PRAGMA user_version = 1")
+        
         self.conn.commit()
     
     def add_location(self, location: Location) -> int:

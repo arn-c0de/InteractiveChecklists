@@ -73,6 +73,10 @@ fun SettingsScreen(
     // Map cache clear state
     var showClearMapCacheConfirm by remember { mutableStateOf(false) }
 
+    // Map DB reimport confirmation
+    var showMapDbConfirm by remember { mutableStateOf(false) }
+    var backupBeforeWipe by remember { mutableStateOf(true) }
+
     val context = LocalContext.current
     val uiScope = rememberCoroutineScope()
     val vm: SettingsViewModel = viewModel(
@@ -84,11 +88,47 @@ fun SettingsScreen(
     )
     val isImporting by vm.isImporting.collectAsState()
     val isClearingMapCache by vm.isClearingMapCache.collectAsState()
+    val isMapImporting by vm.isMapImporting.collectAsState()
+    val mapWipePreview by vm.mapWipePreview.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Load preview when dialog is shown
+    LaunchedEffect(showMapDbConfirm) {
+        if (showMapDbConfirm) {
+            vm.loadMapWipePreview()
+        }
+    }
 
     LaunchedEffect(vm) {
         vm.snackbarMessages.collectLatest { message ->
             snackbarHostState.showSnackbar(message)
+        }
+    }
+
+    // Restart the app when ViewModel requests it after map DB reimport
+    LaunchedEffect(vm) {
+        vm.requestRestart.collectLatest {
+            // Let user see the snackbar or message briefly, then attempt a gentle relaunch
+            try {
+                snackbarHostState.showSnackbar(context.getString(R.string.msg_map_db_reimported))
+            } catch (_: Exception) {}
+            kotlinx.coroutines.delay(800)
+            try {
+                val activity = context as? android.app.Activity
+                val pmIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+                pmIntent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                pmIntent?.putExtra("__restarted_by", "map_reimport")
+                context.startActivity(pmIntent)
+                // finishAffinity closes all activities in task but keeps process; this is a gentler restart
+                activity?.finishAffinity()
+            } catch (e: Exception) {
+                // fallback: attempt process exit if gentle restart fails
+                try {
+                    Runtime.getRuntime().exit(0)
+                } catch (_: Exception) {
+                    // ignore
+                }
+            }
         }
     }
 
@@ -137,6 +177,7 @@ fun SettingsScreen(
     var markdownExpanded by remember { mutableStateOf(false) }
     var sourcesExpanded by remember { mutableStateOf(false) }
     var mapCacheExpanded by remember { mutableStateOf(false) }
+    var mapDbExpanded by remember { mutableStateOf(false) }
 
     // Launcher for folder picker (SAF)
     val folderPicker = rememberLauncherForActivityResult(
@@ -292,6 +333,91 @@ fun SettingsScreen(
                                         }
                                     } else {
                                         Text(stringResource(R.string.settings_clear_map_cache))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // === Map Database (wipe & reimport) ===
+            item {
+                Spacer(modifier = Modifier.height(12.dp))
+                val mapDbRotation by animateFloatAsState(targetValue = if (mapDbExpanded) 180f else 0f)
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { mapDbExpanded = !mapDbExpanded },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = stringResource(R.string.settings_wipe_map_db_title),
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = if (mapDbExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
+                                modifier = Modifier.rotate(mapDbRotation)
+                            )
+                        }
+
+                        AnimatedVisibility(
+                            visible = mapDbExpanded,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            Column {
+                                // Auto-load versions when expanded
+                                LaunchedEffect(Unit) {
+                                    vm.loadDbVersions()
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = stringResource(R.string.settings_wipe_map_db_explain),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // DB version row
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                                    val assetV by vm.assetDbVersion.collectAsState()
+                                    val installedV by vm.installedDbVersion.collectAsState()
+                                    Text(text = stringResource(R.string.settings_internal_db_version, installedV), style = MaterialTheme.typography.bodySmall)
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(text = stringResource(R.string.settings_asset_db_version, assetV), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Spacer(modifier = Modifier.weight(1f))
+                                    IconButton(onClick = { vm.loadDbVersions() }) { Icon(Icons.Default.Refresh, contentDescription = null) }
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Button(
+                                    onClick = { showMapDbConfirm = true },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    enabled = !isMapImporting,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                ) {
+                                    if (isMapImporting) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(16.dp),
+                                                strokeWidth = 2.dp,
+                                                color = MaterialTheme.colorScheme.onErrorContainer
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(stringResource(R.string.settings_processing))
+                                        }
+                                    } else {
+                                        Text(stringResource(R.string.settings_wipe_map_db_button))
                                     }
                                 }
                             }
@@ -934,6 +1060,55 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton({ showClearMapCacheConfirm = false }) { Text(stringResource(R.string.action_cancel)) }
+            }
+        )
+    }
+
+    // Map DB wipe & re-import confirmation
+    if (showMapDbConfirm) {
+        AlertDialog(
+            onDismissRequest = { showMapDbConfirm = false },
+            title = { Text(stringResource(R.string.settings_wipe_map_db_confirm_title)) },
+            text = {
+                Column {
+                    Text(stringResource(R.string.settings_wipe_map_db_confirm_message), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = backupBeforeWipe, onCheckedChange = { backupBeforeWipe = it })
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.settings_wipe_map_db_explain), style = MaterialTheme.typography.bodySmall)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(text = "Markers that will be affected (${mapWipePreview.size}):", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(modifier = Modifier.heightIn(min = 80.dp, max = 220.dp).fillMaxWidth()) {
+                        if (mapWipePreview.isEmpty()) {
+                            Text(stringResource(R.string.common_empty), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        } else {
+                            LazyColumn {
+                                items(mapWipePreview) { m ->
+                                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Text(text = m.name, modifier = Modifier.weight(1f))
+                                        Text(text = m.markerType, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                        TextButton(onClick = { vm.loadMapWipePreview() }) { Text(stringResource(R.string.action_refresh)) }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton({
+                    showMapDbConfirm = false
+                    vm.wipeAndReimportMapDatabase(backupBeforeWipe)
+                }) { Text(stringResource(R.string.action_yes)) }
+            },
+            dismissButton = {
+                TextButton({ showMapDbConfirm = false }) { Text(stringResource(R.string.action_cancel)) }
             }
         )
     }

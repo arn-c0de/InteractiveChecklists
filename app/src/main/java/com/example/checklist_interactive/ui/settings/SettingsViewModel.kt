@@ -19,7 +19,12 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.builtins.ListSerializer
 import com.example.checklist_interactive.data.tags.FileTag
 import java.io.File
-
+import com.example.checklist_interactive.data.tactical.DatabaseUpdateManager
+import com.example.checklist_interactive.data.tactical.TacticalDatabase
+import kotlinx.coroutines.flow.first
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 private val json = Json { prettyPrint = true }
 
 class SettingsViewModel(
@@ -126,6 +131,91 @@ class SettingsViewModel(
             }
         } catch (e: Exception) {
             _tagJsonContent.value = app.getString(com.example.checklist_interactive.R.string.no_default_tags_asset)
+        }
+    }
+
+    // Map DB re-import state and restart request
+    private val _isMapImporting = MutableStateFlow(false)
+    val isMapImporting = _isMapImporting.asStateFlow()
+
+    private val _requestRestart = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val requestRestart = _requestRestart.asSharedFlow()
+
+    private val _assetDbVersion = MutableStateFlow(0)
+    val assetDbVersion = _assetDbVersion.asStateFlow()
+
+    private val _installedDbVersion = MutableStateFlow(0)
+    val installedDbVersion = _installedDbVersion.asStateFlow()
+
+    fun loadDbVersions() = viewModelScope.launch {
+        try {
+            withContext(Dispatchers.IO) {
+                val manager = DatabaseUpdateManager(app)
+                val assetV = manager.getAssetDatabaseVersion()
+                val installedV = manager.getInstalledDatabaseVersion()
+                _assetDbVersion.value = assetV
+                _installedDbVersion.value = installedV
+            }
+        } catch (e: Exception) {
+            _snackbarMessages.tryEmit(app.getString(com.example.checklist_interactive.R.string.import_failed, e.message ?: ""))
+        }
+    }
+
+    // Preview of markers that would be affected by a clean import
+    data class MarkerPreview(val id: Int, val name: String, val markerType: String)
+
+    private val _mapWipePreview = MutableStateFlow<List<MarkerPreview>>(emptyList())
+    val mapWipePreview = _mapWipePreview.asStateFlow()
+
+    fun loadMapWipePreview() = viewModelScope.launch {
+        try {
+            val list = withContext(Dispatchers.IO) {
+                val db = TacticalDatabase.getInstance(app)
+                val locations = db.locationDao().getAllLocations().first()
+                locations.map { MarkerPreview(it.id, it.name ?: "(unnamed)", it.markerType ?: "") }
+            }
+            _mapWipePreview.value = list
+        } catch (e: Exception) {
+            _snackbarMessages.tryEmit(app.getString(com.example.checklist_interactive.R.string.import_failed, e.message ?: ""))
+        }
+    }
+
+    private suspend fun createDatabaseBackup(): String? = withContext(Dispatchers.IO) {
+        try {
+            val dbFile = app.getDatabasePath("map_data.db")
+            if (!dbFile.exists()) return@withContext null
+            val backupDir = java.io.File(app.filesDir, "backups")
+            if (!backupDir.exists()) backupDir.mkdirs()
+            val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+            val dest = java.io.File(backupDir, "map_data_backup_$ts.db")
+            dbFile.copyTo(dest, overwrite = true)
+            dest.absolutePath
+        } catch (e: Exception) {
+            _snackbarMessages.tryEmit(app.getString(com.example.checklist_interactive.R.string.msg_map_db_reimport_failed, e.message ?: ""))
+            null
+        }
+    }
+
+    fun wipeAndReimportMapDatabase(backupBefore: Boolean = true) = viewModelScope.launch {
+        _isMapImporting.value = true
+        try {
+            if (backupBefore) {
+                val backupPath = createDatabaseBackup()
+                if (backupPath != null) {
+                    _snackbarMessages.tryEmit(app.getString(com.example.checklist_interactive.R.string.msg_map_db_backup_created, backupPath))
+                }
+            }
+
+            val dbManager = DatabaseUpdateManager(app)
+            dbManager.importDatabaseClean {
+                // Emit a message and request a restart so markers/details are reloaded
+                _snackbarMessages.tryEmit(app.getString(com.example.checklist_interactive.R.string.msg_map_db_reimported))
+                _requestRestart.tryEmit(Unit)
+            }
+        } catch (e: Exception) {
+            _snackbarMessages.tryEmit(app.getString(com.example.checklist_interactive.R.string.msg_map_db_reimport_failed, e.message ?: ""))
+        } finally {
+            _isMapImporting.value = false
         }
     }
 
