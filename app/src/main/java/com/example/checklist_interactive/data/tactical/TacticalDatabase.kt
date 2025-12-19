@@ -310,28 +310,31 @@ abstract class TacticalDatabase : RoomDatabase() {
          * @param context Application context
          * @param useExternalPath If true, uses external storage path for sharing with Python tools
          */
-        fun getInstance(context: Context, useExternalPath: Boolean = false): TacticalDatabase {
+        /**
+         * Get database instance
+         *
+         * IMPORTANT SAFETY CHANGE: By default this method will NOT attempt any destructive
+         * recovery (deleting the user's installed DB file) if a schema mismatch is detected.
+         * Destructive recovery is dangerous and may cause permanent data loss; it must be
+         * explicitly allowed by callers by passing allowDestructiveMigration = true.
+         *
+         * @param context Application context
+         * @param useExternalPath If true, uses external storage path for sharing with Python tools
+         * @param allowDestructiveMigration When true, the method may attempt destructive
+         * recovery (delete installed DB and recreate from asset). Default = false.
+         */
+        fun getInstance(context: Context, useExternalPath: Boolean = false, allowDestructiveMigration: Boolean = false): TacticalDatabase {
             return INSTANCE ?: synchronized(this) {
-                // Attempt to create the database instance. If a pre-packaged DB schema mismatch is detected
-                // (IllegalStateException from RoomOpenHelper), attempt a safe recovery: delete the existing
-                // installed DB file and retry creation so the asset DB can be copied afresh.
+                // Attempt to create the database instance. If a pre-packaged DB schema mismatch is
+                // detected (IllegalStateException from RoomOpenHelper), we will NOT automatically
+                // delete the user's database unless allowDestructiveMigration is explicitly true.
                 val instance = try {
-                    if (useExternalPath) createExternalDatabase(context) else createInternalDatabase(context)
+                    if (useExternalPath) createExternalDatabase(context, allowDestructiveMigration) else createInternalDatabase(context, allowDestructiveMigration)
                 } catch (e: IllegalStateException) {
-                    android.util.Log.w("TacticalDatabase", "Schema mismatch when opening prepackaged DB, attempting recovery: ${'$'}e")
-
-                    try {
-                        val dbFile = context.getDatabasePath(DATABASE_NAME)
-                        if (dbFile.exists()) {
-                            android.util.Log.i("TacticalDatabase", "Deleting installed DB at ${'$'}{dbFile.absolutePath} to recover from schema mismatch")
-                            dbFile.delete()
-                        }
-                    } catch (ex: Exception) {
-                        android.util.Log.e("TacticalDatabase", "Failed to delete installed DB during recovery", ex)
-                    }
-
-                    // Retry creation (this should copy the asset DB into place)
-                    if (useExternalPath) createExternalDatabase(context) else createInternalDatabase(context)
+                    android.util.Log.w("TacticalDatabase", "Schema mismatch when opening prepackaged DB: ${'$'}e")
+                    android.util.Log.w("TacticalDatabase", "Automatic destructive recovery is disabled by default. Set allowDestructiveMigration=true to opt-in.")
+                    // Propagate the exception so callers can decide how to proceed (backup, notify user, etc.)
+                    throw e
                 }
 
                 // Validate by opening the writable DB now so schema mismatches are detected immediately
@@ -339,13 +342,19 @@ abstract class TacticalDatabase : RoomDatabase() {
                     instance.openHelper.writableDatabase // forces Room to check identity
                     INSTANCE = instance
                 } catch (e: IllegalStateException) {
-                    android.util.Log.w("TacticalDatabase", "Detected schema mismatch when validating DB, attempting recovery: ${'$'}e")
+                    android.util.Log.w("TacticalDatabase", "Detected schema mismatch when validating DB: ${'$'}e")
                     try {
                         instance.close()
                     } catch (_: Exception) {
                         // ignore
                     }
 
+                    if (!allowDestructiveMigration) {
+                        android.util.Log.w("TacticalDatabase", "Destructive recovery not allowed (allowDestructiveMigration=false). Rethrowing exception for caller to handle.")
+                        throw e
+                    }
+
+                    android.util.Log.i("TacticalDatabase", "Destructive recovery allowed; attempting recovery by deleting installed DB and recreating from asset.")
                     try {
                         val dbFile = context.getDatabasePath(DATABASE_NAME)
                         if (dbFile.exists()) {
@@ -357,7 +366,7 @@ abstract class TacticalDatabase : RoomDatabase() {
                     }
 
                     // Recreate the database (copy fresh asset) and validate again
-                    val recreated = if (useExternalPath) createExternalDatabase(context) else createInternalDatabase(context)
+                    val recreated = if (useExternalPath) createExternalDatabase(context, true) else createInternalDatabase(context, true)
                     try {
                         recreated.openHelper.writableDatabase
                         INSTANCE = recreated
@@ -428,35 +437,43 @@ abstract class TacticalDatabase : RoomDatabase() {
          * Create database in internal app storage (default)
          * Copies from assets/databases/map_data.db if database doesn't exist
          */
-        private fun createInternalDatabase(context: Context): TacticalDatabase {
-            android.util.Log.d("TacticalDatabase", "Using prepackaged DB from assets/databases/$DATABASE_NAME")
-            return Room.databaseBuilder(
+        private fun createInternalDatabase(context: Context, allowDestructiveMigration: Boolean): TacticalDatabase {
+            android.util.Log.d("TacticalDatabase", "Using prepackaged DB from assets/databases/$DATABASE_NAME (allowDestructiveMigration=${'$'}allowDestructiveMigration)")
+            val builder = Room.databaseBuilder(
                 context.applicationContext,
                 TacticalDatabase::class.java,
                 DATABASE_NAME
             )
                 .createFromAsset("databases/$DATABASE_NAME")
                 .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
-                .fallbackToDestructiveMigration()
-                .build()
+
+            if (allowDestructiveMigration) {
+                builder.fallbackToDestructiveMigration()
+            }
+
+            return builder.build()
         }
         
         /**
          * Create database in external storage for sharing with Python tools
          * Location: /sdcard/Android/data/com.example_checklist_interactive/files/map_data.db
          */
-        private fun createExternalDatabase(context: Context): TacticalDatabase {
+        private fun createExternalDatabase(context: Context, allowDestructiveMigration: Boolean): TacticalDatabase {
             val externalDir = context.getExternalFilesDir(null)
             val dbFile = File(externalDir, DATABASE_NAME)
             
-            return Room.databaseBuilder(
+            val builder = Room.databaseBuilder(
                 context.applicationContext,
                 TacticalDatabase::class.java,
                 dbFile.absolutePath
             )
                 .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
-                .fallbackToDestructiveMigration()
-                .build()
+
+            if (allowDestructiveMigration) {
+                builder.fallbackToDestructiveMigration()
+            }
+
+            return builder.build()
         }
         
         /**
