@@ -2,75 +2,100 @@
 
 # Project Roadmap
 
-This roadmap outlines planned features, priorities, and future directions for ChecklistInteractive. Items are grouped by area and priority for clarity and professional project management.
+This roadmap outlines the planned development phases and features for the app in the exact priority order requested. All items are listed sequentially, reflecting the intended implementation sequence. The focus is on iterative progression: completing earlier items before moving to the next.
 
 ---
 
-## 1. Core Features & Integration
-
-### DCS (Digital Combat Simulator) Integration
-- **Export Checklists to DCS (Lua):**
-	- Enable exporting checklists as Lua scripts for use in DCS.
-- **Two-way Data Injection (Future):**
-	- Explore sending data from mobile to DCS for two-way workflows.
+### Player Icon Rotation
+- Implement dynamic rotation of player icons on the map.
+- Rotate icons based on real-time heading/orientation data.
+- Ensure smooth visual updates without performance impact.
 
 ---
 
-## 2. Collaboration & Sharing
-
-### Flight Squad Collaboration
-- **Drawings & Notes Sharing:**
-	- Enable flight squad members to share drawings and notes with each other in real-time.
-	- Implement via self-hosted backend server for privacy and control.
-- **Backend Infrastructure:**
-	- Design and deploy lightweight backend server architecture.
-	- Support WebSocket or REST API for real-time synchronization.
-	- Implement user authentication and authorization.
-	- Enable room/session management for flight squads.
-- **Data Synchronization:**
-	- Real-time sync of annotations, sketches, and tactical notes.
-	- Conflict resolution for concurrent edits.
-	- Optional offline mode with sync on reconnection.
-- **Privacy & Security:**
-	- End-to-end encryption for shared content.
-	- Self-hosted deployment options for maximum control.
-	- Configurable visibility and access permissions per squad.
+### Map View Nearest Airport List
+- Add a nearest airport list feature to the map view.
+- Display airports sorted by distance from the player's current position.
+- Include details such as airport name, ICAO code, distance, and bearing.
+- Make the list easily accessible (e.g., via sidebar or overlay toggle).
 
 ---
 
-## 3. User Experience & Design
-
-- **Complete UI/UX Design:**
-	- Finalize and polish the full user interface, visual language, and interaction patterns.
-- **Collaborative UI Elements:**
-	- Visualize active squad members.
-	- Show real-time cursors/annotations from other users.
-	- Notification system for shared content updates.
- - **OSMMap Integration UI:**
-	- Smooth map interaction for telemetry display.
-    - Toggle layers, trails, and squad overlays easily. 
+### Map Database
+- Develop and integrate a dedicated map database.
+- Store geographical data (airports, waypoints, terrain, etc.) for fast offline/online access.
+- Optimize for quick queries and low memory usage on mobile devices.
 
 ---
 
-## 4. File Format & Data Support
-
-- **Additional File Formats:**
-	- Extend support beyond Markdown and PDF (e.g., EPUB, DOCX, ODT, others).
-- **Export Shared Sessions:**
-	- Allow exporting collaborative sessions with all annotations and notes.
+### Map Orders Icons and Airport Symbols
+- Implement customizable order icons on the map.
+- Add standard airport symbols with proper scaling and layering.
+- Ensure icons are clear, distinguishable, and support different zoom levels.
 
 ---
 
-## 5. Localization & Internationalization
-
-- **Multilanguage Support:**
-	- Add more String translation languages, currently only EN an DE.
+### AA Icon Range Circles
+- Add range circles around anti-aircraft (AA) icons.
+- Display configurable threat ranges (e.g., engagement zones, detection radii).
+- Support multiple circle layers (e.g., radar, missile range) with color coding.
 
 ---
 
-## 6. Notes & Prioritization
+### Handshake and AES Implementation with Security Tests
+- Implement secure handshake protocol for connections.
+- Integrate AES encryption for all data in transit.
+- Conduct comprehensive security tests (penetration testing, vulnerability checks, encryption validation).
 
-- Features are prioritized based on user demand and compatibility with existing data flows.
-- Each item should be broken down into implementation milestones and tracked as issues.
-- Collaboration features require careful consideration of network architecture, security, and user privacy.
-- Backend deployment should support containerization (Docker) for easy self-hosting.
+---
+
+### Two-Way Telemetry and App Commands
+- Enable full two-way telemetry between app and external systems (e.g., simulator).
+- Implement command transmission from app to system.
+- Add in-app command buttons and controls (e.g., for waypoints, modes, actions).
+- Support customizable button layouts and reliable delivery with feedback.
+
+---
+
+### Online Sharing with Parsed Data (Location, Name, Plane Heading, Speed, Height)
+- Implement online data sharing functionality.
+- Parse and transmit key telemetry data in real-time:
+  - Location (coordinates)
+  - Aircraft name/type
+  - Heading
+  - Speed
+  - Altitude/height
+- Display received shared data clearly on the map and UI.
+
+---
+
+### Extreme Security Hardening
+- Apply advanced security hardening across the entire app.
+- Include measures such as:
+  - Code obfuscation
+  - Root/jailbreak detection
+  - Secure storage of keys and data
+  - Protection against reverse engineering and tampering
+  - Regular security audits and updates
+
+---
+
+### Squad Mode via Internet
+- Develop full squad mode with internet-based multiplayer collaboration.
+- Enable real-time sharing of:
+  - Positions and telemetry
+  - Map annotations and orders
+  - Player icons and status
+- Include squad management (join/leave rooms, authentication, voice/text coordination hooks).
+- Ensure low-latency synchronization and robust reconnection handling.
+
+---
+
+### Notes & General Guidelines
+- Features are to be implemented strictly in the order listed above.
+- Each phase should be fully completed, tested, and stabilized before proceeding to the next.
+- Security considerations must be integrated from the earliest stages and reinforced throughout.
+- Backend infrastructure (where needed) should prioritize privacy, encryption, and optional self-hosting.
+- Regular testing on target devices and simulators is required at each milestone.
+
+This roadmap is focused and sequential to ensure a solid, secure, and functional foundation before adding advanced collaboration features.
