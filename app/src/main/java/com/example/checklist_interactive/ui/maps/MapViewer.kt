@@ -159,7 +159,7 @@ fun MapViewer(
         MarkerRouteViewModel(locationRepository, routeRepository)
     }
     val routeCreationViewModel = remember {
-        RouteCreationViewModel(routeRepository, locationRepository)
+        RouteCreationViewModel(routeRepository, locationRepository, tacticalDb.runwayDao())
     }
 
     // Load and restore visible routes from SharedPreferences
@@ -253,8 +253,8 @@ fun MapViewer(
                             val midLat = (loc1.latitude + loc2.latitude) / 2
                             val midLon = (loc1.longitude + loc2.longitude) / 2
 
-                            // Add label to text overlay
-                            val labelText = String.format("%.1f NM @ %03.0f°", distNm, heading)
+                            // Add label to text overlay (show heading first, then distance)
+                            val labelText = String.format("HDG %03.0f° 	• %.1f NM", heading, distNm)
                             android.util.Log.d("MapViewer", "Adding label: $labelText at ($midLat, $midLon)")
                             textOverlay.addLabel(org.osmdroid.util.GeoPoint(midLat, midLon), labelText)
                         }
