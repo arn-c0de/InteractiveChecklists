@@ -6,12 +6,7 @@ This roadmap outlines the planned development phases and features for the app in
 
 ---
 
-### Player Icon Rotation
-- Implement dynamic rotation of player icons on the map.
-- Rotate icons based on real-time heading/orientation data.
-- Ensure smooth visual updates without performance impact.
 
----
 
 ### Map View Nearest Airport List
 - Add a nearest airport list feature to the map view.
