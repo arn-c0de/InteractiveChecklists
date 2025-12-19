@@ -28,7 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -70,8 +70,19 @@ class MarkerRouteViewModel(
     private val _expandedGroups = MutableStateFlow<Set<String>>(emptySet())
     val expandedGroups: StateFlow<Set<String>> = _expandedGroups.asStateFlow()
     
+    private val _visibleRouteIds = MutableStateFlow<Set<Int>>(emptySet())
+    val visibleRouteIds: StateFlow<Set<Int>> = _visibleRouteIds.asStateFlow()
+    
     init {
         loadData()
+    }
+    
+    fun toggleRouteVisibility(routeId: Int) {
+        _visibleRouteIds.value = if (_visibleRouteIds.value.contains(routeId)) {
+            _visibleRouteIds.value - routeId
+        } else {
+            _visibleRouteIds.value + routeId
+        }
     }
     
     fun loadData() {
@@ -181,6 +192,7 @@ fun MarkerRouteManagementSheet(
     val markerGroups by viewModel.markerGroups.collectAsState()
     val expandedGroups by viewModel.expandedGroups.collectAsState()
     val allRoutes by viewModel.allRoutes.collectAsState()
+    val visibleRouteIds by viewModel.visibleRouteIds.collectAsState()
     // New tab order: 0=Details, 1=Markers (default), 2=Routes
     var selectedTab by remember { mutableStateOf(if (selectedMarker != null) 0 else 1) }
     val view = LocalView.current
@@ -504,8 +516,10 @@ fun MarkerRouteManagementSheet(
                 )
                 2 -> RoutesList(
                     routes = allRoutes,
+                    visibleRouteIds = visibleRouteIds,
                     onRouteClick = onRouteClick,
                     onDeleteRoute = { viewModel.deleteRoute(it) },
+                    onToggleVisibility = { viewModel.toggleRouteVisibility(it) },
                     onCreateRoute = onCreateRoute
                 )
             }
@@ -713,8 +727,10 @@ fun MarkerListItem(
 @Composable
 fun RoutesList(
     routes: List<RouteEntity>,
+    visibleRouteIds: Set<Int>,
     onRouteClick: (RouteEntity) -> Unit,
     onDeleteRoute: (Int) -> Unit,
+    onToggleVisibility: (Int) -> Unit,
     onCreateRoute: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
@@ -749,8 +765,10 @@ fun RoutesList(
                 items(routes, key = { it.id }) { route ->
                     RouteListItem(
                         route = route,
+                        isVisible = visibleRouteIds.contains(route.id),
                         onClick = { onRouteClick(route) },
-                        onDelete = { onDeleteRoute(route.id) }
+                        onDelete = { onDeleteRoute(route.id) },
+                        onToggleVisibility = { onToggleVisibility(route.id) }
                     )
                 }
             }
@@ -764,8 +782,10 @@ fun RoutesList(
 @Composable
 fun RouteListItem(
     route: RouteEntity,
+    isVisible: Boolean,
     onClick: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onToggleVisibility: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -810,6 +830,13 @@ fun RouteListItem(
                     )
                 }
             }
+            
+            // Visibility toggle
+            Switch(
+                checked = isVisible,
+                onCheckedChange = { onToggleVisibility() },
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
             
             IconButton(onClick = onDelete) {
                 Icon(
@@ -1298,14 +1325,14 @@ fun LocationEditDialog(
                             onValueChange = { latitude = it },
                             label = { Text("Latitude *") },
                             modifier = Modifier.weight(1f),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberDecimal)
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                         )
                         OutlinedTextField(
                             value = longitude,
                             onValueChange = { longitude = it },
                             label = { Text("Longitude *") },
                             modifier = Modifier.weight(1f),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberDecimal)
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                         )
                     }
                     
@@ -1556,7 +1583,7 @@ fun LocationEditDialog(
                                                         label = { Text("ILS (MHz)") },
                                                         placeholder = { Text("118.50") },
                                                         modifier = Modifier.fillMaxWidth(),
-                                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberDecimal)
+                                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                                                     )
                                                     val ilsNum = rw.ilsFrequency?.toDoubleOrNull()
                                                     if (rw.ilsFrequency.isNullOrBlank()) {
@@ -1584,7 +1611,7 @@ fun LocationEditDialog(
                                                         },
                                                         label = { Text("Heading (deg)") },
                                                         modifier = Modifier.fillMaxWidth(),
-                                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberDecimal)
+                                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                                                     )
                                                     val headingErr = rw.headingDeg?.let { !(it.isFinite() && it >= 0.0 && it < 360.0) } ?: false
                                                     if (headingErr) {

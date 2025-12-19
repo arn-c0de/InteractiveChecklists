@@ -174,6 +174,67 @@ fun MapViewer(
         }
     }
 
+    // Observe visible routes and draw them on map
+    val visibleRouteIds by markerRouteViewModel.visibleRouteIds.collectAsState()
+    LaunchedEffect(visibleRouteIds, mapView) {
+        val mv = mapView ?: return@LaunchedEffect
+        
+        // Remove all existing route overlays (Polylines and route markers)
+        mv.overlays.removeAll { overlay ->
+            overlay is org.osmdroid.views.overlay.Polyline ||
+            (overlay is org.osmdroid.views.overlay.Marker && overlay.id?.startsWith("route_") == true)
+        }
+        
+        // Draw all visible routes
+        visibleRouteIds.forEach { routeId ->
+            val routeData = routeRepository.getRouteWithWaypoints(routeId)
+            routeData?.let { data ->
+                val waypoints = data.waypoints.map { wpWithLoc ->
+                    Triple(
+                        wpWithLoc.location,
+                        wpWithLoc.waypoint.distanceNm,
+                        wpWithLoc.waypoint.headingMag
+                    )
+                }
+                if (waypoints.size >= 2) {
+                    // Create red polyline
+                    val polyline = org.osmdroid.views.overlay.Polyline(mv).apply {
+                        outlinePaint.color = android.graphics.Color.RED
+                        outlinePaint.strokeWidth = 8f
+                        outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                        val points = waypoints.map { (loc, _, _) ->
+                            org.osmdroid.util.GeoPoint(loc.latitude, loc.longitude)
+                        }
+                        setPoints(points)
+                        id = "route_polyline_$routeId"
+                    }
+                    mv.overlays.add(polyline)
+                    
+                    // Add distance/heading labels
+                    for (i in 0 until waypoints.size - 1) {
+                        val (loc1, _, _) = waypoints[i]
+                        val (loc2, distNm, heading) = waypoints[i + 1]
+                        
+                        if (distNm != null && heading != null) {
+                            val midLat = (loc1.latitude + loc2.latitude) / 2
+                            val midLon = (loc1.longitude + loc2.longitude) / 2
+                            
+                            val marker = org.osmdroid.views.overlay.Marker(mv).apply {
+                                position = org.osmdroid.util.GeoPoint(midLat, midLon)
+                                title = String.format("%.1f NM @ %03.0f°", distNm, heading)
+                                setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_CENTER)
+                                id = "route_label_${routeId}_$i"
+                            }
+                            mv.overlays.add(marker)
+                        }
+                    }
+                }
+            }
+        }
+        
+        mv.invalidate()
+    }
+
     // Track last programmatic map movement to avoid treating it as a user scroll
     val lastProgrammaticMove = remember { mutableStateOf(0L) }
     // Track last user touch time so we only disable auto-center on real user interactions
