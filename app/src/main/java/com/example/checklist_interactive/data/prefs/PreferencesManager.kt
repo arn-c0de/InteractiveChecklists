@@ -49,6 +49,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_MAP_OVERLAY_RINGS = "map_overlay_rings"
         private const val KEY_MAP_OVERLAY_RINGS_MAX_NM = "map_overlay_rings_max_nm"
         private const val KEY_MAP_OVERLAY_MGRS_GRID = "map_overlay_mgrs_grid"
+        private const val KEY_SCREEN_LOCKED = "screen_locked"
 
         // Application language preference (ISO code, e.g., "en", "de")
         private const val KEY_APP_LANGUAGE = "app_language"
@@ -393,6 +394,17 @@ class PreferencesManager(context: Context) {
 
     fun isMapOverlayMgrsGridEnabled(): Boolean {
         return prefs.getBoolean(KEY_MAP_OVERLAY_MGRS_GRID, false)
+    }
+
+    /**
+     * Screen lock state (prevents tab swipe gestures)
+     */
+    fun setScreenLocked(locked: Boolean) {
+        prefs.edit().putBoolean(KEY_SCREEN_LOCKED, locked).apply()
+    }
+
+    fun isScreenLocked(): Boolean {
+        return prefs.getBoolean(KEY_SCREEN_LOCKED, false)
     }
 
     /**

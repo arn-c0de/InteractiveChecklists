@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.window.Dialog
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.WindowInsetsCompat
@@ -826,7 +827,7 @@ fun MarkerDetailsContent(
                 Text("Set Route")
             }
             
-            // Edit and Delete buttons row
+// Edit / Move / Delete buttons row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -839,6 +840,24 @@ fun MarkerDetailsContent(
                     Icon(Icons.Default.Edit, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Edit")
+                }
+
+                // Move button (only for non-static markers)
+                if (location.isStatic != 1) {
+                    OutlinedButton(
+                        onClick = {
+                            // Request map move and close detail sheet so user can tap on map
+                            MapActionBus.requestMove(location.id)
+                            onClose()
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.OpenWith, contentDescription = "Move marker")
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Move")
+                    }
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
                 }
                 
                 // Delete button
@@ -953,12 +972,30 @@ fun LocationEditDialog(
     var source by remember { mutableStateOf(location.source ?: "") }
     var tags by remember { mutableStateOf(location.tags ?: "") }
     
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        modifier = Modifier.fillMaxHeight(0.9f)
-    ) {
+    var showSymbolPicker by remember { mutableStateOf(false) }
+    
+    // Show symbol picker if requested
+    if (showSymbolPicker) {
+        MilitarySymbolPickerDialog(
+            onDismiss = { showSymbolPicker = false },
+            onSymbolSelected = { symbol, affiliation ->
+                // Update icon and symbol fields
+                icon = "ic_mapicon_${symbol.id}"
+                symbolEntity = symbol.symbolEntity
+                symbolSet = symbol.symbolSet
+                symbolAffiliation = affiliation.name.lowercase()
+                symbolColor = String.format("#%06X", 0xFFFFFF and affiliation.color.hashCode())
+                showSymbolPicker = false
+            }
+        )
+    }
+    
+    Dialog(onDismissRequest = onDismiss) {
         Surface(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.95f)
+                .widthIn(min = 700.dp, max = 1100.dp),
             shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp
@@ -1091,13 +1128,45 @@ fun LocationEditDialog(
                         )
                     }
                     
-                    OutlinedTextField(
-                        value = icon,
-                        onValueChange = { icon = it },
-                        label = { Text("Icon") },
-                        placeholder = { Text("ic_mapicon_...") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    // Icon selection with visual picker
+                    OutlinedCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showSymbolPicker = true },
+                        colors = CardDefaults.outlinedCardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Icon",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = if (icon.isNotEmpty() && icon != "default") icon else "Click to select icon",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = if (icon.isNotEmpty() && icon != "default") 
+                                        MaterialTheme.colorScheme.onSurface 
+                                    else 
+                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                )
+                            }
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = "Change icon",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                     
                     // Static marker checkbox
                     Row(

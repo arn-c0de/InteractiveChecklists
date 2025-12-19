@@ -75,8 +75,9 @@ fun MilitarySymbolPickerDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.9f),
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.9f)
+                .widthIn(min = 600.dp, max = 900.dp),
             shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 8.dp
