@@ -47,6 +47,27 @@ This will install:
 - `cryptography` - For AES-GCM decryption (Apache 2.0)
 - `PySide6` - For the GUI (LGPL v3, commercial-friendly)
 - `requests` - For downloading map assets (Apache 2.0)
+- `pywin32` - For Windows DPAPI encryption (Windows only, PSF license)
+
+## 🔐 Security: ECDH Device Keys
+
+**WICHTIG**: Private ECDH-Schlüssel werden jetzt verschlüsselt gespeichert!
+
+- **Windows**: Verwendet automatisch DPAPI (Data Protection API) - kein Passwort erforderlich
+- **macOS/Linux**: Verwendet passwortbasierte Verschlüsselung - Sie werden beim ersten Start nach einem Passwort gefragt
+
+**Legacy-Migration**: Wenn Sie eine alte `ecdh_device.json` Datei haben (unverschlüsselt), wird diese automatisch migriert.
+
+📖 **Vollständige Dokumentation**: Siehe [SECURITY_ECDH_KEYS.md](SECURITY_ECDH_KEYS.md) für Details zu:
+- Verschlüsselungsmethoden (DPAPI vs. Passwort)
+- Manuelle Migration bestehender Schlüssel
+- Best Practices und Sicherheitsempfehlungen
+- Fehlerbehebung
+
+**Migrationstool**: Falls die automatische Migration nicht funktioniert:
+```bash
+python tools/migrate_device_key.py
+```
 
 ## Configuration
 
