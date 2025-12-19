@@ -1074,6 +1074,11 @@ class SessionManager:
         """
         Handle ClientHello message from Android app
         Returns ServerHello response or error
+        
+        SECURITY NOTE: This message is transmitted in PLAINTEXT (standard for ECDH)
+        - Passive observers can see: device ID, device name, public key
+        - Mitigation: Device whitelist, HMAC verification, session timeouts
+        - Flight data encrypted after handshake completes
         """
         try:
             # SECURITY: Validate message structure first

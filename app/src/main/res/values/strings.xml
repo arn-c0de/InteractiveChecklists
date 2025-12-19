@@ -354,7 +354,7 @@
     <string name="datapad_configuration_tips_label">Configuration Tips</string>
     <string name="datapad_configuration_tips_text">• Changing settings will restart the UDP socket
 • The Pre-Shared Key must match on both sides
-• Reset Key restores the default key (change it for production)
+• Reset Key generates a new secure PSK (save and distribute to server)
 • Leave Bind IP empty to listen on all interfaces
 • Default port: 5010</string>
 
@@ -373,6 +373,7 @@
     <string name="datapad_server_ip_hint">Leave empty for broadcast discovery (less secure)</string>
     <string name="datapad_psk_handshake_hint">PSK used only for handshake encryption, data uses session key</string>
     <string name="datapad_ecdh_info_title">ECDH Mode Information</string>
+    <string name="datapad_settings_generate_key">Generate Key</string>
     <string name="datapad_ecdh_info_text">• Device must be added to authorized_devices.json on DCS server\n• Handshake establishes session key automatically\n• Session key changes each connection (Forward Secrecy)\n• PSK only protects handshake, not data</string>
     <string name="datapad_ecdh_warning">⚠️ ECDH requires Python server update (see docs/technical/ECDH_HANDSHAKE_PROPOSAL.md)</string>
     <string name="datapad_settings_psk_handshake">Pre-Shared Key (for handshake)</string>

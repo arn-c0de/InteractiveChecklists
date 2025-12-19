@@ -44,11 +44,99 @@ DEFAULT_FILE = os.path.expanduser(r"~\Saved Games\DCS\Scripts\player_aircraft_pa
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 5010
 
-# Pre-Shared Key (32 bytes for AES-256) - MUST match Android app!
-# Change this to your own random key in production!
-# WARNING: This file ships with a default key for convenience — change it before using in production.
-DEFAULT_PRE_SHARED_KEY = b'DCS_DataPad_Secret_Key_32BYTES!!'
-PRE_SHARED_KEY = DEFAULT_PRE_SHARED_KEY
+# Pre-Shared Key configuration
+# SECURITY: PSK must be configured externally or via config file
+# DO NOT hardcode production keys in this script
+_PSK_CONFIG_FILE = "datapad_config.json"
+PRE_SHARED_KEY = None  # Will be loaded from config or environment
+
+
+def load_psk_from_config() -> bytes | None:
+    """Load PSK from configuration file or environment variable
+    
+    Priority:
+    1. Environment variable DATAPAD_PSK (base64 encoded)
+    2. Configuration file datapad_config.json
+    3. Interactive prompt for user input
+    
+    Returns: 32-byte PSK or None
+    """
+    import os
+    import json
+    import base64
+    import getpass
+    
+    # Try environment variable first
+    psk_env = os.environ.get('DATAPAD_PSK')
+    if psk_env:
+        try:
+            psk_bytes = base64.b64decode(psk_env)
+            if len(psk_bytes) >= 32:
+                logger.info("✓ Loaded PSK from environment variable")
+                return psk_bytes[:32]
+            else:
+                logger.warning(f"⚠️ PSK from environment too short: {len(psk_bytes)} bytes (need 32)")
+        except Exception as e:
+            logger.error(f"❌ Failed to decode PSK from environment: {e}")
+    
+    # Try config file
+    if os.path.exists(_PSK_CONFIG_FILE):
+        try:
+            with open(_PSK_CONFIG_FILE, 'r') as f:
+                config = json.load(f)
+                psk_b64 = config.get('pre_shared_key')
+                if psk_b64:
+                    psk_bytes = base64.b64decode(psk_b64)
+                    if len(psk_bytes) >= 32:
+                        logger.info(f"✓ Loaded PSK from config file: {_PSK_CONFIG_FILE}")
+                        return psk_bytes[:32]
+                    else:
+                        logger.warning(f"⚠️ PSK from config too short: {len(psk_bytes)} bytes (need 32)")
+        except Exception as e:
+            logger.error(f"❌ Failed to load PSK from config: {e}")
+    
+    # Interactive prompt (console mode only)
+    if sys.stdin.isatty():
+        print("\n" + "="*60)
+        print("🔐 PSK Configuration Required")
+        print("="*60)
+        print("No Pre-Shared Key (PSK) found in environment or config.")
+        print("You can:")
+        print("  1. Set environment variable: DATAPAD_PSK=<base64_encoded_key>")
+        print(f"  2. Create config file: {_PSK_CONFIG_FILE}")
+        print("  3. Enter PSK now (32 characters minimum)")
+        print("="*60)
+        
+        psk_input = getpass.getpass("Enter PSK (or press Enter to generate random): ")
+        if not psk_input:
+            # Generate random PSK
+            import secrets
+            psk_bytes = secrets.token_bytes(32)
+            psk_b64 = base64.b64encode(psk_bytes).decode('utf-8')
+            print(f"\n✓ Generated random PSK: {psk_b64}")
+            print("⚠️ SAVE THIS KEY - You'll need it for the Android app!")
+            print(f"💡 Store in: {_PSK_CONFIG_FILE}")
+            
+            # Offer to save
+            save = input("\nSave to config file? (y/n): ").strip().lower()
+            if save == 'y':
+                try:
+                    with open(_PSK_CONFIG_FILE, 'w') as f:
+                        json.dump({'pre_shared_key': psk_b64}, f, indent=2)
+                    print(f"✓ Saved to {_PSK_CONFIG_FILE}")
+                except Exception as e:
+                    print(f"❌ Failed to save: {e}")
+            
+            return psk_bytes
+        else:
+            # Use provided PSK
+            psk_bytes = psk_input.encode('utf-8')
+            if len(psk_bytes) < 32:
+                logger.error(f"❌ PSK too short: {len(psk_bytes)} bytes (need 32)")
+                return None
+            return psk_bytes[:32]
+    
+    return None
 
 
 def find_dcs_scripts_folder() -> str | None:
@@ -131,23 +219,31 @@ def find_export_file(scripts_dir: str) -> str | None:
 
 
 def check_psk_security():
-    """Check if default PSK is used and require confirmation (only for PSK mode)"""
-    if PRE_SHARED_KEY == DEFAULT_PRE_SHARED_KEY:
-        sys.stderr.write("\n" + "="*70 + "\n")
-        sys.stderr.write("⚠️  SECURITY WARNING: Using default PRE_SHARED_KEY!\n")
-        sys.stderr.write("="*70 + "\n")
-        sys.stderr.write("This is INSECURE for production use!\n")
-        sys.stderr.write("Change PRE_SHARED_KEY in this file or use --use-handshake for ECDH.\n")
-        sys.stderr.write("See docs/technical/AES_GCM_ENCRYPTION.md for details.\n")
-        sys.stderr.write("="*70 + "\n")
+    """Validate PSK configuration and security"""
+    global PRE_SHARED_KEY
+    
+    if PRE_SHARED_KEY is None:
+        # Load PSK from config/environment
+        PRE_SHARED_KEY = load_psk_from_config()
         
-        # Require explicit confirmation
+        if PRE_SHARED_KEY is None:
+            sys.stderr.write("\n❌ ERROR: No PSK configured!\n")
+            sys.stderr.write("Options:\n")
+            sys.stderr.write("  1. Set DATAPAD_PSK environment variable (base64)\n")
+            sys.stderr.write(f"  2. Create {_PSK_CONFIG_FILE} with 'pre_shared_key'\n")
+            sys.stderr.write("  3. Use --use-handshake for ECDH mode (recommended)\n")
+            sys.exit(1)
+    
+    # Validate PSK length
+    if len(PRE_SHARED_KEY) < 32:
+        sys.stderr.write(f"\n⚠️ WARNING: PSK too short ({len(PRE_SHARED_KEY)} bytes, need 32)\n")
+        sys.stderr.write("PSK will be padded, but this reduces security.\n")
+        sys.stderr.write("Recommended: Use 32-byte (256-bit) key or ECDH mode.\n")
+        
         try:
-            response = input("\nType 'ACCEPT' to continue with default key (insecure): ")
-            if response.strip().upper() != 'ACCEPT':
-                sys.stderr.write("\n❌ Aborted. Please configure a secure key or use ECDH mode.\n")
+            response = input("\nContinue anyway? (y/n): ")
+            if response.strip().lower() != 'y':
                 sys.exit(1)
-            sys.stderr.write("\n✅ Proceeding with default key (NOT RECOMMENDED)\n\n")
         except (EOFError, KeyboardInterrupt):
             sys.stderr.write("\n\n❌ Aborted by user.\n")
             sys.exit(1)
