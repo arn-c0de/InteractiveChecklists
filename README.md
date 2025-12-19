@@ -81,7 +81,7 @@ DataPad is an experimental feature that receives real-time aircraft telemetry fr
 **Quick Start (ECDH Mode):**
 ```bash
 # Python: Enable handshake mode
-python forward_parsed_udp.py --host 192.168.178.100 --port 5010 --use-handshake --verbose
+python forward_parsed_udp.py --repeat-last --interval 1 --host 192.168.178.101 --port 5010 --verbose --authorized-devices authorized_devices.json --bind-ip 192.168.178.100
 
 # Android: Settings → DataPad → Enable "ECDH Handshake Mode"
 # Add your device ID to authorized_devices.json on server
