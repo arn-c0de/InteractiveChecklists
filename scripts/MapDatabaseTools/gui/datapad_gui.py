@@ -1,7 +1,8 @@
 """
-DataPad GUI - Live Flight Data Display
+DataPad GUI - Live Flight Data Display (ECDH-only)
 Visualizes DCS flight data received via UDP in a PySide6 GUI.
 Matches the layout and functionality of the Kotlin DataPadPopup.
+PSK mode has been removed - only ECDH encryption is supported.
 """
 
 import sys
@@ -27,11 +28,10 @@ import os
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'datapad_config.json')
 
 def load_config() -> dict:
-    """Load config from file or return defaults"""
+    """Load config from file or return defaults (ECDH-only mode)"""
     defaults = {
         'senderIp': '192.168.178.100',
         'senderPort': None,  # Use same as port if not specified
-        'useEcdh': False,
         'deviceName': 'Python DataPad',
         'port': 5010,
         'bindIp': '0.0.0.0'  # Default to all interfaces for ECDH compatibility
@@ -86,32 +86,15 @@ class SettingsDialog(QDialog):
         self.ip_edit.setPlaceholderText("0.0.0.0 (all interfaces)")
         ip_layout.addWidget(self.ip_edit)
         layout.addLayout(ip_layout)
-        
-        # Pre-Shared Key (only for non-ECDH mode)
-        key_layout = QHBoxLayout()
-        self.psk_label = QLabel("Pre-Shared Key (32 chars):")
-        key_layout.addWidget(self.psk_label)
-        psk_value = self.receiver.pre_shared_key.decode('utf-8') if self.receiver.pre_shared_key else ""
-        self.key_edit = QLineEdit(psk_value)
-        self.key_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        self.key_edit.setPlaceholderText("Not needed when using ECDH")
-        key_layout.addWidget(self.key_edit)
-        layout.addLayout(key_layout)
-        
-        # ECDH Section
-        ecdh_group = QGroupBox("ECDH Handshake Settings")
+
+        # ECDH Section (ECDH-only mode, no PSK support)
+        ecdh_group = QGroupBox("ECDH Handshake Settings (Required)")
         ecdh_layout = QVBoxLayout()
         
         # Load persistent device
         from network.ecdh_device import load_device, get_public_key_b64_from_pem
         persistent_device = load_device()
-        
-        # Enable ECDH checkbox
-        self.ecdh_checkbox = QCheckBox("Enable ECDH Handshake")
-        self.ecdh_checkbox.setChecked(self.config.get('useEcdh', False))
-        self.ecdh_checkbox.toggled.connect(self._on_ecdh_toggled)
-        ecdh_layout.addWidget(self.ecdh_checkbox)
-        
+
         # Sender IP
         sender_ip_layout = QHBoxLayout()
         sender_ip_layout.addWidget(QLabel("Sender IP:"))
@@ -172,10 +155,7 @@ class SettingsDialog(QDialog):
         
         ecdh_group.setLayout(ecdh_layout)
         layout.addWidget(ecdh_group)
-        
-        # Update ECDH fields state
-        self._on_ecdh_toggled(self.ecdh_checkbox.isChecked())
-        
+
         # Info label
         info = QLabel("Changes require restart of the receiver")
         info.setStyleSheet("color: gray; font-style: italic;")
@@ -193,24 +173,6 @@ class SettingsDialog(QDialog):
 
         self.setLayout(layout)
 
-        # Set initial state of PSK field based on ECDH checkbox
-        self._on_ecdh_toggled(self.ecdh_checkbox.isChecked())
-    
-    def _on_ecdh_toggled(self, checked: bool):
-        """Enable/disable ECDH fields based on checkbox"""
-        self.sender_ip_edit.setEnabled(checked)
-        self.device_name_edit.setEnabled(checked)
-        self.sender_port_edit.setEnabled(checked)
-
-        # Disable PSK field when ECDH is enabled
-        self.key_edit.setEnabled(not checked)
-        self.psk_label.setEnabled(not checked)
-
-        if checked:
-            self.key_edit.setStyleSheet("background-color: #2a2a2a; color: #666;")
-        else:
-            self.key_edit.setStyleSheet("")
-    
     def _copy_pubkey(self):
         """Copy public key to clipboard"""
         from PySide6.QtWidgets import QApplication
@@ -224,96 +186,76 @@ class SettingsDialog(QDialog):
         QMessageBox.information(self, "Copied", "Device ID copied to clipboard!")
         
     def save_and_restart(self):
-        """Save settings and restart receiver"""
+        """Save settings and restart receiver (ECDH-only mode)"""
         try:
-            import uuid
             from network.datapad_receiver import DataPadReceiver
-            
+
             port = int(self.port_edit.text())
             if port < 1024 or port > 65535:
                 QMessageBox.warning(self, "Invalid Port", "Port must be between 1024 and 65535")
                 return
 
-            # ECDH settings
-            use_ecdh = self.ecdh_checkbox.isChecked()
+            # ECDH settings (always required)
+            sender_ip = self.sender_ip_edit.text().strip()
+            device_name = self.device_name_edit.text().strip() or "Python DataPad"
 
-            # Validate PSK only if NOT using ECDH
-            key = self.key_edit.text() if not use_ecdh else None
-            if not use_ecdh and key and len(key) != 32:
-                QMessageBox.warning(self, "Invalid Key", "Pre-shared key must be exactly 32 characters (not needed for ECDH mode)")
-                return
-            sender_ip = self.sender_ip_edit.text() if use_ecdh else None
-            device_name = self.device_name_edit.text() if use_ecdh else "Python DataPad"
-            
-            if use_ecdh and not sender_ip:
+            if not sender_ip:
                 QMessageBox.warning(self, "Invalid Input", "Sender IP is required for ECDH mode")
                 return
-            
-            # Load or create persistent device (device_id is auto-managed)
+
+            # Load or create persistent device
             from network.ecdh_device import get_or_create_device
             device = get_or_create_device()
-            device_id = device['deviceId'] if use_ecdh else None
-            
+            device_id = device['deviceId']
+
             # Save config
-            self.config['useEcdh'] = use_ecdh
-            self.config['senderIp'] = sender_ip or ''
+            self.config['senderIp'] = sender_ip
             sender_port_text = self.sender_port_edit.text().strip()
             self.config['senderPort'] = int(sender_port_text) if sender_port_text else None
             self.config['deviceName'] = device_name
             self.config['port'] = port
-            self.config['bindIp'] = self.ip_edit.text()
+            self.config['bindIp'] = '0.0.0.0'  # ECDH requires binding to all interfaces
             save_config(self.config)
-            
+
             # Stop old receiver
             self.receiver.stop()
-            
-            # For ECDH: need to bind to 0.0.0.0 to reach external sender
-            bind_ip = self.ip_edit.text()
-            allow_bind_all = False
-            if use_ecdh:
-                bind_ip = '0.0.0.0'
-                allow_bind_all = True
-                # Update config with correct bind IP
-                self.config['bindIp'] = '0.0.0.0'
-            
-            # Create new receiver with updated settings
+
+            # Create new receiver with updated settings (ECDH-only)
             new_receiver = DataPadReceiver(
                 port=port,
-                bind_ip=bind_ip,
-                allow_bind_all=allow_bind_all,
-                pre_shared_key=key,
-                use_ecdh=use_ecdh,
+                bind_ip='0.0.0.0',
+                allow_bind_all=True,
                 sender_ip=sender_ip,
                 sender_port=self.config.get('senderPort'),
                 device_id=device_id,
                 device_name=device_name
             )
-            
+
             # Copy callbacks
             new_receiver.data_callbacks = self.receiver.data_callbacks
             new_receiver.connection_callbacks = self.receiver.connection_callbacks
-            
+
             # Replace receiver in parent
             if hasattr(self.parent(), 'receiver'):
                 self.parent().receiver = new_receiver
-            
+
             # Start new receiver
             new_receiver.start()
-            
-            if use_ecdh:
-                from network.ecdh_device import get_public_key_b64_from_pem
-                pubkey = get_public_key_b64_from_pem(device['privateKeyPem'])
-                QMessageBox.information(
-                    self,
-                    "ECDH Enabled",
-                    f"ECDH handshake enabled.\n\n"
-                    f"Device ID: {device_id}\n"
-                    f"Public Key: {pubkey[:32]}...\n\n"
-                    f"⚠️ Add this device to authorized_devices.json on sender:\n{sender_ip}"
-                )
-            
+
+            # Show ECDH info
+            from network.ecdh_device import get_public_key_b64_from_pem
+            pubkey = get_public_key_b64_from_pem(device['privateKeyPem'])
+            QMessageBox.information(
+                self,
+                "Settings Saved",
+                f"ECDH handshake settings saved.\n\n"
+                f"Device ID: {device_id}\n"
+                f"Public Key: {pubkey[:32]}...\n\n"
+                f"⚠️ Add this device to authorized_devices.json on sender:\n{sender_ip}"
+            )
+
             self.accept()
-            
+
         except ValueError:
             QMessageBox.warning(self, "Invalid Input", "Port must be a number")
 
@@ -327,27 +269,20 @@ class DataPadGUI(QMainWindow):
         # Load config and create receiver with saved settings
         config = load_config()
         
-        # Load persistent device for ECDH if enabled
-        device_id = None
-        if config.get('useEcdh', False):
-            from network.ecdh_device import get_or_create_device
-            device = get_or_create_device()
-            device_id = device['deviceId']
-        
-        # For ECDH: need to bind to 0.0.0.0 to reach external sender
-        bind_ip = config.get('bindIp', '127.0.0.1')
-        allow_bind_all = False
-        if config.get('useEcdh', False):
-            bind_ip = '0.0.0.0'
-            allow_bind_all = True
-        
+        # ECDH-only mode: always load persistent device
+        from network.ecdh_device import get_or_create_device
+        device = get_or_create_device()
+        device_id = device['deviceId']
+
+        # ECDH mode requires binding to receive handshakes
+        bind_ip = config.get('bindIp', '0.0.0.0')
+        allow_bind_all = True
+
         self.receiver = DataPadReceiver(
             port=config.get('port', 5010),
             bind_ip=bind_ip,
             allow_bind_all=allow_bind_all,
-            pre_shared_key=config.get('pre_shared_key') if not config.get('useEcdh', False) else None,
-            use_ecdh=config.get('useEcdh', False),
-            sender_ip=config.get('senderIp') if config.get('useEcdh') else None,
+            sender_ip=config.get('senderIp'),
             sender_port=config.get('senderPort'),
             device_id=device_id,
             device_name=config.get('deviceName', 'Python DataPad')

@@ -1,119 +1,54 @@
 # AES-GCM Encryption for DataPad
 
 ## Overview
-Communication between the Python script and the Android app is protected using **AES-GCM** (Authenticated Encryption with Associated Data).
+DataPad communication is protected using **ECDH (Elliptic Curve Diffie-Hellman)** key exchange with **AES-GCM** (Authenticated Encryption with Associated Data).
 
-## Implemented changes
+## Security Architecture
 
-### 1. Python script (`forward_parsed_udp.py`)
-- ✅ AES-GCM encryption with a 256-bit pre-shared key
-- ✅ Random 12-byte nonce per packet
-- ✅ AEAD (authenticated encryption) provides integrity and authenticity
-- ✅ Optional disable with the `--no-encrypt` flag
+### ECDH Key Exchange (Primary Method)
+DataPad uses ECDH for secure key agreement between the server and Android device:
 
-### 2. Android app (`DataPadManager.kt`)
-- ✅ AES-GCM decryption using `javax.crypto`
-- ✅ Automatic validation of packet authenticity
-- ✅ Error handling for invalid packets
+1. **Perfect Forward Secrecy**: Each session uses unique ephemeral keys
+2. **Mutual Authentication**: Both server and client verify each other's identity
+3. **Device Authorization**: Server maintains a whitelist of authorized devices (`authorized_devices.json`)
+4. **Session-based Encryption**: AES-GCM encryption uses session keys derived from ECDH
 
-### 3. UI updates (`DataPadPopup.kt`)
-- ✅ "🔒 AES-GCM encrypted" status indicator
-- ✅ Updated command-line messages
+### Encryption Details
+- **Algorithm**: AES-256-GCM
+- **Key Derivation**: HKDF-SHA256 with random salt
+- **Nonce**: Counter-based nonces (prevents collision and replay attacks)
+- **Authentication**: HMAC-SHA256 for key confirmation
+- **Replay Protection**: Sliding-window nonce validation
 
-## Installation
+## Setup
 
-### Python side
-```bash
-pip install cryptography
-```
+For complete setup instructions, see:
+- **[ECDH Usage Guide](ECDH_USAGE_GUIDE.md)** - Step-by-step setup and configuration
 
-### Android side
-No additional dependencies required — uses `javax.crypto` (standard Android API).
+## Implementation
 
-> Notes: Follow the instructions in this document to generate and configure the pre-shared key securely on both sides.
+### Python side (`forward_parsed_udp.py`)
+- ✅ ECDH handshake protocol
+- ✅ AES-GCM encryption with session keys
+- ✅ Counter-based nonce generation (server side: 0x01 prefix)
+- ✅ Device authorization via `authorized_devices.json`
+- ✅ HKDF-SHA256 for key derivation
 
-## Usage
+### Android side (`DataPadManager.kt`, `EncryptionProvider.kt`)
+- ✅ ECDH key pair generation and storage in Android KeyStore
+- ✅ Handshake client (ClientHello → ServerHello → KeyConfirm → Ack)
+- ✅ AES-GCM decryption using session keys
+- ✅ Counter-based nonce validation (client side: 0x00 prefix)
+- ✅ Replay attack protection
 
-### Encrypted (recommended)
-```bash
-python forward_parsed_udp.py --host 192.168.178.100 --port 5010
-```
+## Migration from Legacy PSK
 
-### Unencrypted (not recommended)
-```bash
-python forward_parsed_udp.py --host 192.168.178.100 --port 5010 --no-encrypt
-```
+**Note**: Legacy PSK mode has been removed. All connections now use ECDH.
 
-## Pre-Shared Key
+If you were previously using PSK mode:
+1. Update your server to the latest version
+2. Generate device keys on Android (automatic on first launch)
+3. Add your device ID to `authorized_devices.json` on the server
+4. Restart both server and Android app
 
-**Important:** The pre-shared key **must** be identical on both sides. Prefer generating a random 32‑byte (256‑bit) key and use a hex string to avoid accidentally checking secrets into the repository.
-
-Example: Generate a 32-byte key (hex):
-
-```bash
-python - <<'PY'
-import os
-print(os.urandom(32).hex())
-PY
-```
-
-Configure in Python (safer: hex-to-bytes):
-
-```python
-# forward_parsed_udp.py
-PRE_SHARED_KEY = bytes.fromhex('your_64_char_hex_key_here')
-```
-
-Configure in Android/Kotlin:
-
-```kotlin
-// Helper to convert hex string to byte array
-private fun hexStringToByteArray(hex: String): ByteArray {
-    val len = hex.length
-    val data = ByteArray(len / 2)
-    var i = 0
-    while (i < len) {
-        data[i / 2] = ((Character.digit(hex[i], 16) shl 4) + Character.digit(hex[i + 1], 16)).toByte()
-        i += 2
-    }
-    return data
-}
-
-// Use the hex key generated above
-private val PRE_SHARED_KEY = hexStringToByteArray("your_64_char_hex_key_here")
-```
-
-### In production
-- Distribute and store keys securely (out-of-band), rotate them as needed, and avoid checking secrets into the repository.
-
-## Security properties
-
-✅ **Confidentiality**: Data is encrypted using AES-256
-✅ **Integrity**: GCM authentication tag prevents tampering
-✅ **Authenticity**: Only clients with the correct key can decrypt
-✅ **Replay protection**: Each packet uses a unique nonce
-
-## Packet format
-
-```
-[12 Bytes Nonce][Encrypted JSON][16 Bytes GCM Tag]
-```
-
-Minimum packet size: 28 bytes (nonce + tag)
-
-## Troubleshooting
-
-### "Failed to decrypt packet - check Pre-Shared Key!"
-- Ensure the pre-shared key is identical in both configurations
-- Ensure the Python script has the `cryptography` package installed
-
-### Python import errors
-```bash
-pip install --upgrade cryptography
-```
-
-## Notes
-
-- Pylance may show unresolved-import warnings in VSCode if `cryptography` is not installed in the active Python environment
-- Encryption is enabled by default — use `--no-encrypt` only for debugging
-- The app shows "🔒 AES-GCM encrypted" in the connection status
+See [ECDH Usage Guide](ECDH_USAGE_GUIDE.md) for detailed migration instructions.

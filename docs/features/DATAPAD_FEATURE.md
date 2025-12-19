@@ -3,7 +3,7 @@
 ## Overview
 DataPad is a live flight data display panel that receives real-time aircraft telemetry via UDP from DCS World through the `forward_parsed_udp.py` script.
 
-Phase 1 (experimental): This implementation represents Phase 1 of DataPad. Future phases will expand telemetry coverage and add visual and security improvements, including live animated aircraft visualizations based on flight attitude and a dedicated DataPad UI redesign. DataPad now supports AES-GCM encrypted UDP telemetry (AEAD) with a pre-shared key. See `docs/technical/AES_GCM_ENCRYPTION.md` for configuration and key setup.
+Phase 1 (experimental): This implementation represents Phase 1 of DataPad. Future phases will expand telemetry coverage and add visual and security improvements, including live animated aircraft visualizations based on flight attitude and a dedicated DataPad UI redesign. DataPad uses ECDH key exchange with AES-GCM encrypted UDP telemetry for secure communication. See `docs/technical/ECDH_USAGE_GUIDE.md` for setup instructions.
 
 ## Architecture
 
@@ -163,9 +163,12 @@ New-NetFirewallRule -DisplayName "DCS DataPad" -Direction Inbound -Protocol UDP 
 - `INTERNET` permission is required in AndroidManifest.xml (already added)
 
 ## Security
-- AES-GCM encryption for UDP telemetry is **enabled by default** in the Python forwarder (`forward_parsed_udp.py`).
-- To temporarily disable encryption for debugging use `--no-encrypt` (not recommended in production).
-- The Pre-Shared Key (32 bytes) **must match** on both Python and Android sides. See `docs/technical/AES_GCM_ENCRYPTION.md` for generation and configuration instructions.- The DataPad UI exposes a **Settings** dialog (⚙️) where you can change the UDP port, bind IP, and Pre-Shared Key. The dialog includes a **Reset Key** action which restores the default key — **you should change the key after resetting (do not use default in production)**.
+- DataPad uses **ECDH (Elliptic Curve Diffie-Hellman) key exchange** for secure communication
+- All telemetry is encrypted with **AES-GCM** using session keys derived from ECDH
+- Perfect Forward Secrecy ensures past sessions remain secure even if keys are compromised
+- Device authorization via `authorized_devices.json` on the server
+- See `docs/technical/ECDH_USAGE_GUIDE.md` for complete setup and security configuration
+- The DataPad UI Settings dialog (⚙️) allows you to configure UDP port, bind IP, device name, and server IP for handshake
 ## Data Format
 Expected JSON format (one object per UDP datagram):
 
