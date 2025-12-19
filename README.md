@@ -103,6 +103,9 @@ Planned enhancements include additional telemetry (speed, vertical speed, fuel, 
 		<img src="images/pdf_viewer.png" alt="PDF viewer with annotation tools" width="360" />
 		<img src="images/quick_notes.png" alt="QuickNotes bottom sheet and editor" width="360" />
 		<img src="images/map_viewer.png" alt="Aviation map viewer with terrain" width="360" />
+		<img src="images/map-route.png" alt="Route lines overlay with labels" width="360" />
+		<img src="images/routeplanner.png" alt="Route planner - line preview" width="360" />
+		<img src="images/landingroute-planner.png" alt="Create Route sheet" width="360" />
 		<img src="images/datapad.png" alt="DataPad live telemetry panel" width="360" />
 		<img src="images/settings_menu.png" alt="Settings and preferences" width="360" />
 </p>
