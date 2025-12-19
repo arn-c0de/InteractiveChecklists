@@ -15,6 +15,10 @@ import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -105,6 +109,12 @@ fun MapViewer(
     
     // Military symbol placement state
     var pendingSymbolPlacement by remember { mutableStateOf<Pair<MilitarySymbol, SymbolAffiliation>?>(null) }
+
+    // Pending move marker id (driven by MapActionBus)
+    val pendingMoveMarkerIdFlow = MapActionBus.pendingMoveMarkerId
+    val pendingMoveMarkerId by pendingMoveMarkerIdFlow.collectAsState(initial = null)
+
+    var pendingMoveTargetName by remember { mutableStateOf<String?>(null) }
     
     // Store last valid player position to prevent reset during recompositions
     var lastValidPlayerPosition by remember { mutableStateOf<GeoPoint?>(null) }
@@ -114,6 +124,19 @@ fun MapViewer(
     // Selected location for marker details in management sheet
     var selectedLocation by remember { mutableStateOf<com.example.checklist_interactive.data.tactical.LocationEntity?>(null) }
     var selectedRunways by remember { mutableStateOf<List<com.example.checklist_interactive.data.tactical.RunwayEntity>>(emptyList()) }
+
+    // Radial menu state
+    var radialMenuVisible by remember { mutableStateOf(false) }
+    var radialMenuX by remember { mutableStateOf(0) }
+    var radialMenuY by remember { mutableStateOf(0) }
+    var radialMenuMarker by remember { mutableStateOf<com.example.checklist_interactive.data.tactical.LocationEntity?>(null) }
+
+    // Track last long-pressed marker to suppress immediately following click
+    var lastLongPressedMarkerId by remember { mutableStateOf<Int?>(null) }
+    var lastLongPressTime by remember { mutableStateOf(0L) }
+
+    // Map from Marker object to LocationEntity to robustly find marker data
+    val markerToLocation = remember { mutableMapOf<org.osmdroid.views.overlay.Marker, com.example.checklist_interactive.data.tactical.LocationEntity>() }
 
     // Create a coroutine scope for state updates from listeners
     val scope = rememberCoroutineScope()
@@ -461,37 +484,58 @@ fun MapViewer(
                     val mapEventsReceiver = object : org.osmdroid.events.MapEventsReceiver {
                         override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
                             p?.let { geoPoint ->
-                                pendingSymbolPlacement?.let { (symbol, affiliation) ->
-                                    // Place military symbol at clicked location
-                                    scope.launch {
-                                        try {
-                                            val newLocation = com.example.checklist_interactive.data.tactical.LocationEntity(
-                                                name = "${symbol.name} - ${java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}",
-                                                latitude = geoPoint.latitude,
-                                                longitude = geoPoint.longitude,
-                                                markerType = "tactical_military",
-                                                coalition = affiliation.name.lowercase(),
-                                                symbolSet = symbol.symbolSet,
-                                                symbolEntity = symbol.symbolEntity,
-                                                symbolAffiliation = affiliation.name.lowercase(),
-                                                symbolColor = String.format("#%06X", (0xFFFFFF and affiliation.color.hashCode())),
-                                                icon = "ic_mapicon_${symbol.id}",
-                                                description = "Military symbol: ${symbol.name}"
-                                            )
-                                            
-                                            val insertedId = locationRepository.saveLocation(newLocation)
-                                            Log.d(TAG, "Placed military symbol: ${symbol.name} at ${geoPoint.latitude}, ${geoPoint.longitude} (id=$insertedId)")
-                                            
-                                            // Clear pending placement and optionally set selectedLocation
-                                            pendingSymbolPlacement = null
-                                            // Optionally fetch the saved entity if needed
-                                            // selectedLocation = locationRepository.getLocationById(insertedId.toInt())
-                                        } catch (e: Exception) {
-                                            Log.e(TAG, "Failed to place military symbol", e)
+                                // 1) If a move is pending, use this tap to set new coords for that marker
+                                    if (pendingMoveMarkerId != null) {
+                                        val moveId = pendingMoveMarkerId
+                                        scope.launch {
+                                            try {
+                                                val loc = locationRepository.getLocationById(moveId!!)
+                                                if (loc != null) {
+                                                    val updated = loc.copy(latitude = geoPoint.latitude, longitude = geoPoint.longitude)
+                                                    locationRepository.updateLocation(updated)
+                                                    Log.d(TAG, "Moved marker id=$moveId to ${geoPoint.latitude},${geoPoint.longitude}")
+                                                }
+                                            } catch (e: Exception) {
+                                                Log.e(TAG, "Failed to move marker id=$moveId", e)
+                                            } finally {
+                                                MapActionBus.clear()
+                                            }
                                         }
+                                        return true
                                     }
-                                    return true
-                                }
+
+                                    // 2) Normal symbol placement flow
+                                    pendingSymbolPlacement?.let { (symbol, affiliation) ->
+                                        // Place military symbol at clicked location
+                                        scope.launch {
+                                            try {
+                                                val newLocation = com.example.checklist_interactive.data.tactical.LocationEntity(
+                                                    name = "${symbol.name} - ${java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}",
+                                                    latitude = geoPoint.latitude,
+                                                    longitude = geoPoint.longitude,
+                                                    markerType = "tactical_military",
+                                                    coalition = affiliation.name.lowercase(),
+                                                    symbolSet = symbol.symbolSet,
+                                                    symbolEntity = symbol.symbolEntity,
+                                                    symbolAffiliation = affiliation.name.lowercase(),
+                                                    symbolColor = String.format("#%06X", (0xFFFFFF and affiliation.color.hashCode())),
+                                                    icon = "ic_mapicon_${symbol.id}",
+                                                    description = "Military symbol: ${symbol.name}"
+                                                )
+                                                
+                                                val insertedId = locationRepository.saveLocation(newLocation)
+                                                Log.d(TAG, "Placed military symbol: ${symbol.name} at ${geoPoint.latitude}, ${geoPoint.longitude} (id=$insertedId)")
+                                                
+                                                // Clear pending placement and optionally set selectedLocation
+                                                pendingSymbolPlacement = null
+                                                // Optionally fetch the saved entity if needed
+                                                // selectedLocation = locationRepository.getLocationById(insertedId.toInt())
+                                            } catch (e: Exception) {
+                                                Log.e(TAG, "Failed to place military symbol", e)
+                                            }
+                                        }
+                                        return true
+                                    }
                             }
                             return false
                         }
@@ -505,22 +549,110 @@ fun MapViewer(
                     
                     mapView = this
 
-                    // Touch listener: mark when real user touches the map so we don't disable auto-center from animations
+                    // Touch listener: detect long-press on markers and mark user touch to disable auto-center
                     try {
+                        var downX = 0f
+                        var downY = 0f
+                        var moved = false
+                        var isDown = false
+                        var longPressJob: kotlinx.coroutines.Job? = null
+                        val longPressTimeoutMs = 600L
+                        val moveThresholdPx = with(density) { 10.dp.toPx() }
+
                         setOnTouchListener { _, ev ->
                             try {
-                                if (ev.action == MotionEvent.ACTION_DOWN || ev.action == MotionEvent.ACTION_MOVE) {
-                                    lastUserTouch.value = System.currentTimeMillis()
-                                    prefsManager.setMapAutoCenter(false)
-                                    // Use coroutine scope to properly update Compose state
-                                    scope.launch {
-                                        Log.d(TAG, "Touch detected - disabling autoCenter via scope.launch")
-                                        autoCenter = false
+                                when (ev.action) {
+                                    MotionEvent.ACTION_DOWN -> {
+                                        lastUserTouch.value = System.currentTimeMillis()
+                                        prefsManager.setMapAutoCenter(false)
+                                        scope.launch { autoCenter = false }
+
+                                        downX = ev.x
+                                        downY = ev.y
+                                        moved = false
+                                        isDown = true
+
+                                        longPressJob?.cancel()
+                                        longPressJob = scope.launch {
+                                            kotlinx.coroutines.delay(longPressTimeoutMs)
+                                            if (isDown && !moved) {
+                                                try {
+                                                    // Find nearest marker within radius
+                                                    val touchX = ev.x.toInt()
+                                                    val touchY = ev.y.toInt()
+                                                    var nearestMarker: org.osmdroid.views.overlay.Marker? = null
+                                                    var bestDist2 = Int.MAX_VALUE
+                                                    val radiusPx = (with(density) { 40.dp.toPx() }).toInt()
+
+                                                    for (o in overlays) {
+                                                        if (o is org.osmdroid.views.overlay.Marker && o != positionMarker) {
+                                                            val p = android.graphics.Point()
+                                                            projection.toPixels(o.position, p)
+                                                            val dx = p.x - touchX
+                                                            val dy = p.y - touchY
+                                                            val dist2 = dx * dx + dy * dy
+                                                            Log.d(TAG, "marker candidate at screen=(${p.x},${p.y}) dx=$dx dy=$dy dist2=$dist2")
+                                                            if (dist2 < bestDist2 && dist2 <= radiusPx * radiusPx) {
+                                                                bestDist2 = dist2
+                                                                nearestMarker = o
+                                                            }
+                                                        }
+                                                    }
+
+                                                    nearestMarker?.let { nm ->
+                                                        // Prefer mapping lookup; fall back to relatedObject
+                                                        val loc = markerToLocation[nm] ?: try { nm.relatedObject as? com.example.checklist_interactive.data.tactical.LocationEntity } catch (_: Throwable) { null }
+                                                        val point = android.graphics.Point()
+                                                        projection.toPixels(nm.position, point)
+                                                        // Convert MapView-local pixels to screen coordinates
+                                                        try {
+                                                            val mapLoc = IntArray(2)
+                                                            // `map` was an undefined identifier here; use the enclosing MapView instance. Inside the `apply` block the MapView receiver is `this@apply`.
+                                                            this@apply.getLocationOnScreen(mapLoc)
+                                                            val screenX = mapLoc[0] + point.x
+                                                            val screenY = mapLoc[1] + point.y
+                                                            Log.d(TAG, "nearestMarker=${nm.title} locFound=${loc != null} mapLoc=(${mapLoc[0]},${mapLoc[1]}) point=(${point.x},${point.y}) screen=(${screenX},${screenY})")
+                                                            if (loc != null) {
+                                                                // Show radial menu at marker screen coordinates
+                                                                scope.launch {
+                                                                    radialMenuMarker = loc
+                                                                    radialMenuX = screenX
+                                                                    radialMenuY = screenY
+                                                                    radialMenuVisible = true
+                                                                    lastLongPressedMarkerId = loc.id
+                                                                    lastLongPressTime = System.currentTimeMillis()
+                                                                }
+                                                            } else {
+                                                                Log.d(TAG, "Long-press found nearest marker but could not resolve LocationEntity")
+                                                            }
+                                                        } catch (e: Exception) {
+                                                            Log.e(TAG, "Failed to compute screen coords for marker", e)
+                                                        }
+                                                    }
+
+                                                } catch (_: Exception) {
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    MotionEvent.ACTION_MOVE -> {
+                                        lastUserTouch.value = System.currentTimeMillis()
+                                        if (kotlin.math.hypot((ev.x - downX).toDouble(), (ev.y - downY).toDouble()) > moveThresholdPx) {
+                                            moved = true
+                                            longPressJob?.cancel()
+                                        }
+                                    }
+
+                                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                                        isDown = false
+                                        longPressJob?.cancel()
                                     }
                                 }
                             } catch (_: Exception) {
                             }
-                            // Let MapView handle the touch too
+
+                            // Let MapView handle the touch normally (click listeners will be invoked unless suppressed)
                             false
                         }
                     } catch (_: Exception) {
@@ -583,7 +715,9 @@ fun MapViewer(
                     mapView?.let { mv ->
                         // Remove existing marker overlays (except position marker)
                         mv.overlays.removeAll { it is org.osmdroid.views.overlay.Marker && it != positionMarker }
-                        
+                        // Clear mapping to avoid holding stale references
+                        markerToLocation.clear()
+
                         // Add markers to map
                         markers.forEach { marker ->
                             val osmMarker = org.osmdroid.views.overlay.Marker(mv).apply {
@@ -609,7 +743,19 @@ fun MapViewer(
                                 
                                 // Set marker icon based on type
                                 setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_BOTTOM)
-                                
+
+                                // Attach LocationEntity to marker and keep mapping so we can find it from touch coords reliably
+                                try {
+                                    this.setRelatedObject(marker)
+                                } catch (_: Throwable) {
+                                    // ignore if API not available
+                                }
+                                try {
+                                    markerToLocation[this] = marker
+                                } catch (_: Throwable) {
+                                    // ignore mapping failures
+                                }
+
                                 // Different colors for different types
                                 val markerColor = when {
                                     marker.markerType == "airport" -> android.graphics.Color.parseColor("#8B4513")
@@ -779,9 +925,16 @@ fun MapViewer(
 
                             mv.overlays.add(osmMarker)
 
-                            // Attach click listener to marker (outside apply to avoid receiver resolution issues)
+                            // Attach click and long-press listeners to marker
                             osmMarker.setOnMarkerClickListener(object : org.osmdroid.views.overlay.Marker.OnMarkerClickListener {
                                 override fun onMarkerClick(markerView: org.osmdroid.views.overlay.Marker?, mapView: org.osmdroid.views.MapView?): Boolean {
+                                    // Suppress short click if it immediately followed a long-press on the same marker
+                                    if (lastLongPressedMarkerId == marker.id && System.currentTimeMillis() - lastLongPressTime < 1000L) {
+                                        lastLongPressedMarkerId = null
+                                        return true
+                                    }
+
+                                    // Short click: show marker details
                                     selectedLocation = marker
                                     showMarkerRouteManagement = true
 
@@ -796,6 +949,10 @@ fun MapViewer(
                                     return true
                                 }
                             })
+
+                            // TODO: Implement long press listener for radial menu
+                            // osmdroid doesn't have built-in long press support for markers
+                            // Consider implementing using GestureDetector or custom touch handling
                         }
                         
                         mv.invalidate()
@@ -1008,61 +1165,31 @@ fun MapViewer(
             }
         }
 
-        // Active Navigation HUD (top-center) - shows target, heading, distance
-        if (activeNavigationTarget != null && navigationDistanceNm != null && navigationHeading != null) {
+        // Move mode instruction banner
+        if (pendingMoveMarkerId != null) {
+            // Optionally resolve name for nicer text
+            LaunchedEffect(pendingMoveMarkerId) {
+                pendingMoveTargetName = try {
+                    locationRepository.getLocationById(pendingMoveMarkerId!!)?.name
+                } catch (_: Exception) {
+                    null
+                }
+            }
+
             Surface(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 8.dp)
-                    .widthIn(max = 400.dp),
-                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.95f),
+                    .padding(top = 16.dp)
+                    .widthIn(max = 800.dp)
+                    .clickable { /* do nothing - purely informational */ },
+                color = MaterialTheme.colorScheme.secondaryContainer,
                 shape = MaterialTheme.shapes.medium
             ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.Flight,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onErrorContainer,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "→ ${activeNavigationTarget!!.name}",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text(
-                                text = String.format("%.1f NM", navigationDistanceNm),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onErrorContainer
-                            )
-                            Text(
-                                text = String.format("%03.0f°", navigationHeading),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onErrorContainer
-                            )
-                        }
-                    }
-                    IconButton(
-                        onClick = { 
-                            activeNavigationTarget = null
-                            navigationLine = null
-                            navigationDistanceNm = null
-                            navigationHeading = null
-                        },
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = "Clear route",
-                            tint = MaterialTheme.colorScheme.onErrorContainer
-                        )
+                Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = "Move marker: ${pendingMoveTargetName ?: pendingMoveMarkerId}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    TextButton(onClick = { MapActionBus.clear() }) {
+                        Text("Cancel")
                     }
                 }
             }
@@ -1212,6 +1339,11 @@ fun MapViewer(
                     mv.overlays.add(rr)
                     rangeRingsOverlay = rr
                 }
+                if (mgrsGridEnabled && mgrsGridOverlay == null) {
+                    val mg = MgrsGridOverlay()
+                    mv.overlays.add(mg)
+                    mgrsGridOverlay = mg
+                }
                 mv.invalidate()
             }
         }
@@ -1347,6 +1479,61 @@ fun MapViewer(
                 Log.d(TAG, "Pending military symbol selected: ${symbol.name} (${affiliation.name})")
                 showMilitarySymbolPicker = false
             }
+        )
+    }
+    
+    // Radial menu
+    if (radialMenuVisible && radialMenuMarker != null) {
+        val items = mutableListOf<RadialMenuItem>().apply {
+            add(RadialMenuItem(
+                icon = Icons.Default.Info,
+                label = "Info",
+                onClick = {
+                    selectedLocation = radialMenuMarker
+                    showMarkerRouteManagement = true
+                }
+            ))
+
+            add(RadialMenuItem(
+                icon = Icons.Default.Edit,
+                label = "Edit",
+                onClick = {
+                    selectedLocation = radialMenuMarker
+                    showMarkerRouteManagement = true
+                }
+            ))
+
+            add(RadialMenuItem(
+                icon = Icons.Default.Navigation,
+                label = "Navigate",
+                onClick = {
+                    radialMenuMarker?.let { marker ->
+                        activeNavigationTarget = marker
+                    }
+                }
+            ))
+
+            // Only show Delete for non-static markers
+            if (radialMenuMarker?.isStatic != 1) {
+                add(RadialMenuItem(
+                    icon = Icons.Default.Delete,
+                    label = "Delete",
+                    onClick = {
+                        radialMenuMarker?.let { marker ->
+                            scope.launch {
+                                locationRepository.deleteLocation(marker.id)
+                            }
+                        }
+                    }
+                ))
+            }
+        }
+
+        RadialMenu(
+            centerX = radialMenuX,
+            centerY = radialMenuY,
+            onDismiss = { radialMenuVisible = false },
+            items = items
         )
     }
     

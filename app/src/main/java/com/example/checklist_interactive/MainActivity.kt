@@ -133,7 +133,7 @@ class MainActivity : ComponentActivity() {
             // Restore last main page preference (0=file list, 1=tabs/viewer)
             var showFileList by remember { mutableStateOf(prefsManager.getLastMainPage() == 0) }
             var showSettings by remember { mutableStateOf(false) }
-            var isScreenLocked by remember { mutableStateOf(false) }
+            var isScreenLocked by remember { mutableStateOf(prefsManager.isScreenLocked()) }
             val backHandlerEnabled = openTabs.isNotEmpty() || showSettings
 
             // Handle Android back button: return to file list instead of closing app
@@ -496,7 +496,10 @@ class MainActivity : ComponentActivity() {
                                         // Render aviation map viewer
                                         com.example.checklist_interactive.ui.maps.MapViewer(
                                             isScreenLocked = isScreenLocked,
-                                            onLockScreen = { isScreenLocked = !isScreenLocked }
+                                            onLockScreen = {
+                                                isScreenLocked = !isScreenLocked
+                                                prefsManager.setScreenLocked(isScreenLocked)
+                                            }
                                         )
                                     }
                                     is TabManager.TabContent.DocumentTab -> {
