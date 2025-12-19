@@ -19,6 +19,9 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FlightLand
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -106,7 +109,17 @@ fun MapViewer(
     var navigationLine by remember { mutableStateOf<org.osmdroid.views.overlay.Polyline?>(null) }
     var navigationDistanceNm by remember { mutableStateOf<Double?>(null) }
     var navigationHeading by remember { mutableStateOf<Double?>(null) }
-    
+
+    // Runway approach mode
+    var showRunwayApproach by remember { mutableStateOf(false) }
+    var targetRunways by remember { mutableStateOf<List<com.example.checklist_interactive.data.tactical.RunwayEntity>>(emptyList()) }
+    var runwayApproachLines by remember { mutableStateOf<List<org.osmdroid.views.overlay.Polyline>>(emptyList()) }
+    var selectedRunwayIndex by remember { mutableStateOf<Int?>(null) }
+    var originalAirportTarget by remember { mutableStateOf<com.example.checklist_interactive.data.tactical.LocationEntity?>(null) }
+    var selectedRunwayHeading by remember { mutableStateOf<Double?>(null) }
+    var finalApproachDistanceNm by remember { mutableStateOf(5.0) }
+    var selectedRunway by remember { mutableStateOf<com.example.checklist_interactive.data.tactical.RunwayEntity?>(null) }
+
     // Military symbol placement state
     var pendingSymbolPlacement by remember { mutableStateOf<Pair<MilitarySymbol, SymbolAffiliation>?>(null) }
 
@@ -356,7 +369,7 @@ fun MapViewer(
             // Update or create red navigation line
             scope.launch {
                 val line = navigationLine ?: org.osmdroid.views.overlay.Polyline(map).apply {
-                    outlinePaint.color = android.graphics.Color.RED
+                    outlinePaint.color = android.graphics.Color.argb(128, 255, 0, 0) // 50% transparent red
                     outlinePaint.strokeWidth = 10f
                     outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
                     map.overlays.add(this)
@@ -376,7 +389,143 @@ fun MapViewer(
             }
         }
     }
-    
+
+    // Load runways for active navigation target
+    LaunchedEffect(activeNavigationTarget) {
+        val target = activeNavigationTarget
+        // Only update original airport if it's a real location (not a temporary approach point)
+        if (target != null && target.id > 0) {
+            originalAirportTarget = target
+            // Load runways from database
+            val db = com.example.checklist_interactive.data.tactical.TacticalDatabase.getInstance(context, useExternalPath = false)
+            db.runwayDao().getRunwaysByLocation(target.id).collect { runways ->
+                targetRunways = runways
+            }
+        } else if (target == null) {
+            // Navigation cleared completely
+            targetRunways = emptyList()
+            originalAirportTarget = null
+            showRunwayApproach = false
+            selectedRunwayIndex = null
+            selectedRunwayHeading = null
+            selectedRunway = null
+        }
+        // If target.id == -1, it's an approach point - keep original airport and runways
+    }
+
+    // Helper function to extract runway heading from runway name
+    fun extractRunwayHeading(runwayName: String): Double? {
+        // Parse runway name like "12/30", "09/27", "13L/31R"
+        // Extract first number before "/" and multiply by 10
+        val match = runwayName.trim().split("/").firstOrNull()?.trim()
+        return match?.replace(Regex("[LCR]"), "")?.toIntOrNull()?.times(10)?.toDouble()
+    }
+
+    // Draw runway approach lines when enabled
+    LaunchedEffect(showRunwayApproach, targetRunways, originalAirportTarget, mapView, finalApproachDistanceNm) {
+        val map = mapView
+        val target = originalAirportTarget
+
+        // Remove existing approach lines
+        runwayApproachLines.forEach { line ->
+            map?.overlays?.remove(line)
+        }
+        runwayApproachLines = emptyList()
+
+        if (showRunwayApproach && target != null && map != null && targetRunways.isNotEmpty()) {
+            val newLines = mutableListOf<org.osmdroid.views.overlay.Polyline>()
+
+            targetRunways.forEach { runway ->
+                val heading = runway.headingDeg ?: extractRunwayHeading(runway.name) ?: 0.0
+                val center = GeoPoint(target.latitude, target.longitude)
+
+                // Calculate final approach distance in meters
+                val distanceMeters = finalApproachDistanceNm * 1852.0
+
+                // Direction 1: heading
+                val rad1 = Math.toRadians(heading)
+                val lat1 = Math.toRadians(center.latitude)
+                val lon1 = Math.toRadians(center.longitude)
+                val dLat1 = distanceMeters * Math.cos(rad1) / 6371000.0
+                val dLon1 = distanceMeters * Math.sin(rad1) / (6371000.0 * Math.cos(lat1))
+                val endLat1 = lat1 + dLat1
+                val endLon1 = lon1 + dLon1
+                val endpoint1 = GeoPoint(Math.toDegrees(endLat1), Math.toDegrees(endLon1))
+
+                // Direction 2: opposite heading
+                val heading2 = (heading + 180) % 360
+                val rad2 = Math.toRadians(heading2)
+                val dLat2 = distanceMeters * Math.cos(rad2) / 6371000.0
+                val dLon2 = distanceMeters * Math.sin(rad2) / (6371000.0 * Math.cos(lat1))
+                val endLat2 = lat1 + dLat2
+                val endLon2 = lon1 + dLon2
+                val endpoint2 = GeoPoint(Math.toDegrees(endLat2), Math.toDegrees(endLon2))
+
+                // Create lines for both directions
+                val line1 = org.osmdroid.views.overlay.Polyline(map).apply {
+                    outlinePaint.color = android.graphics.Color.argb(128, 255, 255, 0) // 50% transparent yellow
+                    outlinePaint.strokeWidth = 8f
+                    outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                    setPoints(listOf(center, endpoint1))
+                    map.overlays.add(this)
+                }
+
+                val line2 = org.osmdroid.views.overlay.Polyline(map).apply {
+                    outlinePaint.color = android.graphics.Color.argb(128, 255, 255, 0) // 50% transparent yellow
+                    outlinePaint.strokeWidth = 8f
+                    outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                    setPoints(listOf(center, endpoint2))
+                    map.overlays.add(this)
+                }
+
+                newLines.add(line1)
+                newLines.add(line2)
+            }
+
+            runwayApproachLines = newLines
+            map.invalidate()
+        }
+    }
+
+    // Recalculate approach point when final approach distance changes
+    LaunchedEffect(finalApproachDistanceNm, selectedRunwayIndex) {
+        val index = selectedRunwayIndex
+        val runway = selectedRunway
+        val target = originalAirportTarget
+
+        if (index != null && runway != null && target != null) {
+            // Determine if it's direction 1 or direction 2
+            val isDirection1 = (index % 2) == 0
+            val baseHeading = runway.headingDeg ?: extractRunwayHeading(runway.name) ?: 0.0
+            val heading = if (isDirection1) {
+                baseHeading
+            } else {
+                (baseHeading + 180) % 360
+            }
+
+            // Recalculate approach endpoint with new distance
+            val distanceMeters = finalApproachDistanceNm * 1852.0
+            val rad = Math.toRadians(heading)
+            val lat1 = Math.toRadians(target.latitude)
+            val lon1 = Math.toRadians(target.longitude)
+            val dLat = distanceMeters * Math.cos(rad) / 6371000.0
+            val dLon = distanceMeters * Math.sin(rad) / (6371000.0 * Math.cos(lat1))
+            val endLat = lat1 + dLat
+            val endLon = lon1 + dLon
+            val endpoint = GeoPoint(Math.toDegrees(endLat), Math.toDegrees(endLon))
+
+            // Update navigation target with new approach point
+            val approachTarget = target.copy(
+                id = -1,
+                name = "${target.name} RWY ${String.format("%02d", heading.toInt() / 10)}",
+                latitude = endpoint.latitude,
+                longitude = endpoint.longitude
+            )
+            activeNavigationTarget = approachTarget
+            selectedRunwayHeading = heading
+        }
+    }
+
     // Update position marker when flight data changes
     LaunchedEffect(flightData, autoCenter) {
         val data = flightData
@@ -1211,60 +1360,312 @@ fun MapViewer(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 16.dp)
-                    .widthIn(max = 400.dp),
+                    .widthIn(max = 500.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.errorContainer
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "ROUTE TO: ${activeNavigationTarget?.name ?: ""}",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            modifier = Modifier.padding(top = 4.dp)
-                        ) {
-                            navigationDistanceNm?.let { dist ->
-                                Text(
-                                    text = "${String.format("%.1f", dist)} NM",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onErrorContainer
-                                )
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "ROUTE TO: ${activeNavigationTarget?.name ?: ""}",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                modifier = Modifier.padding(top = 4.dp)
+                            ) {
+                                navigationDistanceNm?.let { dist ->
+                                    Text(
+                                        text = "${String.format("%.1f", dist)} NM",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+                                navigationHeading?.let { hdg ->
+                                    Text(
+                                        text = "HDG ${String.format("%03.0f", hdg)}°",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
                             }
-                            navigationHeading?.let { hdg ->
-                                Text(
-                                    text = "HDG ${String.format("%03.0f", hdg)}°",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onErrorContainer
+                            // Show final runway heading when runway selected
+                            selectedRunwayHeading?.let { rwyHdg ->
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.padding(top = 4.dp)
+                                ) {
+                                    Text(
+                                        text = "FINAL:",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
+                                    )
+                                    Text(
+                                        text = "RWY ${String.format("%03.0f", rwyHdg)}°",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                    originalAirportTarget?.let { airport ->
+                                        val airportPos = GeoPoint(airport.latitude, airport.longitude)
+                                        flightData?.let { data ->
+                                            if (data.latitude != 0.0 && data.longitude != 0.0) {
+                                                val playerPos = GeoPoint(data.latitude, data.longitude)
+                                                val distanceMeters = playerPos.distanceToAsDouble(airportPos)
+                                                val distanceNm = distanceMeters / 1852.0
+                                                Text(
+                                                    text = "${String.format("%.1f", distanceNm)} NM",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            // Land button (only show if target has runways)
+                            if (targetRunways.isNotEmpty()) {
+                                FilledTonalIconButton(
+                                    onClick = {
+                                        showRunwayApproach = !showRunwayApproach
+                                        if (!showRunwayApproach) {
+                                            selectedRunwayIndex = null
+                                            selectedRunwayHeading = null
+                                            selectedRunway = null
+                                        }
+                                    },
+                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                        containerColor = if (showRunwayApproach)
+                                            MaterialTheme.colorScheme.primary
+                                        else
+                                            MaterialTheme.colorScheme.surfaceVariant,
+                                        contentColor = if (showRunwayApproach)
+                                            MaterialTheme.colorScheme.onPrimary
+                                        else
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.FlightLand,
+                                        contentDescription = "Landing approach"
+                                    )
+                                }
+                            }
+
+                            // Cancel button
+                            IconButton(
+                                onClick = {
+                                    activeNavigationTarget = null
+                                    originalAirportTarget = null
+                                    showRunwayApproach = false
+                                    selectedRunwayIndex = null
+                                    selectedRunwayHeading = null
+                                    selectedRunway = null
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Cancel navigation",
+                                    tint = MaterialTheme.colorScheme.onErrorContainer
                                 )
                             }
                         }
                     }
 
-                    // Cancel button
-                    IconButton(
-                        onClick = {
-                            activeNavigationTarget = null
+                    // Runway selection (when approach mode active)
+                    if (showRunwayApproach && targetRunways.isNotEmpty()) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.2f))
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "SELECT RUNWAY",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
+                                )
+
+                                // Final approach distance dropdown
+                                var expanded by remember { mutableStateOf(false) }
+                                val distances = listOf(2.5, 5.0, 10.0, 15.0, 25.0)
+
+                                Box {
+                                    FilterChip(
+                                        selected = false,
+                                        onClick = { expanded = !expanded },
+                                        label = {
+                                            Text(
+                                                text = "${finalApproachDistanceNm.let { if (it == it.toInt().toDouble()) it.toInt().toString() else it.toString() }} NM",
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                        },
+                                        trailingIcon = {
+                                            Icon(
+                                                imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        },
+                                        modifier = Modifier.height(28.dp)
+                                    )
+
+                                    DropdownMenu(
+                                        expanded = expanded,
+                                        onDismissRequest = { expanded = false }
+                                    ) {
+                                        distances.forEach { dist ->
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Text(
+                                                        text = "${if (dist == dist.toInt().toDouble()) dist.toInt().toString() else dist.toString()} NM Final",
+                                                        style = MaterialTheme.typography.bodySmall
+                                                    )
+                                                },
+                                                onClick = {
+                                                    finalApproachDistanceNm = dist
+                                                    expanded = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            targetRunways.forEachIndexed { index, runway ->
+                                val baseHeading = runway.headingDeg ?: extractRunwayHeading(runway.name) ?: 0.0
+                                val heading1 = baseHeading.toInt()
+                                val heading2 = ((heading1 + 180) % 360)
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    // Direction 1
+                                    FilterChip(
+                                        selected = selectedRunwayIndex == (index * 2),
+                                        onClick = {
+                                            selectedRunwayIndex = index * 2
+                                            selectedRunway = runway
+                                            // Store the runway heading for display
+                                            val calcHeading = runway.headingDeg ?: extractRunwayHeading(runway.name) ?: 0.0
+                                            selectedRunwayHeading = calcHeading
+                                            // Create route to approach endpoint
+                                            val target = originalAirportTarget
+                                            if (target != null) {
+                                                val distanceMeters = finalApproachDistanceNm * 1852.0
+                                                val rad = Math.toRadians(calcHeading)
+                                                val lat1 = Math.toRadians(target.latitude)
+                                                val lon1 = Math.toRadians(target.longitude)
+                                                val dLat = distanceMeters * Math.cos(rad) / 6371000.0
+                                                val dLon = distanceMeters * Math.sin(rad) / (6371000.0 * Math.cos(lat1))
+                                                val endLat = lat1 + dLat
+                                                val endLon = lon1 + dLon
+                                                val endpoint = GeoPoint(Math.toDegrees(endLat), Math.toDegrees(endLon))
+
+                                                // Update navigation to approach endpoint (red line will auto-update)
+                                                // Create temporary target at endpoint
+                                                val approachTarget = target.copy(
+                                                    id = -1,
+                                                    name = "${target.name} RWY ${String.format("%02d", heading1 / 10)}",
+                                                    latitude = endpoint.latitude,
+                                                    longitude = endpoint.longitude
+                                                )
+                                                activeNavigationTarget = approachTarget
+                                                // Keep runway approach lines visible (don't set showRunwayApproach = false)
+                                            }
+                                        },
+                                        label = {
+                                            Text(
+                                                text = "RWY ${String.format("%02d", heading1 / 10)} (${heading1}°)",
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                        },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(32.dp),
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            containerColor = MaterialTheme.colorScheme.surface,
+                                            selectedContainerColor = MaterialTheme.colorScheme.primary
+                                        )
+                                    )
+
+                                    // Direction 2
+                                    FilterChip(
+                                        selected = selectedRunwayIndex == (index * 2 + 1),
+                                        onClick = {
+                                            selectedRunwayIndex = index * 2 + 1
+                                            selectedRunway = runway
+                                            // Store the opposite runway heading for display
+                                            val calcHeading = runway.headingDeg ?: extractRunwayHeading(runway.name) ?: 0.0
+                                            val oppositeHeading = (calcHeading + 180) % 360
+                                            selectedRunwayHeading = oppositeHeading
+                                            // Create route to opposite approach endpoint
+                                            val target = originalAirportTarget
+                                            if (target != null) {
+                                                val distanceMeters = finalApproachDistanceNm * 1852.0
+                                                val heading2Rad = Math.toRadians(oppositeHeading)
+                                                val lat1 = Math.toRadians(target.latitude)
+                                                val lon1 = Math.toRadians(target.longitude)
+                                                val dLat = distanceMeters * Math.cos(heading2Rad) / 6371000.0
+                                                val dLon = distanceMeters * Math.sin(heading2Rad) / (6371000.0 * Math.cos(lat1))
+                                                val endLat = lat1 + dLat
+                                                val endLon = lon1 + dLon
+                                                val endpoint = GeoPoint(Math.toDegrees(endLat), Math.toDegrees(endLon))
+
+                                                val approachTarget = target.copy(
+                                                    id = -1,
+                                                    name = "${target.name} RWY ${String.format("%02d", heading2 / 10)}",
+                                                    latitude = endpoint.latitude,
+                                                    longitude = endpoint.longitude
+                                                )
+                                                activeNavigationTarget = approachTarget
+                                                // Keep runway approach lines visible (don't set showRunwayApproach = false)
+                                            }
+                                        },
+                                        label = {
+                                            Text(
+                                                text = "RWY ${String.format("%02d", heading2 / 10)} (${heading2}°)",
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                        },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(32.dp),
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            containerColor = MaterialTheme.colorScheme.surface,
+                                            selectedContainerColor = MaterialTheme.colorScheme.primary
+                                        )
+                                    )
+                                }
+                            }
                         }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Cancel navigation",
-                            tint = MaterialTheme.colorScheme.onErrorContainer
-                        )
                     }
                 }
             }
@@ -1830,6 +2231,12 @@ fun MapViewer(
                 mapView?.overlays?.remove(line)
             }
             navigationLine = null
+
+            // Clear runway approach lines
+            runwayApproachLines.forEach { line ->
+                mapView?.overlays?.remove(line)
+            }
+            runwayApproachLines = emptyList()
             // Save current map center/zoom and tile preferences on dispose
             try {
                 mapView?.let { mv ->
