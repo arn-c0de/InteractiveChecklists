@@ -92,10 +92,7 @@ This roadmap outlines the planned development phases and features for the app in
 ---
 
 ### Notes & General Guidelines
-- Features are to be implemented strictly in the order listed above.
-- Each phase should be fully completed, tested, and stabilized before proceeding to the next.
-- Security considerations must be integrated from the earliest stages and reinforced throughout.
+
 - Backend infrastructure (where needed) should prioritize privacy, encryption, and optional self-hosting.
 - Regular testing on target devices and simulators is required at each milestone.
 
-This roadmap is focused and sequential to ensure a solid, secure, and functional foundation before adding advanced collaboration features.
