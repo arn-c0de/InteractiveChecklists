@@ -1204,7 +1204,72 @@ fun MapViewer(
                 )
             }
         }
-        
+
+        // Active Navigation Display (top center)
+        if (activeNavigationTarget != null) {
+            Card(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 16.dp)
+                    .widthIn(max = 400.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "ROUTE TO: ${activeNavigationTarget?.name ?: ""}",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            modifier = Modifier.padding(top = 4.dp)
+                        ) {
+                            navigationDistanceNm?.let { dist ->
+                                Text(
+                                    text = "${String.format("%.1f", dist)} NM",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                            navigationHeading?.let { hdg ->
+                                Text(
+                                    text = "HDG ${String.format("%03.0f", hdg)}°",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
+                    }
+
+                    // Cancel button
+                    IconButton(
+                        onClick = {
+                            activeNavigationTarget = null
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Cancel navigation",
+                            tint = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+            }
+        }
+
         // Connection status indicator (only show when DataPad enabled)
         if (datapadEnabled && !isConnected) {
             Surface(
