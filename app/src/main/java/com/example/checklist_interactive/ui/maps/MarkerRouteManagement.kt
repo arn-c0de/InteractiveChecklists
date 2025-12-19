@@ -84,6 +84,10 @@ class MarkerRouteViewModel(
             _visibleRouteIds.value + routeId
         }
     }
+
+    fun setVisibleRoutes(routeIds: Set<Int>) {
+        _visibleRouteIds.value = routeIds
+    }
     
     fun loadData() {
         viewModelScope.launch {
@@ -163,10 +167,17 @@ class MarkerRouteViewModel(
             loadData()
         }
     }
-    
+
     fun updateMarker(location: LocationEntity) {
         viewModelScope.launch {
             locationRepository.updateLocation(location)
+            loadData()
+        }
+    }
+
+    fun updateRoute(route: RouteEntity) {
+        viewModelScope.launch {
+            routeRepository.updateRoute(route)
             loadData()
         }
     }
@@ -186,7 +197,8 @@ fun MarkerRouteManagementSheet(
     onCenter: (LocationEntity) -> Unit = {},
     selectedMarker: LocationEntity? = null,
     selectedRunways: List<RunwayEntity> = emptyList(),
-    onSetActiveRoute: (LocationEntity) -> Unit = {}
+    onSetActiveRoute: (LocationEntity) -> Unit = {},
+    onEditRouteWaypoints: (Int) -> Unit = {}
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val markerGroups by viewModel.markerGroups.collectAsState()
@@ -520,7 +532,9 @@ fun MarkerRouteManagementSheet(
                     onRouteClick = onRouteClick,
                     onDeleteRoute = { viewModel.deleteRoute(it) },
                     onToggleVisibility = { viewModel.toggleRouteVisibility(it) },
-                    onCreateRoute = onCreateRoute
+                    onCreateRoute = onCreateRoute,
+                    onEditRoute = { viewModel.updateRoute(it) },
+                    onEditWaypoints = onEditRouteWaypoints
                 )
             }
         }
@@ -731,7 +745,9 @@ fun RoutesList(
     onRouteClick: (RouteEntity) -> Unit,
     onDeleteRoute: (Int) -> Unit,
     onToggleVisibility: (Int) -> Unit,
-    onCreateRoute: () -> Unit
+    onCreateRoute: () -> Unit,
+    onEditRoute: (RouteEntity) -> Unit = {},
+    onEditWaypoints: (Int) -> Unit = {}
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         // Create new route button
@@ -768,7 +784,9 @@ fun RoutesList(
                         isVisible = visibleRouteIds.contains(route.id),
                         onClick = { onRouteClick(route) },
                         onDelete = { onDeleteRoute(route.id) },
-                        onToggleVisibility = { onToggleVisibility(route.id) }
+                        onToggleVisibility = { onToggleVisibility(route.id) },
+                        onEdit = { onEditRoute(it) },
+                        onEditWaypoints = { onEditWaypoints(it) }
                     )
                 }
             }
@@ -785,7 +803,9 @@ fun RouteListItem(
     isVisible: Boolean,
     onClick: () -> Unit,
     onDelete: () -> Unit,
-    onToggleVisibility: () -> Unit
+    onToggleVisibility: () -> Unit,
+    onEdit: (RouteEntity) -> Unit = {},
+    onEditWaypoints: (Int) -> Unit = {}
 ) {
     Card(
         modifier = Modifier
@@ -813,9 +833,9 @@ fun RouteListItem(
                     tint = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
-            
+
             Spacer(modifier = Modifier.width(12.dp))
-            
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = route.name,
@@ -830,14 +850,23 @@ fun RouteListItem(
                     )
                 }
             }
-            
+
             // Visibility toggle
             Switch(
                 checked = isVisible,
                 onCheckedChange = { onToggleVisibility() },
                 modifier = Modifier.padding(horizontal = 8.dp)
             )
-            
+
+            // Edit waypoints button
+            IconButton(onClick = { onEditWaypoints(route.id) }) {
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = "Edit waypoints",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+
             IconButton(onClick = onDelete) {
                 Icon(
                     Icons.Default.Delete,
@@ -1822,4 +1851,152 @@ fun LocationEditDialog(
             }
         }
     }
+}
+
+/**
+ * Route edit dialog
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RouteEditDialog(
+    route: RouteEntity,
+    onDismiss: () -> Unit,
+    onSave: (RouteEntity) -> Unit
+) {
+    var name by remember { mutableStateOf(route.name) }
+    var description by remember { mutableStateOf(route.description) }
+    var color by remember { mutableStateOf(route.color) }
+    var colorDropdownExpanded by remember { mutableStateOf(false) }
+
+    // Predefined color presets
+    val colorPresets = listOf(
+        "Blue" to "#00A8FF",
+        "Red" to "#FF3B30",
+        "Green" to "#34C759",
+        "Yellow" to "#FFD60A",
+        "Orange" to "#FF9500",
+        "Purple" to "#AF52DE",
+        "Pink" to "#FF2D55",
+        "Cyan" to "#32ADE6",
+        "Teal" to "#5AC8FA",
+        "Indigo" to "#5856D6",
+        "Mint" to "#00C7BE",
+        "Brown" to "#A2845E",
+        "Gray" to "#8E8E93",
+        "White" to "#FFFFFF",
+        "Black" to "#000000"
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Route") },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Route Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    maxLines = 4
+                )
+
+                // Color dropdown
+                ExposedDropdownMenuBox(
+                    expanded = colorDropdownExpanded,
+                    onExpandedChange = { colorDropdownExpanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = colorPresets.find { it.second == color }?.first ?: "Custom",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Color") },
+                        trailingIcon = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                // Color preview
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            try {
+                                                androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(color))
+                                            } catch (e: Exception) {
+                                                androidx.compose.ui.graphics.Color.Gray
+                                            }
+                                        )
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = colorDropdownExpanded)
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor()
+                    )
+
+                    ExposedDropdownMenu(
+                        expanded = colorDropdownExpanded,
+                        onDismissRequest = { colorDropdownExpanded = false }
+                    ) {
+                        colorPresets.forEach { (colorName, colorHex) ->
+                            DropdownMenuItem(
+                                text = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clip(CircleShape)
+                                                .background(
+                                                    androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(colorHex))
+                                                )
+                                        )
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(colorName)
+                                    }
+                                },
+                                onClick = {
+                                    color = colorHex
+                                    colorDropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val updatedRoute = route.copy(
+                        name = name.takeIf { it.isNotBlank() } ?: route.name,
+                        description = description,
+                        color = color.takeIf { it.isNotBlank() } ?: route.color
+                    )
+                    onSave(updatedRoute)
+                },
+                enabled = name.isNotBlank()
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }

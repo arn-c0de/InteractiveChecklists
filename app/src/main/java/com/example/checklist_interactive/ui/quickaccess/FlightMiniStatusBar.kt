@@ -30,6 +30,54 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.res.stringResource
 import com.example.checklist_interactive.R
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalContext
+
+@Composable
+fun BatteryLevelIndicator(
+    modifier: Modifier = Modifier,
+    pollIntervalMs: Long = 5 * 60 * 1000L // 5 minutes
+) {
+    val context = LocalContext.current
+    val batteryManager = remember { context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager? }
+    var percent by remember { mutableStateOf<Int?>(null) }
+
+    DisposableEffect(Unit) {
+        val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                intent?.let {
+                    val level = it.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                    val scale = it.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+                    percent = if (level >= 0 && scale > 0) level * 100 / scale
+                              else batteryManager?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+                }
+            }
+        }
+        context.registerReceiver(receiver, filter)
+        onDispose { context.unregisterReceiver(receiver) }
+    }
+
+    if (pollIntervalMs > 0L) {
+        LaunchedEffect(pollIntervalMs) {
+            while (true) {
+                delay(pollIntervalMs)
+                val p = batteryManager?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+                if (p != null && p >= 0) percent = p
+            }
+        }
+    }
+
+    percent?.let {
+        Text(text = "$it%", style = MaterialTheme.typography.labelSmall, modifier = modifier.semantics { contentDescription = "Battery level $it percent" })
+    }
+}
+
 @Composable
 fun FlightMiniStatusBar(noteManager: QuickNoteManager, onClick: (() -> Unit)? = null, useBackground: Boolean = true) {
     val callsign by noteManager.callsign.collectAsState()
@@ -113,6 +161,7 @@ fun FlightMiniStatusBar(noteManager: QuickNoteManager, onClick: (() -> Unit)? = 
             }
         }
 
+        BatteryLevelIndicator(modifier = Modifier.padding(end = 6.dp))
         Text(text = timeText, style = MaterialTheme.typography.labelSmall)
     }
     }

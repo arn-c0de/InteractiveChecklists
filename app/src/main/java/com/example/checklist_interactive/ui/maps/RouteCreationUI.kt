@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalView
+import com.example.checklist_interactive.ui.datapad.LocalDataPadManager
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.WindowInsetsCompat
@@ -40,6 +41,10 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Polyline
 import org.osmdroid.views.overlay.Marker as OsmMarker
+import org.osmdroid.views.overlay.Overlay
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Rect
 
 /**
  * ViewModel for route creation and management
@@ -51,16 +56,19 @@ class RouteCreationViewModel(
     
     private val _isCreatingRoute = MutableStateFlow(false)
     val isCreatingRoute: StateFlow<Boolean> = _isCreatingRoute.asStateFlow()
-    
+
     private val _selectedWaypoints = MutableStateFlow<List<LocationEntity>>(emptyList())
     val selectedWaypoints: StateFlow<List<LocationEntity>> = _selectedWaypoints.asStateFlow()
-    
+
     private val _currentRouteName = MutableStateFlow("")
     val currentRouteName: StateFlow<String> = _currentRouteName.asStateFlow()
-    
+
+    private val _currentRouteId = MutableStateFlow<Int?>(null)
+    val currentRouteId: StateFlow<Int?> = _currentRouteId.asStateFlow()
+
     private val _allRoutes = MutableStateFlow<List<RouteEntity>>(emptyList())
     val allRoutes: StateFlow<List<RouteEntity>> = _allRoutes.asStateFlow()
-    
+
     private val _availableLocations = MutableStateFlow<List<LocationEntity>>(emptyList())
     val availableLocations: StateFlow<List<LocationEntity>> = _availableLocations.asStateFlow()
     
@@ -81,15 +89,51 @@ class RouteCreationViewModel(
         _isCreatingRoute.value = true
         _selectedWaypoints.value = emptyList()
         _currentRouteName.value = "New Route ${System.currentTimeMillis() % 1000}"
+        _currentRouteId.value = null
     }
-    
+
+    fun startRouteEditing(routeId: Int) {
+        viewModelScope.launch {
+            val routeData = routeRepository.getRouteWithWaypoints(routeId)
+            routeData?.let { data ->
+                _isCreatingRoute.value = true
+                _currentRouteId.value = routeId
+                _currentRouteName.value = data.route.name
+                _selectedWaypoints.value = data.waypoints.map { it.location }
+            }
+        }
+    }
+
     fun cancelRouteCreation() {
         _isCreatingRoute.value = false
         _selectedWaypoints.value = emptyList()
+        _currentRouteId.value = null
     }
     
     fun addWaypoint(location: LocationEntity) {
         _selectedWaypoints.value = _selectedWaypoints.value + location
+    }
+
+    /**
+     * Persist a location (e.g., current player position) and add it as a waypoint
+     */
+    fun addWaypointFromCoordinates(name: String, latitude: Double, longitude: Double) {
+        viewModelScope.launch {
+            // Create a minimal LocationEntity and persist it
+            val newLoc = LocationEntity(
+                name = name,
+                latitude = latitude,
+                longitude = longitude,
+                markerType = "waypoint",
+                isStatic = 0,
+                description = "Auto-saved player position"
+            )
+            val insertedId = locationRepository.saveLocation(newLoc).toInt()
+            val saved = locationRepository.getLocationById(insertedId)
+            if (saved != null) {
+                _selectedWaypoints.value = _selectedWaypoints.value + saved
+            }
+        }
     }
     
     fun removeWaypoint(index: Int) {
@@ -120,29 +164,46 @@ class RouteCreationViewModel(
         _currentRouteName.value = name
     }
     
-    fun finishRouteCreation(onSuccess: () -> Unit) {
+    fun finishRouteCreation(onSuccess: (Int) -> Unit) {
         val waypoints = _selectedWaypoints.value
         if (waypoints.size < 2) {
             // Need at least 2 waypoints
             return
         }
-        
+
         viewModelScope.launch {
-            val route = RouteEntity(
-                name = _currentRouteName.value.ifEmpty { "Route ${System.currentTimeMillis()}" },
-                description = "Route with ${waypoints.size} waypoints",
-                color = "#00A8FF",
-                created = "",
-                modified = ""
-            )
-            
+            val routeId = _currentRouteId.value
             val locationIds = waypoints.map { it.id }
-            routeRepository.saveRouteWithWaypoints(route, locationIds)
-            
+
+            val finalRouteId = if (routeId != null) {
+                // Edit mode - update existing route
+                val existingRouteData = routeRepository.getRouteWithWaypoints(routeId)
+                existingRouteData?.let { data ->
+                    val updatedRoute = data.route.copy(
+                        name = _currentRouteName.value.ifEmpty { data.route.name },
+                        description = "Route with ${waypoints.size} waypoints"
+                    )
+                    routeRepository.updateRoute(updatedRoute)
+                    routeRepository.updateRouteWaypoints(routeId, locationIds)
+                }
+                routeId
+            } else {
+                // Create mode - new route
+                val route = RouteEntity(
+                    name = _currentRouteName.value.ifEmpty { "Route ${System.currentTimeMillis()}" },
+                    description = "Route with ${waypoints.size} waypoints",
+                    color = "#00A8FF",
+                    created = "",
+                    modified = ""
+                )
+                routeRepository.saveRouteWithWaypoints(route, locationIds).toInt()
+            }
+
             _isCreatingRoute.value = false
             _selectedWaypoints.value = emptyList()
+            _currentRouteId.value = null
             loadRoutes()
-            onSuccess()
+            onSuccess(finalRouteId)
         }
     }
     
@@ -170,14 +231,18 @@ class RouteCreationViewModel(
 fun RouteCreationSheet(
     viewModel: RouteCreationViewModel,
     onDismiss: () -> Unit,
-    onWaypointClick: (LocationEntity) -> Unit
+    onWaypointClick: (LocationEntity) -> Unit,
+    onRouteFinished: (Int) -> Unit = {}
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val selectedWaypoints by viewModel.selectedWaypoints.collectAsState()
     val routeName by viewModel.currentRouteName.collectAsState()
+    val currentRouteId by viewModel.currentRouteId.collectAsState()
     val availableLocations by viewModel.availableLocations.collectAsState()
     var showNameDialog by remember { mutableStateOf(false) }
     var showLocationPicker by remember { mutableStateOf(false) }
+
+    val isEditMode = currentRouteId != null
 
     val view = LocalView.current
 
@@ -256,7 +321,8 @@ fun RouteCreationSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = sheetOpacity)
+        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = sheetOpacity),
+        dragHandle = null // Disable default drag handle, use custom one only
     ) {
         // Try to hide the system UI inside the dialog window that hosts the sheet.
         val dialogView = LocalView.current
@@ -374,11 +440,19 @@ fun RouteCreationSheet(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Create Route",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = if (isEditMode) "Edit Route" else "Create Route",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        IconButton(onClick = { showNameDialog = true }) {
+                            Icon(Icons.Default.Edit, "Edit route name", modifier = Modifier.size(20.dp))
+                        }
+                    }
 
                     Row {
                         IconButton(onClick = { showOpacitySlider = !showOpacitySlider }) {
@@ -386,9 +460,6 @@ fun RouteCreationSheet(
                                 if (showOpacitySlider) Icons.Default.Close else Icons.Default.Settings,
                                 contentDescription = "Toggle opacity"
                             )
-                        }
-                        IconButton(onClick = { showNameDialog = true }) {
-                            Icon(Icons.Default.Edit, "Edit name")
                         }
                         IconButton(onClick = {
                             viewModel.cancelRouteCreation()
@@ -471,20 +542,52 @@ fun RouteCreationSheet(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
                 ) {
-                    itemsIndexed(selectedWaypoints) { index, waypoint ->
-                        WaypointItem(
-                            waypoint = waypoint,
-                            index = index,
-                            totalCount = selectedWaypoints.size,
-                            onMoveUp = { viewModel.moveWaypointUp(index) },
-                            onMoveDown = { viewModel.moveWaypointDown(index) },
-                            onRemove = { viewModel.removeWaypoint(index) },
-                            onClick = { onWaypointClick(waypoint) }
-                        )
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(0.dp),
+                        userScrollEnabled = true
+                    ) {
+                        selectedWaypoints.forEachIndexed { index, waypoint ->
+                            item(key = "waypoint_$index") {
+                                Column {
+                                    WaypointItem(
+                                        waypoint = waypoint,
+                                        index = index,
+                                        totalCount = selectedWaypoints.size,
+                                        onMoveUp = { viewModel.moveWaypointUp(index) },
+                                        onMoveDown = { viewModel.moveWaypointDown(index) },
+                                        onRemove = { viewModel.removeWaypoint(index) },
+                                        onClick = { onWaypointClick(waypoint) }
+                                    )
+
+                                    // Show distance and heading to next waypoint
+                                    if (index < selectedWaypoints.size - 1) {
+                                        val nextWaypoint = selectedWaypoints[index + 1]
+                                        val distanceKm = NavigationUtils.calculateDistance(
+                                            waypoint.latitude, waypoint.longitude,
+                                            nextWaypoint.latitude, nextWaypoint.longitude
+                                        )
+                                        val distanceNm = NavigationUtils.kmToNauticalMiles(distanceKm)
+                                        val heading = NavigationUtils.calculateBearing(
+                                            waypoint.latitude, waypoint.longitude,
+                                            nextWaypoint.latitude, nextWaypoint.longitude
+                                        )
+
+                                        RouteSegmentInfo(
+                                            distanceNm = distanceNm,
+                                            heading = heading
+                                        )
+                                    } else {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -509,7 +612,8 @@ fun RouteCreationSheet(
 
                     Button(
                         onClick = {
-                            viewModel.finishRouteCreation {
+                            viewModel.finishRouteCreation { routeId ->
+                                onRouteFinished(routeId)
                                 onDismiss()
                             }
                         },
@@ -571,6 +675,35 @@ fun RouteCreationSheet(
             title = { Text("Add Waypoint") },
             text = {
                 Column {
+                    // Offer quick-add of the current player position (when available)
+                    val dataPadManager = LocalDataPadManager.current
+                    val flightData by dataPadManager.flightData.collectAsState()
+                    val datapadEnabled by dataPadManager.isEnabled.collectAsState()
+
+                    flightData?.let { flight ->
+                        if (datapadEnabled && flight.latitude != 0.0 && flight.longitude != 0.0) {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 8.dp)
+                                    .clickable {
+                                        val label = if (flight.unitName.isNotBlank()) flight.unitName else "Player"
+                                        viewModel.addWaypointFromCoordinates("$label (player)", flight.latitude, flight.longitude)
+                                        showLocationPicker = false
+                                    }
+                            ) {
+                                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.MyLocation, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text("Add current player position", fontWeight = FontWeight.Bold)
+                                        Text("${String.format("%.4f", flight.latitude)}, ${String.format("%.4f", flight.longitude)}", style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
@@ -638,6 +771,58 @@ fun RouteCreationSheet(
 }
 
 /**
+ * Route segment info between waypoints
+ */
+@Composable
+fun RouteSegmentInfo(
+    distanceNm: Double,
+    heading: Double
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp, horizontal = 16.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                    shape = RoundedCornerShape(8.dp)
+                )
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Default.ArrowDownward,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(16.dp)
+            )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Text(
+                text = String.format("%.1f NM", distanceNm),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Text(
+                text = "HDG ${String.format("%03.0f°", heading)}",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+}
+
+/**
  * Individual waypoint item in the list
  */
 @Composable
@@ -653,7 +838,7 @@ fun WaypointItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .padding(vertical = 4.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
@@ -662,7 +847,7 @@ fun WaypointItem(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Drag handle (circle icon)
+            // Reorder indicator (not draggable - use arrows instead)
             Box(
                 modifier = Modifier
                     .size(36.dp)
@@ -677,14 +862,14 @@ fun WaypointItem(
             ) {
                 Icon(
                     Icons.Default.Menu,
-                    contentDescription = "Drag to reorder",
+                    contentDescription = "Reorder indicator",
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
             }
-            
+
             Spacer(modifier = Modifier.width(8.dp))
-            
+
             // Sequence number
             Box(
                 modifier = Modifier
@@ -700,11 +885,16 @@ fun WaypointItem(
                     fontSize = 14.sp
                 )
             }
-            
+
             Spacer(modifier = Modifier.width(12.dp))
-            
-            // Waypoint info
-            Column(modifier = Modifier.weight(1f)) {
+
+            // Waypoint info (clickable to center on map)
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable(onClick = onClick)
+                    .padding(vertical = 4.dp)
+            ) {
                 Text(
                     text = waypoint.name,
                     style = MaterialTheme.typography.bodyMedium,
@@ -756,6 +946,81 @@ fun WaypointItem(
 }
 
 /**
+ * Custom overlay to draw permanent text labels on the map
+ */
+class RouteTextOverlay : Overlay() {
+    data class TextLabel(val position: GeoPoint, val text: String)
+
+    private val labels = mutableListOf<TextLabel>()
+    private val textPaint = Paint().apply {
+        color = android.graphics.Color.WHITE
+        textSize = 36f
+        isAntiAlias = true
+        textAlign = Paint.Align.CENTER
+        style = Paint.Style.FILL
+        setShadowLayer(4f, 0f, 0f, android.graphics.Color.BLACK)
+    }
+
+    private val backgroundPaint = Paint().apply {
+        color = android.graphics.Color.parseColor("#CC2C3E50")
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+
+    fun addLabel(position: GeoPoint, text: String) {
+        labels.add(TextLabel(position, text))
+    }
+
+    fun clearLabels() {
+        labels.clear()
+    }
+
+    fun getLabelCount(): Int = labels.size
+
+    override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
+        if (shadow) return
+
+        android.util.Log.d("RouteTextOverlay", "Drawing ${labels.size} labels")
+
+        val projection = mapView.projection
+        val point = android.graphics.Point()
+
+        for ((index, label) in labels.withIndex()) {
+            android.util.Log.d("RouteTextOverlay", "Drawing label $index: ${label.text} at ${label.position}")
+            projection.toPixels(label.position, point)
+
+            // Measure text
+            val bounds = Rect()
+            textPaint.getTextBounds(label.text, 0, label.text.length, bounds)
+
+            // Draw background with padding
+            val padding = 12f
+            val textHeight = bounds.height().toFloat()
+            val textWidth = bounds.width().toFloat()
+
+            val left = point.x - textWidth / 2f - padding
+            val top = point.y - textHeight / 2f - padding
+            val right = point.x + textWidth / 2f + padding
+            val bottom = point.y + textHeight / 2f + padding
+
+            canvas.drawRoundRect(
+                left, top, right, bottom,
+                8f, 8f,
+                backgroundPaint
+            )
+
+            // Draw text centered
+            canvas.drawText(
+                label.text,
+                point.x.toFloat(),
+                point.y.toFloat() + textHeight / 2f - bounds.bottom,
+                textPaint
+            )
+        }
+    }
+}
+
+/**
  * Helper to draw route on map
  */
 fun drawRouteOnMap(
@@ -763,45 +1028,44 @@ fun drawRouteOnMap(
     waypoints: List<Triple<LocationEntity, Double?, Double?>>, // location, distance_nm, heading
     color: Int = android.graphics.Color.parseColor("#00A8FF")
 ) {
-    // Clear previous route overlays (if any)
-    mapView.overlays.removeAll { it is Polyline }
-    
+    // Clear previous route overlays (Polyline and RouteTextOverlay)
+    mapView.overlays.removeAll { it is Polyline || it is RouteTextOverlay }
+
     if (waypoints.size < 2) return
-    
+
     // Create polyline
     val polyline = Polyline(mapView).apply {
         outlinePaint.color = color
         outlinePaint.strokeWidth = 8f
         outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
     }
-    
+
     val points = waypoints.map { (loc, _, _) ->
         GeoPoint(loc.latitude, loc.longitude)
     }
     polyline.setPoints(points)
-    
+
     mapView.overlays.add(polyline)
-    
+
+    // Create text overlay for distance/heading labels
+    val textOverlay = RouteTextOverlay()
+
     // Add distance/heading labels on route segments
     for (i in 0 until waypoints.size - 1) {
-        val (loc1, _, _) = waypoints[i]
-        val (loc2, distNm, heading) = waypoints[i + 1]
-        
+        val (loc1, distNm, heading) = waypoints[i]  // Distance/heading FROM this waypoint to next
+        val (loc2, _, _) = waypoints[i + 1]
+
         if (distNm != null && heading != null) {
             // Calculate midpoint
             val midLat = (loc1.latitude + loc2.latitude) / 2
             val midLon = (loc1.longitude + loc2.longitude) / 2
-            
-            // Create text marker
-            val marker = OsmMarker(mapView).apply {
-                position = GeoPoint(midLat, midLon)
-                title = String.format("%.1f NM @ %03.0f°", distNm, heading)
-                setAnchor(OsmMarker.ANCHOR_CENTER, OsmMarker.ANCHOR_CENTER)
-            }
-            
-            mapView.overlays.add(marker)
+
+            // Add label to text overlay
+            val labelText = String.format("%.1f NM @ %03.0f°", distNm, heading)
+            textOverlay.addLabel(GeoPoint(midLat, midLon), labelText)
         }
     }
-    
+
+    mapView.overlays.add(textOverlay)
     mapView.invalidate()
 }

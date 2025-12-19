@@ -162,6 +162,18 @@ fun MapViewer(
         RouteCreationViewModel(routeRepository, locationRepository)
     }
 
+    // Load and restore visible routes from SharedPreferences
+    LaunchedEffect(Unit) {
+        val prefs = context.getSharedPreferences("map_routes_prefs", android.content.Context.MODE_PRIVATE)
+        val savedRouteIds = prefs.getStringSet("visible_route_ids", emptySet())
+            ?.mapNotNull { it.toIntOrNull() }
+            ?.toSet() ?: emptySet()
+
+        if (savedRouteIds.isNotEmpty()) {
+            markerRouteViewModel.setVisibleRoutes(savedRouteIds)
+        }
+    }
+
     // Load runways for the selected location from the DB
     LaunchedEffect(selectedLocation?.id) {
         val locId = selectedLocation?.id
@@ -176,12 +188,21 @@ fun MapViewer(
 
     // Observe visible routes and draw them on map
     val visibleRouteIds by markerRouteViewModel.visibleRouteIds.collectAsState()
+
+    // Save visible routes to SharedPreferences when they change
+    LaunchedEffect(visibleRouteIds) {
+        val prefs = context.getSharedPreferences("map_routes_prefs", android.content.Context.MODE_PRIVATE)
+        prefs.edit()
+            .putStringSet("visible_route_ids", visibleRouteIds.map { it.toString() }.toSet())
+            .apply()
+    }
     LaunchedEffect(visibleRouteIds, mapView) {
         val mv = mapView ?: return@LaunchedEffect
         
-        // Remove all existing route overlays (Polylines and route markers)
+        // Remove all existing route overlays (Polylines, RouteTextOverlay and route markers)
         mv.overlays.removeAll { overlay ->
             overlay is org.osmdroid.views.overlay.Polyline ||
+            overlay is RouteTextOverlay ||
             (overlay is org.osmdroid.views.overlay.Marker && overlay.id?.startsWith("route_") == true)
         }
         
@@ -197,9 +218,16 @@ fun MapViewer(
                     )
                 }
                 if (waypoints.size >= 2) {
-                    // Create red polyline
+                    // Parse route color or use default
+                    val routeColor = try {
+                        android.graphics.Color.parseColor(data.route.color)
+                    } catch (e: Exception) {
+                        android.graphics.Color.parseColor("#00A8FF") // Default blue
+                    }
+
+                    // Create polyline with route's color
                     val polyline = org.osmdroid.views.overlay.Polyline(mv).apply {
-                        outlinePaint.color = android.graphics.Color.RED
+                        outlinePaint.color = routeColor
                         outlinePaint.strokeWidth = 8f
                         outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
                         val points = waypoints.map { (loc, _, _) ->
@@ -209,25 +237,31 @@ fun MapViewer(
                         id = "route_polyline_$routeId"
                     }
                     mv.overlays.add(polyline)
-                    
-                    // Add distance/heading labels
+
+                    // Create text overlay for distance/heading labels
+                    val textOverlay = RouteTextOverlay()
+
+                    // Add distance/heading labels on route segments
                     for (i in 0 until waypoints.size - 1) {
-                        val (loc1, _, _) = waypoints[i]
-                        val (loc2, distNm, heading) = waypoints[i + 1]
-                        
+                        val (loc1, distNm, heading) = waypoints[i]  // Distance/heading FROM this waypoint to next
+                        val (loc2, _, _) = waypoints[i + 1]
+
+                        android.util.Log.d("MapViewer", "Segment $i to ${i+1}: distNm=$distNm, heading=$heading")
+
                         if (distNm != null && heading != null) {
+                            // Calculate midpoint
                             val midLat = (loc1.latitude + loc2.latitude) / 2
                             val midLon = (loc1.longitude + loc2.longitude) / 2
-                            
-                            val marker = org.osmdroid.views.overlay.Marker(mv).apply {
-                                position = org.osmdroid.util.GeoPoint(midLat, midLon)
-                                title = String.format("%.1f NM @ %03.0f°", distNm, heading)
-                                setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_CENTER)
-                                id = "route_label_${routeId}_$i"
-                            }
-                            mv.overlays.add(marker)
+
+                            // Add label to text overlay
+                            val labelText = String.format("%.1f NM @ %03.0f°", distNm, heading)
+                            android.util.Log.d("MapViewer", "Adding label: $labelText at ($midLat, $midLon)")
+                            textOverlay.addLabel(org.osmdroid.util.GeoPoint(midLat, midLon), labelText)
                         }
                     }
+
+                    android.util.Log.d("MapViewer", "Total labels in overlay: ${textOverlay.getLabelCount()}")
+                    mv.overlays.add(textOverlay)
                 }
             }
         }
@@ -1637,8 +1671,16 @@ fun MapViewer(
                                 wpWithLoc.waypoint.headingMag
                             )
                         }
+
+                        // Parse route color
+                        val routeColor = try {
+                            android.graphics.Color.parseColor(data.route.color)
+                        } catch (e: Exception) {
+                            android.graphics.Color.parseColor("#00A8FF") // Default blue
+                        }
+
                         mapView?.let { mv ->
-                            drawRouteOnMap(mv, waypoints)
+                            drawRouteOnMap(mv, waypoints, routeColor)
                             // Center on first waypoint
                             if (waypoints.isNotEmpty()) {
                                 mv.controller.animateTo(
@@ -1669,6 +1711,12 @@ fun MapViewer(
                 autoCenter = false
                 // Optionally close the sheet
                 showMarkerRouteManagement = false
+            },
+            onEditRouteWaypoints = { routeId ->
+                // Open RouteCreationSheet in edit mode
+                routeCreationViewModel.startRouteEditing(routeId)
+                showMarkerRouteManagement = false
+                showRouteCreation = true
             }
         )
     }
@@ -1677,13 +1725,28 @@ fun MapViewer(
     if (showRouteCreation) {
         RouteCreationSheet(
             viewModel = routeCreationViewModel,
-            onDismiss = { 
+            onDismiss = {
                 showRouteCreation = false
                 routeCreationViewModel.cancelRouteCreation()
             },
             onWaypointClick = { location ->
                 // Center map on waypoint
                 mapView?.controller?.animateTo(GeoPoint(location.latitude, location.longitude))
+            },
+            onRouteFinished = { routeId ->
+                // Force refresh the route on the map
+                scope.launch {
+                    val currentVisibleIds = markerRouteViewModel.visibleRouteIds.value
+                    if (currentVisibleIds.contains(routeId)) {
+                        // Route is already visible - toggle off and on to force redraw
+                        markerRouteViewModel.toggleRouteVisibility(routeId)
+                        kotlinx.coroutines.delay(50)
+                        markerRouteViewModel.toggleRouteVisibility(routeId)
+                    } else {
+                        // Route is not visible - make it visible
+                        markerRouteViewModel.toggleRouteVisibility(routeId)
+                    }
+                }
             }
         )
     }
