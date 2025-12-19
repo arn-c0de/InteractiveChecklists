@@ -312,10 +312,11 @@ fun MapViewer(
         val target = activeNavigationTarget
         val map = mapView
         
-        // If rotation mode is HDG-up, update map orientation to latest heading (fix: add 180° to align correctly)
+        // If rotation mode is HDG-up, update map orientation to latest heading
+        // Negate the heading so the player's heading direction always points up (north position on screen)
         if (mapRotationMode == 1 && data != null && map != null) {
-            try { 
-                map.setMapOrientation(Math.toDegrees(data.heading).toFloat()) 
+            try {
+                map.setMapOrientation(-Math.toDegrees(data.heading).toFloat()) 
                 // Ensure the player is visually placed at the top-center so the heading line points to the top center
                 try {
                     val playerPos = GeoPoint(data.latitude, data.longitude)
@@ -422,16 +423,22 @@ fun MapViewer(
                 // use center anchor so rotation pivots around icon center
                 marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
 
-                // Use raw datapad heading for the player marker (keep previous behavior)
+                // Use raw datapad heading for the player marker
                 val rawHeading = data.heading.toFloat()
                 // Convert raw heading to degrees for overlays/labels
                 val headingDeg = Math.toDegrees(rawHeading.toDouble()).toFloat()
-                // Adjust rotation: apply rotationOffset and invert sign so marker rotates in same direction as heading
-                // Add +45° right tuning so icon aligns with heading
-                val rotationOffset = 135f // 90° + 45° right tuning
-                val computedRotation = (rotationOffset - headingDeg + 360f) % 360f
+                // Adjust rotation: apply rotationOffset to compensate for emoji's default orientation
+                // 45° = 135° (previous) - 90° (to compensate for emoji default orientation)
+                val rotationOffset = 45f
+                val computedRotation = if (mapRotationMode == 1) {
+                    // HDG-up mode: constant rotation (map rotates, icon stays pointing up)
+                    rotationOffset
+                } else {
+                    // North-up mode: rotate based on heading
+                    (rotationOffset - headingDeg + 360f) % 360f
+                }
                 marker.rotation = computedRotation
-                Log.d(TAG, "headingDeg=$headingDeg rotationOffset=$rotationOffset computedRotation=$computedRotation (inverted sign)")
+                Log.d(TAG, "headingDeg=$headingDeg rotationOffset=$rotationOffset computedRotation=$computedRotation mapRotationMode=$mapRotationMode")
                 try {
                     val color = if (isDarkTheme) android.graphics.Color.WHITE else android.graphics.Color.BLACK
                     // rely on Marker.rotation for rotation; use unrotated bitmap
@@ -1186,7 +1193,7 @@ fun MapViewer(
                     if (mapRotationMode == 0) {
                         try { mapView?.setMapOrientation(0f) } catch (_: Throwable) {}
                     } else {
-                        flightData?.let { d -> try { mapView?.setMapOrientation(Math.toDegrees(d.heading).toFloat()) } catch (_: Throwable) {} }
+                        flightData?.let { d -> try { mapView?.setMapOrientation(-Math.toDegrees(d.heading).toFloat()) } catch (_: Throwable) {} }
                     }
                 },
                 containerColor = if (mapRotationMode == 1) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
@@ -2050,7 +2057,8 @@ private class HeadingSpeedLineOverlay : org.osmdroid.views.overlay.Overlay() {
     var speedKts: Double = 0.0
     
     private val linePaint = Paint().apply {
-        color = android.graphics.Color.YELLOW
+        // Slightly transparent yellow for subtler visual
+        color = android.graphics.Color.argb(0xCC, 0xFF, 0xFF, 0x00)
         strokeWidth = 6f
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
@@ -2080,8 +2088,8 @@ private class HeadingSpeedLineOverlay : org.osmdroid.views.overlay.Overlay() {
         // Defensive speed handling to avoid NaN/Infinite lengths
         val safeSpeed = if (speedKts.isFinite()) speedKts.coerceIn(0.0, 1000.0) else 0.0
         val speedFactor = (safeSpeed / 300.0).coerceIn(0.0, 1.0)
-        // Original was 50 + 150*factor, scale up 5x, clamp to safe pixel range
-        var lineLength = ((50f + 150f * speedFactor.toFloat()) * 5f).coerceIn(50f, 1000f)
+        // Original was 50 + 150*factor, scale up by 2.5x (half of previous 5x), clamp to safe pixel range
+        var lineLength = ((50f + 150f * speedFactor.toFloat()) * 2.5f).coerceIn(50f, 1000f)
         if (!lineLength.isFinite()) lineLength = 200f
 
         // Validate heading
@@ -2247,18 +2255,22 @@ private class RangeRingsOverlay : org.osmdroid.views.overlay.Overlay() {
             val maxSpeed = 300.0 // knots
             var scaleFactor = (minFactor + ((speedKts.coerceIn(0.0, maxSpeed) / maxSpeed) * (maxFactor - minFactor))).toFloat()
             if (!scaleFactor.isFinite() || scaleFactor.isNaN()) scaleFactor = minFactor
-            // Double the computed radial so the visible heading line is more prominent,
-            // but keep it clamped to the outer ring
-            val headingRadiusRaw = outerRadiusPx * scaleFactor * 2f
+            // Compute heading radial scaled by speed; cap it to a configurable maximum so it never becomes too long.
+            // maxHeadingRatio defines the maximum fraction of the outer ring the heading radial may occupy.
+            // Also clamp to an absolute pixel limit for very large rings.
+            val headingRadiusRaw = outerRadiusPx * scaleFactor * 1f
             val minHeadingPx = 12f
-            val headingRadius = headingRadiusRaw.coerceIn(minHeadingPx, outerRadiusPx)
+            val maxHeadingRatio = 0.6f // at most 60% of outer ring
+            val maxHeadingAbsPx = 300f // absolute cap in pixels
+            val maxHeadingPx = kotlin.math.min(outerRadiusPx * maxHeadingRatio, maxHeadingAbsPx)
+            val headingRadius = headingRadiusRaw.coerceIn(minHeadingPx, maxHeadingPx)
 
             val hx = centerPt.x + (Math.sin(hRad) * headingRadius).toFloat()
             val hy = centerPt.y + (-Math.cos(hRad) * headingRadius).toFloat()
             val headingLabel = "${headingNorm}°"
             val headingPaint = Paint(textPaint).apply { color = android.graphics.Color.YELLOW; textSize = textPaint.textSize + 2f }
-            // Draw a highlighted radial for heading
-            val headingLinePaint = Paint(paint).apply { color = android.graphics.Color.YELLOW; strokeWidth = 4f }
+            // Draw a highlighted radial for heading (slightly transparent)
+            val headingLinePaint = Paint(paint).apply { color = android.graphics.Color.argb(0xCC, 0xFF, 0xFF, 0x00); strokeWidth = 4f }
             canvas?.drawLine(centerPt.x.toFloat(), centerPt.y.toFloat(), hx, hy, headingLinePaint)
 
             // Draw heading label
