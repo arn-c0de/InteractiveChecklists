@@ -214,6 +214,8 @@ fun MapViewer(
 
     // Observe visible routes and draw them on map
     val visibleRouteIds by (markerRouteViewModel?.visibleRouteIds?.collectAsState(initial = emptySet()) ?: remember { mutableStateOf(emptySet<Int>()) })
+    // Also observe all routes so changes (e.g. color updates) trigger a redraw
+    val allRoutesForRedraw by (markerRouteViewModel?.allRoutes?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList<com.example.checklist_interactive.data.tactical.RouteEntity>()) })
 
     // Save visible routes to SharedPreferences when they change
     LaunchedEffect(visibleRouteIds) {
@@ -222,7 +224,7 @@ fun MapViewer(
             .putStringSet("visible_route_ids", visibleRouteIds.map { it.toString() }.toSet())
             .apply()
     }
-    LaunchedEffect(visibleRouteIds, mapView) {
+    LaunchedEffect(visibleRouteIds, mapView, allRoutesForRedraw) {
         val mv = mapView ?: return@LaunchedEffect
         
         // Remove all existing route overlays (Polylines, RouteTextOverlay and route markers)
