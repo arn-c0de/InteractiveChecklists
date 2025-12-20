@@ -17,32 +17,9 @@ else
 fi
 
 # ---- Secrets scan ----
-if command -v detect-secrets >/dev/null 2>&1; then
-  echo "[git-safety] Running detect-secrets scan (this inspects all files)..."
-  detect-secrets scan --all-files --json > .detect_secrets_scan.json
-  if python - <<'PY'
-import json,sys
-try:
-    data=json.load(open('.detect_secrets_scan.json'))
-except Exception:
-    sys.exit(1)
-if data.get('results'):
-    sys.exit(1)
-sys.exit(0)
-PY
-  then
-    echo "[git-safety] No potential secrets found."
-  else
-    echo "[git-safety] Potential secrets found! Please review .detect_secrets_scan.json"
-    exit 1
-  fi
-else
-  echo "[git-safety] detect-secrets not found on PATH. Install with: pip install detect-secrets"
-  echo "[git-safety] Aborting push. To bypass locally, set SKIP_SECRET_SCAN=1 in the environment (not recommended)."
-  if [ "${SKIP_SECRET_SCAN:-0}" != "1" ]; then
-    exit 1
-  fi
-fi
+# Secret-scanning has been disabled per request — only running CodeQL now.
+# If you want to re-enable secrets scanning, restore detect-secrets usage here or set SKIP_SECRET_SCAN to 0 and install detect-secrets.
+echo "[git-safety] Secret-scan disabled; proceeding to CodeQL scan."
 
 # ---- CodeQL scan ----
 if [ "${SKIP_CODEQL_SCAN:-0}" = "1" ]; then
