@@ -19,20 +19,8 @@ if (-not (git diff --cached --quiet)) {
 }
 
 # Secrets scan
-if (Get-Command detect-secrets -ErrorAction SilentlyContinue) {
-    Write-Host "[git-safety] Running detect-secrets scan..."
-    detect-secrets scan --all-files --json > .detect_secrets_scan.json
-    $json = Get-Content .detect_secrets_scan.json | ConvertFrom-Json
-    if ($json.results.Keys.Count -gt 0) {
-        Write-Host "[git-safety] Potential secrets found! Review .detect_secrets_scan.json" -ForegroundColor Red
-        exit 1
-    } else {
-        Write-Host "[git-safety] No potential secrets found."
-    }
-} else {
-    Write-Host "[git-safety] detect-secrets not found. Install with: pip install detect-secrets" -ForegroundColor Yellow
-    if (-not ($env:SKIP_SECRET_SCAN -eq '1')) { exit 1 }
-}
+# Secret-scanning has been disabled per request — only running CodeQL now.
+Write-Host "[git-safety] Secret-scan disabled; proceeding to CodeQL scan."
 
 # CodeQL scan
 if ($env:SKIP_CODEQL_SCAN -eq '1') {
