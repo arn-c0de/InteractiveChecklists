@@ -45,6 +45,8 @@ import com.example.checklist_interactive.ui.datapad.DataPadPopup
 import com.example.checklist_interactive.ui.quickaccess.QuickAccessSheet
 import com.example.checklist_interactive.ui.quickaccess.LocalQuickNoteManager
 import com.example.checklist_interactive.ui.common.DraggableFab
+import com.example.checklist_interactive.ui.common.FABOverlay
+import com.example.checklist_interactive.ui.common.MapViewerFABs
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
@@ -1213,20 +1215,19 @@ fun MapViewer(
             }
         }
         
-        // Control overlay
+        // Control overlay with centralized FABs
         // Shared trigger for resetting FAB positions (moved here so both the control buttons
         // and the DraggableFab instances can access it)
         var fabLayoutResetTrigger by remember { mutableStateOf(0) }
 
-        Column(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // Center on position button
-            FloatingActionButton(
-                onClick = {
+        // Use centralized FAB overlay system
+        FABOverlay(
+            prefsManager = prefsManager,
+            screenWidthPx = screenWidthPx,
+            screenHeightPx = effectiveScreenHeightPx,
+            marginPx = fabMarginPx,
+            fabs = MapViewerFABs.create(
+                onCenterOnPosition = {
                     val data = flightData
                     if (data != null && data.latitude != 0.0 && data.longitude != 0.0) {
                         // We have a live position — try to center immediately on UI thread
@@ -1262,74 +1263,12 @@ fun MapViewer(
                         }
                     }
                 },
-                containerColor = if (isConnected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-            ) {
-                Icon(
-                    imageVector = Icons.Default.MyLocation,
-                    contentDescription = stringResource(R.string.map_center_on_aircraft)
-                )
-            }
-            
-            // Layer selection button
-            FloatingActionButton(
-                onClick = { showLayerDialog = true },
-                containerColor = MaterialTheme.colorScheme.secondaryContainer
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Layers,
-                    contentDescription = stringResource(R.string.map_layers)
-                )
-            }
-
-            // Overlay selection button (compass, range rings)
-            FloatingActionButton(
-                onClick = { showOverlayDialog = true },
-                containerColor = MaterialTheme.colorScheme.secondaryContainer
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Flight,
-                    contentDescription = stringResource(R.string.map_overlays)
-                )
-            }
-            
-            // Add Military Symbol button (disabled until DB is ready)
-            FloatingActionButton(
-                onClick = { if (repositoriesReady) showMilitarySymbolPicker = true },
-                containerColor = if (pendingSymbolPlacement != null) MaterialTheme.colorScheme.primaryContainer else if (repositoriesReady) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceVariant
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Add Military Symbol",
-                    tint = if (repositoriesReady) LocalContentColor.current else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                )
-            }
-            
-            // Marker/Route management button (disabled until DB is ready)
-            FloatingActionButton(
-                onClick = { if (repositoriesReady) showMarkerRouteManagement = true },
-                containerColor = if (repositoriesReady) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceVariant
-            ) {
-                Icon(
-                    imageVector = Icons.Default.List,
-                    contentDescription = "Markers & Routes",
-                    tint = if (repositoriesReady) LocalContentColor.current else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                )
-            }
-            
-            // Screen lock button - prevents tab swipe gestures
-            FloatingActionButton(
-                onClick = onLockScreen,
-                containerColor = if (isScreenLocked) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-            ) {
-                Icon(
-                    imageVector = if (isScreenLocked) Icons.Default.Lock else Icons.Default.LockOpen,
-                    contentDescription = if (isScreenLocked) stringResource(R.string.cd_unlock_screen) else stringResource(R.string.cd_lock_screen)
-                )
-            }
-
-            // Map rotate button (North-up / HDG-up toggle)
-            FloatingActionButton(
-                onClick = {
+                onLayerSelection = { showLayerDialog = true },
+                onOverlaySelection = { showOverlayDialog = true },
+                onAddMilitarySymbol = { if (repositoriesReady) showMilitarySymbolPicker = true },
+                onMarkerRouteManagement = { if (repositoriesReady) showMarkerRouteManagement = true },
+                onLockScreen = onLockScreen,
+                onToggleMapRotation = {
                     mapRotationMode = (mapRotationMode + 1) % 2
                     if (mapRotationMode == 0) {
                         try { mapView?.setMapOrientation(0f) } catch (_: Throwable) {}
@@ -1337,30 +1276,32 @@ fun MapViewer(
                         flightData?.let { d -> try { mapView?.setMapOrientation(-Math.toDegrees(d.heading).toFloat()) } catch (_: Throwable) {} }
                     }
                 },
-                containerColor = if (mapRotationMode == 1) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-            ) {
-                Icon(
-                    imageVector = if (mapRotationMode == 1) Icons.Default.Flight else Icons.Default.Explore,
-                    contentDescription = "Toggle map rotation (North / HDG)"
-                )
-            }
-
-            // Reset FAB positions (useful when a FAB was dragged off or stored position moved)
-            FloatingActionButton(
-                onClick = {
+                onResetFabPositions = {
                     try {
-                        prefsManager.resetPdfViewerLayout()
+                        prefsManager.resetFabPositions("map")
                     } catch (e: Exception) { android.util.Log.w(TAG, "Failed to reset FAB prefs: ${e.message}") }
                     // force re-read of saved positions for the DraggableFabs
                     try { fabLayoutResetTrigger = fabLayoutResetTrigger + 1 } catch (_: Throwable) {}
                     // quick feedback
                     android.widget.Toast.makeText(context, "FAB-Positionen zurückgesetzt", android.widget.Toast.LENGTH_SHORT).show()
                 },
-                containerColor = MaterialTheme.colorScheme.secondaryContainer
-            ) {
-                Icon(imageVector = Icons.Default.Refresh, contentDescription = "Reset FAB positions")
-            }
-        }
+
+                onDataPadOpen = { if (datapadEnabled) showDataPad = true },
+                onQuickAccessOpen = { showQuickAccess = true },
+                isConnected = isConnected,
+                isScreenLocked = isScreenLocked,
+                mapRotationMode = mapRotationMode,
+                repositoriesReady = repositoriesReady,
+                pendingSymbolPlacement = pendingSymbolPlacement,
+                datapadEnabled = datapadEnabled,
+                containerColorConnected = MaterialTheme.colorScheme.primaryContainer,
+                containerColorDisconnected = MaterialTheme.colorScheme.surfaceVariant,
+                containerColorSecondary = MaterialTheme.colorScheme.secondaryContainer,
+                containerColorTertiary = MaterialTheme.colorScheme.tertiaryContainer,
+                containerColorPrimary = MaterialTheme.colorScheme.primaryContainer,
+                containerColorSurface = MaterialTheme.colorScheme.surfaceVariant
+            )
+        )
 
         // Active Navigation Display (top center)
         if (activeNavigationTarget != null) {
@@ -1926,53 +1867,8 @@ fun MapViewer(
             }
         }
         
-        // Draggable FABs for QuickNote and DataPad
-        // Use effective height excluding TabBar so FABs cannot be dragged under/above TabBar
-        val prefsManager = remember { com.example.checklist_interactive.data.prefs.PreferencesManager(context) }
-        val screenWidth = screenWidthPx
-        val screenHeight = effectiveScreenHeightPx
-        // Uses the shared `fabLayoutResetTrigger` declared above in the control overlay
-
-        // QuickNote FAB (wrapped in key so it re-reads prefs when we reset them)
-        if (quickNoteManager != null) {
-            key(fabLayoutResetTrigger) {
-                DraggableFab(
-                    name = "map_quicknote_fab",
-                    prefsManager = prefsManager,
-                    screenWidthPx = screenWidth,
-                    screenHeightPx = screenHeight,
-                    fabSizePx = fabSizePx,
-                    defaultX = 0.85f,
-                    defaultY = 0.75f,
-                    visible = true,
-                    onClick = { showQuickAccess = true },
-                    content = { Icon(Icons.AutoMirrored.Filled.Note, contentDescription = stringResource(R.string.quick_notes_title)) },
-                    marginPx = fabMarginPx
-                )
-            }
-        }
-
-        val datapadManager = LocalDataPadManager.current
-        val datapadEnabled by datapadManager.isEnabled.collectAsState()
-
-        key(fabLayoutResetTrigger) {
-            DraggableFab(
-                name = "map_datapad_fab",
-                prefsManager = prefsManager,
-                screenWidthPx = screenWidth,
-                screenHeightPx = screenHeight,
-                fabSizePx = fabSizePx,
-                defaultX = 0.85f,
-                defaultY = 0.65f,
-                visible = datapadEnabled,
-                onClick = { if (datapadEnabled) showDataPad = true },
-
-                content = { Icon(Icons.Default.Flight, contentDescription = stringResource(R.string.datapad_title)) },
-                marginPx = fabMarginPx
-            )
-        }
-
-        // Add an unobtrusive reset button in the control column (see below) to restore FAB positions
+        // Removed old DraggableFab implementations for QuickNote and DataPad
+        // These are now handled by the centralized FABOverlay system above
     }
     
         // Pending symbol placement indicator

@@ -110,6 +110,8 @@ import android.content.SharedPreferences
 import com.example.checklist_interactive.ui.quickaccess.QuickAccessSheet
 import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
 import com.example.checklist_interactive.ui.common.DraggableFab
+import com.example.checklist_interactive.ui.common.FABOverlay
+import com.example.checklist_interactive.ui.common.PdfViewerFABs
 
 /**
  * Custom PDF viewer with no external heavy dependencies.
@@ -1507,74 +1509,29 @@ fun PdfViewer(
                     }
                 }
 
-                    // Draggable floating action buttons overlay
-                    val fabSizePx = with(LocalDensity.current) { 56.dp.roundToPx() }
-
-                    // Zoom FAB (conditionally visible)
-                    DraggableFab(
-                        name = "zoom_reset",
-                        prefsManager = prefsManager,
-                        screenWidthPx = screenWidthPx,
-                        screenHeightPx = screenHeightPx,
-                        fabSizePx = fabSizePx,
-                        defaultX = 1.0f,
-                        defaultY = 0.7f,
-                        visible = kotlin.math.abs((pageScales[currentPage] ?: 1f) - 1f) > 0.01f,
-                        onClick = {
-                            pageScales[currentPage] = 1f
-                            pageOffsetsX[currentPage] = 0f
-                            pageOffsetsY[currentPage] = 0f
-                            transientScaleMap[currentPage] = 1f
-                        },
-                        content = { Icon(Icons.Default.CenterFocusWeak, contentDescription = stringResource(R.string.pdf_reset_zoom)) }
-                    )
-
-                    // Menu FAB (only if feature available)
-                    if (onShowFileList != null) {
-                        DraggableFab(
-                            name = "menu",
-                            prefsManager = prefsManager,
-                            screenWidthPx = screenWidthPx,
-                            screenHeightPx = screenHeightPx,
-                            fabSizePx = fabSizePx,
-                            defaultX = 1.0f,
-                            defaultY = 0.8f,
-                            visible = true,
-                            onClick = onShowFileList,
-                            content = { Icon(Icons.Default.Menu, contentDescription = context.getString(R.string.file_list)) }
-                        )
-                    }
-
-                    // DataPad FAB (left of Quick Access)
+                    // Draggable floating action buttons overlay using centralized FABOverlay
                     val datapadManager = LocalDataPadManager.current
                     val datapadEnabled by datapadManager.isEnabled.collectAsState()
-                    DraggableFab(
-                        name = "datapad",
+                    
+                    FABOverlay(
                         prefsManager = prefsManager,
                         screenWidthPx = screenWidthPx,
                         screenHeightPx = screenHeightPx,
-                        fabSizePx = fabSizePx,
-                        // Place slightly left of quick_access and aligned vertically
-                        defaultX = 0.92f,
-                        defaultY = 0.9f,
-                        visible = datapadEnabled,
-                        onClick = { if (datapadEnabled) showDataPad = true },
-
-                        content = { Icon(Icons.Default.Flight, contentDescription = stringResource(R.string.datapad_title)) }
-                    )
-
-                    // Quick Access FAB
-                    DraggableFab(
-                        name = "quick_access",
-                        prefsManager = prefsManager,
-                        screenWidthPx = screenWidthPx,
-                        screenHeightPx = screenHeightPx,
-                        fabSizePx = fabSizePx,
-                        defaultX = 0.9f,
-                        defaultY = 0.9f,
-                        visible = true,
-                        onClick = { showQuickAccess = true },
-                        content = { Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = stringResource(R.string.quick_access_title)) }
+                        fabs = PdfViewerFABs.create(
+                            onZoomReset = {
+                                pageScales[currentPage] = 1f
+                                pageOffsetsX[currentPage] = 0f
+                                pageOffsetsY[currentPage] = 0f
+                                transientScaleMap[currentPage] = 1f
+                            },
+                            onMenuOpen = onShowFileList,
+                            onDataPadOpen = { if (datapadEnabled) showDataPad = true },
+                            onQuickAccessOpen = { showQuickAccess = true },
+                            zoomResetVisible = kotlin.math.abs((pageScales[currentPage] ?: 1f) - 1f) > 0.01f,
+                            datapadEnabled = datapadEnabled,
+                            containerColorPrimary = MaterialTheme.colorScheme.primaryContainer,
+                            containerColorTertiary = MaterialTheme.colorScheme.tertiaryContainer
+                        )
                     )
             }
         }
