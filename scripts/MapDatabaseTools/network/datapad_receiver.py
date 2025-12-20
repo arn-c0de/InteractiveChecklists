@@ -238,7 +238,8 @@ class DataPadReceiver:
         # Initialize ECDH client with optional private key PEM for persistence
         self.ecdh_client = ECDHClient(device_id=self.device_id, device_name=self.device_name, private_key_pem=private_pem)
         logging.info(f"🔐 ECDH mode enabled")
-        logging.info(f"📱 Device ID: {self.device_id}")
+        # Avoid logging full device identifiers
+        logging.info(f"📱 Device ID (truncated): {self.device_id[:8]}...")
 
         if not self.sender_ip:
             logging.warning("⚠️ No sender_ip specified - handshake will fail")
@@ -305,7 +306,8 @@ class DataPadReceiver:
             try:
                 valid = default_gcm_nonce_manager.validate_nonce(nonce, expected_sender=0x01, client_addr=sender_addr)
             except Exception as e:
-                logging.error(f"Nonce validation error for {sender_addr}: {e}")
+                # Avoid logging full client addresses to prevent leaking PII
+                logging.error(f"Nonce validation error: {e}")
                 return None
 
             if not valid:
@@ -546,7 +548,8 @@ def main():
 
     print("🔐 DataPad Receiver - ECDH Mode Only")
     print(f"📡 Listening on {args.bind_ip}:{args.port}")
-    print(f"📤 Sender: {args.sender_ip}:{args.sender_port or args.port}")
+    # Do not print sender IP to avoid leaking network endpoints
+    print(f"📤 Sender: [REDACTED]:{args.sender_port or args.port}")
 
     receiver = DataPadReceiver(
         port=args.port,

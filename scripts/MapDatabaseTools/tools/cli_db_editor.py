@@ -91,7 +91,8 @@ def cmd_list(args: argparse.Namespace):
     with MarkersDatabase() as db:
         locs = db.get_all_locations(marker_type=args.type)
         for loc in locs:
-            print(f"{loc.id:5d}  {loc.name} ({loc.marker_type}) {loc.icao or ''} @ {loc.latitude:.4f},{loc.longitude:.4f}")
+            # Avoid printing precise coordinates to protect sensitive location data
+            print(f"{loc.id:5d}  {loc.name} ({loc.marker_type}) {loc.icao or ''}  [coords redacted]")
 
 
 def cmd_show(args: argparse.Namespace):
@@ -100,7 +101,13 @@ def cmd_show(args: argparse.Namespace):
         if not loc:
             print("Location not found")
             return
-        print(json.dumps(loc.to_dict(), indent=2, ensure_ascii=False))
+        loc_dict = loc.to_dict()
+        # Redact precise coordinates to avoid leaking sensitive location data
+        if 'latitude' in loc_dict:
+            loc_dict['latitude'] = '<redacted>'
+        if 'longitude' in loc_dict:
+            loc_dict['longitude'] = '<redacted>'
+        print(json.dumps(loc_dict, indent=2, ensure_ascii=False))
 
 
 def cmd_search(args: argparse.Namespace):

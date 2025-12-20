@@ -84,7 +84,8 @@ class ECDHClient:
         self._nonce_counter = 0
         
         logger.info(f"🔐 ECDH Client initialized")
-        logger.info(f"📱 Device ID: {self.device_id}")
+        # Avoid logging full device identifiers
+        logger.info(f"📱 Device ID (truncated): {self.device_id[:8]}...")
         logger.info(f"📝 Device Name: {self.device_name}")
     
     def _generate_nonce(self) -> bytes:
@@ -183,11 +184,12 @@ class ECDHClient:
                 backend=default_backend()
             ).derive(shared_secret)
             
-            logger.info(f"🔑 Session key derived via ECDH+HKDF")
-            logger.debug(f"   Session ID: {session_id}")
-            logger.debug(f"   Shared secret (first 16 bytes hex): {shared_secret[:16].hex()}")
-            logger.debug(f"   Salt (hex): {salt.hex()}")
-            logger.debug(f"   Session key (first 16 bytes hex): {session_key[:16].hex()}")
+            logger.info("🔑 Session key derived via ECDH+HKDF")
+            # Avoid logging secret material; expose only a short fingerprint for debugging
+            import hashlib
+            session_fingerprint = hashlib.sha256(session_key).hexdigest()[:16]
+            logger.debug(f"   Session ID (truncated): {session_id[:8]}...")
+            logger.debug(f"   Session key fingerprint: {session_fingerprint}")
             
             # Verify server HMAC
             if server_hmac_b64:
@@ -199,9 +201,8 @@ class ECDHClient:
                 ).digest()
                 server_hmac = base64.b64decode(server_hmac_b64)
                 
-                logger.debug(f"   HMAC data: {hmac_data}")
-                logger.debug(f"   Expected HMAC (first 16 bytes hex): {expected_hmac[:16].hex()}")
-                logger.debug(f"   Server HMAC (first 16 bytes hex): {server_hmac[:16].hex()}")
+                # HMAC verification performed; values are redacted for security
+                logger.debug("   Verifying server HMAC (values redacted for security)")
                 
                 if server_hmac != expected_hmac:
                     logger.error("❌ Server HMAC verification failed!")
