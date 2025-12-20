@@ -709,4 +709,27 @@
     
     
     
+    <!-- Military Symbol Picker -->
+    <string name="military_symbols_title">Militärische Symbole</string>
+    <string name="military_symbols_close">Schließen</string>
+    <string name="military_symbols_affiliation_label">Zugehörigkeit</string>
+    <string name="military_symbols_category_label">Kategorie</string>
+
+    <!-- Symbol Categories -->
+    <string name="military_symbols_category_ground_units">Bodeneinheiten</string>
+    <string name="military_symbols_category_equipment">Ausrüstung</string>
+    <string name="military_symbols_category_installations">Installationen</string>
+    <string name="military_symbols_category_activities">Aktivitäten</string>
+    <string name="military_symbols_category_unit_size">Einheitengröße</string>
+    <string name="military_symbols_category_aircraft">Flugzeuge</string>
+    <string name="military_symbols_category_helicopter">Helikopter</string>
+    <string name="military_symbols_category_ship">Schiffe</string>
+    <string name="military_symbols_category_vehicle">Fahrzeuge</string>
+
+    <!-- Symbol Affiliations -->
+    <string name="military_symbols_affiliation_friendly">Freundlich</string>
+    <string name="military_symbols_affiliation_hostile">Feindlich</string>
+    <string name="military_symbols_affiliation_neutral">Neutral</string>
+    <string name="military_symbols_affiliation_unknown">Unbekannt</string>
+
 </resources>

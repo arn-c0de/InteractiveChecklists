@@ -879,4 +879,27 @@
     <string name="db_update_btn_clean">Clean Import</string>
     <string name="db_update_btn_skip">Skip</string>
 
+    <!-- MILITARY SYMBOL PICKER -->
+    <string name="military_symbols_title">Military Symbols</string>
+    <string name="military_symbols_close">Close</string>
+    <string name="military_symbols_affiliation_label">Affiliation</string>
+    <string name="military_symbols_category_label">Category</string>
+
+    <!-- Symbol Categories -->
+    <string name="military_symbols_category_ground_units">Ground Units</string>
+    <string name="military_symbols_category_equipment">Equipment</string>
+    <string name="military_symbols_category_installations">Installations</string>
+    <string name="military_symbols_category_activities">Activities</string>
+    <string name="military_symbols_category_unit_size">Unit Size</string>
+    <string name="military_symbols_category_aircraft">Aircraft</string>
+    <string name="military_symbols_category_helicopter">Helicopter</string>
+    <string name="military_symbols_category_ship">Ship</string>
+    <string name="military_symbols_category_vehicle">Vehicle</string>
+
+    <!-- Symbol Affiliations -->
+    <string name="military_symbols_affiliation_friendly">Friendly</string>
+    <string name="military_symbols_affiliation_hostile">Hostile</string>
+    <string name="military_symbols_affiliation_neutral">Neutral</string>
+    <string name="military_symbols_affiliation_unknown">Unknown</string>
+
 </resources>

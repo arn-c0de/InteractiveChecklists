@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.platform.LocalContext
 import com.example.checklist_interactive.R
+import androidx.annotation.StringRes
+import androidx.compose.ui.res.stringResource
 
 /**
  * Military Symbol Definition
@@ -37,26 +39,26 @@ data class MilitarySymbol(
 /**
  * Symbol Categories for organization
  */
-enum class SymbolCategory(val displayName: String) {
-    GROUND_UNITS("Ground Units"),
-    EQUIPMENT("Equipment"),
-    INSTALLATIONS("Installations"),
-    ACTIVITIES("Activities"),
-    UNIT_SIZE("Unit Size"),
-    AIRCRAFT("Aircraft"),
-    HELICOPTER("Helicopter"),
-    SHIP("Ship"),
-    VEHICLE("Vehicle")
+enum class SymbolCategory(@StringRes val displayNameResId: Int) {
+    GROUND_UNITS(R.string.military_symbols_category_ground_units),
+    EQUIPMENT(R.string.military_symbols_category_equipment),
+    INSTALLATIONS(R.string.military_symbols_category_installations),
+    ACTIVITIES(R.string.military_symbols_category_activities),
+    UNIT_SIZE(R.string.military_symbols_category_unit_size),
+    AIRCRAFT(R.string.military_symbols_category_aircraft),
+    HELICOPTER(R.string.military_symbols_category_helicopter),
+    SHIP(R.string.military_symbols_category_ship),
+    VEHICLE(R.string.military_symbols_category_vehicle)
 }
 
 /**
  * Affiliation for symbol coloring
  */
-enum class SymbolAffiliation(val displayName: String, val color: Color) {
-    FRIENDLY("Friendly", Color(0xFF00A8FF)),  // Blue
-    HOSTILE("Hostile", Color(0xFFFF4444)),    // Red
-    NEUTRAL("Neutral", Color(0xFF00FF00)),    // Green
-    UNKNOWN("Unknown", Color(0xFFFFFF80))     // Yellow
+enum class SymbolAffiliation(@StringRes val displayNameResId: Int, val color: Color) {
+    FRIENDLY(R.string.military_symbols_affiliation_friendly, Color(0xFF00A8FF)),  // Blue
+    HOSTILE(R.string.military_symbols_affiliation_hostile, Color(0xFFFF4444)),    // Red
+    NEUTRAL(R.string.military_symbols_affiliation_neutral, Color(0xFF00FF00)),    // Green
+    UNKNOWN(R.string.military_symbols_affiliation_unknown, Color(0xFFFFFF80))     // Yellow
 }
 
 /**
@@ -94,12 +96,12 @@ fun MilitarySymbolPickerDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Military Symbols",
+                        text = stringResource(R.string.military_symbols_title),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold
                     )
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.military_symbols_close))
                     }
                 }
 
@@ -107,7 +109,7 @@ fun MilitarySymbolPickerDialog(
 
                 // Affiliation Selector
                 Text(
-                    text = "Affiliation",
+                    text = stringResource(R.string.military_symbols_affiliation_label),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
                 )
@@ -121,7 +123,7 @@ fun MilitarySymbolPickerDialog(
                         FilterChip(
                             selected = selectedAffiliation == affiliation,
                             onClick = { selectedAffiliation = affiliation },
-                            label = { Text(affiliation.displayName) },
+                            label = { Text(stringResource(affiliation.displayNameResId)) },
                             leadingIcon = {
                                 Box(
                                     modifier = Modifier
@@ -137,7 +139,7 @@ fun MilitarySymbolPickerDialog(
 
                 // Category Selector
                 Text(
-                    text = "Category",
+                    text = stringResource(R.string.military_symbols_category_label),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
                 )
@@ -151,7 +153,7 @@ fun MilitarySymbolPickerDialog(
                         Tab(
                             selected = selectedCategory == category,
                             onClick = { selectedCategory = category },
-                            text = { Text(category.displayName) }
+                            text = { Text(stringResource(category.displayNameResId)) }
                         )
                     }
                 }
