@@ -49,4 +49,7 @@ scripts/DCS-SCRIPTS-FOLDER-Experimental/security_audit.key
 scripts/DCS-SCRIPTS-FOLDER-Experimental/authorized_devices.json
 scripts/DCS-SCRIPTS-FOLDER-Experimental/ip_blacklist.json
 
-
+# CodeQL local analysis files
+.codeql/
+codeql-db/
+codeql-results.sarif
