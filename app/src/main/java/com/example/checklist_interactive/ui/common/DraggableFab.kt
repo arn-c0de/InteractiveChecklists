@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.Alignment
 import com.example.checklist_interactive.data.prefs.PreferencesManager
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -37,7 +38,8 @@ fun DraggableFab(
     prefsManager: PreferencesManager,
     screenWidthPx: Int,
     screenHeightPx: Int,
-    fabSizePx: Int = 56,
+    fabSizeDp: Int = 56,
+    scope: String = "",
     defaultX: Float = 1.0f,
     defaultY: Float = 0.9f,
     visible: Boolean = true,
@@ -52,10 +54,13 @@ fun DraggableFab(
     val coroutineScope = rememberCoroutineScope()
     
     // Load saved position or use defaults (normalized to the available area excluding margins)
-    val (savedXPercent, savedYPercent) = remember(name) {
-        prefsManager.getPdfViewerFabPosition(name, defaultX, defaultY)
+    val (savedXPercent, savedYPercent) = remember(name, scope) {
+        prefsManager.getFabPosition(if (scope.isBlank()) null else scope, name, defaultX, defaultY)
     }
     
+    val density = LocalDensity.current
+    val fabSizePx = with(density) { fabSizeDp.dp.roundToPx() }
+
     // Calculate available area (screen minus FAB size and margins)
     val availableWidth = (screenWidthPx - fabSizePx - marginPx * 2).coerceAtLeast(1)
     val availableHeight = (screenHeightPx - fabSizePx - marginPx * 2).coerceAtLeast(1)
@@ -160,6 +165,7 @@ fun DraggableFab(
             },
             modifier = Modifier
                 .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
+                .size(fabSizeDp.dp)
                 .zIndex(10f)
                 .pointerInput(Unit) {
                     detectDragGesturesAfterLongPress(
@@ -184,7 +190,7 @@ fun DraggableFab(
                                 val yPercent = if (availableHeight > 0) ((offsetY - marginPx) / availableHeight) else 0f
 
                                 coroutineScope.launch {
-                                    prefsManager.setPdfViewerFabPosition(name, xPercent, yPercent)
+                                    prefsManager.setFabPosition(if (scope.isBlank()) null else scope, name, xPercent, yPercent)
                                 }
                             }
                             isDragging = false
@@ -199,7 +205,10 @@ fun DraggableFab(
             containerColor = localContainerColor ?: MaterialTheme.colorScheme.primary,
             contentColor = localContentColor ?: MaterialTheme.colorScheme.onPrimary
         ) {
-            content()
+            // Make the icon scale relative to FAB size so it remains visually balanced
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                content()
+            }
         }
     }
 }

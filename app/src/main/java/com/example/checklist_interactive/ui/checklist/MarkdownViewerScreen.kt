@@ -44,6 +44,8 @@ import androidx.compose.ui.platform.LocalContext
 import com.example.checklist_interactive.ui.quickaccess.QuickAccessSheet
 import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
 import com.example.checklist_interactive.ui.common.DraggableFab
+import com.example.checklist_interactive.ui.common.FABOverlay
+import com.example.checklist_interactive.ui.common.MarkdownViewerFABs
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.ui.res.stringResource
 import com.example.checklist_interactive.R
@@ -164,7 +166,7 @@ fun MarkdownViewerScreen(
                         detectTapGestures(
                             onTap = { showQuickAccess = true },
                             onLongPress = {
-                                prefsManager.resetPdfViewerLayout()
+                                prefsManager.resetFabPositions("markdown")
                                 android.widget.Toast.makeText(context, context.getString(R.string.msg_fab_positions_restored), android.widget.Toast.LENGTH_SHORT).show()
                             }
                         )
@@ -224,59 +226,22 @@ fun MarkdownViewerScreen(
             val topPadPx = with(LocalDensity.current) { paddingValues.calculateTopPadding().roundToPx() }
             val bottomPadPx = with(LocalDensity.current) { paddingValues.calculateBottomPadding().roundToPx() }
             val effectiveScreenHeightPx = (screenHeightPx - topPadPx - bottomPadPx).coerceAtLeast(1)
-            val fabSizePx = with(LocalDensity.current) { 56.dp.roundToPx() }
 
-            if (onShowFileList != null) {
-                DraggableFab(
-                    name = "menu",
-                    prefsManager = prefsManager,
-                    screenWidthPx = screenWidthPx,
-                    screenHeightPx = effectiveScreenHeightPx,
-                    fabSizePx = fabSizePx,
-                    defaultX = 1.0f,
-                    defaultY = 0.8f,
-                    visible = true,
-                    onClick = onShowFileList,
-                    content = { Icon(Icons.Default.Menu, contentDescription = stringResource(R.string.cd_menu)) }
-                )
-            }
-
-            // DataPad FAB - placed first to be rendered
-            val datapadPos = prefsManager.getPdfViewerFabPosition("datapad", 0.75f, 0.9f)
-            android.util.Log.d("MarkdownViewer", "datapad saved pos: x=${datapadPos.first}, y=${datapadPos.second}")
             val datapadManager = LocalDataPadManager.current
             val datapadEnabled by datapadManager.isEnabled.collectAsState()
 
-            Box(modifier = Modifier.fillMaxSize()) {
-                DraggableFab(
-                    name = "datapad",
-                    prefsManager = prefsManager,
-                    screenWidthPx = screenWidthPx,
-                    screenHeightPx = effectiveScreenHeightPx,
-                    fabSizePx = fabSizePx,
-                    defaultX = 0.75f,
-                    defaultY = 0.9f,
-                    visible = datapadEnabled,
-                    onClick = { 
-                        android.util.Log.d("MarkdownViewer", "DataPad FAB clicked!")
-                        if (datapadEnabled) showDataPad = true
-                    },
-
-                    content = { Icon(Icons.Default.Flight, contentDescription = stringResource(R.string.cd_datapad)) }
-                )
-            }
-
-            DraggableFab(
-                name = "quick_access",
+            FABOverlay(
                 prefsManager = prefsManager,
                 screenWidthPx = screenWidthPx,
                 screenHeightPx = effectiveScreenHeightPx,
-                fabSizePx = fabSizePx,
-                defaultX = 0.9f,
-                defaultY = 0.9f,
-                visible = true,
-                onClick = { showQuickAccess = true },
-                content = { Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = stringResource(R.string.cd_quick_access)) }
+                fabs = MarkdownViewerFABs.create(
+                    onMenuOpen = onShowFileList,
+                    onDataPadOpen = { if (datapadEnabled) showDataPad = true },
+                    onQuickAccessOpen = { showQuickAccess = true },
+                    datapadEnabled = datapadEnabled,
+                    containerColorPrimary = MaterialTheme.colorScheme.primaryContainer,
+                    containerColorTertiary = MaterialTheme.colorScheme.tertiaryContainer
+                )
             )
         }
     }

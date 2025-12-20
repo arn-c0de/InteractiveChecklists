@@ -633,6 +633,11 @@
     <string name="settings_version">Version: %1$s</string>
     <string name="settings_viewer_layout">Viewer Layout</string>
     <string name="settings_fab_positions_explain">Reset floating action button positions to defaults</string>
+    <string name="settings_fab_size">FAB Size</string>
+    <string name="settings_fab_size_explain">Change the size of all floating action buttons</string>
+    <string name="settings_fab_size_small">Small</string>
+    <string name="settings_fab_size_medium">Medium</string>
+    <string name="settings_fab_size_large">Large</string>
     <string name="contributors_title">Contributors</string>
     <string name="contributors_explain">View and manage project contributors</string>
     <string name="error_encoding_contributors">Error encoding contributors data</string>

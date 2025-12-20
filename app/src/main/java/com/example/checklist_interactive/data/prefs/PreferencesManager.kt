@@ -36,6 +36,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_DOCUMENT_SOURCES_JSON = "document_sources_json"
         private const val KEY_CONTRIBUTORS_JSON = "contributors_json"
         private const val KEY_PDF_FAB_PREFIX = "pdf_fab_"
+        private const val KEY_FAB_PREFIX = "fab_pos_"
         private const val KEY_PDF_TOOLBAR_VISIBLE = "pdf_toolbar_visible"
 
         // Map preferences
@@ -54,6 +55,10 @@ class PreferencesManager(context: Context) {
         // Application language preference (ISO code, e.g., "en", "de")
         private const val KEY_APP_LANGUAGE = "app_language"
         private const val DEFAULT_APP_LANGUAGE = "en"
+
+        // FAB size preference ("small", "medium", "large")
+        private const val KEY_FAB_SIZE = "fab_size"
+        private const val DEFAULT_FAB_SIZE = "medium"
 
         // Shared Json instance to avoid redundant creation
         private val json = Json { prettyPrint = true }
@@ -432,39 +437,69 @@ class PreferencesManager(context: Context) {
         setContributors(emptyList())
     }
 
-    // PDF viewer FAB positions: stored as percentage (0..1) of available area
-    fun setPdfViewerFabPosition(name: String, xPercent: Float, yPercent: Float) {
+    // Generic FAB positions API (scoped by screen name): stored as percentage (0..1) of available area
+    private fun makeFabKey(screen: String?, name: String, axis: String): String {
+        return if (!screen.isNullOrBlank()) {
+            "${KEY_FAB_PREFIX}${screen}_${name}_$axis"
+        } else {
+            // fallback to legacy pdf-based key for compatibility
+            "${KEY_PDF_FAB_PREFIX}${name}_$axis"
+        }
+    }
+
+    fun setFabPosition(screen: String?, name: String, xPercent: Float, yPercent: Float) {
         prefs.edit()
-            .putFloat("${KEY_PDF_FAB_PREFIX}${name}_x", xPercent.coerceIn(0f, 1f))
-            .putFloat("${KEY_PDF_FAB_PREFIX}${name}_y", yPercent.coerceIn(0f, 1f))
+            .putFloat(makeFabKey(screen, name, "x"), xPercent.coerceIn(0f, 1f))
+            .putFloat(makeFabKey(screen, name, "y"), yPercent.coerceIn(0f, 1f))
             .apply()
     }
 
-    fun getPdfViewerFabPosition(name: String, defaultX: Float, defaultY: Float): Pair<Float, Float> {
-        val x = prefs.getFloat("${KEY_PDF_FAB_PREFIX}${name}_x", defaultX).coerceIn(0f, 1f)
-        val y = prefs.getFloat("${KEY_PDF_FAB_PREFIX}${name}_y", defaultY).coerceIn(0f, 1f)
+    fun getFabPosition(screen: String?, name: String, defaultX: Float, defaultY: Float): Pair<Float, Float> {
+        // Try new scoped key first, then fall back to legacy pdf-prefixed key for compatibility
+        val xKey = makeFabKey(screen, name, "x")
+        val yKey = makeFabKey(screen, name, "y")
+        val legacyXKey = "${KEY_PDF_FAB_PREFIX}${name}_x"
+        val legacyYKey = "${KEY_PDF_FAB_PREFIX}${name}_y"
+
+        val x = when {
+            prefs.contains(xKey) -> prefs.getFloat(xKey, defaultX)
+            prefs.contains(legacyXKey) -> prefs.getFloat(legacyXKey, defaultX)
+            else -> defaultX
+        }.coerceIn(0f, 1f)
+
+        val y = when {
+            prefs.contains(yKey) -> prefs.getFloat(yKey, defaultY)
+            prefs.contains(legacyYKey) -> prefs.getFloat(legacyYKey, defaultY)
+            else -> defaultY
+        }.coerceIn(0f, 1f)
+
         return Pair(x, y)
     }
 
+    fun resetFabPositions(screen: String?) {
+        val editor = prefs.edit()
+        if (!screen.isNullOrBlank()) {
+            // Remove scoped keys matching that screen
+            prefs.all.keys.filter { it.startsWith("${KEY_FAB_PREFIX}${screen}_") }.forEach { editor.remove(it) }
+        } else {
+            // If screen is null/blank, remove all known FAB keys (legacy and new)
+            prefs.all.keys.filter { it.startsWith(KEY_FAB_PREFIX) || it.startsWith(KEY_PDF_FAB_PREFIX) }.forEach { editor.remove(it) }
+        }
+        editor.apply()
+    }
+
+    // Backwards-compatible wrappers for existing PDF-specific API
+    fun setPdfViewerFabPosition(name: String, xPercent: Float, yPercent: Float) {
+        setFabPosition("pdf", name, xPercent, yPercent)
+    }
+
+    fun getPdfViewerFabPosition(name: String, defaultX: Float, defaultY: Float): Pair<Float, Float> {
+        return getFabPosition("pdf", name, defaultX, defaultY)
+    }
+
     fun resetPdfViewerLayout() {
-        prefs.edit().apply {
-            // remove all FAB keys (pdf viewer, markdown viewer, internal file viewer)
-            remove("${KEY_PDF_FAB_PREFIX}menu_x")
-            remove("${KEY_PDF_FAB_PREFIX}menu_y")
-            remove("${KEY_PDF_FAB_PREFIX}quick_access_x")
-            remove("${KEY_PDF_FAB_PREFIX}quick_access_y")
-            remove("${KEY_PDF_FAB_PREFIX}zoom_reset_x")
-            remove("${KEY_PDF_FAB_PREFIX}zoom_reset_y")
-            // legacy keys - kept for backward compatibility
-            remove("${KEY_PDF_FAB_PREFIX}md_menu_x")
-            remove("${KEY_PDF_FAB_PREFIX}md_menu_y")
-            remove("${KEY_PDF_FAB_PREFIX}md_quick_access_x")
-            remove("${KEY_PDF_FAB_PREFIX}md_quick_access_y")
-            remove("${KEY_PDF_FAB_PREFIX}ifv_menu_x")
-            remove("${KEY_PDF_FAB_PREFIX}ifv_menu_y")
-            remove("${KEY_PDF_FAB_PREFIX}ifv_quick_access_x")
-            remove("${KEY_PDF_FAB_PREFIX}ifv_quick_access_y")
-        }.apply()
+        // Reset only PDF-scoped FAB positions to avoid stomping other screens' FAB states
+        resetFabPositions("pdf")
     }
 
     /**
@@ -527,5 +562,35 @@ class PreferencesManager(context: Context) {
         }
 
         if (changed) editor.apply()
+    }
+
+    /**
+     * Sets the FAB size preference: "small", "medium", or "large"
+     */
+    fun setFabSize(size: String) {
+        val validSizes = listOf("small", "medium", "large")
+        val normalizedSize = size.lowercase().trim()
+        if (normalizedSize in validSizes) {
+            prefs.edit().putString(KEY_FAB_SIZE, normalizedSize).apply()
+        }
+    }
+
+    /**
+     * Gets the FAB size preference (default: "medium")
+     * Returns one of: "small", "medium", "large"
+     */
+    fun getFabSize(): String {
+        return prefs.getString(KEY_FAB_SIZE, DEFAULT_FAB_SIZE) ?: DEFAULT_FAB_SIZE
+    }
+
+    /**
+     * Gets the FAB size in dp based on the current preference
+     */
+    fun getFabSizeDp(): Int {
+        return when (getFabSize()) {
+            "small" -> 40
+            "large" -> 72
+            else -> 56 // medium (default Material3 FAB size)
+        }
     }
 }

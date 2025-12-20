@@ -37,6 +37,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.LocalContentColor
 import com.example.checklist_interactive.ui.common.DraggableFab
+import com.example.checklist_interactive.ui.common.FABOverlay
+import com.example.checklist_interactive.ui.common.InternalFilesScreenFABs
 import com.example.checklist_interactive.data.files.FileInfo
 import com.example.checklist_interactive.data.files.InternalFileManager
 import com.example.checklist_interactive.data.prefs.PreferencesManager
@@ -730,53 +732,21 @@ fun InternalFilesScreen(
             val configuration = LocalConfiguration.current
             val screenWidthPx = with(LocalDensity.current) { configuration.screenWidthDp.dp.roundToPx() }
             val screenHeightPx = with(LocalDensity.current) { configuration.screenHeightDp.dp.roundToPx() }
-            val fabSizePx = with(LocalDensity.current) { 56.dp.roundToPx() }
 
             val datapadManager = LocalDataPadManager.current
             val datapadEnabled by datapadManager.isEnabled.collectAsState()
 
-            DraggableFab(
-                name = "datapad",
+            FABOverlay(
                 prefsManager = prefsManager,
                 screenWidthPx = screenWidthPx,
                 screenHeightPx = screenHeightPx,
-                fabSizePx = fabSizePx,
-                // Slightly left of quick_access and aligned vertically
-                defaultX = 0.92f,
-                defaultY = 0.9f,
-                visible = datapadEnabled,
-                onClick = { if (datapadEnabled) showDataPad = true },
-
-                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                content = {
-                    Icon(
-                        Icons.Default.Flight,
-                        contentDescription = stringResource(R.string.datapad_title),
-                        tint = MaterialTheme.colorScheme.onTertiaryContainer
-                    )
-                }
-            )
-
-            DraggableFab(
-                name = "quick_access",
-                prefsManager = prefsManager,
-                screenWidthPx = screenWidthPx,
-                screenHeightPx = screenHeightPx,
-                fabSizePx = fabSizePx,
-                defaultX = 1.0f,
-                defaultY = 0.9f,
-                visible = true,
-                onClick = { showQuickAccess = true },
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                content = {
-                    Icon(
-                        Icons.AutoMirrored.Filled.NoteAdd,
-                        contentDescription = stringResource(R.string.quick_access_title),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
+                fabs = InternalFilesScreenFABs.create(
+                    onDataPadOpen = { if (datapadEnabled) showDataPad = true },
+                    onQuickAccessOpen = { showQuickAccess = true },
+                    datapadEnabled = datapadEnabled,
+                    containerColorPrimary = MaterialTheme.colorScheme.primaryContainer,
+                    containerColorTertiary = MaterialTheme.colorScheme.tertiaryContainer
+                )
             )
 
             // Allow long-press (on the quick access area) to reset FAB positions
@@ -785,7 +755,7 @@ fun InternalFilesScreen(
                 .pointerInput(Unit) {
                     detectTapGestures(
                         onLongPress = {
-                            prefsManager.resetPdfViewerLayout()
+                            prefsManager.resetFabPositions("internal_files")
                             android.widget.Toast.makeText(context, context.getString(R.string.msg_fab_positions_restored), android.widget.Toast.LENGTH_SHORT).show()
                         }
                     )
