@@ -1,24 +1,16 @@
 #!/usr/bin/env bash
 # scripts/git-safety.sh
-# Usage: Called by .githooks/pre-push or manually (pass a commit message as first arg)
+# Usage: Called by .githooks/pre-push. Runs CodeQL analysis.
 set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 
-echo "[git-safety] Staging all changes..."
-git add .
-
-if git diff --cached --quiet; then
-  echo "[git-safety] No staged changes to commit."
-else
-  MSG="${1:-Automated commit by git-safety}"
-  echo "[git-safety] Committing: $MSG"
-  git commit -m "$MSG"
-fi
+# This script no longer stages or commits changes.
+# It is now a dedicated scanner that should be called from a pre-push hook
+# that has already determined a scan is necessary.
 
 # ---- Secrets scan ----
 # Secret-scanning has been disabled per request — only running CodeQL now.
-# If you want to re-enable secrets scanning, restore detect-secrets usage here or set SKIP_SECRET_SCAN to 0 and install detect-secrets.
 echo "[git-safety] Secret-scan disabled; proceeding to CodeQL scan."
 
 # ---- CodeQL scan ----
@@ -33,33 +25,44 @@ else
       codeql database create codeql-db --language=python --source-root=. --overwrite
     fi
 
+    # The '|| true' is intentional. codeql analyze exits with 2 if it finds issues,
+    # which would otherwise terminate the script. We want the Python script below to
+    # parse the results and decide if the exit code should be 1.
     codeql database analyze codeql-db --format=sarif-latest --output=codeql-results.sarif codeql/python-queries -j 0 || true
 
     if python - <<'PY'
-import json,sys
+import json, sys
 try:
-    d=json.load(open('codeql-results.sarif'))
-except Exception:
-    print('No codeql-results.sarif produced')
+    with open('codeql-results.sarif') as f:
+        d = json.load(f)
+except FileNotFoundError:
+    print('[git-safety] Error: codeql-results.sarif not found. The analysis may have failed.', file=sys.stderr)
     sys.exit(1)
-runs=d.get('runs',[])
-count=0
+except json.JSONDecodeError:
+    print('[git-safety] Error: Could not decode codeql-results.sarif. It may be empty or corrupt.', file=sys.stderr)
+    sys.exit(1)
+
+runs = d.get('runs', [])
+count = 0
 if runs:
-    count=len(runs[0].get('results',[]))
-if count>0:
-    print(f'CodeQL found {count} issue(s)')
+    count = len(runs[0].get('results', []))
+
+if count > 0:
+    print(f'[git-safety] CodeQL found {count} issue(s). See codeql-results.sarif for details.')
     sys.exit(1)
+
 sys.exit(0)
 PY
     then
       echo "[git-safety] CodeQL scan passed (0 results)."
     else
-      echo "[git-safety] CodeQL found issues. See codeql-results.sarif"
+      # This block is now reached if the Python script exits with a non-zero status.
+      # The Python script already printed a detailed error.
       exit 1
     fi
   else
-    echo "[git-safety] CodeQL CLI not found on PATH. Install and ensure 'codeql' is available."
-    echo "[git-safety] Aborting push. To bypass locally, set SKIP_CODEQL_SCAN=1 (not recommended)."
+    echo "[git-safety] CodeQL CLI not found on PATH. Install and ensure 'codeql' is available." >&2
+    echo "[git-safety] Aborting push. To bypass locally, set SKIP_CODEQL_SCAN=1 (not recommended)." >&2
     if [ "${SKIP_CODEQL_SCAN:-0}" != "1" ]; then
       exit 1
     fi
@@ -67,9 +70,5 @@ PY
 fi
 
 # All checks passed
-echo "[git-safety] All checks passed — proceeding to push."
-# Let git continue the push (pre-push hook uses exit status). If script was run manually, push now.
-if [ "$GIT_PUSH_BY_SCRIPT" = "1" ] 2>/dev/null; then
-  git push "$@"
-fi
+echo "[git-safety] All checks passed."
 exit 0

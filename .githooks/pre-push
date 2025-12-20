@@ -1,8 +1,64 @@
 #!/usr/bin/env bash
 # .githooks/pre-push
-# Runs the git-safety helper from .githooks/scripts; aborts push if the helper exits non-zero.
+# Runs the git-safety helper from scripts/; aborts push if the helper exits non-zero.
 # This hook is intended to be used with `git config core.hooksPath .githooks`.
 set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
-exec "$ROOT/.githooks/scripts/git-safety.sh" "$@"
+
+# --- Determine if a scan is needed ---
+# This hook will check if any .py files are part of the changes being pushed.
+# The heavy CodeQL scan will only run if Python code is affected.
+
+python_files_changed=false
+while read local_ref local_sha remote_ref remote_sha; do
+  # If the remote ref is all zeroes, this is a new branch.
+  if [[ "$remote_sha" =~ ^0+$ ]]; then
+    # In a new branch, we check all commits that are not on any remote.
+    # A simple approach is to find a merge base with a default branch.
+    default_branch=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
+    if [ -z "$default_branch" ]; then
+        # Fallback to main or master if origin/HEAD is not set
+        if git show-ref --verify --quiet refs/heads/main; then
+            default_branch=main
+        elif git show-ref --verify --quiet refs/heads/master; then
+            default_branch=master
+        else
+            echo "[git-safety] Could not determine a default branch to compare against. Running full scan."
+            python_files_changed=true
+            break
+        fi
+    fi
+    range="$default_branch..$local_sha"
+  else
+    # This is an update to an existing branch.
+    range="$remote_sha..$local_sha"
+  fi
+
+  # Handle branch deletion.
+  if [[ "$local_ref" == "(delete)" ]]; then
+    echo "[git-safety] A branch is being deleted, no checks needed."
+    continue
+  fi
+
+  # Get the list of changed files in the commit range.
+  changed_files=$(git diff-tree --no-commit-id --name-only -r "$range" || echo "")
+  if [ -z "$changed_files" ]; then
+    # This can happen in cases like a force-push to an older commit.
+    echo "[git-safety] No file changes detected in range $range. Skipping."
+    continue
+  fi
+
+  if echo "$changed_files" | grep -q -E '\.py$'; then
+    python_files_changed=true
+    break # Found a python file, no need to check other refs.
+  fi
+done
+
+if [ "$python_files_changed" = true ]; then
+  echo "[git-safety] Python files were changed. Running security scan..."
+  exec "$ROOT/scripts/git-safety.sh"
+else
+  echo "[git-safety] No Python files were changed. Skipping security scan."
+  exit 0
+fi
