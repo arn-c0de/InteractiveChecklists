@@ -33,7 +33,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
+import com.example.checklist_interactive.R
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.WindowInsetsCompat
@@ -64,11 +66,11 @@ class MarkerRouteViewModel(
     private val _allRoutes = MutableStateFlow<List<RouteEntity>>(emptyList())
     val allRoutes: StateFlow<List<RouteEntity>> = _allRoutes.asStateFlow()
     
-    private val _markerGroups = MutableStateFlow<Map<String, List<LocationEntity>>>(emptyMap())
-    val markerGroups: StateFlow<Map<String, List<LocationEntity>>> = _markerGroups.asStateFlow()
+    private val _markerGroups = MutableStateFlow<Map<Int, List<LocationEntity>>>(emptyMap())
+    val markerGroups: StateFlow<Map<Int, List<LocationEntity>>> = _markerGroups.asStateFlow()
     
-    private val _expandedGroups = MutableStateFlow<Set<String>>(emptySet())
-    val expandedGroups: StateFlow<Set<String>> = _expandedGroups.asStateFlow()
+    private val _expandedGroups = MutableStateFlow<Set<Int>>(emptySet())
+    val expandedGroups: StateFlow<Set<Int>> = _expandedGroups.asStateFlow()
     
     private val _visibleRouteIds = MutableStateFlow<Set<Int>>(emptySet())
     val visibleRouteIds: StateFlow<Set<Int>> = _visibleRouteIds.asStateFlow()
@@ -105,43 +107,43 @@ class MarkerRouteViewModel(
     }
     
     private fun groupMarkers(markers: List<LocationEntity>) {
-        val groups = mutableMapOf<String, MutableList<LocationEntity>>()
+        val groups = mutableMapOf<Int, MutableList<LocationEntity>>()
         
         markers.forEach { marker ->
             // Group by marker type
             val groupKey = when {
-                marker.markerType == "airport" -> "✈ Airports"
-                marker.markerType == "waypoint" -> "📍 Waypoints"
-                marker.markerType.startsWith("tactical_blufor") -> "🔵 BLUFOR Units"
-                marker.markerType.startsWith("tactical_opfor") -> "🔴 OPFOR Units"
-                marker.markerType.startsWith("tactical_neutral") -> "⚪ Neutral Units"
-                marker.markerType == "target" -> "🎯 Targets"
-                marker.markerType == "threat" -> "⚠ Threats"
-                else -> "📌 Other"
+                marker.markerType == "airport" -> R.string.map_group_airports
+                marker.markerType == "waypoint" -> R.string.map_group_waypoints
+                marker.markerType.startsWith("tactical_blufor") -> R.string.map_group_blufor_units
+                marker.markerType.startsWith("tactical_opfor") -> R.string.map_group_opfor_units
+                marker.markerType.startsWith("tactical_neutral") -> R.string.map_group_neutral_units
+                marker.markerType == "target" -> R.string.map_group_targets
+                marker.markerType == "threat" -> R.string.map_group_threats
+                else -> R.string.map_group_other
             }
             
             groups.getOrPut(groupKey) { mutableListOf() }.add(marker)
         }
-        
+        // Keep keys as resource IDs (Int). UI will resolve to human-readable strings.
         _markerGroups.value = groups
     }
     
-    fun toggleGroup(groupName: String) {
-        _expandedGroups.value = if (_expandedGroups.value.contains(groupName)) {
-            _expandedGroups.value - groupName
+    fun toggleGroup(groupKey: Int) {
+        _expandedGroups.value = if (_expandedGroups.value.contains(groupKey)) {
+            _expandedGroups.value - groupKey
         } else {
-            _expandedGroups.value + groupName
+            _expandedGroups.value + groupKey
         }
     }
     
-    fun createRouteFromGroup(groupName: String, onSuccess: () -> Unit) {
+    fun createRouteFromGroup(groupKey: Int, groupLabel: String, description: String = "", onSuccess: () -> Unit) {
         viewModelScope.launch {
-            val markers = _markerGroups.value[groupName] ?: return@launch
+            val markers = _markerGroups.value[groupKey] ?: return@launch
             if (markers.size < 2) return@launch
             
             val route = RouteEntity(
-                name = groupName.replace(Regex("^[^a-zA-Z]+"), ""),
-                description = "Auto-generated from marker group",
+                name = groupLabel.replace(Regex("^[^a-zA-Z]+"), ""),
+                description = description,
                 color = "#00A8FF",
                 created = "",
                 modified = ""
@@ -421,7 +423,7 @@ fun MarkerRouteManagementSheet(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Map Objects",
+                            text = stringResource(R.string.map_objects_title),
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold
                         )
@@ -433,14 +435,14 @@ fun MarkerRouteManagementSheet(
                         }
 
                         IconButton(onClick = onDismiss) {
-                            Icon(Icons.Default.Close, contentDescription = "Close")
+                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_close))
                         }
                     }
                 }
 
                 AnimatedVisibility(visible = showOpacitySlider, enter = androidx.compose.animation.fadeIn(), exit = androidx.compose.animation.fadeOut()) {
                     Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 8.dp)) {
-                        Text(text = "Transparency: ${(sheetOpacity * 100).toInt()}%", style = MaterialTheme.typography.labelSmall)
+                        Text(text = stringResource(R.string.map_objects_transparency_label, (sheetOpacity * 100).toInt()), style = MaterialTheme.typography.labelSmall)
                         Slider(
                             value = sheetOpacity,
                             onValueChange = { sheetOpacity = it },
@@ -457,26 +459,28 @@ fun MarkerRouteManagementSheet(
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text("Details") },
+                    text = { Text(stringResource(R.string.tab_map_details)) },
                     enabled = selectedMarker != null
                 )
 
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    text = { Text("Markers (${markerGroups.values.sumOf { it.size }})") }
+                    text = { Text(stringResource(R.string.tab_map_markers_count, markerGroups.values.sumOf { it.size })) }
                 )
 
                 Tab(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
-                    text = { Text("Routes (${allRoutes.size})") }
+                    text = { Text(stringResource(R.string.tab_map_routes_count, allRoutes.size)) }
                 )
             }
             
             Spacer(modifier = Modifier.height(8.dp))
             
             // Content
+            val autoDesc = stringResource(R.string.map_route_auto_generated_description)
+
             when (selectedTab) {
                 // New mapping: 0=Details, 1=Markers, 2=Routes
                 0 -> {
@@ -504,13 +508,14 @@ fun MarkerRouteManagementSheet(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "No marker selected",
+                                text = stringResource(R.string.map_objects_no_marker_selected),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
                 }
+
                 1 -> MarkerGroupsList(
                     groups = markerGroups,
                     expandedGroups = expandedGroups,
@@ -520,9 +525,13 @@ fun MarkerRouteManagementSheet(
                         selectedTab = 0
                     },
                     onDeleteMarker = { viewModel.deleteMarker(it) },
-                    onCreateRouteFromGroup = { groupName ->
-                        viewModel.createRouteFromGroup(groupName) {
-                            selectedTab = 2 // Switch to routes tab
+                    onCreateRouteFromGroup = { groupKey, groupLabel ->
+                        viewModel.createRouteFromGroup(
+                            groupKey,
+                            groupLabel,
+                            autoDesc
+                        ) {
+                            selectedTab = 2
                         }
                     }
                 )
@@ -547,12 +556,12 @@ fun MarkerRouteManagementSheet(
  */
 @Composable
 fun MarkerGroupsList(
-    groups: Map<String, List<LocationEntity>>,
-    expandedGroups: Set<String>,
-    onToggleGroup: (String) -> Unit,
+    groups: Map<Int, List<LocationEntity>>,
+    expandedGroups: Set<Int>,
+    onToggleGroup: (Int) -> Unit,
     onMarkerClick: (LocationEntity) -> Unit,
     onDeleteMarker: (Int) -> Unit,
-    onCreateRouteFromGroup: (String) -> Unit
+    onCreateRouteFromGroup: (Int, String) -> Unit
 ) {
     if (groups.isEmpty()) {
         Box(
@@ -560,7 +569,7 @@ fun MarkerGroupsList(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "No markers yet",
+                text = stringResource(R.string.map_objects_no_markers_yet),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -572,28 +581,31 @@ fun MarkerGroupsList(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        groups.forEach { (groupName, markers) ->
-            item(key = groupName) {
+        groups.forEach { (groupKey, markers) ->
+            item(key = groupKey) {
+                val groupLabel = stringResource(groupKey)
                 MarkerGroupItem(
-                    groupName = groupName,
+                    groupKey = groupKey,
+                    groupLabel = groupLabel,
                     markers = markers,
-                    isExpanded = expandedGroups.contains(groupName),
-                    onToggle = { onToggleGroup(groupName) },
+                    isExpanded = expandedGroups.contains(groupKey),
+                    onToggle = { onToggleGroup(groupKey) },
                     onMarkerClick = onMarkerClick,
                     onDeleteMarker = onDeleteMarker,
-                    onCreateRoute = { onCreateRouteFromGroup(groupName) }
+                    onCreateRoute = { onCreateRouteFromGroup(groupKey, groupLabel) }
                 )
             }
         }
     }
-}
+} 
 
 /**
  * Individual marker group with expandable children
  */
 @Composable
 fun MarkerGroupItem(
-    groupName: String,
+    groupKey: Int,
+    groupLabel: String,
     markers: List<LocationEntity>,
     isExpanded: Boolean,
     onToggle: () -> Unit,
@@ -617,7 +629,7 @@ fun MarkerGroupItem(
                 IconButton(onClick = onToggle, modifier = Modifier.size(36.dp)) {
                     Icon(
                         imageVector = if (isExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
-                        contentDescription = if (isExpanded) "Collapse" else "Expand",
+                        contentDescription = if (isExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -627,7 +639,7 @@ fun MarkerGroupItem(
                 // Make the title area toggle the group as well (but keep action icons free)
                 Column(modifier = Modifier.weight(1f).clickable(onClick = onToggle)) {
                     Text(
-                        text = groupName,
+                        text = groupLabel,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -653,7 +665,7 @@ fun MarkerGroupItem(
                     IconButton(onClick = { onCreateRoute() }) {
                         Icon(
                             Icons.Default.AddRoad,
-                            contentDescription = "Create route from group",
+                            contentDescription = stringResource(R.string.map_create_route_from_group),
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -726,7 +738,7 @@ fun MarkerListItem(
             ) {
                 Icon(
                     Icons.Default.Delete,
-                    contentDescription = "Delete",
+                    contentDescription = stringResource(R.string.action_delete),
                     tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(20.dp)
                 )
@@ -757,7 +769,7 @@ fun RoutesList(
         ) {
             Icon(Icons.Default.Add, contentDescription = null)
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Create New Route")
+            Text(stringResource(R.string.map_create_new_route))
         }
         
         Spacer(modifier = Modifier.height(8.dp))
@@ -768,7 +780,7 @@ fun RoutesList(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "No routes yet",
+                    text = stringResource(R.string.map_objects_no_routes_yet),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -879,7 +891,7 @@ fun RouteListItem(
             IconButton(onClick = { onEditWaypoints(route.id) }) {
                 Icon(
                     Icons.Default.Edit,
-                    contentDescription = "Edit waypoints",
+                    contentDescription = stringResource(R.string.map_edit_waypoints),
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
@@ -887,7 +899,7 @@ fun RouteListItem(
             IconButton(onClick = onDelete) {
                 Icon(
                     Icons.Default.Delete,
-                    contentDescription = "Delete",
+                    contentDescription = stringResource(R.string.action_delete),
                     tint = MaterialTheme.colorScheme.error
                 )
             }
@@ -1095,7 +1107,7 @@ fun MarkerDetailsContent(
             ) {
                 Icon(Icons.Default.Flight, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Set Route")
+                Text(stringResource(R.string.map_set_route))
             }
             
 // Edit / Move / Delete buttons row
@@ -1110,7 +1122,7 @@ fun MarkerDetailsContent(
                 ) {
                     Icon(Icons.Default.Edit, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Edit")
+                    Text(stringResource(R.string.map_action_edit))
                 }
 
                 // Move button (only for non-static markers)
@@ -1123,9 +1135,9 @@ fun MarkerDetailsContent(
                         },
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Default.OpenWith, contentDescription = "Move marker")
+                        Icon(Icons.Default.OpenWith, contentDescription = stringResource(R.string.map_move_marker))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Move")
+                        Text(stringResource(R.string.map_action_move))
                     }
                 } else {
                     Spacer(modifier = Modifier.weight(1f))
@@ -1141,9 +1153,9 @@ fun MarkerDetailsContent(
                     },
                     modifier = Modifier.weight(1f)
                 ) {
-                    Icon(Icons.Default.MyLocation, contentDescription = "Center on map")
+                    Icon(Icons.Default.MyLocation, contentDescription = stringResource(R.string.map_center_on_map))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Center")
+                    Text(stringResource(R.string.map_action_center))
                 }
                 
                 // Delete button
@@ -1156,15 +1168,15 @@ fun MarkerDetailsContent(
                 ) {
                     Icon(Icons.Default.Delete, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Delete")
+                    Text(stringResource(R.string.action_delete))
                 }
             }
             
             // Back button
             OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.ArrowBack, contentDescription = null)
+                Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.action_back))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Back to Markers")
+                Text(stringResource(R.string.action_back))
             }
         }
     }
@@ -1206,8 +1218,8 @@ fun MarkerDetailsContent(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete Marker") },
-            text = { Text("Are you sure you want to delete '${location.name}'? This action cannot be undone.") },
+            title = { Text(stringResource(R.string.map_delete_marker_title)) },
+            text = { Text(stringResource(R.string.map_delete_marker_confirm, location.name)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -1219,12 +1231,12 @@ fun MarkerDetailsContent(
                         contentColor = MaterialTheme.colorScheme.error
                     )
                 ) {
-                    Text("Delete")
+                    Text(stringResource(R.string.action_delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -1350,12 +1362,12 @@ fun LocationEditDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Edit Marker",
+                        text = stringResource(R.string.map_edit_marker_title),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold
                     )
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, "Close")
+                        Icon(Icons.Default.Close, stringResource(R.string.action_close))
                     }
                 }
                 
@@ -1369,12 +1381,12 @@ fun LocationEditDialog(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // Basic info section
-                    Text("Basic Information", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.map_basic_information), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     
                     OutlinedTextField(
                         value = name,
                         onValueChange = { name = it },
-                        label = { Text("Name *") },
+                        label = { Text(stringResource(R.string.map_name_label)) },
                         modifier = Modifier.fillMaxWidth()
                     )
                     
@@ -1382,14 +1394,14 @@ fun LocationEditDialog(
                         OutlinedTextField(
                             value = latitude,
                             onValueChange = { latitude = it },
-                            label = { Text("Latitude *") },
+                            label = { Text(stringResource(R.string.map_latitude_label)) },
                             modifier = Modifier.weight(1f),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                         )
                         OutlinedTextField(
                             value = longitude,
                             onValueChange = { longitude = it },
-                            label = { Text("Longitude *") },
+                            label = { Text(stringResource(R.string.map_longitude_label)) },
                             modifier = Modifier.weight(1f),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                         )
@@ -1399,15 +1411,15 @@ fun LocationEditDialog(
                         OutlinedTextField(
                             value = markerType,
                             onValueChange = { markerType = it },
-                            label = { Text("Type *") },
-                            placeholder = { Text("airport, waypoint, tactical_military, etc.") },
+                            label = { Text(stringResource(R.string.map_type_label)) },
+                            placeholder = { Text(stringResource(R.string.map_type_placeholder)) },
                             modifier = Modifier.weight(1f)
                         )
                         OutlinedTextField(
                             value = coalition,
                             onValueChange = { coalition = it },
-                            label = { Text("Coalition") },
-                            placeholder = { Text("blufor, opfor, neutral") },
+                            label = { Text(stringResource(R.string.map_coalition_label)) },
+                            placeholder = { Text(stringResource(R.string.map_coalition_placeholder)) },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -1415,7 +1427,7 @@ fun LocationEditDialog(
                     OutlinedTextField(
                         value = description,
                         onValueChange = { description = it },
-                        label = { Text("Description") },
+                        label = { Text(stringResource(R.string.map_description_label)) },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 2,
                         maxLines = 4
@@ -1424,13 +1436,13 @@ fun LocationEditDialog(
                     HorizontalDivider()
                     
                     // NATO Symbol section
-                    Text("NATO Military Symbol", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.map_nato_military_symbol_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     
                     OutlinedTextField(
                         value = symbolEntity,
                         onValueChange = { symbolEntity = it },
-                        label = { Text("Symbol Entity") },
-                        placeholder = { Text("equipment_mortar, aircraft_fighter, etc.") },
+                        label = { Text(stringResource(R.string.map_symbol_entity_label)) },
+                        placeholder = { Text(stringResource(R.string.map_symbol_entity_placeholder)) },
                         modifier = Modifier.fillMaxWidth()
                     )
                     
@@ -1438,15 +1450,15 @@ fun LocationEditDialog(
                         OutlinedTextField(
                             value = symbolSet,
                             onValueChange = { symbolSet = it },
-                            label = { Text("Symbol Set") },
-                            placeholder = { Text("ground_unit, equipment, etc.") },
+                            label = { Text(stringResource(R.string.map_symbol_set_label)) },
+                            placeholder = { Text(stringResource(R.string.map_symbol_set_placeholder)) },
                             modifier = Modifier.weight(1f)
                         )
                         OutlinedTextField(
                             value = symbolSize,
                             onValueChange = { symbolSize = it },
-                            label = { Text("Size") },
-                            placeholder = { Text("squad, platoon, etc.") },
+                            label = { Text(stringResource(R.string.map_size_label)) },
+                            placeholder = { Text(stringResource(R.string.map_size_placeholder)) },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -1455,15 +1467,15 @@ fun LocationEditDialog(
                         OutlinedTextField(
                             value = symbolAffiliation,
                             onValueChange = { symbolAffiliation = it },
-                            label = { Text("Affiliation") },
-                            placeholder = { Text("friendly, hostile, neutral, unknown") },
+                            label = { Text(stringResource(R.string.map_affiliation_label)) },
+                            placeholder = { Text(stringResource(R.string.map_affiliation_placeholder)) },
                             modifier = Modifier.weight(1f)
                         )
                         OutlinedTextField(
                             value = symbolColor,
                             onValueChange = { symbolColor = it },
-                            label = { Text("Color") },
-                            placeholder = { Text("#00A8FF") },
+                            label = { Text(stringResource(R.string.map_color_label)) },
+                            placeholder = { Text(stringResource(R.string.map_color_placeholder)) },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -1486,13 +1498,13 @@ fun LocationEditDialog(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Icon",
+                                    text = stringResource(R.string.map_icon_label),
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = if (icon.isNotEmpty() && icon != "default") icon else "Click to select icon",
+                                    text = if (icon.isNotEmpty() && icon != "default") icon else stringResource(R.string.map_icon_select_hint),
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = if (icon.isNotEmpty() && icon != "default") 
                                         MaterialTheme.colorScheme.onSurface 
@@ -1502,7 +1514,7 @@ fun LocationEditDialog(
                             }
                             Icon(
                                 Icons.Default.Edit,
-                                contentDescription = "Change icon",
+                                contentDescription = stringResource(R.string.map_icon_label),
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }
@@ -1518,7 +1530,7 @@ fun LocationEditDialog(
                             onCheckedChange = { isStatic = it }
                         )
                         Text(
-                            text = "Static Marker (Airport, Installation, etc.)",
+                            text = stringResource(R.string.map_static_marker_checkbox),
                             modifier = Modifier.padding(start = 8.dp)
                         )
                     }
@@ -1527,12 +1539,12 @@ fun LocationEditDialog(
 
                     // Airport section (hidden by default unless marker is static)
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Airport Fields", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.map_airport_fields_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.weight(1f))
                         IconButton(onClick = { showAirportFields = !showAirportFields }) {
                             Icon(
                                 imageVector = if (showAirportFields) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                contentDescription = if (showAirportFields) "Collapse airport fields" else "Expand airport fields"
+                                contentDescription = if (showAirportFields) stringResource(R.string.map_collapse_airport_fields_cd) else stringResource(R.string.map_expand_airport_fields_cd)
                             )
                         }
                     }
@@ -1547,22 +1559,22 @@ fun LocationEditDialog(
                                 OutlinedTextField(
                                     value = icao,
                                     onValueChange = { icao = it.uppercase() },
-                                    label = { Text("ICAO") },
-                                    placeholder = { Text("EDDF") },
+                                    label = { Text(stringResource(R.string.map_icao_label)) },
+                                    placeholder = { Text(stringResource(R.string.map_icao_placeholder)) },
                                     modifier = Modifier.weight(1f)
                                 )
                                 OutlinedTextField(
                                     value = iata,
                                     onValueChange = { iata = it.uppercase() },
-                                    label = { Text("IATA") },
-                                    placeholder = { Text("FRA") },
+                                    label = { Text(stringResource(R.string.map_iata_label)) },
+                                    placeholder = { Text(stringResource(R.string.map_iata_placeholder)) },
                                     modifier = Modifier.weight(1f)
                                 )
                                 OutlinedTextField(
                                     value = elevationM,
                                     onValueChange = { elevationM = it.filter { ch -> ch.isDigit() } },
-                                    label = { Text("Elevation (m)") },
-                                    placeholder = { Text("100") },
+                                    label = { Text(stringResource(R.string.map_elevation_m_label)) },
+                                    placeholder = { Text(stringResource(R.string.map_elevation_m_placeholder)) },
                                     modifier = Modifier.weight(1f),
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                                 )
@@ -1571,8 +1583,8 @@ fun LocationEditDialog(
                             OutlinedTextField(
                                 value = frequencies,
                                 onValueChange = { frequencies = it },
-                                label = { Text("Frequencies (JSON)") },
-                                placeholder = { Text("{\"tower\":\"118.5\", \"ground\":\"121.9\"}") },
+                                label = { Text(stringResource(R.string.map_frequencies_json_label)) },
+                                placeholder = { Text(stringResource(R.string.map_frequencies_json_placeholder)) },
                                 modifier = Modifier.fillMaxWidth(),
                                 minLines = 2
                             )
@@ -1580,7 +1592,7 @@ fun LocationEditDialog(
                             Spacer(modifier = Modifier.height(8.dp))
 
                             // Runways (editable)
-                            Text("Runways", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.map_runways_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(6.dp))
 
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1591,11 +1603,11 @@ fun LocationEditDialog(
                                                 OutlinedTextField(
                                                     value = rw.name,
                                                     onValueChange = { v -> editRunways[idx] = rw.copy(name = v) },
-                                                    label = { Text("Name") },
+                                                    label = { Text(stringResource(R.string.map_runway_name_label)) },
                                                     modifier = Modifier.weight(1f)
                                                 )
                                                 IconButton(onClick = { editRunways.removeAt(idx) }) {
-                                                    Icon(Icons.Default.Delete, contentDescription = "Remove runway")
+                                                    Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.map_remove_runway_cd))
                                                 }
                                             }
 
@@ -1605,7 +1617,7 @@ fun LocationEditDialog(
                                                 OutlinedTextField(
                                                     value = rw.lengthM?.toString() ?: "",
                                                     onValueChange = { v -> editRunways[idx] = rw.copy(lengthM = v.toIntOrNull()) },
-                                                    label = { Text("Length (m)") },
+                                                    label = { Text(stringResource(R.string.map_runway_length_m_label)) },
                                                     modifier = Modifier.weight(1f),
                                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                                                 )
@@ -1613,7 +1625,7 @@ fun LocationEditDialog(
                                                 OutlinedTextField(
                                                     value = rw.widthM?.toString() ?: "",
                                                     onValueChange = { v -> editRunways[idx] = rw.copy(widthM = v.toIntOrNull()) },
-                                                    label = { Text("Width (m)") },
+                                                    label = { Text(stringResource(R.string.map_runway_width_m_label)) },
                                                     modifier = Modifier.weight(1f),
                                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                                                 )
@@ -1625,7 +1637,7 @@ fun LocationEditDialog(
                                                 OutlinedTextField(
                                                     value = rw.surface ?: "",
                                                     onValueChange = { v -> editRunways[idx] = rw.copy(surface = v) },
-                                                    label = { Text("Surface") },
+                                                    label = { Text(stringResource(R.string.map_runway_surface_label)) },
                                                     modifier = Modifier.weight(1f)
                                                 )
 
@@ -1639,20 +1651,20 @@ fun LocationEditDialog(
                                                             filtered = if (parts.size > 1) parts[0] + "." + parts[1].take(2) else parts[0]
                                                             editRunways[idx] = rw.copy(ilsFrequency = filtered)
                                                         },
-                                                        label = { Text("ILS (MHz)") },
+                                                        label = { Text(stringResource(R.string.map_runway_ils_mhz_label)) },
                                                         placeholder = { Text("118.50") },
                                                         modifier = Modifier.fillMaxWidth(),
                                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                                                     )
                                                     val ilsNum = rw.ilsFrequency?.toDoubleOrNull()
                                                     if (rw.ilsFrequency.isNullOrBlank()) {
-                                                        Text(text = "Range: 108.00–137.00 MHz", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                                                        Text(text = stringResource(R.string.map_runway_ils_range_hint), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                                                     } else if (ilsNum == null) {
-                                                        Text(text = "Invalid format", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                                        Text(text = stringResource(R.string.map_runway_ils_invalid_format), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                                                     } else if (ilsNum < 108.0 || ilsNum > 137.0) {
-                                                        Text(text = "Out of range (108.00–137.00)", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                                        Text(text = stringResource(R.string.map_runway_ils_out_of_range), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                                                     } else {
-                                                        Text(text = "OK", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+                                                        Text(text = stringResource(R.string.action_ok), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
                                                     }
                                                 }
                                             }
@@ -1668,35 +1680,34 @@ fun LocationEditDialog(
                                                             val filtered = v.filter { ch -> ch.isDigit() || ch == '.' }
                                                             editRunways[idx] = rw.copy(headingDeg = filtered.toDoubleOrNull())
                                                         },
-                                                        label = { Text("Heading (deg)") },
+                                                        label = { Text(stringResource(R.string.map_runway_heading_deg_label)) },
                                                         modifier = Modifier.fillMaxWidth(),
                                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                                                     )
                                                     val headingErr = rw.headingDeg?.let { !(it.isFinite() && it >= 0.0 && it < 360.0) } ?: false
                                                     if (headingErr) {
-                                                        Text(text = "Heading must be 0–359.9°", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                                        Text(text = stringResource(R.string.map_runway_heading_invalid_range), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                                                     } else {
-                                                        Text(text = "0–359.9°", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                                                        Text(text = stringResource(R.string.map_runway_heading_range_hint), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                                                     }
                                                 }
 
                                                 Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                                                     Checkbox(checked = (rw.hasLighting ?: 0) == 1, onCheckedChange = { checked -> editRunways[idx] = rw.copy(hasLighting = if (checked) 1 else 0) })
                                                     Spacer(modifier = Modifier.width(8.dp))
-                                                    Text("Lighting")
+                                                    Text(stringResource(R.string.map_runway_lighting_checkbox))
                                                 }
                                             }
 
                                             Spacer(modifier = Modifier.height(6.dp))
 
-                                            OutlinedTextField(
-                                                value = rw.notes ?: "",
-                                                onValueChange = { v -> editRunways[idx] = rw.copy(notes = v) },
-                                                label = { Text("Notes") },
-                                                modifier = Modifier.fillMaxWidth(),
-                                                minLines = 1
-                                            )
-                                        }
+                                                                                            OutlinedTextField(
+                                                                                                value = rw.notes ?: "",
+                                                                                                onValueChange = { v -> editRunways[idx] = rw.copy(notes = v) },
+                                                                                                label = { Text(stringResource(R.string.map_notes_label)) },
+                                                                                                modifier = Modifier.fillMaxWidth(),
+                                                                                                minLines = 1
+                                                                                            )                                        }
                                     }
                                 }
 
@@ -1710,7 +1721,7 @@ fun LocationEditDialog(
                                     }) {
                                         Icon(Icons.Default.Add, contentDescription = null)
                                         Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Add Runway")
+                                        Text(stringResource(R.string.map_add_runway_button))
                                     }
                                 }
                             }
@@ -1722,42 +1733,42 @@ fun LocationEditDialog(
                     HorizontalDivider()
 
                     // Tactical section
-                    Text("Tactical Fields", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.map_tactical_fields_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
                             value = unitType,
                             onValueChange = { unitType = it },
-                            label = { Text("Unit Type") },
-                            placeholder = { Text("Infantry, Armor, etc.") },
+                            label = { Text(stringResource(R.string.map_unit_type_label)) },
+                            placeholder = { Text(stringResource(R.string.map_unit_type_placeholder)) },
                             modifier = Modifier.weight(1f)
                         )
                         Column(modifier = Modifier.weight(1f)) {
                             OutlinedTextField(
                                 value = threatLevel,
                                 onValueChange = { threatLevel = it.filter { ch -> ch.isDigit() } },
-                                label = { Text("Threat Level") },
-                                placeholder = { Text("0-10") },
+                                label = { Text(stringResource(R.string.map_threat_level_label)) },
+                                placeholder = { Text(stringResource(R.string.map_threat_level_placeholder)) },
                                 modifier = Modifier.fillMaxWidth(),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                             )
-                            Text(text = "Range: 0–10", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                            Text(text = stringResource(R.string.map_threat_level_range_hint), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                             if (threatLevelError) {
-                                Text(text = "Must be an integer between 0 and 10", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                Text(text = stringResource(R.string.map_threat_level_invalid_error), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                             }
                         }
                         Column(modifier = Modifier.weight(1f)) {
                             OutlinedTextField(
                                 value = strength,
                                 onValueChange = { strength = it.filter { ch -> ch.isDigit() } },
-                                label = { Text("Strength") },
-                                placeholder = { Text("Number of units") },
+                                label = { Text(stringResource(R.string.map_strength_label)) },
+                                placeholder = { Text(stringResource(R.string.map_strength_placeholder)) },
                                 modifier = Modifier.fillMaxWidth(),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                             )
-                            Text(text = "Enter number of units", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                            Text(text = stringResource(R.string.map_strength_placeholder), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                             if (strengthError) {
-                                Text(text = "Must be a non-negative integer", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                Text(text = stringResource(R.string.map_strength_invalid_error), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                             }
                         }
                     }
@@ -1765,21 +1776,21 @@ fun LocationEditDialog(
                     HorizontalDivider()
                     
                     // Geography section
-                    Text("Geography & Admin", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.map_geography_admin_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
                             value = country,
                             onValueChange = { country = it },
-                            label = { Text("Country") },
-                            placeholder = { Text("Germany") },
+                            label = { Text(stringResource(R.string.map_country_label)) },
+                            placeholder = { Text(stringResource(R.string.map_country_placeholder)) },
                             modifier = Modifier.weight(1f)
                         )
                         OutlinedTextField(
                             value = region,
                             onValueChange = { region = it },
-                            label = { Text("Region") },
-                            placeholder = { Text("Hesse") },
+                            label = { Text(stringResource(R.string.map_region_label)) },
+                            placeholder = { Text(stringResource(R.string.map_region_placeholder)) },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -1787,29 +1798,29 @@ fun LocationEditDialog(
                     OutlinedTextField(
                         value = timezone,
                         onValueChange = { timezone = it },
-                        label = { Text("Timezone") },
-                        placeholder = { Text("Europe/Berlin") },
+                        label = { Text(stringResource(R.string.map_timezone_label)) },
+                        placeholder = { Text(stringResource(R.string.map_timezone_placeholder)) },
                         modifier = Modifier.fillMaxWidth()
                     )
                     
                     HorizontalDivider()
                     
                     // Meta section
-                    Text("Metadata", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.map_metadata_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     
                     OutlinedTextField(
                         value = source,
                         onValueChange = { source = it },
-                        label = { Text("Source") },
-                        placeholder = { Text("OpenFlightMaps, user_created, etc.") },
+                        label = { Text(stringResource(R.string.map_source_label)) },
+                        placeholder = { Text(stringResource(R.string.map_source_placeholder)) },
                         modifier = Modifier.fillMaxWidth()
                     )
                     
                     OutlinedTextField(
                         value = tags,
                         onValueChange = { tags = it },
-                        label = { Text("Tags") },
-                        placeholder = { Text("civil,military,public (comma-separated)") },
+                        label = { Text(stringResource(R.string.tags_title)) },
+                        placeholder = { Text(stringResource(R.string.map_tags_placeholder)) },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -1825,7 +1836,7 @@ fun LocationEditDialog(
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("Cancel")
+                        Text(stringResource(R.string.action_cancel))
                     }
                     
                     Button(
@@ -1875,7 +1886,7 @@ fun LocationEditDialog(
                         modifier = Modifier.weight(1f),
                         enabled = name.isNotBlank() && latValid && lonValid && !threatLevelError && !strengthError && runwaysValid
                     ) {
-                        Text("Save")
+                        Text(stringResource(R.string.action_save))
                     }
                 }
             }
@@ -1900,26 +1911,26 @@ fun RouteEditDialog(
 
     // Predefined color presets
     val colorPresets = listOf(
-        "Blue" to "#00A8FF",
-        "Red" to "#FF3B30",
-        "Green" to "#34C759",
-        "Yellow" to "#FFD60A",
-        "Orange" to "#FF9500",
-        "Purple" to "#AF52DE",
-        "Pink" to "#FF2D55",
-        "Cyan" to "#32ADE6",
-        "Teal" to "#5AC8FA",
-        "Indigo" to "#5856D6",
-        "Mint" to "#00C7BE",
-        "Brown" to "#A2845E",
-        "Gray" to "#8E8E93",
-        "White" to "#FFFFFF",
-        "Black" to "#000000"
+        stringResource(R.string.map_color_blue) to "#00A8FF",
+        stringResource(R.string.map_color_red) to "#FF3B30",
+        stringResource(R.string.map_color_green) to "#34C759",
+        stringResource(R.string.map_color_yellow) to "#FFD60A",
+        stringResource(R.string.map_color_orange) to "#FF9500",
+        stringResource(R.string.map_color_purple) to "#AF52DE",
+        stringResource(R.string.map_color_pink) to "#FF2D55",
+        stringResource(R.string.map_color_cyan) to "#32ADE6",
+        stringResource(R.string.map_color_teal) to "#5AC8FA",
+        stringResource(R.string.map_color_indigo) to "#5856D6",
+        stringResource(R.string.map_color_mint) to "#00C7BE",
+        stringResource(R.string.map_color_brown) to "#A2845E",
+        stringResource(R.string.map_color_gray) to "#8E8E93",
+        stringResource(R.string.map_color_white) to "#FFFFFF",
+        stringResource(R.string.map_color_black) to "#000000"
     )
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Edit Route") },
+        title = { Text(stringResource(R.string.map_edit_route_title)) },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -1927,7 +1938,7 @@ fun RouteEditDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Route Name") },
+                    label = { Text(stringResource(R.string.map_route_name_label)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -1935,7 +1946,7 @@ fun RouteEditDialog(
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text("Description") },
+                    label = { Text(stringResource(R.string.map_description_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 2,
                     maxLines = 4
@@ -1947,10 +1958,10 @@ fun RouteEditDialog(
                     onExpandedChange = { colorDropdownExpanded = it }
                 ) {
                     OutlinedTextField(
-                        value = colorPresets.find { it.second == color }?.first ?: "Custom",
+                        value = colorPresets.find { it.second == color }?.first ?: stringResource(R.string.map_color_custom),
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Color") },
+                        label = { Text(stringResource(R.string.map_color_label)) },
                         trailingIcon = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 // Color preview
