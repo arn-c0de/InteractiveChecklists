@@ -19,16 +19,16 @@ if [ "${SKIP_CODEQL_SCAN:-0}" = "1" ]; then
 else
   if command -v codeql >/dev/null 2>&1; then
     echo "[git-safety] Running CodeQL (this can be slow)..."
-    # Create database if missing
-    if [ ! -d codeql-db ] || [ ! -f codeql-db/codeql-database.yml ]; then
-      echo "[git-safety] Creating CodeQL database (first run, may take a while)..."
-      codeql database create codeql-db --language=python --source-root=. --overwrite
+    # Create database if missing or if language set changed
+    if [ ! -d codeql-db ] || [ ! -f codeql-db/codeql-database.yml ] || ! grep -q "languages: \[kotlin, python\]" codeql-db/codeql-database.yml; then
+      echo "[git-safety] Creating multi-language CodeQL database (first run or language change, may take a while)..."
+      codeql database create codeql-db --language=python,kotlin --source-root=. --overwrite --db-cluster
     fi
 
     # The '|| true' is intentional. codeql analyze exits with 2 if it finds issues,
     # which would otherwise terminate the script. We want the Python script below to
     # parse the results and decide if the exit code should be 1.
-    codeql database analyze codeql-db --format=sarif-latest --output=codeql-results.sarif codeql/python-queries -j 0 || true
+    codeql database analyze codeql-db --format=sarif-latest --output=codeql-results.sarif codeql/python-queries codeql/kotlin-queries -j 0 || true
 
     if python - <<'PY'
 import json, sys

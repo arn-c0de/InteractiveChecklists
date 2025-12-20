@@ -49,7 +49,7 @@ while read local_ref local_sha remote_ref remote_sha; do
     continue
   fi
 
-  if echo "$changed_files" | grep -q -E '\.py$'; then
+  if echo "$changed_files" | grep -q -E '\.py$|\.kt$|\.kts$'; then
     python_files_changed=true
     break # Found a python file, no need to check other refs.
   fi

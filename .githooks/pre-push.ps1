@@ -50,7 +50,7 @@ foreach ($line in $input) {
     # Get the list of changed files in the commit range.
     $changed_files = git diff-tree --no-commit-id --name-only -r $range
     
-    if ($changed_files | Select-String -Quiet -Pattern '\.py$') {
+    if ($changed_files | Select-String -Quiet -Pattern '\.py$|\.kt$|\.kts$') {
         $python_files_changed = $true
         break # Found a python file, no need to check other refs.
     }
