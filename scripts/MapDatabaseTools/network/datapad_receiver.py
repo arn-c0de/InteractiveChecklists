@@ -221,9 +221,12 @@ class DataPadReceiver:
             dev = get_or_create_device()
             device_id = dev['deviceId']
             private_pem = dev['privateKeyPem']
-            # Do not log device identifiers in clear-text; log a short fingerprint instead
+            # Do not log device identifiers in clear-text; use HMAC for secure fingerprinting
+            import hmac
             import hashlib
-            device_fp = hashlib.sha256(device_id.encode('utf-8')).hexdigest()[:8]
+            import secrets
+            fp_key = secrets.token_bytes(32)
+            device_fp = hmac.new(fp_key, device_id.encode('utf-8'), hashlib.sha256).hexdigest()[:8]
             logging.info(f"🔐 Loaded persistent device (id fingerprint): {device_fp} from disk")
         else:
             # If user provided device_id, check for stored device
@@ -241,9 +244,12 @@ class DataPadReceiver:
         # Initialize ECDH client with optional private key PEM for persistence
         self.ecdh_client = ECDHClient(device_id=self.device_id, device_name=self.device_name, private_key_pem=private_pem)
         logging.info(f"🔐 ECDH mode enabled")
-        # Avoid logging clear-text identifiers; emit short hashed fingerprint instead
+        # Avoid logging clear-text identifiers; use HMAC for secure fingerprinting
+        import hmac
         import hashlib
-        device_fp_self = hashlib.sha256(self.device_id.encode('utf-8')).hexdigest()[:8]
+        import secrets
+        fp_key = secrets.token_bytes(32)
+        device_fp_self = hmac.new(fp_key, self.device_id.encode('utf-8'), hashlib.sha256).hexdigest()[:8]
         logging.info(f"📱 Device ID fingerprint: {device_fp_self}")
 
         if not self.sender_ip:
