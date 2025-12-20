@@ -50,9 +50,11 @@ fun RadialMenu(
         RadialMenuItem(Icons.Default.Delete, "Delete") {}
     )
 ) {
+    android.util.Log.d("RadialMenu", "RadialMenu composing at ($centerX, $centerY) with ${items.size} items")
     var visible by remember { mutableStateOf(false) }
     
     LaunchedEffect(Unit) {
+        android.util.Log.d("RadialMenu", "LaunchedEffect triggered, setting visible to true")
         visible = true
     }
     
