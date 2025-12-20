@@ -902,4 +902,46 @@
     <string name="military_symbols_affiliation_neutral">Neutral</string>
     <string name="military_symbols_affiliation_unknown">Unknown</string>
 
+    <!-- ROUTE CREATION -->
+    <string name="route_new_name_template">New Route %d</string>
+    <string name="route_autosaved_player_position_description">Auto-saved player position</string>
+    <string name="route_description_waypoints">Route with %d waypoints</string>
+
+    <string name="route_edit_title">Edit Route</string>
+    <string name="route_create_title">Create Route</string>
+    <string name="route_edit_name_content_description">Edit route name</string>
+    <string name="route_toggle_opacity_content_description">Toggle opacity</string>
+    <string name="route_opacity_label">Opacity: %d%%</string>
+    <string name="route_instructions_add_waypoints">Add waypoints manually or tap locations on the map</string>
+    <string name="route_instructions_lock_waypoints_title">Lock waypoints to fix their position</string>
+    <string name="route_instructions_lock_waypoints_message">Locked waypoints stay in place when optimizing the route</string>
+    <string name="route_plan_fastest_button">Plan Fastest Route</string>
+    <string name="route_no_candidates_message">No candidate routes generated.</string>
+    <string name="route_candidate_format">%d) %.1f NM</string>
+    <string name="route_waypoints_label">Waypoints (%d)</string>
+    <string name="route_total_distance_format">%.1f NM</string>
+    <string name="route_locked_waypoints_count">%d locked</string>
+    <string name="route_finish_button">Finish Route</string>
+    <string name="route_dialog_name_title">Route Name</string>
+    <string name="route_dialog_name_label">Name</string>
+    <string name="route_dialog_add_waypoint_title">Add Waypoint</string>
+    <string name="route_add_current_player_position">Add current player position</string>
+    <string name="route_player_position_coordinates_format">%.4f, %.4f</string>
+    <string name="route_search_locations_label">Search locations</string>
+    <string name="route_search_refine_message">... and %d more. Refine your search.</string>
+
+    <string name="route_segment_hdg_distance_format">HDG %03.0f° • %.1f NM</string>
+
+    <string name="route_waypoint_locked_content_description">Locked - position fixed</string>
+    <string name="route_waypoint_unlocked_content_description">Unlocked - can be optimized</string>
+    <string name="route_waypoint_runways_content_description">Has %d runway(s)</string>
+    <string name="route_waypoint_ils_content_description">Has ILS</string>
+    <string name="route_waypoint_airport_content_description">Airport</string>
+    <string name="route_waypoint_waypoint_content_description">Waypoint</string>
+    <string name="route_waypoint_tactical_unit_content_description">Tactical unit</string>
+    <string name="route_waypoint_target_content_description">Target</string>
+    <string name="route_waypoint_static_content_description">Static</string>
+    <string name="action_move_up">Move up</string>
+    <string name="action_move_down">Move down</string>
+
 </resources>
