@@ -1,0 +1,23 @@
+{
+  "devices": [
+    {
+      "deviceId": "example_device_id_32_chars_hex",
+      "name": "Example Device",
+      "publicKey": "base64_encoded_ec_public_key",
+      "permissions": [
+        "receive",
+        "send_commands"
+      ],
+      "addedDate": "2024-01-15T10:30:00Z",
+      "_comment": "Delete this example entry and add real devices"
+    }
+  ],
+  "_instructions": {
+    "howToAdd": "Run your Android app with ECDH enabled, check logs for Device ID, then add entry here",
+    "permissions": [
+      "receive: can receive flight data",
+      "send_commands: can send commands to DCS"
+    ],
+    "reloadHotkey": "The script reloads this file automatically when changed"
+  }
+}

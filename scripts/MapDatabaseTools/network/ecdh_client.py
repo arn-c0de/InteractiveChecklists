@@ -83,10 +83,13 @@ class ECDHClient:
         # Nonce counter for encryption
         self._nonce_counter = 0
         
-        logger.info(f"🔐 ECDH Client initialized")
-        # Avoid logging full device identifiers
-        logger.info(f"📱 Device ID (truncated): {self.device_id[:8]}...")
-        logger.info(f"📝 Device Name: {self.device_name}")
+        import hashlib
+        logger.info("🔐 ECDH Client initialized")
+        # Avoid logging clear-text identifiers; emit short hashed fingerprints instead
+        device_id_fp = hashlib.sha256(self.device_id.encode('utf-8')).hexdigest()[:8]
+        device_name_fp = hashlib.sha256(self.device_name.encode('utf-8')).hexdigest()[:8]
+        logger.info(f"📱 Device ID fingerprint: {device_id_fp}")
+        logger.info(f"📝 Device Name fingerprint: {device_name_fp}")
     
     def _generate_nonce(self) -> bytes:
         """Generate counter-based nonce for CLIENT (0x00 prefix) - used for DATA encryption with session key"""

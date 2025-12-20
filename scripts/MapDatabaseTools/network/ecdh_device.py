@@ -79,7 +79,10 @@ def _get_password_for_encryption(device_id: str, force_new: bool = False) -> str
     print("\n" + "="*70)
     print("🔐 ECDH DEVICE KEY PROTECTION")
     print("="*70)
-    print(f"Device ID: {device_id}")
+    # Display only a short fingerprint of the device ID (avoid clear-text identifiers)
+    import hashlib
+    device_fp = hashlib.sha256(device_id.encode('utf-8')).hexdigest()[:8]
+    print(f"Device ID: {device_fp}")
     print("\nYour private ECDH key needs to be protected with a password.")
     print("This password will be required each time you start the application.")
     print("\n⚠️  IMPORTANT: Choose a strong password and remember it!")

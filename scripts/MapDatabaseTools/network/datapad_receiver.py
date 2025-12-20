@@ -221,7 +221,10 @@ class DataPadReceiver:
             dev = get_or_create_device()
             device_id = dev['deviceId']
             private_pem = dev['privateKeyPem']
-            logging.info(f"🔐 Loaded persistent device {device_id} from disk")
+            # Do not log device identifiers in clear-text; log a short fingerprint instead
+            import hashlib
+            device_fp = hashlib.sha256(device_id.encode('utf-8')).hexdigest()[:8]
+            logging.info(f"🔐 Loaded persistent device (id fingerprint): {device_fp} from disk")
         else:
             # If user provided device_id, check for stored device
             dev = None
@@ -238,8 +241,10 @@ class DataPadReceiver:
         # Initialize ECDH client with optional private key PEM for persistence
         self.ecdh_client = ECDHClient(device_id=self.device_id, device_name=self.device_name, private_key_pem=private_pem)
         logging.info(f"🔐 ECDH mode enabled")
-        # Avoid logging full device identifiers
-        logging.info(f"📱 Device ID (truncated): {self.device_id[:8]}...")
+        # Avoid logging clear-text identifiers; emit short hashed fingerprint instead
+        import hashlib
+        device_fp_self = hashlib.sha256(self.device_id.encode('utf-8')).hexdigest()[:8]
+        logging.info(f"📱 Device ID fingerprint: {device_fp_self}")
 
         if not self.sender_ip:
             logging.warning("⚠️ No sender_ip specified - handshake will fail")
