@@ -39,6 +39,8 @@ import com.example.checklist_interactive.data.checklist.MarkdownChecklistParser
 import com.example.checklist_interactive.ui.checklist.ChecklistViewModel
 import com.example.checklist_interactive.ui.checklist.ChecklistViewModelFactory
 import com.example.checklist_interactive.ui.common.DraggableFab
+import com.example.checklist_interactive.ui.common.FABOverlay
+import com.example.checklist_interactive.ui.common.InternalFileViewerFABs
 import java.io.File
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
@@ -243,61 +245,29 @@ fun InternalFileViewer(
                         resetTrigger = resetTrigger
                     )
 
-                    // Draggable FABs
+                    // Draggable FABs using centralized FABOverlay
                     val configuration = LocalConfiguration.current
                     val screenWidthPx = with(LocalDensity.current) { configuration.screenWidthDp.dp.roundToPx() }
                     val screenHeightPx = with(LocalDensity.current) { configuration.screenHeightDp.dp.roundToPx() }
                     val topPadPx = with(LocalDensity.current) { padding.calculateTopPadding().roundToPx() }
                     val bottomPadPx = with(LocalDensity.current) { padding.calculateBottomPadding().roundToPx() }
                     val effectiveScreenHeightPx = (screenHeightPx - topPadPx - bottomPadPx).coerceAtLeast(1)
-                    val fabSizePx = with(LocalDensity.current) { 56.dp.roundToPx() }
 
-                    DraggableFab(
-                        name = "menu",
-                        prefsManager = prefsManager,
-                        screenWidthPx = screenWidthPx,
-                        screenHeightPx = effectiveScreenHeightPx,
-                        fabSizePx = fabSizePx,
-                        defaultX = 1.0f,
-                        defaultY = 0.8f,
-                        visible = true,
-                        onClick = onShowFileList,
-                        content = { Icon(Icons.Default.Menu, contentDescription = context.getString(R.string.file_list)) }
-                    )
-
-                    DraggableFab(
-                        name = "quick_access",
-                        prefsManager = prefsManager,
-                        screenWidthPx = screenWidthPx,
-                        screenHeightPx = effectiveScreenHeightPx,
-                        fabSizePx = fabSizePx,
-                        defaultX = 0.9f,
-                        defaultY = 0.9f,
-                        visible = true,
-                        onClick = { showQuickAccess = true },
-                        content = { Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = stringResource(R.string.cd_quick_access)) }
-                    )
-
-                    // DataPad FAB for internal markdown viewer
-                    val datapadPos = prefsManager.getPdfViewerFabPosition("datapad", 0.75f, 0.9f)
-                    android.util.Log.d("InternalFileViewer", "datapad saved pos: x=${datapadPos.first}, y=${datapadPos.second}")
                     val datapadManager = LocalDataPadManager.current
                     val datapadEnabled by datapadManager.isEnabled.collectAsState()
-                    DraggableFab(
-                        name = "datapad",
+
+                    FABOverlay(
                         prefsManager = prefsManager,
                         screenWidthPx = screenWidthPx,
                         screenHeightPx = effectiveScreenHeightPx,
-                        fabSizePx = fabSizePx,
-                        defaultX = 0.75f,
-                        defaultY = 0.9f,
-                        visible = datapadEnabled,
-                        onClick = {
-                            android.util.Log.d("InternalFileViewer", "DataPad FAB clicked")
-                            if (datapadEnabled) showDataPad = true
-                        },
-
-                        content = { Icon(Icons.Default.Flight, contentDescription = stringResource(R.string.cd_datapad)) }
+                        fabs = InternalFileViewerFABs.create(
+                            onMenuOpen = onShowFileList,
+                            onDataPadOpen = { if (datapadEnabled) showDataPad = true },
+                            onQuickAccessOpen = { showQuickAccess = true },
+                            datapadEnabled = datapadEnabled,
+                            containerColorPrimary = MaterialTheme.colorScheme.primaryContainer,
+                            containerColorTertiary = MaterialTheme.colorScheme.tertiaryContainer
+                        )
                     )
                 }
 

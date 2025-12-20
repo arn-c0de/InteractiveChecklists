@@ -259,10 +259,64 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.height(12.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Button(onClick = {
-                                prefsManager.resetPdfViewerLayout()
+                                // Reset all FAB positions (global) — user action in Settings should clear everything
+                                prefsManager.resetFabPositions(null)
                                 uiScope.launch { snackbarHostState.showSnackbar(context.getString(R.string.msg_fab_positions_restored)) }
                             }) {
                                 Text(stringResource(R.string.settings_reset_fab_positions))
+                            }
+                        }
+                    }
+                }
+            }
+
+            // === FAB Size ===
+            item {
+                Spacer(modifier = Modifier.height(12.dp))
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = stringResource(R.string.settings_fab_size),
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = stringResource(R.string.settings_fab_size_explain),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        var currentFabSize by remember { mutableStateOf(prefsManager.getFabSize()) }
+                        val fabSizes = listOf(
+                            "small" to stringResource(R.string.settings_fab_size_small),
+                            "medium" to stringResource(R.string.settings_fab_size_medium),
+                            "large" to stringResource(R.string.settings_fab_size_large)
+                        )
+                        
+                        Column {
+                            fabSizes.forEach { (size, label) ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            currentFabSize = size
+                                            prefsManager.setFabSize(size)
+                                        }
+                                        .padding(vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    RadioButton(
+                                        selected = currentFabSize == size,
+                                        onClick = {
+                                            currentFabSize = size
+                                            prefsManager.setFabSize(size)
+                                        }
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(label)
+                                }
                             }
                         }
                     }
