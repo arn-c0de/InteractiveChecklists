@@ -83,11 +83,15 @@ class ECDHClient:
         # Nonce counter for encryption
         self._nonce_counter = 0
         
+        import hmac
         import hashlib
+        import secrets
         logger.info("🔐 ECDH Client initialized")
-        # Avoid logging clear-text identifiers; emit short hashed fingerprints instead
-        device_id_fp = hashlib.sha256(self.device_id.encode('utf-8')).hexdigest()[:8]
-        device_name_fp = hashlib.sha256(self.device_name.encode('utf-8')).hexdigest()[:8]
+        # Avoid logging clear-text identifiers; use HMAC for secure fingerprinting
+        # HMAC with random key prevents brute-force attacks on sensitive identifiers
+        fp_key = secrets.token_bytes(32)
+        device_id_fp = hmac.new(fp_key, self.device_id.encode('utf-8'), hashlib.sha256).hexdigest()[:8]
+        device_name_fp = hmac.new(fp_key, self.device_name.encode('utf-8'), hashlib.sha256).hexdigest()[:8]
         logger.info(f"📱 Device ID fingerprint: {device_id_fp}")
         logger.info(f"📝 Device Name fingerprint: {device_name_fp}")
     
@@ -188,9 +192,12 @@ class ECDHClient:
             ).derive(shared_secret)
             
             logger.info("🔑 Session key derived via ECDH+HKDF")
-            # Avoid logging secret material; expose only a short fingerprint for debugging
+            # Avoid logging secret material; use HMAC for secure fingerprint
+            import hmac
             import hashlib
-            session_fingerprint = hashlib.sha256(session_key).hexdigest()[:16]
+            import secrets
+            fp_key = secrets.token_bytes(32)
+            session_fingerprint = hmac.new(fp_key, session_key, hashlib.sha256).hexdigest()[:16]
             logger.debug(f"   Session ID (truncated): {session_id[:8]}...")
             logger.debug(f"   Session key fingerprint: {session_fingerprint}")
             

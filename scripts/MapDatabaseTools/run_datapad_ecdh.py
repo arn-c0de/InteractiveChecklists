@@ -9,6 +9,8 @@ import os
 import argparse
 import logging
 import hashlib
+import hmac
+import secrets
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -75,10 +77,12 @@ def main():
     print(f"📡 Sender IP: {args.sender_ip}")
     if args.sender_port:
         print(f"🔌 Sender Handshake Port: {args.sender_port}")
-    device_name_fp = hashlib.sha256(args.device_name.encode('utf-8')).hexdigest()[:8] if args.device_name else 'N/A'
+    # Use HMAC for secure fingerprinting of sensitive identifiers
+    fp_key = secrets.token_bytes(32)
+    device_name_fp = hmac.new(fp_key, args.device_name.encode('utf-8'), hashlib.sha256).hexdigest()[:8] if args.device_name else 'N/A'
     print(f"📱 Device Name fingerprint: {device_name_fp}")
     if args.device_id:
-        device_id_fp = hashlib.sha256(args.device_id.encode('utf-8')).hexdigest()[:8]
+        device_id_fp = hmac.new(fp_key, args.device_id.encode('utf-8'), hashlib.sha256).hexdigest()[:8]
         print(f"🔑 Device ID fingerprint: {device_id_fp}")
 
     print(f"🌐 Listen Port: {args.port}")
