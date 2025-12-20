@@ -21,13 +21,18 @@ if ($env:SKIP_CODEQL_SCAN -eq '1') {
 } else {
     if (Get-Command codeql -ErrorAction SilentlyContinue) {
         Write-Host "[git-safety] Running CodeQL (can be slow)..."
-        if (-not (Test-Path codeql-db\codeql-database.yml)) {
-            codeql database create codeql-db --language=python --source-root=. --overwrite
-        }
-        
-        # We use -ErrorAction Continue because codeql.exe exits with a non-zero status code (2)
-        # when it finds results, which would otherwise be a terminating error.
-        codeql database analyze codeql-db --format=sarif-latest --output=codeql-results.sarif codeql/python-queries -j 0 -ErrorAction Continue
+                # Create database if missing or if language set changed
+                if (-not (Test-Path codeql-db\codeql-database.yml)) {
+                    Write-Host "[git-safety] Creating multi-language CodeQL database (first run, may take a while)..."
+                    codeql database create codeql-db --language=python,kotlin --source-root=. --overwrite --db-cluster
+                } elseif (-not (Get-Content codeql-db\codeql-database.yml | Select-String -Pattern "languages: \[- kotlin, - python\]" -Quiet)) {
+                    Write-Host "[git-safety] Recreating CodeQL database due to language set change..."
+                    codeql database create codeql-db --language=python,kotlin --source-root=. --overwrite --db-cluster
+                }
+                
+                # We use -ErrorAction Continue because codeql.exe exits with a non-zero status code (2)
+                # when it finds results, which would otherwise be a terminating error.
+                codeql database analyze codeql-db --format=sarif-latest --output=codeql-results.sarif codeql/python-queries codeql/kotlin-queries -j 0 -ErrorAction Continue
         
         $sarif = $null
         try {
