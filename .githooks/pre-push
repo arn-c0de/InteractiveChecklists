@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# .githooks/pre-push
+# Runs the git-safety helper from .githooks/scripts; aborts push if the helper exits non-zero.
+# This hook is intended to be used with `git config core.hooksPath .githooks`.
+set -euo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+exec "$ROOT/.githooks/scripts/git-safety.sh" "$@"
