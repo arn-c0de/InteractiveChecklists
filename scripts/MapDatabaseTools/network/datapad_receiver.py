@@ -18,6 +18,9 @@ from cryptography.hazmat.backends import default_backend
 import threading
 import time
 import os
+import secrets
+import hmac
+import hashlib
 
 # GCM nonce validation
 try:
