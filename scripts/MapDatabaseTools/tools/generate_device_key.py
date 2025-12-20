@@ -17,7 +17,9 @@ if __name__ == "__main__":
     # Create or load device
     dev = get_or_create_device()
     pubkey_b64 = get_public_key_b64_from_pem(dev['privateKeyPem'])
+    import hashlib
     print("Device stored at:", os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ecdh_device.json')))
-    print(f"Device ID: {dev['deviceId']}")
+    device_fp = hashlib.sha256(dev['deviceId'].encode('utf-8')).hexdigest()[:8]
+    print(f"Device ID fingerprint: {device_fp}")
     print(f"Public Key (Base64):\n{pubkey_b64}\n")
     print("If you want to use a specific deviceId, pass it when calling get_or_create_device(device_id=...)")

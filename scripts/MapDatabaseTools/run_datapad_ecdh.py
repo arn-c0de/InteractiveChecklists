@@ -8,6 +8,7 @@ import sys
 import os
 import argparse
 import logging
+import hashlib
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -74,9 +75,11 @@ def main():
     print(f"📡 Sender IP: {args.sender_ip}")
     if args.sender_port:
         print(f"🔌 Sender Handshake Port: {args.sender_port}")
-    print(f"📱 Device Name: {args.device_name}")
+    device_name_fp = hashlib.sha256(args.device_name.encode('utf-8')).hexdigest()[:8] if args.device_name else 'N/A'
+    print(f"📱 Device Name fingerprint: {device_name_fp}")
     if args.device_id:
-        print(f"🔑 Device ID: {args.device_id}")
+        device_id_fp = hashlib.sha256(args.device_id.encode('utf-8')).hexdigest()[:8]
+        print(f"🔑 Device ID fingerprint: {device_id_fp}")
 
     print(f"🌐 Listen Port: {args.port}")
     print(f"🔌 Bind IP: {args.bind_ip}")
