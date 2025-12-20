@@ -30,6 +30,8 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.WindowInsetsCompat
 import android.view.View
+import androidx.compose.ui.res.stringResource
+import com.example.checklist_interactive.R
 import kotlinx.coroutines.isActive
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -50,11 +52,15 @@ import android.graphics.Rect
 /**
  * ViewModel for route creation and management
  */
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+
 class RouteCreationViewModel(
+    application: Application,
     private val routeRepository: RouteRepository,
     private val locationRepository: LocationRepository,
     private val runwayDao: RunwayDao
-) : ViewModel() {
+) : AndroidViewModel(application) {
 
     private val _isCreatingRoute = MutableStateFlow(false)
     val isCreatingRoute: StateFlow<Boolean> = _isCreatingRoute.asStateFlow()
@@ -222,7 +228,7 @@ class RouteCreationViewModel(
     fun startRouteCreation() {
         _isCreatingRoute.value = true
         _selectedWaypoints.value = emptyList()
-        _currentRouteName.value = "New Route ${System.currentTimeMillis() % 1000}"
+        _currentRouteName.value = getApplication<Application>().getString(R.string.route_new_name_template, System.currentTimeMillis() % 1000)
         _currentRouteId.value = null
     }
 
@@ -282,7 +288,7 @@ class RouteCreationViewModel(
                 longitude = longitude,
                 markerType = "waypoint",
                 isStatic = 0,
-                description = "Auto-saved player position"
+                description = getApplication<Application>().getString(R.string.route_autosaved_player_position_description)
             )
             val insertedId = locationRepository.saveLocation(newLoc).toInt()
             val saved = locationRepository.getLocationById(insertedId)
@@ -493,7 +499,7 @@ class RouteCreationViewModel(
                 existingRouteData?.let { data ->
                     val updatedRoute = data.route.copy(
                         name = _currentRouteName.value.ifEmpty { data.route.name },
-                        description = "Route with ${waypoints.size} waypoints"
+                        description = getApplication<Application>().getString(R.string.route_description_waypoints, waypoints.size)
                     )
                     routeRepository.updateRoute(updatedRoute)
                     routeRepository.updateRouteWaypoints(routeId, locationIds)
@@ -502,8 +508,8 @@ class RouteCreationViewModel(
             } else {
                 // Create mode - new route
                 val route = RouteEntity(
-                    name = _currentRouteName.value.ifEmpty { "Route ${System.currentTimeMillis()}" },
-                    description = "Route with ${waypoints.size} waypoints",
+                    name = _currentRouteName.value.ifEmpty { getApplication<Application>().getString(R.string.route_new_name_template, System.currentTimeMillis() % 1000) },
+                    description = getApplication<Application>().getString(R.string.route_description_waypoints, waypoints.size),
                     color = "#00A8FF",
                     created = "",
                     modified = ""
@@ -806,12 +812,12 @@ fun RouteCreationSheet(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = if (isEditMode) "Edit Route" else "Create Route",
+                            text = if (isEditMode) stringResource(R.string.route_edit_title) else stringResource(R.string.route_create_title),
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold
                         )
                         IconButton(onClick = { showNameDialog = true }) {
-                            Icon(Icons.Default.Edit, "Edit route name", modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Edit, stringResource(R.string.route_edit_name_content_description), modifier = Modifier.size(20.dp))
                         }
                     }
 
@@ -819,14 +825,14 @@ fun RouteCreationSheet(
                         IconButton(onClick = { showOpacitySlider = !showOpacitySlider }) {
                             Icon(
                                 if (showOpacitySlider) Icons.Default.Close else Icons.Default.Settings,
-                                contentDescription = "Toggle opacity"
+                                contentDescription = stringResource(R.string.route_toggle_opacity_content_description)
                             )
                         }
                         IconButton(onClick = {
                             viewModel.cancelRouteCreation()
                             onDismiss()
                         }) {
-                            Icon(Icons.Default.Close, "Cancel")
+                            Icon(Icons.Default.Close, stringResource(R.string.action_cancel))
                         }
                     }
                 }
@@ -835,7 +841,7 @@ fun RouteCreationSheet(
                 if (showOpacitySlider) {
                     Column(modifier = Modifier.padding(bottom = 8.dp)) {
                         Text(
-                            text = "Opacity: ${(sheetOpacity * 100).toInt()}%",
+                            text = stringResource(R.string.route_opacity_label, (sheetOpacity * 100).toInt()),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -875,7 +881,7 @@ fun RouteCreationSheet(
                                 contentDescription = null,
                                 modifier = Modifier.padding(end = 12.dp)
                             )
-                            Text("Add waypoints manually or tap locations on the map")
+                            Text(stringResource(R.string.route_instructions_add_waypoints))
                         }
                     }
                 } else if (selectedWaypoints.size >= 3) {
@@ -897,13 +903,13 @@ fun RouteCreationSheet(
                             )
                             Column {
                                 Text(
-                                    "Lock waypoints to fix their position",
+                                    stringResource(R.string.route_instructions_lock_waypoints_title),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
                                 Text(
-                                    "Locked waypoints stay in place when optimizing the route",
+                                    stringResource(R.string.route_instructions_lock_waypoints_message),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
                                 )
@@ -925,7 +931,7 @@ fun RouteCreationSheet(
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null)
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Add")
+                        Text(stringResource(R.string.action_add))
                     }
 
                     Button(
@@ -938,7 +944,7 @@ fun RouteCreationSheet(
                     ) {
                         Icon(Icons.Default.Route, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Plan Fastest Route")
+                        Text(stringResource(R.string.route_plan_fastest_button))
                     }
 
                     // Route candidates dropdown (no modal) anchored near the Plan button
@@ -951,7 +957,7 @@ fun RouteCreationSheet(
                         ) {
                             if (candidates.isEmpty()) {
                                 DropdownMenuItem(
-                                    text = { Text("No candidate routes generated.") },
+                                    text = { Text(stringResource(R.string.route_no_candidates_message)) },
                                     onClick = { showCandidatesDialog = false }
                                 )
                             } else {
@@ -960,7 +966,7 @@ fun RouteCreationSheet(
                                     DropdownMenuItem(
                                         text = {
                                             Column {
-                                                Text(text = String.format("%d) %.1f NM", idx + 1, distanceNm), fontWeight = FontWeight.Bold)
+                                                Text(text = stringResource(R.string.route_candidate_format, idx + 1, distanceNm), fontWeight = FontWeight.Bold)
                                                 Spacer(modifier = Modifier.height(2.dp))
                                                 Text(text = routeList.joinToString(" → ") { it.name }.take(80), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                             }
@@ -998,13 +1004,13 @@ fun RouteCreationSheet(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "Waypoints (${selectedWaypoints.size})",
+                            text = stringResource(R.string.route_waypoints_label, selectedWaypoints.size),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = String.format("%.1f NM", totalDistanceNm),
+                            text = stringResource(R.string.route_total_distance_format, totalDistanceNm),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1023,7 +1029,7 @@ fun RouteCreationSheet(
                                 tint = MaterialTheme.colorScheme.primary
                             )
                             Text(
-                                text = "${lockedWaypoints.size} locked",
+                                text = stringResource(R.string.route_locked_waypoints_count, lockedWaypoints.size),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1101,7 +1107,7 @@ fun RouteCreationSheet(
                     ) {
                         Icon(Icons.Default.Close, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Cancel")
+                        Text(stringResource(R.string.action_cancel))
                     }
 
                     Button(
@@ -1116,7 +1122,7 @@ fun RouteCreationSheet(
                     ) {
                         Icon(Icons.Default.Check, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Finish Route")
+                        Text(stringResource(R.string.route_finish_button))
                     }
                 }
             }
@@ -1129,12 +1135,12 @@ fun RouteCreationSheet(
         
         AlertDialog(
             onDismissRequest = { showNameDialog = false },
-            title = { Text("Route Name") },
+            title = { Text(stringResource(R.string.route_dialog_name_title)) },
             text = {
                 OutlinedTextField(
                     value = editName,
                     onValueChange = { editName = it },
-                    label = { Text("Name") },
+                    label = { Text(stringResource(R.string.route_dialog_name_label)) },
                     singleLine = true
                 )
             },
@@ -1143,12 +1149,12 @@ fun RouteCreationSheet(
                     viewModel.setRouteName(editName)
                     showNameDialog = false
                 }) {
-                    Text("OK")
+                    Text(stringResource(R.string.action_ok))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showNameDialog = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -1166,7 +1172,7 @@ fun RouteCreationSheet(
         
         AlertDialog(
             onDismissRequest = { showLocationPicker = false },
-            title = { Text("Add Waypoint") },
+            title = { Text(stringResource(R.string.route_dialog_add_waypoint_title)) },
             text = {
                 Column {
                     // Offer quick-add of the current player position (when available)
@@ -1190,8 +1196,8 @@ fun RouteCreationSheet(
                                     Icon(Icons.Default.MyLocation, contentDescription = null)
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column {
-                                        Text("Add current player position", fontWeight = FontWeight.Bold)
-                                        Text("${String.format("%.4f", flight.latitude)}, ${String.format("%.4f", flight.longitude)}", style = MaterialTheme.typography.bodySmall)
+                                        Text(stringResource(R.string.route_add_current_player_position), fontWeight = FontWeight.Bold)
+                                        Text(stringResource(R.string.route_player_position_coordinates_format, flight.latitude, flight.longitude), style = MaterialTheme.typography.bodySmall)
                                     }
                                 }
                             }
@@ -1201,8 +1207,8 @@ fun RouteCreationSheet(
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        label = { Text("Search locations") },
-                        leadingIcon = { Icon(Icons.Default.Search, "Search") },
+                        label = { Text(stringResource(R.string.route_search_locations_label)) },
+                        leadingIcon = { Icon(Icons.Default.Search, stringResource(R.string.action_search)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -1234,7 +1240,7 @@ fun RouteCreationSheet(
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
-                                        text = "${location.markerType} • ${String.format("%.4f", location.latitude)}, ${String.format("%.4f", location.longitude)}",
+                                        text = "${location.markerType} • ${stringResource(R.string.route_player_position_coordinates_format, location.latitude, location.longitude)}",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -1245,7 +1251,7 @@ fun RouteCreationSheet(
                         if (filteredLocations.size > 50) {
                             item {
                                 Text(
-                                    text = "... and ${filteredLocations.size - 50} more. Refine your search.",
+                                    text = stringResource(R.string.route_search_refine_message, filteredLocations.size - 50),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(8.dp)
@@ -1257,7 +1263,7 @@ fun RouteCreationSheet(
             },
             confirmButton = {
                 TextButton(onClick = { showLocationPicker = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -1298,16 +1304,7 @@ fun RouteSegmentInfo(
             Spacer(modifier = Modifier.width(12.dp))
 
             Text(
-                text = "HDG ${String.format("%03.0f°", heading)}",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Text(
-                text = String.format("%.1f NM", distanceNm),
+                text = stringResource(R.string.route_segment_hdg_distance_format, heading, distanceNm),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -1351,7 +1348,7 @@ fun WaypointItem(
             ) {
                 Icon(
                     imageVector = if (isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
-                    contentDescription = if (isLocked) "Locked - position fixed" else "Unlocked - can be optimized",
+                    contentDescription = if (isLocked) stringResource(R.string.route_waypoint_locked_content_description) else stringResource(R.string.route_waypoint_unlocked_content_description),
                     tint = if (isLocked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                     modifier = Modifier.size(20.dp)
                 )
@@ -1398,7 +1395,7 @@ fun WaypointItem(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "${String.format("%.4f", waypoint.latitude)}, ${String.format("%.4f", waypoint.longitude)}",
+                    text = stringResource(R.string.route_player_position_coordinates_format, waypoint.latitude, waypoint.longitude),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1419,7 +1416,7 @@ fun WaypointItem(
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     Icons.Default.Flight,
-                                    contentDescription = "Has ${runways.size} runway(s)",
+                                    contentDescription = stringResource(R.string.route_waypoint_runways_content_description, runways.size),
                                     modifier = Modifier.size(14.dp),
                                     tint = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
@@ -1436,7 +1433,7 @@ fun WaypointItem(
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         Icons.Default.Sensors,
-                                        contentDescription = "Has ILS",
+                                        contentDescription = stringResource(R.string.route_waypoint_ils_content_description),
                                         modifier = Modifier.size(14.dp),
                                         tint = MaterialTheme.colorScheme.onTertiaryContainer
                                     )
@@ -1456,7 +1453,7 @@ fun WaypointItem(
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         Icons.Default.LocalAirport,
-                                        contentDescription = "Airport",
+                                        contentDescription = stringResource(R.string.route_waypoint_airport_content_description),
                                         modifier = Modifier.size(14.dp),
                                         tint = MaterialTheme.colorScheme.onSecondaryContainer
                                     )
@@ -1472,7 +1469,7 @@ fun WaypointItem(
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         Icons.Default.Place,
-                                        contentDescription = "Waypoint",
+                                        contentDescription = stringResource(R.string.route_waypoint_waypoint_content_description),
                                         modifier = Modifier.size(14.dp),
                                         tint = MaterialTheme.colorScheme.onSecondaryContainer
                                     )
@@ -1499,7 +1496,7 @@ fun WaypointItem(
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         Icons.Default.Security,
-                                        contentDescription = "Tactical unit",
+                                        contentDescription = stringResource(R.string.route_waypoint_tactical_unit_content_description),
                                         modifier = Modifier.size(14.dp),
                                         tint = coalitionColor
                                     )
@@ -1515,7 +1512,7 @@ fun WaypointItem(
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         Icons.Default.GpsFixed,
-                                        contentDescription = "Target",
+                                        contentDescription = stringResource(R.string.route_waypoint_target_content_description),
                                         modifier = Modifier.size(14.dp),
                                         tint = MaterialTheme.colorScheme.onErrorContainer
                                     )
@@ -1534,7 +1531,7 @@ fun WaypointItem(
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     Icons.Default.Lock,
-                                    contentDescription = "Static",
+                                    contentDescription = stringResource(R.string.route_waypoint_static_content_description),
                                     modifier = Modifier.size(12.dp),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -1553,7 +1550,7 @@ fun WaypointItem(
                 ) {
                     Icon(
                         Icons.Default.KeyboardArrowUp,
-                        contentDescription = "Move up",
+                        contentDescription = stringResource(R.string.action_move_up),
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -1564,7 +1561,7 @@ fun WaypointItem(
                 ) {
                     Icon(
                         Icons.Default.KeyboardArrowDown,
-                        contentDescription = "Move down",
+                        contentDescription = stringResource(R.string.action_move_down),
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -1574,7 +1571,7 @@ fun WaypointItem(
             IconButton(onClick = onRemove) {
                 Icon(
                     Icons.Default.Close,
-                    contentDescription = "Remove",
+                    contentDescription = stringResource(R.string.action_remove),
                     tint = MaterialTheme.colorScheme.error
                 )
             }
