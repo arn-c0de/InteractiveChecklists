@@ -2,21 +2,14 @@
    PowerShell variant for Windows users.
    Usage: Called by .githooks\pre-push.ps1 or run manually.
 #>
-param([string[]]$CommitArgs)
 $ErrorActionPreference = 'Stop'
 
 $root = git rev-parse --show-toplevel
 Set-Location $root
 
-Write-Host "[git-safety] Staging all changes..."
-git add .
-if (-not (git diff --cached --quiet)) {
-    $msg = if ($CommitArgs) { $CommitArgs -join ' ' } else { 'Automated commit by git-safety' }
-    Write-Host "[git-safety] Committing: $msg"
-    git commit -m $msg
-} else {
-    Write-Host "[git-safety] No staged changes to commit."
-}
+# This script no longer stages or commits changes.
+# It is now a dedicated scanner that should be called from a pre-push hook
+# that has already determined a scan is necessary.
 
 # Secrets scan
 # Secret-scanning has been disabled per request — only running CodeQL now.
@@ -31,8 +24,22 @@ if ($env:SKIP_CODEQL_SCAN -eq '1') {
         if (-not (Test-Path codeql-db\codeql-database.yml)) {
             codeql database create codeql-db --language=python --source-root=. --overwrite
         }
-        codeql database analyze codeql-db --format=sarif-latest --output=codeql-results.sarif codeql/python-queries -j 0
-        $sarif = Get-Content .\codeql-results.sarif | ConvertFrom-Json
+        
+        # We use -ErrorAction Continue because codeql.exe exits with a non-zero status code (2)
+        # when it finds results, which would otherwise be a terminating error.
+        codeql database analyze codeql-db --format=sarif-latest --output=codeql-results.sarif codeql/python-queries -j 0 -ErrorAction Continue
+        
+        $sarif = $null
+        try {
+            $sarif = Get-Content .\codeql-results.sarif -Raw | ConvertFrom-Json
+        } catch [System.IO.FileNotFoundException] {
+            Write-Host "[git-safety] Error: codeql-results.sarif not found. The analysis may have failed." -ForegroundColor Red
+            exit 1
+        } catch { # Catches other errors like JSON parsing
+            Write-Host "[git-safety] Error: Could not parse codeql-results.sarif. It may be empty or corrupt." -ForegroundColor Red
+            exit 1
+        }
+
         $count = $sarif.runs[0].results.Count
         if ($count -gt 0) {
             Write-Host "[git-safety] CodeQL found $count issue(s) — see codeql-results.sarif" -ForegroundColor Red
