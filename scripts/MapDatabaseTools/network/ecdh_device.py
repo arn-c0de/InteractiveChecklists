@@ -79,13 +79,9 @@ def _get_password_for_encryption(device_id: str, force_new: bool = False) -> str
     print("\n" + "="*70)
     print("🔐 ECDH DEVICE KEY PROTECTION")
     print("="*70)
-    # Display only a short fingerprint of the device ID using HMAC for security
-    import hmac
-    import hashlib
-    import secrets
-    fp_key = secrets.token_bytes(32)
-    device_fp = hmac.new(fp_key, device_id.encode('utf-8'), hashlib.sha256).hexdigest()[:8]
-    print(f"Device ID: {device_fp}")
+    # Display only a short non-sensitive prefix of the device ID
+    device_fp = device_id[:8]
+    print(f"Device ID: {device_fp}...")
     print("\nYour private ECDH key needs to be protected with a password.")
     print("This password will be required each time you start the application.")
     print("\n⚠️  IMPORTANT: Choose a strong password and remember it!")
@@ -314,10 +310,13 @@ def generate_device_with_password(device_id: Optional[str] = None, password: Opt
     If a password is provided, password-based encryption (AES-GCM) is used.
     If no password is provided on non-Windows, falls back to the interactive path (which may prompt).
     Returns dict with deviceId and privateKeyPem.
+    
+    Note: deviceId is a random UUID, NOT derived from password. Password is only used
+    for encrypting the private key storage, never for generating deviceId.
     """
     global _password_cache
 
-    # Generate device id if not provided
+    # Generate device id if not provided - random UUID (NOT password-derived)
     if device_id is None:
         device_id = os.urandom(16).hex()
 

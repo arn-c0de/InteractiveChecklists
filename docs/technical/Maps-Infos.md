@@ -1,6 +1,5 @@
 # Map Feature Analysis
 
-This document provides an analysis of the Kotlin files related to the map feature found in `app/src/main/java/com/example/checklist_interactive/ui/maps`. The feature provides a comprehensive and interactive aviation map experience using the osmdroid library, with deep integration into the application's tactical database and live data systems.
 
 ## Core Components & Functionality
 

@@ -83,17 +83,11 @@ class ECDHClient:
         # Nonce counter for encryption
         self._nonce_counter = 0
         
-        import hmac
-        import hashlib
-        import secrets
         logger.info("🔐 ECDH Client initialized")
-        # Avoid logging clear-text identifiers; use HMAC for secure fingerprinting
-        # HMAC with random key prevents brute-force attacks on sensitive identifiers
-        fp_key = secrets.token_bytes(32)
-        device_id_fp = hmac.new(fp_key, self.device_id.encode('utf-8'), hashlib.sha256).hexdigest()[:8]
-        device_name_fp = hmac.new(fp_key, self.device_name.encode('utf-8'), hashlib.sha256).hexdigest()[:8]
-        logger.info(f"📱 Device ID fingerprint: {device_id_fp}")
-        logger.info(f"📝 Device Name fingerprint: {device_name_fp}")
+        # Device ID is a random UUID - no need to log even partial values
+        # Device name is user-visible identifier
+        device_name_fp = self.device_name[:8]
+        logger.info(f"📝 Device Name (short): {device_name_fp}")
     
     def _generate_nonce(self) -> bytes:
         """Generate counter-based nonce for CLIENT (0x00 prefix) - used for DATA encryption with session key"""
