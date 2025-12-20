@@ -930,45 +930,60 @@ fun MapViewer(
                                                     nearestMarker?.let { nm ->
                                                         // Prefer mapping lookup; fall back to relatedObject
                                                         val loc = markerToLocation[nm] ?: try { nm.relatedObject as? com.example.checklist_interactive.data.tactical.LocationEntity } catch (_: Throwable) { null }
-                                                        val point = android.graphics.Point()
-                                                        projection.toPixels(nm.position, point)
-                                                        // Convert MapView-local pixels to window coordinates (use InWindow so Compose Popup positions match)
+                                                        
+                                                        // Get marker position in screen coordinates
+                                                        // Use the raw touch coordinates as they are already in the correct screen space
+                                                        val screenX = touchX
+                                                        val screenY = touchY
+                                                        
+                                                        // If the marker has an icon, adjust for its size so the menu appears centered
+                                                        var iconWidth = 0
+                                                        var iconHeight = 0
                                                         try {
-                                                            val mapLoc = IntArray(2)
-                                                            // Use getLocationInWindow so coords align with the Compose window origin (Popup uses window coordinates)
-                                                            this@apply.getLocationInWindow(mapLoc)
-                                                            // Base screen coordinates at the marker anchor (map window origin + projected point)
-                                                            val rawScreenX = mapLoc[0] + point.x
-                                                            val rawScreenY = mapLoc[1] + point.y
-
-                                                            // If the marker has an icon, compute its visual center so the radial menu appears centered over the icon
-                                                            val iconWidth = try { nm.icon?.intrinsicWidth ?: 0 } catch (_: Throwable) { 0 }
-                                                            val iconHeight = try { nm.icon?.intrinsicHeight ?: 0 } catch (_: Throwable) { 0 }
-
-                                                            // Adjust X to center horizontally on icon (anchor may be CENTER or CENTER/BOTTOM)
-                                                            val adjX = rawScreenX - (iconWidth / 2)
-                                                            // Adjust Y to the icon center; if anchor was BOTTOM the rawScreenY is at bottom of icon
-                                                            // Subtract half the icon height to get to visual center, and add a small upward offset so the menu doesn't overlap the marker
-                                                            val extraUpPx = with(density) { 6.dp.toPx().toInt() }
-                                                            val adjY = rawScreenY - (iconHeight / 2) - extraUpPx
-
-                                                            Log.d(TAG, "nearestMarker=${nm.title} locFound=${loc != null} mapLoc=(${mapLoc[0]},${mapLoc[1]}) point=(${point.x},${point.y}) raw=(${rawScreenX},${rawScreenY}) icon=(${iconWidth}x${iconHeight}) adj=(${adjX},${adjY})")
-
-                                                            if (loc != null) {
-                                                                // Show radial menu at adjusted coordinates (centered on marker icon)
-                                                                scope.launch {
-                                                                    radialMenuMarker = loc
-                                                                    radialMenuX = adjX
-                                                                    radialMenuY = adjY
-                                                                    radialMenuVisible = true
-                                                                    lastLongPressedMarkerId = loc.id
-                                                                    lastLongPressTime = System.currentTimeMillis()
-                                                                }
+                                                            val icon = nm.icon
+                                                            if (icon != null) {
+                                                                iconWidth = icon.intrinsicWidth.coerceAtLeast(0)
+                                                                iconHeight = icon.intrinsicHeight.coerceAtLeast(0)
+                                                                Log.d(TAG, "Icon dimensions: ${iconWidth}x${iconHeight}")
                                                             } else {
-                                                                Log.d(TAG, "Long-press found nearest marker but could not resolve LocationEntity")
+                                                                Log.d(TAG, "Marker has no icon, using default dimensions")
+                                                                iconWidth = 64
+                                                                iconHeight = 64
                                                             }
                                                         } catch (e: Exception) {
-                                                            Log.e(TAG, "Failed to compute screen coords for marker", e)
+                                                            Log.e(TAG, "Error getting icon dimensions", e)
+                                                            iconWidth = 64
+                                                            iconHeight = 64
+                                                        }
+                                                        
+                                                        // Get MapView position in window to convert touch coordinates to window coordinates
+                                                        val mapLoc = IntArray(2)
+                                                        this@apply.getLocationInWindow(mapLoc)
+                                                        
+                                                        // Convert MapView-local touch coordinates to window coordinates
+                                                        val windowX = mapLoc[0] + screenX
+                                                        val windowY = mapLoc[1] + screenY
+                                                        
+                                                        // Offset up slightly so menu doesn't overlap marker
+                                                        val extraUpPx = with(density) { 40.dp.toPx().toInt() }
+                                                        val adjY = windowY - extraUpPx
+                                                        
+                                                        Log.d(TAG, "Long-press on marker '${nm.title}': touch=($touchX,$touchY) mapLoc=(${mapLoc[0]},${mapLoc[1]}) window=($windowX,$windowY) adj=($windowX,$adjY) icon=${iconWidth}x${iconHeight}")
+                                                        
+                                                        if (loc != null) {
+                                                            // Show radial menu at adjusted coordinates
+                                                            scope.launch {
+                                                                Log.d(TAG, "Setting radialMenu state: marker=${loc.name}, pos=($windowX,$adjY)")
+                                                                radialMenuMarker = loc
+                                                                radialMenuX = windowX
+                                                                radialMenuY = adjY
+                                                                radialMenuVisible = true
+                                                                lastLongPressedMarkerId = loc.id
+                                                                lastLongPressTime = System.currentTimeMillis()
+                                                                Log.d(TAG, "RadialMenu state set: visible=$radialMenuVisible, marker=${radialMenuMarker?.name}")
+                                                            }
+                                                        } else {
+                                                            Log.d(TAG, "Long-press found nearest marker but could not resolve LocationEntity")
                                                         }
                                                     }
 
@@ -2193,6 +2208,7 @@ fun MapViewer(
     
     // Radial menu
     if (radialMenuVisible && radialMenuMarker != null) {
+        Log.d(TAG, "Rendering RadialMenu at ($radialMenuX, $radialMenuY) for marker ${radialMenuMarker?.name}")
         val items = mutableListOf<RadialMenuItem>().apply {
             add(RadialMenuItem(
                 icon = Icons.Default.Info,
