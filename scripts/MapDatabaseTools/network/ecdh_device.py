@@ -79,9 +79,12 @@ def _get_password_for_encryption(device_id: str, force_new: bool = False) -> str
     print("\n" + "="*70)
     print("🔐 ECDH DEVICE KEY PROTECTION")
     print("="*70)
-    # Display only a short fingerprint of the device ID (avoid clear-text identifiers)
+    # Display only a short fingerprint of the device ID using HMAC for security
+    import hmac
     import hashlib
-    device_fp = hashlib.sha256(device_id.encode('utf-8')).hexdigest()[:8]
+    import secrets
+    fp_key = secrets.token_bytes(32)
+    device_fp = hmac.new(fp_key, device_id.encode('utf-8'), hashlib.sha256).hexdigest()[:8]
     print(f"Device ID: {device_fp}")
     print("\nYour private ECDH key needs to be protected with a password.")
     print("This password will be required each time you start the application.")
