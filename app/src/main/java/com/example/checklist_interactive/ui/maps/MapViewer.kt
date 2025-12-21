@@ -140,6 +140,8 @@ fun MapViewer(
     var patternFinalDistanceNm by remember { mutableStateOf(1.0) } // Configurable final approach length
     // Collapsible details
     var showPatternDetails by remember { mutableStateOf(true) }
+    // Collapsible navigation display
+    var showNavigationDetails by remember { mutableStateOf(true) }
 
     // Military symbol placement state
     var pendingSymbolPlacement by remember { mutableStateOf<Pair<MilitarySymbol, SymbolAffiliation>?>(null) }
@@ -236,16 +238,92 @@ fun MapViewer(
     // Combined ready state: DB AND repositories must be initialized
     val repositoriesReady = dbReady && locationRepository != null && routeRepository != null
 
-    // Load and restore visible routes from SharedPreferences
-    LaunchedEffect(Unit) {
+    // Track whether we've completed the initial route restoration to prevent overwriting saved state
+    var routesRestored by remember { mutableStateOf(false) }
+    var navigationRestored by remember { mutableStateOf(false) }
+
+    // Load and restore visible routes from SharedPreferences when MarkerRouteViewModel becomes available
+    LaunchedEffect(markerRouteViewModel) {
+        // Reset flag each time the viewmodel instance changes so we don't accidentally
+        // enable saving before restoration for a newly created viewmodel
+        routesRestored = false
+
+        // Only proceed when a non-null ViewModel exists
+        val vm = markerRouteViewModel
+        if (vm == null) {
+            android.util.Log.d("MapViewer", "MarkerRouteViewModel not ready - deferring route restoration")
+            return@LaunchedEffect
+        }
+
         val prefs = context.getSharedPreferences("map_routes_prefs", android.content.Context.MODE_PRIVATE)
         val savedRouteIds = prefs.getStringSet("visible_route_ids", emptySet())
             ?.mapNotNull { it.toIntOrNull() }
             ?.toSet() ?: emptySet()
 
-        if (savedRouteIds.isNotEmpty()) {
-            markerRouteViewModel?.setVisibleRoutes(savedRouteIds)
+        // Apply the saved route set to the ready ViewModel
+        vm.setVisibleRoutes(savedRouteIds)
+        android.util.Log.d("MapViewer", "Restored visible routes: $savedRouteIds")
+
+        // Small delay to ensure collectors process the change before we re-enable saving
+        kotlinx.coroutines.delay(50)
+        routesRestored = true
+    }
+
+    // Restore solo navigation state from SharedPreferences
+    LaunchedEffect(dbReady, locationRepository) {
+        if (!dbReady || locationRepository == null) {
+            android.util.Log.d("MapViewer", "Navigation restore deferred: dbReady=$dbReady, locationRepository=${locationRepository != null}")
+            return@LaunchedEffect
         }
+        navigationRestored = false
+
+        val prefs = context.getSharedPreferences("map_navigation_prefs", android.content.Context.MODE_PRIVATE)
+        
+        // Restore active navigation target
+        val navTargetId = prefs.getInt("active_nav_target_id", -999)
+        android.util.Log.d("MapViewer", "Attempting to restore navigation target with ID: $navTargetId")
+        
+        if (navTargetId > 0) {
+            try {
+                val target = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    locationRepository.getLocationById(navTargetId)
+                }
+                
+                if (target != null) {
+                    activeNavigationTarget = target
+                    originalAirportTarget = target
+                    android.util.Log.d("MapViewer", "✅ Restored navigation target: ${target.name} (id=$navTargetId)")
+                } else {
+                    android.util.Log.w("MapViewer", "⚠️ Navigation target with ID $navTargetId not found in database")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("MapViewer", "❌ Failed to restore navigation target", e)
+            }
+        } else {
+            android.util.Log.d("MapViewer", "No active navigation target to restore (id=$navTargetId)")
+        }
+
+        // Restore runway approach mode
+        showRunwayApproach = prefs.getBoolean("show_runway_approach", false)
+        finalApproachDistanceNm = prefs.getFloat("final_approach_distance_nm", 5.0f).toDouble()
+        
+        val selectedRwyIdx = prefs.getInt("selected_runway_index", -1)
+        if (selectedRwyIdx >= 0) {
+            selectedRunwayIndex = selectedRwyIdx
+            android.util.Log.d("MapViewer", "Restored selected runway index: $selectedRwyIdx")
+            // Runway entity will be restored via the runway-loading effect when activeNavigationTarget is set
+        }
+
+        // Restore traffic pattern mode
+        showTrafficPattern = prefs.getBoolean("show_traffic_pattern", false)
+        patternSize = PatternSize.fromOrdinal(prefs.getInt("pattern_size_ordinal", PatternSize.NORMAL.ordinal))
+        patternDirection = if (prefs.getBoolean("pattern_direction_left", true)) PatternDirection.LEFT_HAND else PatternDirection.RIGHT_HAND
+        patternFinalDistanceNm = prefs.getFloat("pattern_final_distance_nm", 1.0f).toDouble()
+
+        android.util.Log.d("MapViewer", "✅ Restored navigation modes: approach=$showRunwayApproach, pattern=$showTrafficPattern, patternSize=$patternSize, patternDir=$patternDirection")
+
+        kotlinx.coroutines.delay(50)
+        navigationRestored = true
     }
 
     // Load runways for the selected location from the DB (only when DB is ready)
@@ -269,12 +347,63 @@ fun MapViewer(
     // Also observe all routes so changes (e.g. color updates) trigger a redraw
     val allRoutesForRedraw by (markerRouteViewModel?.allRoutes?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList<com.example.checklist_interactive.data.tactical.RouteEntity>()) })
 
-    // Save visible routes to SharedPreferences when they change
-    LaunchedEffect(visibleRouteIds) {
+    // Save visible routes to SharedPreferences when they change (but only after initial restoration completes)
+    LaunchedEffect(visibleRouteIds, routesRestored) {
+        // Skip saving during initial restoration phase to prevent overwriting saved state
+        if (!routesRestored) {
+            android.util.Log.d("MapViewer", "Skipping save - routes not yet restored")
+            return@LaunchedEffect
+        }
+        
         val prefs = context.getSharedPreferences("map_routes_prefs", android.content.Context.MODE_PRIVATE)
         prefs.edit()
             .putStringSet("visible_route_ids", visibleRouteIds.map { it.toString() }.toSet())
             .apply()
+        android.util.Log.d("MapViewer", "Saved visible routes: $visibleRouteIds")
+    }
+
+    // Save navigation state when it changes (but only after initial restoration completes)
+    LaunchedEffect(
+        activeNavigationTarget?.id,
+        showRunwayApproach,
+        showTrafficPattern,
+        selectedRunwayIndex,
+        finalApproachDistanceNm,
+        patternSize,
+        patternDirection,
+        patternFinalDistanceNm,
+        navigationRestored
+    ) {
+        // Skip saving during initial restoration phase
+        if (!navigationRestored) {
+            android.util.Log.d("MapViewer", "Skipping navigation save - not yet restored")
+            return@LaunchedEffect
+        }
+
+        try {
+            val navPrefs = context.getSharedPreferences("map_navigation_prefs", android.content.Context.MODE_PRIVATE)
+            navPrefs.edit().apply {
+                // Save active navigation target
+                val targetId = activeNavigationTarget?.id ?: -999
+                putInt("active_nav_target_id", targetId)
+                
+                // Save runway approach state
+                putBoolean("show_runway_approach", showRunwayApproach)
+                putFloat("final_approach_distance_nm", finalApproachDistanceNm.toFloat())
+                putInt("selected_runway_index", selectedRunwayIndex ?: -1)
+                
+                // Save traffic pattern state
+                putBoolean("show_traffic_pattern", showTrafficPattern)
+                putInt("pattern_size_ordinal", patternSize.ordinal)
+                putBoolean("pattern_direction_left", patternDirection == PatternDirection.LEFT_HAND)
+                putFloat("pattern_final_distance_nm", patternFinalDistanceNm.toFloat())
+                
+                apply()
+            }
+            android.util.Log.d("MapViewer", "💾 Saved navigation state: target=${activeNavigationTarget?.name}, approach=$showRunwayApproach, pattern=$showTrafficPattern, patternSize=$patternSize")
+        } catch (e: Exception) {
+            android.util.Log.e("MapViewer", "Failed to save navigation state", e)
+        }
     }
     LaunchedEffect(visibleRouteIds, mapView, allRoutesForRedraw) {
         val mv = mapView ?: return@LaunchedEffect
@@ -467,6 +596,17 @@ fun MapViewer(
             val db = com.example.checklist_interactive.data.tactical.TacticalDatabase.getInstance(context, useExternalPath = false)
             db.runwayDao().getRunwaysByLocation(target.id).collect { runways ->
                 targetRunways = runways
+                
+                // Restore selected runway if we have a saved index
+                val savedIdx = selectedRunwayIndex
+                if (savedIdx != null && savedIdx >= 0 && runways.isNotEmpty()) {
+                    // Calculate which runway based on index (each runway has 2 directions)
+                    val runwayIdx = savedIdx / 2
+                    if (runwayIdx < runways.size) {
+                        selectedRunway = runways[runwayIdx]
+                        android.util.Log.d("MapViewer", "✅ Restored selected runway: ${selectedRunway?.name} (index=$savedIdx)")
+                    }
+                }
             }
         } else if (target == null) {
             // Navigation cleared completely
@@ -1412,7 +1552,8 @@ fun MapViewer(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(12.dp),
+                            .padding(12.dp)
+                            .clickable { showNavigationDetails = !showNavigationDetails },
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
@@ -1482,6 +1623,17 @@ fun MapViewer(
                         }
 
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            // Toggle expand/collapse button
+                            IconButton(
+                                onClick = { showNavigationDetails = !showNavigationDetails }
+                            ) {
+                                Icon(
+                                    imageVector = if (showNavigationDetails) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                    contentDescription = if (showNavigationDetails) "Collapse" else "Expand",
+                                    tint = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                            
                             // Land button (only show if target has runways)
                             if (targetRunways.isNotEmpty()) {
                                 FilledTonalIconButton(
@@ -1531,8 +1683,15 @@ fun MapViewer(
                         }
                     }
 
-                    // Runway selection (when approach mode active)
-                    if (showRunwayApproach && targetRunways.isNotEmpty()) {
+                    // Collapsible details section
+                    AnimatedVisibility(
+                        visible = showNavigationDetails,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            // Runway selection (when approach mode active)
+                            if (showRunwayApproach && targetRunways.isNotEmpty()) {
                         HorizontalDivider(color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.2f))
                         Column(
                             modifier = Modifier
@@ -2039,6 +2198,8 @@ fun MapViewer(
                                     )
                                 }
                             }
+                            }
+                        }
                         }
                     }
                 }
@@ -2711,6 +2872,33 @@ fun MapViewer(
                 mapView?.overlays?.remove(line)
             }
             runwayApproachLines = emptyList()
+            
+            // Save navigation state before disposing
+            try {
+                val navPrefs = context.getSharedPreferences("map_navigation_prefs", android.content.Context.MODE_PRIVATE)
+                navPrefs.edit().apply {
+                    // Save active navigation target
+                    val targetId = activeNavigationTarget?.id ?: -999
+                    putInt("active_nav_target_id", targetId)
+                    
+                    // Save runway approach state
+                    putBoolean("show_runway_approach", showRunwayApproach)
+                    putFloat("final_approach_distance_nm", finalApproachDistanceNm.toFloat())
+                    putInt("selected_runway_index", selectedRunwayIndex ?: -1)
+                    
+                    // Save traffic pattern state
+                    putBoolean("show_traffic_pattern", showTrafficPattern)
+                    putInt("pattern_size_ordinal", patternSize.ordinal)
+                    putBoolean("pattern_direction_left", patternDirection == PatternDirection.LEFT_HAND)
+                    putFloat("pattern_final_distance_nm", patternFinalDistanceNm.toFloat())
+                    
+                    apply()
+                }
+                android.util.Log.d("MapViewer", "Saved navigation state: target=${activeNavigationTarget?.name}, approach=$showRunwayApproach, pattern=$showTrafficPattern")
+            } catch (e: Exception) {
+                android.util.Log.e("MapViewer", "Failed to save navigation state", e)
+            }
+            
             // Save current map center/zoom and tile preferences on dispose
             try {
                 mapView?.let { mv ->
