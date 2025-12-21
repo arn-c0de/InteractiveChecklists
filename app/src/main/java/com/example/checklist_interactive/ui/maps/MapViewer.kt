@@ -496,16 +496,32 @@ fun MapViewer(
                 runway.touchdownStartLon ?: target.longitude
             )
             
-            // Generate pattern points
-            val patternPoints = TrafficPatternGenerator.generateTrafficPattern(
+            // Generate pattern points (use selected runway index to decide which runway end is active)
+            val isDirection1 = (mapState.selectedRunwayIndex ?: 0) % 2 == 0
+            val headingForPattern = if (isDirection1) runwayHeading else (runwayHeading + 180.0) % 360
+
+            val rawPatternPoints = TrafficPatternGenerator.generateTrafficPattern(
                 runwayThreshold = runwayThreshold,
-                runwayHeading = runwayHeading,
+                runwayHeading = headingForPattern,
                 runwayLengthMeters = runwayLengthMeters,
                 patternSize = mapState.patternSize,
                 direction = mapState.patternDirection,
                 finalDistanceNm = mapState.patternFinalDistanceNm
             )
-            
+
+            // Apply mirroring rules (two independent axes):
+            // 1. If the user selected the opposite runway end (direction1=false), reflect horizontally across runway centerline
+            // 2. If the user switched pattern direction to RIGHT_HAND, reflect vertically (perpendicular to runway)
+            var patternPoints = rawPatternPoints
+
+            if (!isDirection1) {
+                patternPoints = TrafficPatternGenerator.reflectAcrossRunwayCenterline(patternPoints, runwayThreshold, runwayHeading)
+            }
+
+            if (mapState.patternDirection == com.example.checklist_interactive.ui.maps.navigation.PatternDirection.RIGHT_HAND) {
+                patternPoints = TrafficPatternGenerator.reflectPerpendicularToRunway(patternPoints, runwayThreshold, runwayHeading)
+            }
+
             // Create and add pattern polyline
             val polyline = TrafficPatternGenerator.createPatternPolyline(
                 points = patternPoints,
@@ -514,12 +530,12 @@ fun MapViewer(
             )
             mv.overlays.add(polyline)
             mapState.trafficPatternPolyline = polyline
-            
+
             // Create and add pattern labels with distance and heading information
             val labels = TrafficPatternGenerator.generatePatternLabels(
                 points = patternPoints,
                 direction = mapState.patternDirection,
-                runwayHeading = runwayHeading
+                runwayHeading = headingForPattern
             )
             val labelOverlay = PatternLabelOverlay(labels)
             mv.overlays.add(labelOverlay)
