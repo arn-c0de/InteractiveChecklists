@@ -4,6 +4,13 @@ All relevant changes are summarized here by version.
 
 ## [1.0.15] - 2025-12-19
 
+### Summary
+- Major refactor of FAB overlays and map UI components
+- Improved route planning and marker management
+- Enhanced security: sensitive logging fixes, CodeQL and git hook improvements
+- MapDatabaseTools: JSON encryption patch
+- Various bugfixes and translation updates (EN/DE)
+
 ## [1.0.14] - 2025-12-18
 ### Added
 - **Map improvements:** marker popups with detailed info, route display and waypoint routing, rotation-aware markers, MGRS support, map tools (compass, range/ruler, map tools UI), and new base icons/symbol sets.

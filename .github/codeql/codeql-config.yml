@@ -1,0 +1,10 @@
+name: "CodeQL Config"
+
+# Specify Java version for analysis
+paths-ignore:
+  - '**/build/**'
+  - '**/codeql-db/**'
+
+# Use Java 17 for compatibility
+java:
+  version: 17
