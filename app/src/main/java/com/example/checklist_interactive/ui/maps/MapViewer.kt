@@ -299,6 +299,9 @@ fun MapViewer(
                         // Set the active navigation target to the airport so downstream effects will
                         // load runways and then the appropriate effect (approach or pattern) can create the temporary target.
                         activeNavigationTarget = airport
+                        // Make sure the navigation UI is shown so details & buttons appear immediately
+                        showNavigationDetails = true
+                        autoCenter = false
                         android.util.Log.d("MapViewer", "✅ Restored navigation airport: ${airport.name} (id=$patternAirportId) for special target id=$navTargetId")
                     } else {
                         android.util.Log.w("MapViewer", "⚠️ Navigation airport with ID $patternAirportId not found in database")
@@ -318,6 +321,9 @@ fun MapViewer(
                 if (target != null) {
                     activeNavigationTarget = target
                     originalAirportTarget = target
+                    // Make navigation UI visible immediately
+                    showNavigationDetails = true
+                    autoCenter = false
                     android.util.Log.d("MapViewer", "✅ Restored navigation target: ${target.name} (id=$navTargetId)")
                 } else {
                     android.util.Log.w("MapViewer", "⚠️ Navigation target with ID $navTargetId not found in database")
@@ -825,6 +831,9 @@ fun MapViewer(
                 longitude = runwayThreshold.longitude
             )
             activeNavigationTarget = patternTarget
+            // Ensure UI appears when pattern is generated
+            showNavigationDetails = true
+            autoCenter = false
             
             mv.invalidate()
         } else {
