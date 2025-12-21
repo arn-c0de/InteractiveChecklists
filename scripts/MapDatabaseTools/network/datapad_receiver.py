@@ -243,13 +243,11 @@ class DataPadReceiver:
         # Initialize ECDH client with optional private key PEM for persistence
         self.ecdh_client = ECDHClient(device_id=self.device_id, device_name=self.device_name, private_key_pem=private_pem)
         logging.info(f"🔐 ECDH mode enabled")
-        # Create non-sensitive fingerprint for logging (device_id is random UUID)
-        fp_key = secrets.token_bytes(32)
-        device_id_bytes = str(self.device_id).encode('utf-8')
-        device_fp_self = hmac.new(fp_key, device_id_bytes, hashlib.sha256).hexdigest()[:8]
-        logging.info(f"📱 Device ID fingerprint: {device_fp_self}")
-        device_fp_self = hmac.new(fp_key, device_id_bytes, hashlib.sha256).hexdigest()[:8]
-        logging.info(f"📱 Device ID fingerprint: {device_fp_self}")
+        # Create a short, non-sensitive fingerprint for logging.
+        # NOTE: do NOT derive this fingerprint from any sensitive data (passwords, keys).
+        # Use a random per-process token instead to avoid any use of hashing on potentially sensitive inputs.
+        device_fp_self = secrets.token_urlsafe(9)  # ~12 chars base64-url-safe
+        logging.info(f"📱 Device fingerprint (random): {device_fp_self}")
 
         if not self.sender_ip:
             logging.warning("⚠️ No sender_ip specified - handshake will fail")
