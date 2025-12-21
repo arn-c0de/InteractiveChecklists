@@ -500,7 +500,11 @@ fun MapViewer(
             val isDirection1 = (mapState.selectedRunwayIndex ?: 0) % 2 == 0
             val headingForPattern = if (isDirection1) runwayHeading else (runwayHeading + 180.0) % 360
 
-            val rawPatternPoints = TrafficPatternGenerator.generateTrafficPattern(
+            // Generate pattern directly with correct heading and direction
+            // The headingForPattern already accounts for runway direction (07 vs 25)
+            // The direction parameter handles LEFT_HAND vs RIGHT_HAND
+            // No post-generation mirroring needed - the generator creates the pattern correctly
+            val patternPoints = TrafficPatternGenerator.generateTrafficPattern(
                 runwayThreshold = runwayThreshold,
                 runwayHeading = headingForPattern,
                 runwayLengthMeters = runwayLengthMeters,
@@ -508,19 +512,6 @@ fun MapViewer(
                 direction = mapState.patternDirection,
                 finalDistanceNm = mapState.patternFinalDistanceNm
             )
-
-            // Apply mirroring rules (two independent axes):
-            // 1. If the user selected the opposite runway end (direction1=false), reflect horizontally across runway centerline
-            // 2. If the user switched pattern direction to RIGHT_HAND, reflect vertically (perpendicular to runway)
-            var patternPoints = rawPatternPoints
-
-            if (!isDirection1) {
-                patternPoints = TrafficPatternGenerator.reflectAcrossRunwayCenterline(patternPoints, runwayThreshold, runwayHeading)
-            }
-
-            if (mapState.patternDirection == com.example.checklist_interactive.ui.maps.navigation.PatternDirection.RIGHT_HAND) {
-                patternPoints = TrafficPatternGenerator.reflectPerpendicularToRunway(patternPoints, runwayThreshold, runwayHeading)
-            }
 
             // Create and add pattern polyline
             val polyline = TrafficPatternGenerator.createPatternPolyline(

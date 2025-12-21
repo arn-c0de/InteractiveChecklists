@@ -339,12 +339,14 @@ object TrafficPatternGenerator {
     }
 
     /**
-     * Apply reflection perpendicular to runway (vertical axis) to all points
+     * Apply reflection across a line parallel to runway (lateral axis) to all points
      * This is used when switching pattern direction (LEFT_HAND ↔ RIGHT_HAND)
+     * Swaps left/right sides while preserving runway alignment (departure/final stay correct)
      */
-    fun reflectPerpendicularToRunway(points: List<GeoPoint>, runwayThreshold: GeoPoint, runwayBearing: Double): List<GeoPoint> {
-        val perpendicularBearing = normalizeHeading(runwayBearing + 90.0)
-        return points.map { p -> reflectPointAcrossLine(runwayThreshold, perpendicularBearing, p) }
+    fun reflectAcrossRunwayParallel(points: List<GeoPoint>, runwayThreshold: GeoPoint, runwayBearing: Double): List<GeoPoint> {
+        // Reflect across a line PARALLEL to the runway (same bearing)
+        // This swaps lateral positions (left ↔ right) without swapping longitudinal positions (departure ↔ final)
+        return points.map { p -> reflectPointAcrossLine(runwayThreshold, runwayBearing, p) }
     }
 
     /**
