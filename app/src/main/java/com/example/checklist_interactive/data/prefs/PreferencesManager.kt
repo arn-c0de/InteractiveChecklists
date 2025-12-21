@@ -50,6 +50,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_MAP_OVERLAY_RINGS = "map_overlay_rings"
         private const val KEY_MAP_OVERLAY_RINGS_MAX_NM = "map_overlay_rings_max_nm"
         private const val KEY_MAP_OVERLAY_MGRS_GRID = "map_overlay_mgrs_grid"
+        private const val KEY_MAP_OVERLAY_FLIGHT_INSTRUMENTS = "map_overlay_flight_instruments"
         private const val KEY_SCREEN_LOCKED = "screen_locked"
 
         // Application language preference (ISO code, e.g., "en", "de")
@@ -399,6 +400,25 @@ class PreferencesManager(context: Context) {
 
     fun isMapOverlayMgrsGridEnabled(): Boolean {
         return prefs.getBoolean(KEY_MAP_OVERLAY_MGRS_GRID, false)
+    }
+
+    fun setMapOverlayFlightInstrumentsEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_MAP_OVERLAY_FLIGHT_INSTRUMENTS, enabled).apply()
+    }
+
+    fun isMapOverlayFlightInstrumentsEnabled(): Boolean {
+        return prefs.getBoolean(KEY_MAP_OVERLAY_FLIGHT_INSTRUMENTS, false)
+    }
+
+    /**
+     * Instrument position helpers (dp coordinates stored as floats)
+     */
+    fun getInstrumentPosition(key: String): Float? {
+        return if (prefs.contains(key)) prefs.getFloat(key, 0f) else null
+    }
+
+    fun saveInstrumentPosition(key: String, value: Float) {
+        prefs.edit().putFloat(key, value).apply()
     }
 
     /**
