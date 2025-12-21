@@ -1,6 +1,7 @@
 package com.example.checklist_interactive.ui.maps
 
 import android.content.Context
+
 import android.app.Application
 import android.graphics.drawable.BitmapDrawable
 import androidx.compose.foundation.layout.*
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -289,32 +291,42 @@ fun MapViewer(
         return BitmapDrawable(ctx.resources, bitmap)
     }
 
+    // Separate effect for map rotation to prevent flicker from frequent data updates
+    LaunchedEffect(mapState.mapRotationMode) {
+        val map = mapState.mapView
+        
+        // When mode changes to North-up, reset orientation once
+        if (mapState.mapRotationMode == 0 && map != null) {
+            try {
+                map.setMapOrientation(0f)
+            } catch (_: Throwable) {}
+        }
+        
+        // In HDG-up mode, collect heading updates with throttling
+        if (mapState.mapRotationMode == 1 && map != null) {
+            var lastRotationUpdate = 0L
+            val minUpdateIntervalMs = 100L // Limit rotation updates to max 10 Hz
+            
+            snapshotFlow { flightData?.heading }
+                .collect { heading ->
+                    if (heading != null) {
+                        val now = System.currentTimeMillis()
+                        if (now - lastRotationUpdate >= minUpdateIntervalMs) {
+                            try {
+                                map.setMapOrientation(-Math.toDegrees(heading).toFloat())
+                                lastRotationUpdate = now
+                            } catch (_: Throwable) {}
+                        }
+                    }
+                }
+        }
+    }
+
     // Update live navigation line when flight data or target changes
-    LaunchedEffect(flightData, mapState.activeNavigationTarget, mapState.mapRotationMode) {
+    LaunchedEffect(flightData, mapState.activeNavigationTarget) {
         val data = flightData
         val target = mapState.activeNavigationTarget
         val map = mapState.mapView
-        
-        // If rotation mode is HDG-up, update map orientation to latest heading
-        // Negate the heading so the player's heading direction always points up (north position on screen)
-        if (mapState.mapRotationMode == 1 && data != null && map != null) {
-            try {
-                map.setMapOrientation(-Math.toDegrees(data.heading).toFloat()) 
-                // Ensure the player is visually placed at the top-center so the heading line points to the top center
-                try {
-                    val playerPos = GeoPoint(data.latitude, data.longitude)
-                    // Center on player then offset upward so player sits at top-center with some padding
-                    map.controller.animateTo(playerPos)
-                    // Use a small delay to allow controller to apply before scrolling (non-blocking)
-                    kotlinx.coroutines.delay(30L)
-                    val desiredTopDp = 72.dp
-                    val desiredTopPx = with(density) { desiredTopDp.toPx() }
-                    val offsetPx = ((map.height / 2f) - desiredTopPx).toInt()
-                    // Scroll map so player moves from center to the desired top offset
-                    map.scrollBy(0, -offsetPx)
-                } catch (_: Throwable) {}
-            } catch (_: Throwable) {}
-        }
 
         if (data != null && target != null && map != null && data.latitude != 0.0 && data.longitude != 0.0) {
             val playerPos = GeoPoint(data.latitude, data.longitude)
@@ -566,131 +578,121 @@ fun MapViewer(
         }
     }
 
-    // Update position marker when flight data changes
-    LaunchedEffect(flightData, mapState.autoCenter) {
-        val data = flightData
-        val marker = mapState.positionMarker
-        val map = mapState.mapView
+    // Update position marker when flight data changes (throttled to prevent UI blocking)
+    LaunchedEffect(Unit) {
+        var lastUpdateTime = 0L
+        val minUpdateIntervalMs = 100L // Limit position updates to max 10 Hz to prevent stuttering
+        
+        snapshotFlow { flightData }
+            .collect { data ->
+                val marker = mapState.positionMarker
+                val map = mapState.mapView
+                
+                if (data == null || marker == null || map == null) return@collect
+                
+                // Throttle updates
+                val now = System.currentTimeMillis()
+                if (now - lastUpdateTime < minUpdateIntervalMs) {
+                    return@collect
+                }
+                lastUpdateTime = now
 
-        Log.d(TAG, "LaunchedEffect triggered: data=$data, marker=$marker, map=$map, autoCenter=${mapState.autoCenter}")
+                val lat = data.latitude
+                val lon = data.longitude
 
-        if (data != null && marker != null && map != null) {
-            val lat = data.latitude
-            val lon = data.longitude
-
-            Log.d(TAG, "Position data: lat=$lat, lon=$lon, timestamp=${data.timestamp}")
-
-            // Validate timestamp to prevent old/cached data from resetting position
-            val currentTimestamp = data.timestamp
-            // local stable copy to avoid smart-cast / delegated-property issues
-            val lastTs = mapState.lastProcessedTimestamp
-            if (currentTimestamp != null && lastTs != null) {
-                try {
-                    val curInst = java.time.Instant.parse(currentTimestamp)
-                    val lastInst = java.time.Instant.parse(lastTs)
-                    if (!curInst.isAfter(lastInst)) {
-                        Log.w(TAG, "⚠️ REJECTED OLD DATA: timestamp=$currentTimestamp (last=$lastTs) - preventing position reset!")
-                        return@LaunchedEffect
-                    }
-                } catch (e: Exception) {
-                    // Fallback to lexicographic comparison for ISO-8601; works for same-format timestamps
-                    if (currentTimestamp <= lastTs) {
-                        Log.w(TAG, "⚠️ REJECTED OLD DATA (fallback compare): timestamp=$currentTimestamp (last=$lastTs) - preventing position reset!")
-                        return@LaunchedEffect
+                // Validate timestamp to prevent old/cached data from resetting position
+                val currentTimestamp = data.timestamp
+                val lastTs = mapState.lastProcessedTimestamp
+                if (currentTimestamp != null && lastTs != null) {
+                    try {
+                        val curInst = java.time.Instant.parse(currentTimestamp)
+                        val lastInst = java.time.Instant.parse(lastTs)
+                        if (!curInst.isAfter(lastInst)) {
+                            return@collect
+                        }
+                    } catch (e: Exception) {
+                        if (currentTimestamp <= lastTs) {
+                            return@collect
+                        }
                     }
                 }
-            }
 
-            if (lat != 0.0 && lon != 0.0) {
-                // Update last processed timestamp if available
-                if (currentTimestamp != null) mapState.lastProcessedTimestamp = currentTimestamp
-                val newPosition = GeoPoint(lat, lon)
-                Log.d(TAG, "✅ Accepted data with timestamp=$currentTimestamp")
-                // Store as last valid position to prevent reset
-                mapState.lastValidPlayerPosition = newPosition
-                marker.position = newPosition
-                // use center anchor so rotation pivots around icon center
-                marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-
-                // Use raw datapad heading for the player marker
-                val rawHeading = data.heading.toFloat()
-                // Convert raw heading to degrees for overlays/labels
-                val headingDeg = Math.toDegrees(rawHeading.toDouble()).toFloat()
-                // Adjust rotation: apply rotationOffset to compensate for emoji's default orientation
-                // 45° = 135° (previous) - 90° (to compensate for emoji default orientation)
-                val rotationOffset = 45f
-                val computedRotation = if (mapState.mapRotationMode == 1) {
-                    // HDG-up mode: constant rotation (map rotates, icon stays pointing up)
-                    rotationOffset
-                } else {
-                    // North-up mode: rotate based on heading
-                    (rotationOffset - headingDeg + 360f) % 360f
-                }
-                marker.rotation = computedRotation
-                Log.d(TAG, "headingDeg=$headingDeg rotationOffset=$rotationOffset computedRotation=$computedRotation mapRotationMode=${mapState.mapRotationMode}")
-                try {
-                    val color = if (isDarkTheme) android.graphics.Color.WHITE else android.graphics.Color.BLACK
-                    // rely on Marker.rotation for rotation; use unrotated bitmap
-                    marker.icon = createPlaneDrawable(context, 28f, color)
+                if (lat != 0.0 && lon != 0.0) {
+                    // Update last processed timestamp if available
+                    if (currentTimestamp != null) mapState.lastProcessedTimestamp = currentTimestamp
+                    val newPosition = GeoPoint(lat, lon)
+                    mapState.lastValidPlayerPosition = newPosition
+                    marker.position = newPosition
                     marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                } catch (e: Exception) {
-                    // ignore
-                }
 
-                // Update marker snippet with altitude and speed
-                val altFt = (data.altitude * 3.28084).toInt()
-                val speedSource = data.groundSpeed ?: data.trueAirspeed ?: data.indicatedAirspeed ?: 0.0
-                val speedKts = (speedSource * 1.9438)
-                val baseSnippet = context.getString(R.string.marker_snippet_fmt, altFt, speedKts.toInt(), Math.toDegrees(data.heading).toInt())
-                marker.snippet = if (data.unitName.isNotBlank()) {
-                    baseSnippet + "\n\n" + context.getString(R.string.marker_pilot_fmt, data.unitName)
-                } else {
-                    baseSnippet
-                }
-                marker.title = data.aircraft
-
-                // Auto-center map on position if enabled
-                if (mapState.autoCenter) {
-                    Log.d(TAG, "Auto-centering enabled, animating to: $lat,$lon")
-                    lastProgrammaticMove.value = System.currentTimeMillis()
-                    map.controller.animateTo(newPosition)
-                } else {
-                    Log.d(TAG, "Auto-center is disabled, not animating")
-                }
-
-                // Update overlays (compass + heading line + range rings)
-                try {
-                    // compass overlay (fixed size, scales with zoom)
-                    (mapState.compassOverlay as? CompassOverlay)?.let { co ->
-                        co.center = GeoPoint(lat, lon)
-                        co.heading = headingDeg
+                    // Use raw datapad heading for the player marker
+                    val rawHeading = data.heading.toFloat()
+                    val headingDeg = Math.toDegrees(rawHeading.toDouble()).toFloat()
+                    val rotationOffset = 45f
+                    val computedRotation = if (mapState.mapRotationMode == 1) {
+                        rotationOffset
+                    } else {
+                        (rotationOffset - headingDeg + 360f) % 360f
                     }
-                    // heading speed line overlay (length scales with speed)
-                    (mapState.headingSpeedLineOverlay as? HeadingSpeedLineOverlay)?.let { hsl ->
-                        hsl.center = GeoPoint(lat, lon)
-                        hsl.heading = headingDeg
-                        hsl.speedKts = speedKts
+                    marker.rotation = computedRotation
+                    
+                    // Update marker icon less frequently (cached)
+                    try {
+                        val color = if (isDarkTheme) android.graphics.Color.WHITE else android.graphics.Color.BLACK
+                        marker.icon = createPlaneDrawable(context, 28f, color)
+                        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                    } catch (e: Exception) {
+                        // ignore
                     }
-                    // range rings center
-                    (mapState.rangeRingsOverlay as? RangeRingsOverlay)?.let { rr ->
-                        rr.center = GeoPoint(lat, lon)
-                        rr.heading = headingDeg
-                        // pass through speed for scaling the heading radial
-                        rr.speedKts = speedKts
+
+                    // Update marker snippet with altitude and speed
+                    val altFt = (data.altitude * 3.28084).toInt()
+                    val speedSource = data.groundSpeed ?: data.trueAirspeed ?: data.indicatedAirspeed ?: 0.0
+                    val speedKts = (speedSource * 1.9438)
+                    val baseSnippet = context.getString(R.string.marker_snippet_fmt, altFt, speedKts.toInt(), Math.toDegrees(data.heading).toInt())
+                    marker.snippet = if (data.unitName.isNotBlank()) {
+                        baseSnippet + "\n\n" + context.getString(R.string.marker_pilot_fmt, data.unitName)
+                    } else {
+                        baseSnippet
                     }
-                } catch (e: Exception) {
-                    // ignore
-                }
+                    marker.title = data.aircraft
 
-                map.invalidate()
+                    // Auto-center map on position if enabled
+                    if (mapState.autoCenter) {
+                        lastProgrammaticMove.value = System.currentTimeMillis()
+                        map.controller.animateTo(newPosition)
+                    }
 
-                // Persist marker position as last known if user hasn't moved map
-                if (prefsManager.getMapCenter() == null) {
-                    prefsManager.setMapCenter(lat, lon)
-                    prefsManager.setMapZoom(map.zoomLevelDouble)
+                    // Update overlays efficiently (batch updates)
+                    try {
+                        (mapState.compassOverlay as? CompassOverlay)?.let { co ->
+                            co.center = GeoPoint(lat, lon)
+                            co.heading = headingDeg
+                        }
+                        (mapState.headingSpeedLineOverlay as? HeadingSpeedLineOverlay)?.let { hsl ->
+                            hsl.center = GeoPoint(lat, lon)
+                            hsl.heading = headingDeg
+                            hsl.speedKts = speedKts
+                        }
+                        (mapState.rangeRingsOverlay as? RangeRingsOverlay)?.let { rr ->
+                            rr.center = GeoPoint(lat, lon)
+                            rr.heading = headingDeg
+                            rr.speedKts = speedKts
+                        }
+                    } catch (e: Exception) {
+                        // ignore
+                    }
+
+                    // Single invalidate call after all updates
+                    map.postInvalidate()
+
+                    // Persist marker position as last known if user hasn't moved map
+                    if (prefsManager.getMapCenter() == null) {
+                        prefsManager.setMapCenter(lat, lon)
+                        prefsManager.setMapZoom(map.zoomLevelDouble)
+                    }
                 }
             }
-        }
     }
     
     // Compute layout metrics so map and FABs are bounded correctly (exclude TabBar height)
@@ -1484,7 +1486,8 @@ fun MapViewer(
             }
         }
         
-        // Flight data HUD (bottom-left) - shows Altitude, Speed, Pitch, Bank, Mach live from DataPad
+        // Flight data HUD - shows Altitude, Speed, Pitch, Bank, Mach live from DataPad
+        // Positioned at bottom-center, directly below Flight Instruments when they are active
         if (datapadEnabled && flightData != null) {
             val fd = flightData!!
             val altFt = (fd.altitude * 3.28084).toInt()
@@ -1496,11 +1499,12 @@ fun MapViewer(
 
             Surface(
                 modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    // leave extra bottom padding so it doesn't overlap bottom-center connection/HUD and FABs
-                    .padding(start = 12.dp, bottom = 88.dp)
+                    .align(Alignment.BottomCenter)
+                    // Position below flight instruments when they are active
+                    .padding(bottom = if (mapState.flightInstrumentsEnabled) 172.dp else 88.dp)
                     .padding(horizontal = 8.dp),
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                tonalElevation = if (mapState.flightInstrumentsEnabled) 4.dp else 2.dp, // Lower elevation when behind instruments
                 shape = MaterialTheme.shapes.small
             ) {
                 Row(
@@ -1549,14 +1553,39 @@ fun MapViewer(
         
         // Flight Instruments Overlay
         val fd = flightData
+        // Debug log to help diagnose visibility
+        android.util.Log.d("MapViewer", "flightInstrumentsEnabled=${mapState.flightInstrumentsEnabled} flightDataPresent=${fd != null} pitch=${fd?.pitch} bank=${fd?.bank} vs=${fd?.verticalSpeed} ias=${fd?.indicatedAirspeed}")
+
         if (mapState.flightInstrumentsEnabled && fd != null) {
             MapFlightInstruments(
-                pitch = fd.pitch,
-                bank = fd.bank,
+                pitch = Math.toDegrees(fd.pitch), // Convert radians to degrees
+                bank = Math.toDegrees(fd.bank), // Convert radians to degrees
                 turnRate = 0.0, // TODO: Calculate turn rate from heading changes
                 slip = 0.0, // TODO: Add slip data to DataPad if available
+                verticalSpeed = fd.verticalSpeed ?: 0.0,
+                airspeed = fd.indicatedAirspeed ?: fd.trueAirspeed ?: fd.groundSpeed ?: 0.0,
                 enabled = mapState.flightInstrumentsEnabled
             )
+        }
+
+        // Small debug overlay (visible in debug builds) to show state
+        if (android.util.Log.isLoggable("MapViewer", android.util.Log.DEBUG)) {
+            Box(modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp), contentAlignment = Alignment.TopStart) {
+                androidx.compose.material3.Surface(
+                    tonalElevation = 4.dp,
+                    shape = MaterialTheme.shapes.small,
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Text(
+                        text = "FI: enabled=${mapState.flightInstrumentsEnabled} fd=${fd != null}",
+                        modifier = Modifier.padding(6.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
         }
     }
     

@@ -2,7 +2,6 @@ package com.example.checklist_interactive.ui.maps
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
@@ -17,24 +16,25 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.checklist_interactive.data.prefs.PreferencesManager
+import androidx.compose.ui.graphics.Color
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.PI
+import android.util.Log
 
 /**
- * MapFlightInstruments - Draggable flight instruments overlay for map view
+ * MapFlightInstruments - Flight instruments panel overlay for map view
  * 
  * Displays aviation instruments with real-time DataPad data:
  * - Attitude Indicator (Artificial Horizon)
  * - Turn and Slip Indicator
+ * - Vertical Speed Indicator
+ * - Airspeed Indicator
  * 
- * Each instrument is individually draggable and positions are persisted.
+ * Instruments are arranged horizontally at the bottom center of the screen.
+ * The panel automatically expands as more instruments are added.
  */
 @Composable
 fun MapFlightInstruments(
@@ -43,66 +43,61 @@ fun MapFlightInstruments(
     bank: Double = 0.0,
     turnRate: Double = 0.0,
     slip: Double = 0.0,
+    verticalSpeed: Double? = null,
+    airspeed: Double? = null,
     enabled: Boolean = true
 ) {
+    // Log when the instruments composable is active and whenever data changes
+    LaunchedEffect(enabled, pitch, bank, turnRate, slip, verticalSpeed, airspeed) {
+        Log.d("MapFlightInstruments", "composed enabled=$enabled pitch=$pitch bank=$bank turnRate=$turnRate slip=$slip vs=$verticalSpeed ias=$airspeed")
+    }
+
     if (!enabled) return
 
-    val context = LocalContext.current
-    val prefsManager = remember { PreferencesManager(context) }
-    
-    // Load saved positions or use defaults
-    val (attitudeX, setAttitudeX) = remember { 
-        mutableStateOf(prefsManager.getInstrumentPosition("attitude_x") ?: 16f) 
-    }
-    val (attitudeY, setAttitudeY) = remember { 
-        mutableStateOf(prefsManager.getInstrumentPosition("attitude_y") ?: 500f) 
-    }
-    val (turnSlipX, setTurnSlipX) = remember { 
-        mutableStateOf(prefsManager.getInstrumentPosition("turnslip_x") ?: 200f) 
-    }
-    val (turnSlipY, setTurnSlipY) = remember { 
-        mutableStateOf(prefsManager.getInstrumentPosition("turnslip_y") ?: 500f) 
-    }
-
-    Box(modifier = modifier.fillMaxSize()) {
-        // Attitude Indicator
-        DraggableInstrument(
-            x = attitudeX,
-            y = attitudeY,
-            onPositionChange = { dx, dy ->
-                val newX = (attitudeX + dx).coerceIn(0f, 1000f)
-                val newY = (attitudeY + dy).coerceIn(0f, 1000f)
-                setAttitudeX(newX)
-                setAttitudeY(newY)
-                prefsManager.saveInstrumentPosition("attitude_x", newX)
-                prefsManager.saveInstrumentPosition("attitude_y", newY)
-            }
+    // Horizontal panel at bottom center
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        androidx.compose.material3.Surface(
+            modifier = Modifier
+                .padding(bottom = 16.dp)
+                .wrapContentSize(),
+            tonalElevation = 8.dp,
+            shape = MaterialTheme.shapes.large,
+            color = Color(0xCC000000) // Semi-transparent black background
         ) {
-            AttitudeIndicator(
-                pitch = pitch,
-                bank = bank,
-                size = 140.dp
-            )
-        }
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Airspeed Indicator
+                AirspeedIndicator(
+                    airspeed = airspeed ?: 0.0,
+                    size = 120.dp
+                )
 
-        // Turn and Slip Indicator
-        DraggableInstrument(
-            x = turnSlipX,
-            y = turnSlipY,
-            onPositionChange = { dx, dy ->
-                val newX = (turnSlipX + dx).coerceIn(0f, 1000f)
-                val newY = (turnSlipY + dy).coerceIn(0f, 1000f)
-                setTurnSlipX(newX)
-                setTurnSlipY(newY)
-                prefsManager.saveInstrumentPosition("turnslip_x", newX)
-                prefsManager.saveInstrumentPosition("turnslip_y", newY)
+                // Attitude Indicator
+                AttitudeIndicator(
+                    pitch = pitch,
+                    bank = bank,
+                    size = 120.dp
+                )
+
+                // Vertical Speed Indicator
+                VerticalSpeedIndicator(
+                    verticalSpeed = verticalSpeed ?: 0.0,
+                    size = 120.dp
+                )
+
+                // Turn and Slip Indicator
+                TurnAndSlipIndicator(
+                    turnRate = turnRate,
+                    slip = slip,
+                    size = 120.dp
+                )
             }
-        ) {
-            TurnAndSlipIndicator(
-                turnRate = turnRate,
-                slip = slip,
-                size = 140.dp
-            )
         }
     }
 }
@@ -110,47 +105,22 @@ fun MapFlightInstruments(
 /**
  * Wrapper that makes an instrument draggable
  */
-@Composable
-private fun DraggableInstrument(
-    x: Float,
-    y: Float,
-    onPositionChange: (Float, Float) -> Unit,
-    content: @Composable () -> Unit
-) {
-    val density = androidx.compose.ui.platform.LocalDensity.current
-
-    Box(
-        modifier = Modifier
-            .offset(x.dp, y.dp)
-            .pointerInput(Unit) {
-                detectDragGestures { change, dragAmount ->
-                    // consume the pointer event to avoid other gesture interference
-                    // NOTE: `consumeAllChanges()` is not available in older Compose versions; use `consume()`
-                    change.consume()
-
-                    // Convert pixel drag amounts to dp units
-                    val dxDp = with(density) { dragAmount.x.toDp().value }
-                    val dyDp = with(density) { dragAmount.y.toDp().value }
-
-                    onPositionChange(dxDp, dyDp)
-                }
-            }
-    ) {
-        content()
-    }
-}
-
 /**
  * Attitude Indicator (Artificial Horizon)
- * Shows pitch and bank angles
+ * Shows pitch and bank angles (expects values in degrees)
  */
 @Composable
 fun AttitudeIndicator(
-    pitch: Double,
-    bank: Double,
+    pitch: Double, // in degrees
+    bank: Double, // in degrees
     size: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier
 ) {
+    // Debug log for visibility
+    LaunchedEffect(pitch, bank) {
+        Log.d("AttitudeIndicator", "pitch=${pitch}° bank=${bank}°")
+    }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
@@ -340,6 +310,10 @@ fun TurnAndSlipIndicator(
     size: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier
 ) {
+    LaunchedEffect(turnRate, slip) {
+        Log.d("TurnAndSlipIndicator", "turnRate=$turnRate slip=$slip")
+    }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
@@ -471,6 +445,264 @@ private fun DrawScope.drawSlipIndicator(
         radius = ballRadius * 0.6f,
         center = Offset(centerX + ballOffset - 2f, centerY - 2f)
     )
+}
+
+/**
+ * Airspeed Indicator
+ * Shows indicated airspeed in knots
+ */
+@Composable
+fun AirspeedIndicator(
+    airspeed: Double,
+    size: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier
+) {
+    LaunchedEffect(airspeed) {
+        Log.d("AirspeedIndicator", "airspeed=$airspeed")
+    }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+    ) {
+        Box(
+            modifier = Modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(Color(0xFF1A1A1A))
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val centerX = this.size.width / 2
+                val centerY = this.size.height / 2
+                val radius = this.size.minDimension / 2
+
+                // Convert m/s to knots (1 m/s = 1.9438 knots)
+                val speedKts = (airspeed * 1.9438).coerceIn(0.0, 600.0)
+
+                // Draw speed tape background
+                drawCircle(
+                    color = Color(0xFF2A2A2A),
+                    radius = radius * 0.9f,
+                    center = Offset(centerX, centerY)
+                )
+
+                // Draw speed arcs and ticks
+                for (speed in 0..600 step 20) {
+                    val angle = (speed / 600.0) * 270.0 - 135.0 // -135° to +135°
+                    val rad = Math.toRadians(angle)
+                    val tickLength = if (speed % 100 == 0) 15f else if (speed % 50 == 0) 10f else 6f
+                    val innerRadius = radius * 0.85f
+                    val outerRadius = radius * 0.85f - tickLength
+
+                    val startX = centerX + (innerRadius * cos(rad)).toFloat()
+                    val startY = centerY + (innerRadius * sin(rad)).toFloat()
+                    val endX = centerX + (outerRadius * cos(rad)).toFloat()
+                    val endY = centerY + (outerRadius * sin(rad)).toFloat()
+
+                    drawLine(
+                        color = Color.White,
+                        start = Offset(startX, startY),
+                        end = Offset(endX, endY),
+                        strokeWidth = if (speed % 100 == 0) 3f else 2f
+                    )
+                }
+
+                // Draw needle
+                val needleAngle = (speedKts / 600.0) * 270.0 - 135.0
+                val needleRad = Math.toRadians(needleAngle)
+                val needleLength = radius * 0.7f
+                val needleEndX = centerX + (needleLength * cos(needleRad)).toFloat()
+                val needleEndY = centerY + (needleLength * sin(needleRad)).toFloat()
+
+                // Needle shadow
+                drawLine(
+                    color = Color.Black.copy(alpha = 0.5f),
+                    start = Offset(centerX + 2f, centerY + 2f),
+                    end = Offset(needleEndX + 2f, needleEndY + 2f),
+                    strokeWidth = 5f,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+
+                // Needle
+                drawLine(
+                    color = Color.Yellow,
+                    start = Offset(centerX, centerY),
+                    end = Offset(needleEndX, needleEndY),
+                    strokeWidth = 4f,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+
+                // Center hub
+                drawCircle(
+                    color = Color(0xFF444444),
+                    radius = 8f,
+                    center = Offset(centerX, centerY)
+                )
+                drawCircle(
+                    color = Color.White,
+                    radius = 3f,
+                    center = Offset(centerX, centerY)
+                )
+
+                // Digital readout
+                val speedText = "${speedKts.toInt()}"
+                val textPaint = android.graphics.Paint().apply {
+                    isAntiAlias = true
+                    color = android.graphics.Color.WHITE
+                    textSize = 24f
+                    textAlign = android.graphics.Paint.Align.CENTER
+                }
+                drawContext.canvas.nativeCanvas.drawText(
+                    speedText,
+                    centerX,
+                    centerY + radius * 0.5f,
+                    textPaint
+                )
+            }
+        }
+
+        Text(
+            text = "AIRSPEED",
+            fontSize = 10.sp,
+            color = Color.White,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+    }
+}
+
+/**
+ * Vertical Speed Indicator (Variometer)
+ * Shows rate of climb/descent in feet per minute
+ */
+@Composable
+fun VerticalSpeedIndicator(
+    verticalSpeed: Double,
+    size: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier
+) {
+    LaunchedEffect(verticalSpeed) {
+        Log.d("VerticalSpeedIndicator", "verticalSpeed=$verticalSpeed")
+    }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+    ) {
+        Box(
+            modifier = Modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(Color(0xFF1A1A1A))
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val centerX = this.size.width / 2
+                val centerY = this.size.height / 2
+                val radius = this.size.minDimension / 2
+
+                // Convert m/s to feet per minute (1 m/s = 196.85 ft/min)
+                val vsFpm = (verticalSpeed * 196.85).coerceIn(-6000.0, 6000.0)
+
+                // Draw background
+                drawCircle(
+                    color = Color(0xFF2A2A2A),
+                    radius = radius * 0.9f,
+                    center = Offset(centerX, centerY)
+                )
+
+                // Draw VSI scale
+                val scaleValues = listOf(-6000, -4000, -2000, -1000, 0, 1000, 2000, 4000, 6000)
+                scaleValues.forEach { value ->
+                    val angle = (value / 6000.0) * 135.0 // -135° to +135°
+                    val rad = Math.toRadians(angle + 90.0) // Rotate 90° so 0 is at top
+                    val tickLength = if (value == 0 || Math.abs(value) == 2000 || Math.abs(value) == 6000) 15f else 10f
+                    val innerRadius = radius * 0.85f
+                    val outerRadius = radius * 0.85f - tickLength
+
+                    val startX = centerX + (innerRadius * cos(rad)).toFloat()
+                    val startY = centerY + (innerRadius * sin(rad)).toFloat()
+                    val endX = centerX + (outerRadius * cos(rad)).toFloat()
+                    val endY = centerY + (outerRadius * sin(rad)).toFloat()
+
+                    drawLine(
+                        color = if (value == 0) Color.White else Color.Gray,
+                        start = Offset(startX, startY),
+                        end = Offset(endX, endY),
+                        strokeWidth = if (value == 0) 3f else 2f
+                    )
+                }
+
+                // Draw needle
+                val needleAngle = (vsFpm / 6000.0) * 135.0 + 90.0
+                val needleRad = Math.toRadians(needleAngle)
+                val needleLength = radius * 0.7f
+                val needleEndX = centerX + (needleLength * cos(needleRad)).toFloat()
+                val needleEndY = centerY + (needleLength * sin(needleRad)).toFloat()
+
+                // Needle color based on direction
+                val needleColor = when {
+                    vsFpm > 100 -> Color.Green
+                    vsFpm < -100 -> Color.Red
+                    else -> Color.White
+                }
+
+                // Needle shadow
+                drawLine(
+                    color = Color.Black.copy(alpha = 0.5f),
+                    start = Offset(centerX + 2f, centerY + 2f),
+                    end = Offset(needleEndX + 2f, needleEndY + 2f),
+                    strokeWidth = 5f,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+
+                // Needle
+                drawLine(
+                    color = needleColor,
+                    start = Offset(centerX, centerY),
+                    end = Offset(needleEndX, needleEndY),
+                    strokeWidth = 4f,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+
+                // Center hub
+                drawCircle(
+                    color = Color(0xFF444444),
+                    radius = 8f,
+                    center = Offset(centerX, centerY)
+                )
+                drawCircle(
+                    color = Color.White,
+                    radius = 3f,
+                    center = Offset(centerX, centerY)
+                )
+
+                // Digital readout
+                val vsText = if (vsFpm >= 0) "+${vsFpm.toInt()}" else "${vsFpm.toInt()}"
+                val textPaint = android.graphics.Paint().apply {
+                    isAntiAlias = true
+                    color = when {
+                        vsFpm > 100 -> android.graphics.Color.GREEN
+                        vsFpm < -100 -> android.graphics.Color.RED
+                        else -> android.graphics.Color.WHITE
+                    }
+                    textSize = 20f
+                    textAlign = android.graphics.Paint.Align.CENTER
+                }
+                drawContext.canvas.nativeCanvas.drawText(
+                    vsText,
+                    centerX,
+                    centerY + radius * 0.5f,
+                    textPaint
+                )
+            }
+        }
+
+        Text(
+            text = "VERT SPEED",
+            fontSize = 10.sp,
+            color = Color.White,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+    }
 }
 
 
