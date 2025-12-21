@@ -54,6 +54,7 @@ import com.example.checklist_interactive.ui.maps.marker.*
 import com.example.checklist_interactive.ui.maps.navigation.*
 import com.example.checklist_interactive.ui.maps.ui.MapNavigationDisplay
 import com.example.checklist_interactive.ui.maps.ui.MapRadialMenuDisplay
+import com.example.checklist_interactive.ui.maps.ui.OverlaySelectionDialog
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
@@ -2251,72 +2252,6 @@ private fun LayerSelectionDialog(
             TextButton(onClick = onDismiss) {
                 Text(stringResource(R.string.action_close))
             }
-        }
-    )
-}
-
-/**
- * Dialog for selecting overlays (compass, range rings)
- */
-@Composable
-private fun OverlaySelectionDialog(
-    compassEnabled: Boolean,
-    rangeRingsEnabled: Boolean,
-    rangeRingsMaxNm: Int,
-    mgrsGridEnabled: Boolean,
-    onDismiss: () -> Unit,
-    onToggleCompass: (Boolean) -> Unit,
-    onToggleRangeRings: (Boolean) -> Unit,
-    onChangeRangeRingsMaxNm: (Int) -> Unit,
-    onToggleMgrsGrid: (Boolean) -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.map_overlays_dialog_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Column {
-                        Text(stringResource(R.string.map_compass), style = MaterialTheme.typography.bodyMedium)
-                        Text(stringResource(R.string.map_compass_description), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Switch(checked = compassEnabled, onCheckedChange = onToggleCompass)
-                }
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Column {
-                        Text(stringResource(R.string.map_range_rings), style = MaterialTheme.typography.bodyMedium)
-                        Text(stringResource(R.string.map_range_rings_description), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Switch(checked = rangeRingsEnabled, onCheckedChange = onToggleRangeRings)
-                }
-
-                if (rangeRingsEnabled) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(stringResource(R.string.map_range_rings_max_label, rangeRingsMaxNm), style = MaterialTheme.typography.bodySmall)
-                        Slider(
-                            value = rangeRingsMaxNm.toFloat(),
-                            onValueChange = { onChangeRangeRingsMaxNm(it.toInt()) },
-                            valueRange = 1f..500f,
-                            steps = 499,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Text(stringResource(R.string.map_range_rings_max_description), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Column {
-                        Text("MGRS Grid", style = MaterialTheme.typography.bodyMedium)
-                        Text("Military Grid Reference System overlay", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Switch(checked = mgrsGridEnabled, onCheckedChange = onToggleMgrsGrid)
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
         }
     )
 }
