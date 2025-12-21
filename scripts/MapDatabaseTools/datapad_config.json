@@ -3,6 +3,6 @@
   "senderPort": 5011,
   "deviceName": "Python DataPad",
   "port": 5010,
-  "bindIp": "0.0.0.0",
+  "bindIp": "192.168.178.100",
   "useEcdh": true
 }

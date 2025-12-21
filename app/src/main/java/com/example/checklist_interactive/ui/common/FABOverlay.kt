@@ -192,16 +192,6 @@ object MapViewerFABs {
             scope = "map"
         ),
         FABConfig(
-            id = "map_reset_fabs",
-            icon = Icons.Default.Refresh,
-            contentDescription = "Reset FAB positions",
-            onClick = onResetFabPositions,
-            containerColor = containerColorSecondary,
-            defaultX = 0.95f,
-            defaultY = 0.40f,
-            scope = "map"
-        ),
-        FABConfig(
             id = "datapad",
             icon = Icons.Default.Flight,
             contentDescription = "DataPad",
