@@ -1,4 +1,4 @@
-package com.example.checklist_interactive.ui.maps
+package com.example.checklist_interactive.ui.maps.navigation
 
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.overlay.Polyline

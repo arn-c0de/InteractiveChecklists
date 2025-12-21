@@ -53,6 +53,8 @@ import com.example.checklist_interactive.ui.quickaccess.LocalQuickNoteManager
 import com.example.checklist_interactive.ui.common.DraggableFab
 import com.example.checklist_interactive.ui.common.FABOverlay
 import com.example.checklist_interactive.ui.common.MapViewerFABs
+import com.example.checklist_interactive.ui.maps.marker.*
+import com.example.checklist_interactive.ui.maps.navigation.*
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
@@ -283,7 +285,31 @@ fun MapViewer(
         val navTargetId = prefs.getInt("active_nav_target_id", -999)
         android.util.Log.d("MapViewer", "Attempting to restore navigation target with ID: $navTargetId")
         
-        if (navTargetId > 0) {
+        if (navTargetId == -2 || navTargetId == -1) {
+            // Special-case: Pattern (-2) and approach (-1) navigation use temporary targets and
+            // must be reconstructed from the original airport ID and saved runway index.
+            // Support both legacy 'pattern_airport_id' and newer 'nav_airport_id'.
+            val patternAirportId = prefs.getInt("nav_airport_id", prefs.getInt("pattern_airport_id", -999))
+            if (patternAirportId > 0) {
+                try {
+                    val airport = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        locationRepository.getLocationById(patternAirportId)
+                    }
+                    if (airport != null) {
+                        // Set the active navigation target to the airport so downstream effects will
+                        // load runways and then the appropriate effect (approach or pattern) can create the temporary target.
+                        activeNavigationTarget = airport
+                        android.util.Log.d("MapViewer", "✅ Restored navigation airport: ${airport.name} (id=$patternAirportId) for special target id=$navTargetId")
+                    } else {
+                        android.util.Log.w("MapViewer", "⚠️ Navigation airport with ID $patternAirportId not found in database")
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("MapViewer", "❌ Failed to restore navigation airport", e)
+                }
+            } else {
+                android.util.Log.w("MapViewer", "⚠️ No navigation airport id saved; cannot fully restore special navigation (id=$navTargetId)")
+            }
+        } else if (navTargetId > 0) {
             try {
                 val target = withContext(kotlinx.coroutines.Dispatchers.IO) {
                     locationRepository.getLocationById(navTargetId)
@@ -383,8 +409,13 @@ fun MapViewer(
         try {
             val navPrefs = context.getSharedPreferences("map_navigation_prefs", android.content.Context.MODE_PRIVATE)
             navPrefs.edit().apply {
-                // Save active navigation target
-                val targetId = activeNavigationTarget?.id ?: -999
+                // Save active navigation target. Prefer pattern sentinel if a pattern is active or requested,
+                // because activeNavigationTarget might be a temporary object and null during brief restore transitions.
+                val targetId = when {
+                    showTrafficPattern -> -2
+                    activeNavigationTarget != null -> activeNavigationTarget!!.id
+                    else -> -999
+                }
                 putInt("active_nav_target_id", targetId)
                 
                 // Save runway approach state
@@ -397,6 +428,10 @@ fun MapViewer(
                 putInt("pattern_size_ordinal", patternSize.ordinal)
                 putBoolean("pattern_direction_left", patternDirection == PatternDirection.LEFT_HAND)
                 putFloat("pattern_final_distance_nm", patternFinalDistanceNm.toFloat())
+                // Save the original airport id used for pattern/approach navigation (if any)
+                putInt("pattern_airport_id", originalAirportTarget?.id ?: -999)
+                // Backwards-compatible key used for both pattern and approach restores
+                putInt("nav_airport_id", originalAirportTarget?.id ?: -999)
                 
                 apply()
             }
