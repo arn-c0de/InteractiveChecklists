@@ -56,3 +56,8 @@ codeql-results.sarif
 
 codeql-db-py
 codeql-py-analysis.sarif
+
+
+.kotlin
+
+.vscode
