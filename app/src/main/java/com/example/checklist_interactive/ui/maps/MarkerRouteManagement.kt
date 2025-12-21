@@ -210,6 +210,8 @@ fun MarkerRouteManagementSheet(
     // New tab order: 0=Details, 1=Markers (default), 2=Routes
     var selectedTab by remember { mutableStateOf(if (selectedMarker != null) 0 else 1) }
     val view = LocalView.current
+    // Live search text for filtering markers
+    var markerSearch by rememberSaveable { mutableStateOf("") }
 
     // Persisted sheet fraction + opacity like DataPadPopup
     val prefs = context.getSharedPreferences("map_objects_prefs", android.content.Context.MODE_PRIVATE)
@@ -516,25 +518,48 @@ fun MarkerRouteManagementSheet(
                     }
                 }
 
-                1 -> MarkerGroupsList(
-                    groups = markerGroups,
-                    expandedGroups = expandedGroups,
-                    onToggleGroup = { viewModel.toggleGroup(it) },
-                    onMarkerClick = { marker ->
-                        onMarkerClick(marker)
-                        selectedTab = 0
-                    },
-                    onDeleteMarker = { viewModel.deleteMarker(it) },
-                    onCreateRouteFromGroup = { groupKey, groupLabel ->
-                        viewModel.createRouteFromGroup(
-                            groupKey,
-                            groupLabel,
-                            autoDesc
-                        ) {
-                            selectedTab = 2
-                        }
+                1 -> {
+                    Column {
+                        OutlinedTextField(
+                            value = markerSearch,
+                            onValueChange = { markerSearch = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                            trailingIcon = {
+                                if (markerSearch.isNotEmpty()) {
+                                    IconButton(onClick = { markerSearch = "" }) {
+                                        Icon(Icons.Default.Close, contentDescription = null)
+                                    }
+                                }
+                            },
+                            placeholder = { Text("Search markers") },
+                            singleLine = true
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        MarkerGroupsList(
+                            groups = markerGroups,
+                            expandedGroups = expandedGroups,
+                            searchText = markerSearch,
+                            onToggleGroup = { viewModel.toggleGroup(it) },
+                            onMarkerClick = { marker ->
+                                onMarkerClick(marker)
+                                selectedTab = 0
+                            },
+                            onDeleteMarker = { viewModel.deleteMarker(it) },
+                            onCreateRouteFromGroup = { groupKey, groupLabel ->
+                                viewModel.createRouteFromGroup(
+                                    groupKey,
+                                    groupLabel,
+                                    autoDesc
+                                ) {
+                                    selectedTab = 2
+                                }
+                            }
+                        )
                     }
-                )
+                }
                 2 -> RoutesList(
                     routes = allRoutes,
                     visibleRouteIds = visibleRouteIds,
@@ -558,12 +583,29 @@ fun MarkerRouteManagementSheet(
 fun MarkerGroupsList(
     groups: Map<Int, List<LocationEntity>>,
     expandedGroups: Set<Int>,
+    searchText: String = "",
     onToggleGroup: (Int) -> Unit,
     onMarkerClick: (LocationEntity) -> Unit,
     onDeleteMarker: (Int) -> Unit,
     onCreateRouteFromGroup: (Int, String) -> Unit
 ) {
-    if (groups.isEmpty()) {
+    // If a search is active, filter the markers inside each group
+    val filteredGroups = if (searchText.isBlank()) {
+        groups
+    } else {
+        val q = searchText.trim().lowercase()
+        groups.mapValues { (_, list) ->
+            list.filter { marker ->
+                marker.name.lowercase().contains(q) ||
+                (marker.icao?.lowercase()?.contains(q) ?: false) ||
+                (marker.iata?.lowercase()?.contains(q) ?: false) ||
+                (marker.description?.lowercase()?.contains(q) ?: false) ||
+                (marker.tags?.lowercase()?.contains(q) ?: false)
+            }
+        }.filterValues { it.isNotEmpty() }
+    }
+
+    if (filteredGroups.isEmpty()) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
@@ -581,14 +623,15 @@ fun MarkerGroupsList(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        groups.forEach { (groupKey, markers) ->
+        filteredGroups.forEach { (groupKey, markers) ->
             item(key = groupKey) {
                 val groupLabel = stringResource(groupKey)
                 MarkerGroupItem(
                     groupKey = groupKey,
                     groupLabel = groupLabel,
                     markers = markers,
-                    isExpanded = expandedGroups.contains(groupKey),
+                    // Auto-expand groups when a search is active so all matches are visible
+                    isExpanded = if (searchText.isNotBlank()) true else expandedGroups.contains(groupKey),
                     onToggle = { onToggleGroup(groupKey) },
                     onMarkerClick = onMarkerClick,
                     onDeleteMarker = onDeleteMarker,
