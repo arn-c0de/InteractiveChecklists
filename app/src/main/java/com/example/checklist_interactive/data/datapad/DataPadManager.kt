@@ -271,7 +271,14 @@ class DataPadManager(private val context: Context) {
                     try {
                         udpSocket?.receive(packet)
                         val receivedData = packet.data.copyOfRange(0, packet.length)
-                        udpLogD("UDP packet received (${packet.length} bytes) from ${packet.address.hostAddress}:${packet.port}")
+                        val senderIp = packet.address.hostAddress
+                        udpLogD("UDP packet received (${packet.length} bytes) from $senderIp:${packet.port}")
+
+                        // Filter out packets from own IP address (broadcast echoes)
+                        if (senderIp == deviceIp) {
+                            udpLogD("Ignoring packet from own IP address ($senderIp)")
+                            continue
+                        }
 
                         // Handle all incoming messages through a unified handler
                         handleIncomingMessage(receivedData, packet.address, packet.port)
@@ -639,24 +646,26 @@ class DataPadManager(private val context: Context) {
      * Handshake messages are received in PLAINTEXT
      */
     private fun handleIncomingMessage(data: ByteArray, address: InetAddress, port: Int) {
+        val senderIp = address.hostAddress
+        
         // Try parsing as PLAINTEXT (for handshake) first
         try {
             val plaintextMessage = String(data, Charsets.UTF_8)
             if (plaintextMessage.contains("ServerHello")) {
                 val serverHello = json.decodeFromString<ServerHello>(plaintextMessage)
-                udpLogD("📥 Received ServerHello, completing handshake deferred")
+                udpLogD("📥 Received ServerHello from $senderIp, completing handshake deferred")
                 pendingHandshakeResponses["ServerHello"]?.complete(serverHello)
                 return
             }
             if (plaintextMessage.contains("\"Ack\"")) {
                 val ack = json.decodeFromString<Ack>(plaintextMessage)
-                udpLogD("📥 Received Ack, completing handshake deferred")
+                udpLogD("📥 Received Ack from $senderIp, completing handshake deferred")
                 pendingHandshakeResponses["Ack"]?.complete(ack)
                 return
             }
             if (plaintextMessage.contains("\"Error\"")) {
                 val error = json.decodeFromString<HandshakeError>(plaintextMessage)
-                udpLogE("Server error: ${error.error} - ${error.message}")
+                udpLogE("Server error from $senderIp: ${error.error} - ${error.message}")
                 return
             }
         } catch (e: Exception) {
@@ -665,31 +674,36 @@ class DataPadManager(private val context: Context) {
 
         // If not a handshake message, assume it's encrypted flight data
         val provider = encryptionProvider
-        val decryptedData = provider?.decrypt(data)
+        if (provider == null) {
+            udpLogD("⚠️ Ignoring packet from $senderIp - no encryption provider yet (handshake in progress?)")
+            return
+        }
+        
+        val decryptedData = provider.decrypt(data)
 
         if (decryptedData != null) {
             val message = String(decryptedData, Charsets.UTF_8)
             val method = provider.getMethod()
-            udpLogD("Received decrypted message (length=${message.length} bytes, method=$method)")
+            udpLogD("Received decrypted message from $senderIp (length=${message.length} bytes, method=$method)")
 
             try {
                 val flightData = json.decodeFromString<FlightData>(message)
                 if (currentSession == null) {
-                    udpLogE("Received flight data but no active session - rejecting")
+                    udpLogE("Received flight data from $senderIp but no active session - rejecting")
                 } else {
                     _flightData.value = flightData
                     _lastUpdateTime.value = System.currentTimeMillis()
                     _isConnected.value = true
                     currentSession?.let {
-                        udpLogD("✅ Received encrypted flight data: ${flightData.aircraft} at ${flightData.altitude}m (session: ${it.sessionId.take(8)}...)")
-                    } ?: udpLogD("✅ Received encrypted flight data: ${flightData.aircraft} at ${flightData.altitude}m")
+                        udpLogD("✅ Received encrypted flight data from $senderIp: ${flightData.aircraft} at ${flightData.altitude}m (session: ${it.sessionId.take(8)}...)")
+                    } ?: udpLogD("✅ Received encrypted flight data from $senderIp: ${flightData.aircraft} at ${flightData.altitude}m")
                 }
             } catch (e: Exception) {
-                udpLogE("Failed to parse flight data: ${e.message}", e)
+                udpLogE("Failed to parse flight data from $senderIp: ${e.message}", e)
                 udpLogE("Raw message: $message")
             }
         } else {
-            udpLogE("❌ Failed to decrypt packet - rejecting (encryption enforced)")
+            udpLogE("❌ Failed to decrypt packet from $senderIp - rejecting (encryption enforced)")
         }
     }
     

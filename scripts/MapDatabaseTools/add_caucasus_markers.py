@@ -171,7 +171,7 @@ def caucasus_samples():
             icao="URMF",
             iata="",
             elevation_m=1100.0,
-            runways=[Runway(name="26/08", length_m=3000, width_m=45, heading=80.0, surface="asphalt")],
+            runways=[Runway(name="26/08", length_m=3000, width_m=45, heading=85.0, surface="asphalt")],
             frequencies={"tower":137.0, "tower_secondary":266.0},
             country="Russia",
             tags=["airbase"],
