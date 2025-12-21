@@ -508,46 +508,82 @@ fun MapNavigationDisplay(
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            // Threshold controls for pattern altitude indicator
-                            Row(
+                            // Collapsible settings container (default collapsed)
+                            var showAltThresholdSettings by remember { mutableStateOf(false) }
+                            Card(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                             ) {
-                                var smallTolText by remember { mutableStateOf(mapState.patternAltitudeSmallToleranceFt.toInt().toString()) }
-                                var warnTolText by remember { mutableStateOf(mapState.patternAltitudeWarningToleranceFt.toInt().toString()) }
+                                Column(modifier = Modifier.padding(8.dp)) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { showAltThresholdSettings = !showAltThresholdSettings }
+                                            .padding(vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = "Altitude Indicator Settings",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold
+                                        )
 
-                                OutlinedTextField(
-                                    value = smallTolText,
-                                    onValueChange = { v ->
-                                        smallTolText = v.filter { it.isDigit() }
-                                        val intVal = smallTolText.toIntOrNull()
-                                        if (intVal != null) {
-                                            mapState.patternAltitudeSmallToleranceFt = intVal.toDouble()
-                                            mapState.saveNavigationState()
+                                        IconButton(onClick = { showAltThresholdSettings = !showAltThresholdSettings }) {
+                                            Icon(
+                                                imageVector = if (showAltThresholdSettings) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                contentDescription = if (showAltThresholdSettings) "Collapse" else "Expand"
+                                            )
                                         }
-                                    },
-                                    label = { Text("Level tol (ft)") },
-                                    singleLine = true,
-                                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
-                                    modifier = Modifier.weight(1f)
-                                )
+                                    }
 
-                                OutlinedTextField(
-                                    value = warnTolText,
-                                    onValueChange = { v ->
-                                        warnTolText = v.filter { it.isDigit() }
-                                        val intVal = warnTolText.toIntOrNull()
-                                        if (intVal != null) {
-                                            mapState.patternAltitudeWarningToleranceFt = intVal.toDouble()
-                                            mapState.saveNavigationState()
+                                    AnimatedVisibility(
+                                        visible = showAltThresholdSettings,
+                                        enter = expandVertically() + fadeIn(),
+                                        exit = shrinkVertically() + fadeOut()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            var smallTolText by remember { mutableStateOf(mapState.patternAltitudeSmallToleranceFt.toInt().toString()) }
+                                            var warnTolText by remember { mutableStateOf(mapState.patternAltitudeWarningToleranceFt.toInt().toString()) }
+
+                                            OutlinedTextField(
+                                                value = smallTolText,
+                                                onValueChange = { v ->
+                                                    smallTolText = v.filter { it.isDigit() }
+                                                    val intVal = smallTolText.toIntOrNull()
+                                                    if (intVal != null) {
+                                                        mapState.patternAltitudeSmallToleranceFt = intVal.toDouble()
+                                                        mapState.saveNavigationState()
+                                                    }
+                                                },
+                                                label = { Text("Level tol (ft)") },
+                                                singleLine = true,
+                                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                                                modifier = Modifier.weight(1f)
+                                            )
+
+                                            OutlinedTextField(
+                                                value = warnTolText,
+                                                onValueChange = { v ->
+                                                    warnTolText = v.filter { it.isDigit() }
+                                                    val intVal = warnTolText.toIntOrNull()
+                                                    if (intVal != null) {
+                                                        mapState.patternAltitudeWarningToleranceFt = intVal.toDouble()
+                                                        mapState.saveNavigationState()
+                                                    }
+                                                },
+                                                label = { Text("Warn tol (ft)") },
+                                                singleLine = true,
+                                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                                                modifier = Modifier.weight(1f)
+                                            )
                                         }
-                                    },
-                                    label = { Text("Warn tol (ft)") },
-                                    singleLine = true,
-                                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
-                                    modifier = Modifier.weight(1f)
-                                )
+                                    }
+                                }
                             }
 
                             Spacer(modifier = Modifier.height(8.dp))
