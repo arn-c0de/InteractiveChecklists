@@ -117,34 +117,7 @@ fun MapViewer(
 
     // Initialize DB off the main thread to avoid long blocking operations during composition
     LaunchedEffect(Unit) {
-        // Don't block UI - perform DB init on IO
-        android.util.Log.d("MapViewer", "Starting TacticalDatabase initialization...")
-        withContext(kotlinx.coroutines.Dispatchers.IO) {
-            try {
-                android.util.Log.d("MapViewer", "Calling TacticalDatabase.getInstance()...")
-                val db = kotlinx.coroutines.withTimeout(10000L) { // 10 second timeout
-                    com.example.checklist_interactive.data.tactical.TacticalDatabase.getInstance(context, useExternalPath = false)
-                }
-                android.util.Log.d("MapViewer", "TacticalDatabase.getInstance() completed successfully")
-                withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    mapState.tacticalDb = db
-                    android.util.Log.d("MapViewer", "TacticalDatabase assigned to state variable - DB ready!")
-                }
-            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-                android.util.Log.e("MapViewer", "TacticalDatabase initialization timed out after 10 seconds", e)
-                withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    mapState.dbInitFailed = true
-                    mapState.dbInitError = "Zeitüberschreitung beim Laden der Datenbank"
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("MapViewer", "Failed to initialize TacticalDatabase", e)
-                e.printStackTrace()
-                withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    mapState.dbInitFailed = true
-                    mapState.dbInitError = e.message ?: "Unbekannter Fehler"
-                }
-            }
-        }
+        mapState.initializeDatabase()
     }
 
     // Repositories and viewmodels are created when DB is available
@@ -169,132 +142,17 @@ fun MapViewer(
 
     // Load and restore visible routes from SharedPreferences when MarkerRouteViewModel becomes available
     LaunchedEffect(markerRouteViewModel) {
-        // Reset flag each time the viewmodel instance changes so we don't accidentally
-        // enable saving before restoration for a newly created viewmodel
-        mapState.routesRestored = false
-
-        // Only proceed when a non-null ViewModel exists
-        val vm = markerRouteViewModel
-        if (vm == null) {
-            android.util.Log.d("MapViewer", "MarkerRouteViewModel not ready - deferring route restoration")
-            return@LaunchedEffect
-        }
-
-        val prefs = context.getSharedPreferences("map_routes_prefs", android.content.Context.MODE_PRIVATE)
-        val savedRouteIds = prefs.getStringSet("visible_route_ids", emptySet())
-            ?.mapNotNull { it.toIntOrNull() }
-            ?.toSet() ?: emptySet()
-
-        // Apply the saved route set to the ready ViewModel
-        vm.setVisibleRoutes(savedRouteIds)
-        android.util.Log.d("MapViewer", "Restored visible routes: $savedRouteIds")
-
-        // Small delay to ensure collectors process the change before we re-enable saving
-        kotlinx.coroutines.delay(50)
-        mapState.routesRestored = true
+        mapState.restoreVisibleRoutes(markerRouteViewModel)
     }
 
     // Restore solo navigation state from SharedPreferences
     LaunchedEffect(dbReady, locationRepository) {
-        if (!dbReady || locationRepository == null) {
-            android.util.Log.d("MapViewer", "Navigation restore deferred: dbReady=$dbReady, locationRepository=${locationRepository != null}")
-            return@LaunchedEffect
-        }
-        mapState.navigationRestored = false
-
-        val prefs = context.getSharedPreferences("map_navigation_prefs", android.content.Context.MODE_PRIVATE)
-        
-        // Restore active navigation target
-        val navTargetId = prefs.getInt("active_nav_target_id", -999)
-        android.util.Log.d("MapViewer", "Attempting to restore navigation target with ID: $navTargetId")
-        
-        if (navTargetId == -2 || navTargetId == -1) {
-            // Special-case: Pattern (-2) and approach (-1) navigation use temporary targets and
-            // must be reconstructed from the original airport ID and saved runway index.
-            // Support both legacy 'pattern_airport_id' and newer 'nav_airport_id'.
-            val patternAirportId = prefs.getInt("nav_airport_id", prefs.getInt("pattern_airport_id", -999))
-            if (patternAirportId > 0) {
-                try {
-                    val airport = withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        locationRepository.getLocationById(patternAirportId)
-                    }
-                    if (airport != null) {
-                        // Set the active navigation target to the airport so downstream effects will
-                        // load runways and then the appropriate effect (approach or pattern) can create the temporary target.
-                        mapState.activeNavigationTarget = airport
-                        // Make sure the navigation UI is shown so details & buttons appear immediately
-                        mapState.showNavigationDetails = true
-                        mapState.autoCenter = false
-                        android.util.Log.d("MapViewer", "✅ Restored navigation airport: ${airport.name} (id=$patternAirportId) for special target id=$navTargetId")
-                    } else {
-                        android.util.Log.w("MapViewer", "⚠️ Navigation airport with ID $patternAirportId not found in database")
-                    }
-                } catch (e: Exception) {
-                    android.util.Log.e("MapViewer", "❌ Failed to restore navigation airport", e)
-                }
-            } else {
-                android.util.Log.w("MapViewer", "⚠️ No navigation airport id saved; cannot fully restore special navigation (id=$navTargetId)")
-            }
-        } else if (navTargetId > 0) {
-            try {
-                val target = withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    locationRepository.getLocationById(navTargetId)
-                }
-                
-                if (target != null) {
-                    mapState.activeNavigationTarget = target
-                    mapState.originalAirportTarget = target
-                    // Make navigation UI visible immediately
-                    mapState.showNavigationDetails = true
-                    mapState.autoCenter = false
-                    android.util.Log.d("MapViewer", "✅ Restored navigation target: ${target.name} (id=$navTargetId)")
-                } else {
-                    android.util.Log.w("MapViewer", "⚠️ Navigation target with ID $navTargetId not found in database")
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("MapViewer", "❌ Failed to restore navigation target", e)
-            }
-        } else {
-            android.util.Log.d("MapViewer", "No active navigation target to restore (id=$navTargetId)")
-        }
-
-        // Restore runway approach mode
-        mapState.showRunwayApproach = prefs.getBoolean("show_runway_approach", false)
-        mapState.finalApproachDistanceNm = prefs.getFloat("final_approach_distance_nm", 5.0f).toDouble()
-        
-        val selectedRwyIdx = prefs.getInt("selected_runway_index", -1)
-        if (selectedRwyIdx >= 0) {
-            mapState.selectedRunwayIndex = selectedRwyIdx
-            android.util.Log.d("MapViewer", "Restored selected runway index: $selectedRwyIdx")
-            // Runway entity will be restored via the runway-loading effect when activeNavigationTarget is set
-        }
-
-        // Restore traffic pattern mode
-        mapState.showTrafficPattern = prefs.getBoolean("show_traffic_pattern", false)
-        mapState.patternSize = PatternSize.fromOrdinal(prefs.getInt("pattern_size_ordinal", PatternSize.NORMAL.ordinal))
-        mapState.patternDirection = if (prefs.getBoolean("pattern_direction_left", true)) PatternDirection.LEFT_HAND else PatternDirection.RIGHT_HAND
-        mapState.patternFinalDistanceNm = prefs.getFloat("pattern_final_distance_nm", 1.0f).toDouble()
-
-        android.util.Log.d("MapViewer", "✅ Restored navigation modes: approach=${mapState.showRunwayApproach}, pattern=${mapState.showTrafficPattern}, patternSize=${mapState.patternSize}, patternDir=${mapState.patternDirection}")
-
-        kotlinx.coroutines.delay(50)
-        mapState.navigationRestored = true
+        mapState.restoreNavigationState(locationRepository)
     }
 
     // Load runways for the selected location from the DB (only when DB is ready)
     LaunchedEffect(mapState.selectedLocation?.id, dbReady) {
-        val locId = mapState.selectedLocation?.id
-        if (!dbReady) {
-            mapState.selectedRunways = emptyList()
-            return@LaunchedEffect
-        }
-        if (locId != null) {
-            mapState.tacticalDb!!.runwayDao().getRunwaysByLocation(locId).collect { list ->
-                mapState.selectedRunways = list
-            }
-        } else {
-            mapState.selectedRunways = emptyList()
-        }
+        mapState.loadRunwaysForSelectedLocation()
     }
 
     // Observe visible routes and draw them on map
@@ -304,17 +162,7 @@ fun MapViewer(
 
     // Save visible routes to SharedPreferences when they change (but only after initial restoration completes)
     LaunchedEffect(visibleRouteIds, mapState.routesRestored) {
-        // Skip saving during initial restoration phase to prevent overwriting saved state
-        if (!mapState.routesRestored) {
-            android.util.Log.d("MapViewer", "Skipping save - routes not yet restored")
-            return@LaunchedEffect
-        }
-        
-        val prefs = context.getSharedPreferences("map_routes_prefs", android.content.Context.MODE_PRIVATE)
-        prefs.edit()
-            .putStringSet("visible_route_ids", visibleRouteIds.map { it.toString() }.toSet())
-            .apply()
-        android.util.Log.d("MapViewer", "Saved visible routes: $visibleRouteIds")
+        mapState.saveVisibleRoutes(visibleRouteIds)
     }
 
     // Save navigation state when it changes (but only after initial restoration completes)
@@ -329,45 +177,7 @@ fun MapViewer(
         mapState.patternFinalDistanceNm,
         mapState.navigationRestored
     ) {
-        // Skip saving during initial restoration phase
-        if (!mapState.navigationRestored) {
-            android.util.Log.d("MapViewer", "Skipping navigation save - not yet restored")
-            return@LaunchedEffect
-        }
-
-        try {
-            val navPrefs = context.getSharedPreferences("map_navigation_prefs", android.content.Context.MODE_PRIVATE)
-            navPrefs.edit().apply {
-                // Save active navigation target. Prefer pattern sentinel if a pattern is active or requested,
-                // because activeNavigationTarget might be a temporary object and null during brief restore transitions.
-                val targetId = when {
-                    mapState.showTrafficPattern -> -2
-                    mapState.activeNavigationTarget != null -> mapState.activeNavigationTarget!!.id
-                    else -> -999
-                }
-                putInt("active_nav_target_id", targetId)
-                
-                // Save runway approach state
-                putBoolean("show_runway_approach", mapState.showRunwayApproach)
-                putFloat("final_approach_distance_nm", mapState.finalApproachDistanceNm.toFloat())
-                putInt("selected_runway_index", mapState.selectedRunwayIndex ?: -1)
-                
-                // Save traffic pattern state
-                putBoolean("show_traffic_pattern", mapState.showTrafficPattern)
-                putInt("pattern_size_ordinal", mapState.patternSize.ordinal)
-                putBoolean("pattern_direction_left", mapState.patternDirection == PatternDirection.LEFT_HAND)
-                putFloat("pattern_final_distance_nm", mapState.patternFinalDistanceNm.toFloat())
-                // Save the original airport id used for pattern/approach navigation (if any)
-                putInt("pattern_airport_id", mapState.originalAirportTarget?.id ?: -999)
-                // Backwards-compatible key used for both pattern and approach restores
-                putInt("nav_airport_id", mapState.originalAirportTarget?.id ?: -999)
-                
-                apply()
-            }
-            android.util.Log.d("MapViewer", "💾 Saved navigation state: target=${mapState.activeNavigationTarget?.name}, approach=${mapState.showRunwayApproach}, pattern=${mapState.showTrafficPattern}, patternSize=${mapState.patternSize}")
-        } catch (e: Exception) {
-            android.util.Log.e("MapViewer", "Failed to save navigation state", e)
-        }
+        mapState.saveNavigationState()
     }
     LaunchedEffect(visibleRouteIds, mapState.mapView, allRoutesForRedraw) {
         val mv = mapState.mapView ?: return@LaunchedEffect
@@ -452,8 +262,7 @@ fun MapViewer(
     
     // Initialize osmdroid configuration
     LaunchedEffect(Unit) {
-        Configuration.getInstance().userAgentValue = context.packageName
-        Configuration.getInstance().load(context, context.getSharedPreferences("osmdroid", Context.MODE_PRIVATE))
+        mapState.initializeOsmdroidConfig()
     }
     
     // Map theme helper
@@ -552,36 +361,7 @@ fun MapViewer(
 
     // Load runways for active navigation target
     LaunchedEffect(mapState.activeNavigationTarget) {
-        val target = mapState.activeNavigationTarget
-        // Only update original airport if it's a real location (not a temporary approach point)
-        if (target != null && target.id > 0) {
-            mapState.originalAirportTarget = target
-            // Load runways from database
-            val db = com.example.checklist_interactive.data.tactical.TacticalDatabase.getInstance(context, useExternalPath = false)
-            db.runwayDao().getRunwaysByLocation(target.id).collect { runways ->
-                mapState.targetRunways = runways
-                
-                // Restore selected runway if we have a saved index
-                val savedIdx = mapState.selectedRunwayIndex
-                if (savedIdx != null && savedIdx >= 0 && runways.isNotEmpty()) {
-                    // Calculate which runway based on index (each runway has 2 directions)
-                    val runwayIdx = savedIdx / 2
-                    if (runwayIdx < runways.size) {
-                        mapState.selectedRunway = runways[runwayIdx]
-                        android.util.Log.d("MapViewer", "✅ Restored selected runway: ${mapState.selectedRunway?.name} (index=$savedIdx)")
-                    }
-                }
-            }
-        } else if (target == null) {
-            // Navigation cleared completely
-            mapState.targetRunways = emptyList()
-            mapState.originalAirportTarget = null
-            mapState.showRunwayApproach = false
-            mapState.selectedRunwayIndex = null
-            mapState.selectedRunwayHeading = null
-            mapState.selectedRunway = null
-        }
-        // If target.id == -1, it's an approach point - keep original airport and runways
+        mapState.loadRunwaysForActiveTarget()
     }
 
     // Helper function to extract runway heading from runway name
@@ -1673,11 +1453,7 @@ fun MapViewer(
         if (pendingMoveMarkerId != null) {
             // Optionally resolve name for nicer text
             LaunchedEffect(pendingMoveMarkerId) {
-                mapState.pendingMoveTargetName = try {
-                    locationRepository?.getLocationById(pendingMoveMarkerId!!)?.name
-                } catch (_: Exception) {
-                    null
-                }
+                mapState.resolvePendingMoveTargetName(pendingMoveMarkerId!!, locationRepository)
             }
 
             Surface(
