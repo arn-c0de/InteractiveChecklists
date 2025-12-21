@@ -526,7 +526,8 @@ fun MapViewer(
             val labels = TrafficPatternGenerator.generatePatternLabels(
                 points = patternPoints,
                 direction = mapState.patternDirection,
-                runwayHeading = headingForPattern
+                runwayHeading = headingForPattern,
+                patternSize = mapState.patternSize
             )
             val labelOverlay = PatternLabelOverlay(labels)
             mv.overlays.add(labelOverlay)
