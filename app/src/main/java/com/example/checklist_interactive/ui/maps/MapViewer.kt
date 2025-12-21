@@ -215,7 +215,7 @@ fun MapViewer(
         }
     }
     val markerRouteViewModel = remember(tacticalDb) { if (locationRepository != null && routeRepository != null) MarkerRouteViewModel(locationRepository, routeRepository) else null }
-    val routeCreationViewModel = remember(tacticalDb) { if (routeRepository != null && locationRepository != null && tacticalDb != null) RouteCreationViewModel(context.applicationContext as Application, routeRepository, locationRepository, tacticalDb!!.runwayDao()) else null }
+    val routeCreationViewModel = remember(tacticalDb) { if (routeRepository != null && locationRepository != null && tacticalDb != null) MultiWaypointRouteViewModel(context.applicationContext as Application, routeRepository, locationRepository, tacticalDb!!.runwayDao()) else null }
 
     // Combined ready state: DB AND repositories must be initialized
     val repositoriesReady = dbReady && locationRepository != null && routeRepository != null
