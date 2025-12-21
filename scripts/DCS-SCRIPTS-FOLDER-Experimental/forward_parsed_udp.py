@@ -24,6 +24,7 @@ import time
 import json
 import logging
 import traceback
+import re
 import glob
 from datetime import datetime
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -949,6 +950,75 @@ def repeat_last_line(path: str, host: str, port: int, session_mgr: 'SessionManag
         # handshake_sock is same as sock in ECDH mode, don't close twice
 
 
+def write_live_command(interval_ms: int, scripts_dir: str = None):
+    """
+    Writes a live command file that Export.lua can read to update interval dynamically.
+    This allows changing the interval WITHOUT restarting DCS!
+    """
+    interval_seconds = interval_ms / 1000.0
+
+    # Try to find DCS Scripts folder if not provided
+    if not scripts_dir:
+        scripts_dir = find_dcs_scripts_folder()
+
+    if not scripts_dir:
+        logger.warning("Cannot write live command: DCS Scripts folder not found")
+        return
+
+    command_path = os.path.join(scripts_dir, 'forwarder_command.json')
+
+    try:
+        command_data = {
+            "updateInterval": interval_seconds,
+            "timestamp": datetime.now().isoformat()
+        }
+        with open(command_path, 'w', encoding='utf-8') as f:
+            json.dump(command_data, f, indent=2)
+        logger.info(f"✅ Live command sent: UPDATE_INTERVAL → {interval_seconds}s (DCS will update within 2 seconds)")
+    except Exception as e:
+        logger.warning(f"Failed to write live command: {e}")
+
+
+def update_export_lua_interval(interval_ms: int, lua_path: str):
+    """
+    Updates the UPDATE_INTERVAL in the specified Export.lua file.
+    """
+    if not os.path.exists(lua_path):
+        logger.warning(f"Export.lua not found at {lua_path}, cannot update interval.")
+        return
+
+    interval_seconds = interval_ms / 1000.0
+
+    try:
+        with open(lua_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+
+        updated = False
+        new_lines = []
+        # Regex to find 'local UPDATE_INTERVAL = 0.2' (or other numbers)
+        pattern = re.compile(r"(local\s+UPDATE_INTERVAL\s*=\s*)[\d.]+")
+
+        for line in lines:
+            new_line, count = pattern.subn(r"\g<1>" + str(interval_seconds), line)
+            if count > 0:
+                new_lines.append(new_line)
+                updated = True
+            else:
+                new_lines.append(line)
+
+        if updated:
+            # Safely write back to the file
+            temp_path = lua_path + '.tmp'
+            with open(temp_path, 'w', encoding='utf-8') as f:
+                f.writelines(new_lines)
+            os.replace(temp_path, lua_path)
+            logger.info(f"Updated UPDATE_INTERVAL in {os.path.basename(lua_path)} to {interval_seconds} seconds (requires DCS restart).")
+
+
+    except Exception as e:
+        logger.error(f"Failed to update {os.path.basename(lua_path)}: {e}")
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description='Forward parsed JSONL as UDP datagrams with ECDH encryption (PSK mode removed)')
     p.add_argument('--file', '-f', default=DEFAULT_FILE, help='Path to JSONL file')
@@ -962,12 +1032,14 @@ def main(argv=None):
     p.add_argument('--handshake-port', type=int, default=None,
                    help='Port to listen for ECDH handshakes (default: same as --port). '
                         'Use different port when sender and receiver are on same PC.')
-    p.add_argument('--interval', type=float, default=0.2, help='Polling interval in seconds')
+    p.add_argument('--interval', type=int, default=200, help='Polling interval in milliseconds (e.g., 50 for 50ms).')
     p.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
-    p.add_argument('--repeat-last', action='store_true', help='Repeat the last line every <interval> seconds')
+    p.add_argument('--repeat-last', action='store_true', help='Repeat the last line every <interval> milliseconds')
     p.add_argument('--show-env', action='store_true', help='Print temperature/pressure/wind when sending')
     p.add_argument('--authorized-devices', default='authorized_devices.json', help='Path to authorized devices file')
     p.add_argument('--aircraft', default=None, help='Aircraft name to send in handshake')
+    p.add_argument('--export-lua-path', default=None, help='Path to Export.lua to update interval. If not provided, will search in script folder.')
+    p.add_argument('--no-update-lua', action='store_true', help='Do not attempt to update Export.lua.')
     args = p.parse_args(argv)
 
     # Setup logging
@@ -977,6 +1049,36 @@ def main(argv=None):
         format='%(asctime)s [%(levelname)s] %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
+
+    # Update Export.lua if requested
+    if not args.no_update_lua:
+        lua_path = args.export_lua_path
+        if not lua_path:
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            lua_path = os.path.join(script_dir, 'Export.lua')
+
+        if os.path.exists(lua_path):
+            update_export_lua_interval(args.interval, lua_path)
+        else:
+            logger.warning(f"Export.lua not found at '{lua_path}'. Searching in other locations.")
+            # Try to find it near the --file location, if --use-export was used
+            if getattr(args, 'use_export', False) or 'DCS' in args.file:
+                file_dir = os.path.dirname(args.file)
+                lua_path_alt = os.path.join(file_dir, 'Export.lua')
+                if os.path.exists(lua_path_alt):
+                    logger.info(f"Found Export.lua in data file directory: {lua_path_alt}")
+                    update_export_lua_interval(args.interval, lua_path_alt)
+                else:
+                    logger.warning(f"Could not find Export.lua in {file_dir} either. Interval not updated.")
+            else:
+                logger.warning("Not a DCS export path, not searching further. Interval not updated.")
+
+        # LIVE COMMAND: Write command file for runtime interval updates (no DCS restart needed!)
+        scripts_dir = None
+        if 'DCS' in args.file or getattr(args, 'use_export', False):
+            scripts_dir = os.path.dirname(args.file)
+        write_live_command(args.interval, scripts_dir)
+
     
     # Auto-detect DCS export file if requested (--use-export)
     if getattr(args, 'use_export', False):
@@ -1012,17 +1114,19 @@ def main(argv=None):
 
     enc_status = "🔒 ECDH-AES-GCM"
     
+    interval_seconds = args.interval / 1000.0
+    
     try:
         if args.repeat_last:
-            print(f"Repeating last line every {args.interval} seconds from {args.file} to {args.host}:{args.port} ({enc_status})")
-            repeat_last_line(args.file, args.host, args.port, session_mgr, interval=args.interval, verbose=args.verbose,
+            print(f"Repeating last line every {args.interval} ms from {args.file} to {args.host}:{args.port} ({enc_status})")
+            repeat_last_line(args.file, args.host, args.port, session_mgr, interval=interval_seconds, verbose=args.verbose,
                            show_env=args.show_env, handshake_port=args.handshake_port, bind_ip=args.bind_ip)
         else:
             print(f"Forwarding {args.file} to {args.host}:{args.port} (forward only new lines) ({enc_status})")
             while True:
                 try:
                     tail_and_send(args.file, args.host, args.port, session_mgr, send_existing=False, once=False,
-                                interval=args.interval, verbose=args.verbose, show_env=args.show_env,
+                                interval=interval_seconds, verbose=args.verbose, show_env=args.show_env,
                                 handshake_port=args.handshake_port, bind_ip=args.bind_ip)
                 except KeyboardInterrupt:
                     raise

@@ -5,11 +5,14 @@ pcall(function()
 	local LOG_PATH = writeDir .. [[Scripts\player_aircraft.log]]
 	local DEBUG_LOG_PATH = writeDir .. [[Scripts\player_aircraft_debug.log]]
 	local JSON_PATH = writeDir .. [[Scripts\player_aircraft_parsed.jsonl]]
+	local COMMAND_PATH = writeDir .. [[Scripts\forwarder_command.json]]
 	local DEBUG_DUMP_TABLES = true -- set to false to disable table debug dumps
 	local dumped_tables = {}
-	local UPDATE_INTERVAL = 0.2 -- seconds (5 Hz update rate)
+	local UPDATE_INTERVAL = 0.05 -- seconds (5 Hz update rate)
 	local lastWrite = 0
-	local STREAMER_VERSION = "1.0.2"
+	local lastCommandCheck = 0
+	local COMMAND_CHECK_INTERVAL = 2.0 -- check for command file every 2 seconds
+	local STREAMER_VERSION = "1.0.3"
 	-- Maximum number of JSON lines to keep in the output file. Set to 0 to disable trimming.
 	local MAX_JSON_LINES = 10000
 	-- If true, clear the JSON/log/debug files once when the export starts
@@ -115,10 +118,40 @@ pcall(function()
 		end)
 	end
 
+	-- Check for live commands from forwarder (updates interval dynamically)
+	local function check_live_commands()
+		pcall(function()
+			local f = io.open(COMMAND_PATH, 'r')
+			if not f then return end
+			local content = f:read('*all')
+			f:close()
+
+			if not content or content == '' then return end
+
+			-- Simple JSON parsing for {updateInterval: 0.5}
+			local interval = string.match(content, '"updateInterval"%s*:%s*([%d%.]+)')
+			if interval then
+				local newInterval = tonumber(interval)
+				if newInterval and newInterval > 0 and newInterval ~= UPDATE_INTERVAL then
+					UPDATE_INTERVAL = newInterval
+					debug_log('Live update: UPDATE_INTERVAL changed to ' .. tostring(newInterval) .. ' seconds')
+				end
+			end
+		end)
+	end
+
+	-- Generate high-precision timestamp with milliseconds
+	local function generate_timestamp()
+		local modelTime = LoGetModelTime()
+		if not modelTime then modelTime = os.clock() end
+		local milliseconds = math.floor((modelTime * 1000) % 1000)
+		return string.format('%s.%03dZ', os.date('!%Y-%m-%dT%H:%M:%S'), milliseconds)
+	end
+
 	-- Collect comprehensive telemetry data
 	local function collect_telemetry()
 		local data = {
-			timestamp = os.date('!%Y-%m-%dT%H:%M:%SZ'),
+			timestamp = generate_timestamp(),
 			streamer_version = STREAMER_VERSION,
 			dataAge = 0.0,
 			updateRate = 1.0 / UPDATE_INTERVAL
@@ -563,6 +596,13 @@ pcall(function()
 	function LuaExportAfterNextFrame()
 		local now = LoGetModelTime()
 		if not now then now = os.clock() end
+
+		-- Check for live commands from forwarder every COMMAND_CHECK_INTERVAL seconds
+		if now - lastCommandCheck >= COMMAND_CHECK_INTERVAL then
+			check_live_commands()
+			lastCommandCheck = now
+		end
+
 		if now - lastWrite >= UPDATE_INTERVAL then
 			local telemetry = collect_telemetry()
 			write_json(telemetry)
