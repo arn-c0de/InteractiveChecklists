@@ -595,39 +595,49 @@ fun MapNavigationDisplay(
                                         }
                                         val turnMultiplier = if (mapState.patternDirection == PatternDirection.LEFT_HAND) -1 else 1
                                         val selectedRwy = mapState.selectedRunway
-                                        val baseHdg = (selectedRwy?.headingDeg ?: extractRunwayHeading(selectedRwy?.name ?: "") ?: 0.0).toInt()
+                                        val runwayHeading = (selectedRwy?.headingDeg ?: extractRunwayHeading(selectedRwy?.name ?: "") ?: 0.0)
+
+                                        // Compute canonical headings for each leg using runwayHeading and turn direction
+                                        val departureHdg = normalizeHeading(runwayHeading)
+                                        val crosswindHdg = normalizeHeading(runwayHeading + (90.0 * turnMultiplier))
+                                        val downwindHdg = normalizeHeading(runwayHeading + 180.0)
+                                        val baseLegHdg = normalizeHeading(downwindHdg + (90.0 * turnMultiplier))
+                                        val finalHdg = normalizeHeading(runwayHeading)
+
+                                        val departureHdgInt = departureHdg.toInt()
+                                        val crosswindHdgInt = crosswindHdg.toInt()
+                                        val downwindHdgInt = downwindHdg.toInt()
+                                        val baseLegHdgInt = baseLegHdg.toInt()
+                                        val finalHdgInt = finalHdg.toInt()
 
                                         Text(
-                                            text = "• Departure: HDG ${String.format("%03d", baseHdg)}° • ${String.format("%.1f", 0.5 * sizeScale)} NM",
+                                            text = "• Departure: HDG ${String.format("%03d", departureHdgInt)}° • ${String.format("%.1f", 0.5 * sizeScale)} NM",
                                             style = MaterialTheme.typography.bodySmall,
                                             fontFamily = FontFamily.Monospace,
                                             fontSize = 11.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
 
-                                        val crosswindHdg = (baseHdg + (90 * turnMultiplier) + 360) % 360
                                         Text(
-                                            text = "• Crosswind: HDG ${String.format("%03d", crosswindHdg)}° • ${String.format("%.1f", mapState.patternSize.downwindDistanceNm * sizeScale)} NM",
+                                            text = "• Crosswind: HDG ${String.format("%03d", crosswindHdgInt)}° • ${String.format("%.1f", mapState.patternSize.downwindDistanceNm * sizeScale)} NM",
                                             style = MaterialTheme.typography.bodySmall,
                                             fontFamily = FontFamily.Monospace,
                                             fontSize = 11.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
 
-                                        val downwindHdg = (baseHdg + 180) % 360
                                         val downwindLengthNm = (selectedRwy?.lengthM?.toDouble() ?: 2000.0) / 1852.0 + mapState.patternFinalDistanceNm + (0.5 * sizeScale)
                                         Text(
-                                            text = "• Downwind: HDG ${String.format("%03d", downwindHdg)}° • ${String.format("%.1f", downwindLengthNm)} NM",
+                                            text = "• Downwind: HDG ${String.format("%03d", downwindHdgInt)}° • ${String.format("%.1f", downwindLengthNm)} NM",
                                             style = MaterialTheme.typography.bodySmall,
                                             fontFamily = FontFamily.Monospace,
                                             fontSize = 11.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
 
-                                        val baseHdgValue = (baseHdg + (270 * turnMultiplier) + 360) % 360
                                         val baseExtensionNm = (0.3 + (mapState.patternFinalDistanceNm * 0.2)) * sizeScale
                                         Text(
-                                            text = "• Base: HDG ${String.format("%03d", baseHdgValue)}° • ${String.format("%.1f", mapState.patternSize.downwindDistanceNm * sizeScale)} NM (turn at ${String.format("%.1f", baseExtensionNm)} NM)",
+                                            text = "• Base: HDG ${String.format("%03d", baseLegHdgInt)}° • ${String.format("%.1f", mapState.patternSize.downwindDistanceNm * sizeScale)} NM (turn at ${String.format("%.1f", baseExtensionNm)} NM)",
                                             style = MaterialTheme.typography.bodySmall,
                                             fontFamily = FontFamily.Monospace,
                                             fontSize = 11.sp,
@@ -635,7 +645,7 @@ fun MapNavigationDisplay(
                                         )
 
                                         Text(
-                                            text = "• Final: HDG ${String.format("%03d", baseHdg)}° • ${String.format("%.1f", mapState.patternFinalDistanceNm)} NM",
+                                            text = "• Final: HDG ${String.format("%03d", finalHdgInt)}° • ${String.format("%.1f", mapState.patternFinalDistanceNm)} NM",
                                             style = MaterialTheme.typography.bodySmall,
                                             fontFamily = FontFamily.Monospace,
                                             fontSize = 11.sp,
@@ -864,4 +874,13 @@ private fun extractRunwayHeading(runwayName: String?): Double? {
     // Extract first 2 digits from runway name (e.g., "09L" -> 09, "27R" -> 27)
     val headingStr = runwayName.take(2)
     return headingStr.toIntOrNull()?.let { it * 10.0 }
+}
+
+/**
+ * Normalize heading to 0..360
+ */
+private fun normalizeHeading(heading: Double): Double {
+    var h = heading % 360.0
+    if (h < 0) h += 360.0
+    return h
 }
