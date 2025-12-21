@@ -128,6 +128,9 @@ interface RunwayDao {
     @Query("SELECT * FROM runways WHERE location_id = :locationId ORDER BY name")
     fun getRunwaysByLocation(locationId: Int): Flow<List<RunwayEntity>>
     
+    @Query("SELECT * FROM runways WHERE location_id = :locationId ORDER BY name")
+    suspend fun getRunwaysByLocationSync(locationId: Int): List<RunwayEntity>
+    
     @Query("SELECT * FROM runways WHERE id = :id")
     suspend fun getRunwayById(id: Int): RunwayEntity?
     
