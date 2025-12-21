@@ -91,87 +91,17 @@ fun MapViewer(
     val isConnected by dataPadManager.isConnected.collectAsState()
     val datapadEnabled by dataPadManager.isEnabled.collectAsState()
 
-    var mapView by remember { mutableStateOf<MapView?>(null) }
-    var positionMarker by remember { mutableStateOf<Marker?>(null) }
+    // State holder for all MapViewer state
+    val mapState = rememberMapViewerState()
+    
     // Load previous map state from preferences
     val prefsManager = remember { com.example.checklist_interactive.data.prefs.PreferencesManager(context) }
     val savedCenter = remember { prefsManager.getMapCenter() }
     val savedZoom = remember { prefsManager.getMapZoom() }
-    var autoCenter by remember { mutableStateOf(if (savedCenter != null) prefsManager.isMapAutoCenterEnabled() else true) }
-    var showLayerDialog by remember { mutableStateOf(false) }
-    var showOverlayDialog by remember { mutableStateOf(false) }
-    var compassEnabled by remember { mutableStateOf(prefsManager.isMapOverlayCompassEnabled()) }
-    var rangeRingsEnabled by remember { mutableStateOf(prefsManager.isMapOverlayRangeRingsEnabled()) }
-    var rangeRingsMaxNm by remember { mutableStateOf(prefsManager.getMapOverlayRangeRingsMaxNm()) }
-    var mgrsGridEnabled by remember { mutableStateOf(prefsManager.isMapOverlayMgrsGridEnabled()) }
-    var compassOverlay by remember { mutableStateOf<org.osmdroid.views.overlay.Overlay?>(null) }
-    var headingSpeedLineOverlay by remember { mutableStateOf<org.osmdroid.views.overlay.Overlay?>(null) }
-    var rangeRingsOverlay by remember { mutableStateOf<org.osmdroid.views.overlay.Overlay?>(null) }
-    var mgrsGridOverlay by remember { mutableStateOf<org.osmdroid.views.overlay.Overlay?>(null) }
-    var showQuickAccess by remember { mutableStateOf(false) }
-    var showDataPad by remember { mutableStateOf(false) }
-    var showMarkerRouteManagement by remember { mutableStateOf(false) }
-    var showRouteCreation by remember { mutableStateOf(false) }
-    var showMilitarySymbolPicker by remember { mutableStateOf(false) }
-    
-    // Map rotation mode: 0 = North-up, 1 = HDG-up (follow aircraft heading)
-    var mapRotationMode by remember { mutableStateOf(0) }
-
-    // Active navigation target
-    var activeNavigationTarget by remember { mutableStateOf<com.example.checklist_interactive.data.tactical.LocationEntity?>(null) }
-    var navigationLine by remember { mutableStateOf<org.osmdroid.views.overlay.Polyline?>(null) }
-    var navigationDistanceNm by remember { mutableStateOf<Double?>(null) }
-    var navigationHeading by remember { mutableStateOf<Double?>(null) }
-
-    // Runway approach mode
-    var showRunwayApproach by remember { mutableStateOf(false) }
-    var targetRunways by remember { mutableStateOf<List<com.example.checklist_interactive.data.tactical.RunwayEntity>>(emptyList()) }
-    var runwayApproachLines by remember { mutableStateOf<List<org.osmdroid.views.overlay.Polyline>>(emptyList()) }
-    var selectedRunwayIndex by remember { mutableStateOf<Int?>(null) }
-    var originalAirportTarget by remember { mutableStateOf<com.example.checklist_interactive.data.tactical.LocationEntity?>(null) }
-    var selectedRunwayHeading by remember { mutableStateOf<Double?>(null) }
-    var finalApproachDistanceNm by remember { mutableStateOf(5.0) }
-    var selectedRunway by remember { mutableStateOf<com.example.checklist_interactive.data.tactical.RunwayEntity?>(null) }
-
-    // Traffic pattern mode
-    var showTrafficPattern by remember { mutableStateOf(false) }
-    var trafficPatternPolyline by remember { mutableStateOf<org.osmdroid.views.overlay.Polyline?>(null) }
-    var trafficPatternLabelOverlay by remember { mutableStateOf<PatternLabelOverlay?>(null) }
-    var patternSize by remember { mutableStateOf(PatternSize.NORMAL) }
-    var patternDirection by remember { mutableStateOf(PatternDirection.LEFT_HAND) }
-    var patternFinalDistanceNm by remember { mutableStateOf(1.0) } // Configurable final approach length
-    // Collapsible details
-    var showPatternDetails by remember { mutableStateOf(true) }
-    // Collapsible navigation display
-    var showNavigationDetails by remember { mutableStateOf(true) }
-
-    // Military symbol placement state
-    var pendingSymbolPlacement by remember { mutableStateOf<Pair<MilitarySymbol, SymbolAffiliation>?>(null) }
 
     // Pending move marker id (driven by MapActionBus)
     val pendingMoveMarkerIdFlow = MapActionBus.pendingMoveMarkerId
     val pendingMoveMarkerId by pendingMoveMarkerIdFlow.collectAsState(initial = null)
-
-    var pendingMoveTargetName by remember { mutableStateOf<String?>(null) }
-    
-    // Store last valid player position to prevent reset during recompositions
-    var lastValidPlayerPosition by remember { mutableStateOf<GeoPoint?>(null) }
-    // Store last processed timestamp to prevent accepting old/cached data
-    var lastProcessedTimestamp by remember { mutableStateOf<String?>(null) }
-
-    // Selected location for marker details in management sheet
-    var selectedLocation by remember { mutableStateOf<com.example.checklist_interactive.data.tactical.LocationEntity?>(null) }
-    var selectedRunways by remember { mutableStateOf<List<com.example.checklist_interactive.data.tactical.RunwayEntity>>(emptyList()) }
-
-    // Radial menu state
-    var radialMenuVisible by remember { mutableStateOf(false) }
-    var radialMenuX by remember { mutableStateOf(0) }
-    var radialMenuY by remember { mutableStateOf(0) }
-    var radialMenuMarker by remember { mutableStateOf<com.example.checklist_interactive.data.tactical.LocationEntity?>(null) }
-
-    // Track last long-pressed marker to suppress immediately following click
-    var lastLongPressedMarkerId by remember { mutableStateOf<Int?>(null) }
-    var lastLongPressTime by remember { mutableStateOf(0L) }
 
     // Map from Marker object to LocationEntity to robustly find marker data
     val markerToLocation = remember { mutableMapOf<org.osmdroid.views.overlay.Marker, com.example.checklist_interactive.data.tactical.LocationEntity>() }
@@ -182,11 +112,8 @@ fun MapViewer(
     // Density for dp<->px conversions needed by effects below
     val density = androidx.compose.ui.platform.LocalDensity.current
     
-    // Initialize tactical database and repositories (async to avoid blocking UI)
-    var tacticalDb by remember { mutableStateOf<com.example.checklist_interactive.data.tactical.TacticalDatabase?>(null) }
-    var dbInitFailed by remember { mutableStateOf(false) }
-    var dbInitError by remember { mutableStateOf<String?>(null) }
-    val dbReady = tacticalDb != null
+    // DB ready state
+    val dbReady = mapState.tacticalDb != null
 
     // Initialize DB off the main thread to avoid long blocking operations during composition
     LaunchedEffect(Unit) {
@@ -200,55 +127,51 @@ fun MapViewer(
                 }
                 android.util.Log.d("MapViewer", "TacticalDatabase.getInstance() completed successfully")
                 withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    tacticalDb = db
+                    mapState.tacticalDb = db
                     android.util.Log.d("MapViewer", "TacticalDatabase assigned to state variable - DB ready!")
                 }
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
                 android.util.Log.e("MapViewer", "TacticalDatabase initialization timed out after 10 seconds", e)
                 withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    dbInitFailed = true
-                    dbInitError = "Zeitüberschreitung beim Laden der Datenbank"
+                    mapState.dbInitFailed = true
+                    mapState.dbInitError = "Zeitüberschreitung beim Laden der Datenbank"
                 }
             } catch (e: Exception) {
                 android.util.Log.e("MapViewer", "Failed to initialize TacticalDatabase", e)
                 e.printStackTrace()
                 withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    dbInitFailed = true
-                    dbInitError = e.message ?: "Unbekannter Fehler"
+                    mapState.dbInitFailed = true
+                    mapState.dbInitError = e.message ?: "Unbekannter Fehler"
                 }
             }
         }
     }
 
     // Repositories and viewmodels are created when DB is available
-    val locationRepository = remember(tacticalDb) { 
-        tacticalDb?.let { 
+    val locationRepository = remember(mapState.tacticalDb) { 
+        mapState.tacticalDb?.let { 
             android.util.Log.d("MapViewer", "Creating LocationRepository from tacticalDb")
             com.example.checklist_interactive.data.tactical.LocationRepositoryImpl(it.locationDao()) 
         }.also {
             android.util.Log.d("MapViewer", "LocationRepository state: ${if (it != null) "READY" else "NULL"}")
         }
     }
-    val routeRepository = remember(tacticalDb) { 
-        tacticalDb?.let { 
+    val routeRepository = remember(mapState.tacticalDb) { 
+        mapState.tacticalDb?.let { 
             com.example.checklist_interactive.data.tactical.RouteRepositoryImpl(it.routeDao(), it.locationDao()) 
         }
     }
-    val markerRouteViewModel = remember(tacticalDb) { if (locationRepository != null && routeRepository != null) MarkerRouteViewModel(locationRepository, routeRepository) else null }
-    val routeCreationViewModel = remember(tacticalDb) { if (routeRepository != null && locationRepository != null && tacticalDb != null) MultiWaypointRouteViewModel(context.applicationContext as Application, routeRepository, locationRepository, tacticalDb!!.runwayDao()) else null }
+    val markerRouteViewModel = remember(mapState.tacticalDb) { if (locationRepository != null && routeRepository != null) MarkerRouteViewModel(locationRepository, routeRepository) else null }
+    val routeCreationViewModel = remember(mapState.tacticalDb) { if (routeRepository != null && locationRepository != null && mapState.tacticalDb != null) MultiWaypointRouteViewModel(context.applicationContext as Application, routeRepository, locationRepository, mapState.tacticalDb!!.runwayDao()) else null }
 
     // Combined ready state: DB AND repositories must be initialized
     val repositoriesReady = dbReady && locationRepository != null && routeRepository != null
-
-    // Track whether we've completed the initial route restoration to prevent overwriting saved state
-    var routesRestored by remember { mutableStateOf(false) }
-    var navigationRestored by remember { mutableStateOf(false) }
 
     // Load and restore visible routes from SharedPreferences when MarkerRouteViewModel becomes available
     LaunchedEffect(markerRouteViewModel) {
         // Reset flag each time the viewmodel instance changes so we don't accidentally
         // enable saving before restoration for a newly created viewmodel
-        routesRestored = false
+        mapState.routesRestored = false
 
         // Only proceed when a non-null ViewModel exists
         val vm = markerRouteViewModel
@@ -268,7 +191,7 @@ fun MapViewer(
 
         // Small delay to ensure collectors process the change before we re-enable saving
         kotlinx.coroutines.delay(50)
-        routesRestored = true
+        mapState.routesRestored = true
     }
 
     // Restore solo navigation state from SharedPreferences
@@ -277,7 +200,7 @@ fun MapViewer(
             android.util.Log.d("MapViewer", "Navigation restore deferred: dbReady=$dbReady, locationRepository=${locationRepository != null}")
             return@LaunchedEffect
         }
-        navigationRestored = false
+        mapState.navigationRestored = false
 
         val prefs = context.getSharedPreferences("map_navigation_prefs", android.content.Context.MODE_PRIVATE)
         
@@ -298,10 +221,10 @@ fun MapViewer(
                     if (airport != null) {
                         // Set the active navigation target to the airport so downstream effects will
                         // load runways and then the appropriate effect (approach or pattern) can create the temporary target.
-                        activeNavigationTarget = airport
+                        mapState.activeNavigationTarget = airport
                         // Make sure the navigation UI is shown so details & buttons appear immediately
-                        showNavigationDetails = true
-                        autoCenter = false
+                        mapState.showNavigationDetails = true
+                        mapState.autoCenter = false
                         android.util.Log.d("MapViewer", "✅ Restored navigation airport: ${airport.name} (id=$patternAirportId) for special target id=$navTargetId")
                     } else {
                         android.util.Log.w("MapViewer", "⚠️ Navigation airport with ID $patternAirportId not found in database")
@@ -319,11 +242,11 @@ fun MapViewer(
                 }
                 
                 if (target != null) {
-                    activeNavigationTarget = target
-                    originalAirportTarget = target
+                    mapState.activeNavigationTarget = target
+                    mapState.originalAirportTarget = target
                     // Make navigation UI visible immediately
-                    showNavigationDetails = true
-                    autoCenter = false
+                    mapState.showNavigationDetails = true
+                    mapState.autoCenter = false
                     android.util.Log.d("MapViewer", "✅ Restored navigation target: ${target.name} (id=$navTargetId)")
                 } else {
                     android.util.Log.w("MapViewer", "⚠️ Navigation target with ID $navTargetId not found in database")
@@ -336,41 +259,41 @@ fun MapViewer(
         }
 
         // Restore runway approach mode
-        showRunwayApproach = prefs.getBoolean("show_runway_approach", false)
-        finalApproachDistanceNm = prefs.getFloat("final_approach_distance_nm", 5.0f).toDouble()
+        mapState.showRunwayApproach = prefs.getBoolean("show_runway_approach", false)
+        mapState.finalApproachDistanceNm = prefs.getFloat("final_approach_distance_nm", 5.0f).toDouble()
         
         val selectedRwyIdx = prefs.getInt("selected_runway_index", -1)
         if (selectedRwyIdx >= 0) {
-            selectedRunwayIndex = selectedRwyIdx
+            mapState.selectedRunwayIndex = selectedRwyIdx
             android.util.Log.d("MapViewer", "Restored selected runway index: $selectedRwyIdx")
             // Runway entity will be restored via the runway-loading effect when activeNavigationTarget is set
         }
 
         // Restore traffic pattern mode
-        showTrafficPattern = prefs.getBoolean("show_traffic_pattern", false)
-        patternSize = PatternSize.fromOrdinal(prefs.getInt("pattern_size_ordinal", PatternSize.NORMAL.ordinal))
-        patternDirection = if (prefs.getBoolean("pattern_direction_left", true)) PatternDirection.LEFT_HAND else PatternDirection.RIGHT_HAND
-        patternFinalDistanceNm = prefs.getFloat("pattern_final_distance_nm", 1.0f).toDouble()
+        mapState.showTrafficPattern = prefs.getBoolean("show_traffic_pattern", false)
+        mapState.patternSize = PatternSize.fromOrdinal(prefs.getInt("pattern_size_ordinal", PatternSize.NORMAL.ordinal))
+        mapState.patternDirection = if (prefs.getBoolean("pattern_direction_left", true)) PatternDirection.LEFT_HAND else PatternDirection.RIGHT_HAND
+        mapState.patternFinalDistanceNm = prefs.getFloat("pattern_final_distance_nm", 1.0f).toDouble()
 
-        android.util.Log.d("MapViewer", "✅ Restored navigation modes: approach=$showRunwayApproach, pattern=$showTrafficPattern, patternSize=$patternSize, patternDir=$patternDirection")
+        android.util.Log.d("MapViewer", "✅ Restored navigation modes: approach=${mapState.showRunwayApproach}, pattern=${mapState.showTrafficPattern}, patternSize=${mapState.patternSize}, patternDir=${mapState.patternDirection}")
 
         kotlinx.coroutines.delay(50)
-        navigationRestored = true
+        mapState.navigationRestored = true
     }
 
     // Load runways for the selected location from the DB (only when DB is ready)
-    LaunchedEffect(selectedLocation?.id, dbReady) {
-        val locId = selectedLocation?.id
+    LaunchedEffect(mapState.selectedLocation?.id, dbReady) {
+        val locId = mapState.selectedLocation?.id
         if (!dbReady) {
-            selectedRunways = emptyList()
+            mapState.selectedRunways = emptyList()
             return@LaunchedEffect
         }
         if (locId != null) {
-            tacticalDb!!.runwayDao().getRunwaysByLocation(locId).collect { list ->
-                selectedRunways = list
+            mapState.tacticalDb!!.runwayDao().getRunwaysByLocation(locId).collect { list ->
+                mapState.selectedRunways = list
             }
         } else {
-            selectedRunways = emptyList()
+            mapState.selectedRunways = emptyList()
         }
     }
 
@@ -380,9 +303,9 @@ fun MapViewer(
     val allRoutesForRedraw by (markerRouteViewModel?.allRoutes?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList<com.example.checklist_interactive.data.tactical.RouteEntity>()) })
 
     // Save visible routes to SharedPreferences when they change (but only after initial restoration completes)
-    LaunchedEffect(visibleRouteIds, routesRestored) {
+    LaunchedEffect(visibleRouteIds, mapState.routesRestored) {
         // Skip saving during initial restoration phase to prevent overwriting saved state
-        if (!routesRestored) {
+        if (!mapState.routesRestored) {
             android.util.Log.d("MapViewer", "Skipping save - routes not yet restored")
             return@LaunchedEffect
         }
@@ -396,18 +319,18 @@ fun MapViewer(
 
     // Save navigation state when it changes (but only after initial restoration completes)
     LaunchedEffect(
-        activeNavigationTarget?.id,
-        showRunwayApproach,
-        showTrafficPattern,
-        selectedRunwayIndex,
-        finalApproachDistanceNm,
-        patternSize,
-        patternDirection,
-        patternFinalDistanceNm,
-        navigationRestored
+        mapState.activeNavigationTarget?.id,
+        mapState.showRunwayApproach,
+        mapState.showTrafficPattern,
+        mapState.selectedRunwayIndex,
+        mapState.finalApproachDistanceNm,
+        mapState.patternSize,
+        mapState.patternDirection,
+        mapState.patternFinalDistanceNm,
+        mapState.navigationRestored
     ) {
         // Skip saving during initial restoration phase
-        if (!navigationRestored) {
+        if (!mapState.navigationRestored) {
             android.util.Log.d("MapViewer", "Skipping navigation save - not yet restored")
             return@LaunchedEffect
         }
@@ -418,36 +341,36 @@ fun MapViewer(
                 // Save active navigation target. Prefer pattern sentinel if a pattern is active or requested,
                 // because activeNavigationTarget might be a temporary object and null during brief restore transitions.
                 val targetId = when {
-                    showTrafficPattern -> -2
-                    activeNavigationTarget != null -> activeNavigationTarget!!.id
+                    mapState.showTrafficPattern -> -2
+                    mapState.activeNavigationTarget != null -> mapState.activeNavigationTarget!!.id
                     else -> -999
                 }
                 putInt("active_nav_target_id", targetId)
                 
                 // Save runway approach state
-                putBoolean("show_runway_approach", showRunwayApproach)
-                putFloat("final_approach_distance_nm", finalApproachDistanceNm.toFloat())
-                putInt("selected_runway_index", selectedRunwayIndex ?: -1)
+                putBoolean("show_runway_approach", mapState.showRunwayApproach)
+                putFloat("final_approach_distance_nm", mapState.finalApproachDistanceNm.toFloat())
+                putInt("selected_runway_index", mapState.selectedRunwayIndex ?: -1)
                 
                 // Save traffic pattern state
-                putBoolean("show_traffic_pattern", showTrafficPattern)
-                putInt("pattern_size_ordinal", patternSize.ordinal)
-                putBoolean("pattern_direction_left", patternDirection == PatternDirection.LEFT_HAND)
-                putFloat("pattern_final_distance_nm", patternFinalDistanceNm.toFloat())
+                putBoolean("show_traffic_pattern", mapState.showTrafficPattern)
+                putInt("pattern_size_ordinal", mapState.patternSize.ordinal)
+                putBoolean("pattern_direction_left", mapState.patternDirection == PatternDirection.LEFT_HAND)
+                putFloat("pattern_final_distance_nm", mapState.patternFinalDistanceNm.toFloat())
                 // Save the original airport id used for pattern/approach navigation (if any)
-                putInt("pattern_airport_id", originalAirportTarget?.id ?: -999)
+                putInt("pattern_airport_id", mapState.originalAirportTarget?.id ?: -999)
                 // Backwards-compatible key used for both pattern and approach restores
-                putInt("nav_airport_id", originalAirportTarget?.id ?: -999)
+                putInt("nav_airport_id", mapState.originalAirportTarget?.id ?: -999)
                 
                 apply()
             }
-            android.util.Log.d("MapViewer", "💾 Saved navigation state: target=${activeNavigationTarget?.name}, approach=$showRunwayApproach, pattern=$showTrafficPattern, patternSize=$patternSize")
+            android.util.Log.d("MapViewer", "💾 Saved navigation state: target=${mapState.activeNavigationTarget?.name}, approach=${mapState.showRunwayApproach}, pattern=${mapState.showTrafficPattern}, patternSize=${mapState.patternSize}")
         } catch (e: Exception) {
             android.util.Log.e("MapViewer", "Failed to save navigation state", e)
         }
     }
-    LaunchedEffect(visibleRouteIds, mapView, allRoutesForRedraw) {
-        val mv = mapView ?: return@LaunchedEffect
+    LaunchedEffect(visibleRouteIds, mapState.mapView, allRoutesForRedraw) {
+        val mv = mapState.mapView ?: return@LaunchedEffect
         
         // Remove all existing route overlays (Polylines, RouteTextOverlay and route markers)
         mv.overlays.removeAll { overlay ->
@@ -557,14 +480,14 @@ fun MapViewer(
     }
 
     // Update live navigation line when flight data or target changes
-    LaunchedEffect(flightData, activeNavigationTarget, mapRotationMode) {
+    LaunchedEffect(flightData, mapState.activeNavigationTarget, mapState.mapRotationMode) {
         val data = flightData
-        val target = activeNavigationTarget
-        val map = mapView
+        val target = mapState.activeNavigationTarget
+        val map = mapState.mapView
         
         // If rotation mode is HDG-up, update map orientation to latest heading
         // Negate the heading so the player's heading direction always points up (north position on screen)
-        if (mapRotationMode == 1 && data != null && map != null) {
+        if (mapState.mapRotationMode == 1 && data != null && map != null) {
             try {
                 map.setMapOrientation(-Math.toDegrees(data.heading).toFloat()) 
                 // Ensure the player is visually placed at the top-center so the heading line points to the top center
@@ -590,7 +513,7 @@ fun MapViewer(
             // Calculate distance and heading
             val distanceMeters = playerPos.distanceToAsDouble(targetPos)
             val distanceNm = distanceMeters / 1852.0
-            navigationDistanceNm = distanceNm
+            mapState.navigationDistanceNm = distanceNm
             
             // Calculate bearing/heading
             val lat1 = Math.toRadians(playerPos.latitude)
@@ -601,62 +524,62 @@ fun MapViewer(
             val y = Math.sin(dLon) * Math.cos(lat2)
             val x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon)
             val bearing = (Math.toDegrees(Math.atan2(y, x)) + 360) % 360
-            navigationHeading = bearing
+            mapState.navigationHeading = bearing
             
             // Update or create red navigation line
             scope.launch {
-                val line = navigationLine ?: org.osmdroid.views.overlay.Polyline(map).apply {
+                val line = mapState.navigationLine ?: org.osmdroid.views.overlay.Polyline(map).apply {
                     outlinePaint.color = android.graphics.Color.argb(128, 255, 0, 0) // 50% transparent red
                     outlinePaint.strokeWidth = 10f
                     outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
                     map.overlays.add(this)
-                    navigationLine = this
+                    mapState.navigationLine = this
                 }
                 line.setPoints(listOf(playerPos, targetPos))
                 map.invalidate()
             }
-        } else if (target == null && navigationLine != null) {
+        } else if (target == null && mapState.navigationLine != null) {
             // Remove navigation line if target cleared
             scope.launch {
-                mapView?.overlays?.remove(navigationLine)
-                navigationLine = null
-                navigationDistanceNm = null
-                navigationHeading = null
-                mapView?.invalidate()
+                mapState.mapView?.overlays?.remove(mapState.navigationLine)
+                mapState.navigationLine = null
+                mapState.navigationDistanceNm = null
+                mapState.navigationHeading = null
+                mapState.mapView?.invalidate()
             }
         }
     }
 
     // Load runways for active navigation target
-    LaunchedEffect(activeNavigationTarget) {
-        val target = activeNavigationTarget
+    LaunchedEffect(mapState.activeNavigationTarget) {
+        val target = mapState.activeNavigationTarget
         // Only update original airport if it's a real location (not a temporary approach point)
         if (target != null && target.id > 0) {
-            originalAirportTarget = target
+            mapState.originalAirportTarget = target
             // Load runways from database
             val db = com.example.checklist_interactive.data.tactical.TacticalDatabase.getInstance(context, useExternalPath = false)
             db.runwayDao().getRunwaysByLocation(target.id).collect { runways ->
-                targetRunways = runways
+                mapState.targetRunways = runways
                 
                 // Restore selected runway if we have a saved index
-                val savedIdx = selectedRunwayIndex
+                val savedIdx = mapState.selectedRunwayIndex
                 if (savedIdx != null && savedIdx >= 0 && runways.isNotEmpty()) {
                     // Calculate which runway based on index (each runway has 2 directions)
                     val runwayIdx = savedIdx / 2
                     if (runwayIdx < runways.size) {
-                        selectedRunway = runways[runwayIdx]
-                        android.util.Log.d("MapViewer", "✅ Restored selected runway: ${selectedRunway?.name} (index=$savedIdx)")
+                        mapState.selectedRunway = runways[runwayIdx]
+                        android.util.Log.d("MapViewer", "✅ Restored selected runway: ${mapState.selectedRunway?.name} (index=$savedIdx)")
                     }
                 }
             }
         } else if (target == null) {
             // Navigation cleared completely
-            targetRunways = emptyList()
-            originalAirportTarget = null
-            showRunwayApproach = false
-            selectedRunwayIndex = null
-            selectedRunwayHeading = null
-            selectedRunway = null
+            mapState.targetRunways = emptyList()
+            mapState.originalAirportTarget = null
+            mapState.showRunwayApproach = false
+            mapState.selectedRunwayIndex = null
+            mapState.selectedRunwayHeading = null
+            mapState.selectedRunway = null
         }
         // If target.id == -1, it's an approach point - keep original airport and runways
     }
@@ -670,25 +593,25 @@ fun MapViewer(
     }
 
     // Draw runway approach lines when enabled
-    LaunchedEffect(showRunwayApproach, targetRunways, originalAirportTarget, mapView, finalApproachDistanceNm) {
-        val map = mapView
-        val target = originalAirportTarget
+    LaunchedEffect(mapState.showRunwayApproach, mapState.targetRunways, mapState.originalAirportTarget, mapState.mapView, mapState.finalApproachDistanceNm) {
+        val map = mapState.mapView
+        val target = mapState.originalAirportTarget
 
         // Remove existing approach lines
-        runwayApproachLines.forEach { line ->
+        mapState.runwayApproachLines.forEach { line ->
             map?.overlays?.remove(line)
         }
-        runwayApproachLines = emptyList()
+        mapState.runwayApproachLines = emptyList()
 
-        if (showRunwayApproach && target != null && map != null && targetRunways.isNotEmpty()) {
+        if (mapState.showRunwayApproach && target != null && map != null && mapState.targetRunways.isNotEmpty()) {
             val newLines = mutableListOf<org.osmdroid.views.overlay.Polyline>()
 
-            targetRunways.forEach { runway ->
+            mapState.targetRunways.forEach { runway ->
                 val heading = runway.headingDeg ?: extractRunwayHeading(runway.name) ?: 0.0
                 val center = GeoPoint(target.latitude, target.longitude)
 
                 // Calculate final approach distance in meters
-                val distanceMeters = finalApproachDistanceNm * 1852.0
+                val distanceMeters = mapState.finalApproachDistanceNm * 1852.0
 
                 // Direction 1: heading
                 val rad1 = Math.toRadians(heading)
@@ -730,16 +653,16 @@ fun MapViewer(
                 newLines.add(line2)
             }
 
-            runwayApproachLines = newLines
+            mapState.runwayApproachLines = newLines
             map.invalidate()
         }
     }
 
     // Recalculate approach point when final approach distance changes
-    LaunchedEffect(finalApproachDistanceNm, selectedRunwayIndex) {
-        val index = selectedRunwayIndex
-        val runway = selectedRunway
-        val target = originalAirportTarget
+    LaunchedEffect(mapState.finalApproachDistanceNm, mapState.selectedRunwayIndex) {
+        val index = mapState.selectedRunwayIndex
+        val runway = mapState.selectedRunway
+        val target = mapState.originalAirportTarget
 
         if (index != null && runway != null && target != null) {
             // Determine if it's direction 1 or direction 2
@@ -752,7 +675,7 @@ fun MapViewer(
             }
 
             // Recalculate approach endpoint with new distance
-            val distanceMeters = finalApproachDistanceNm * 1852.0
+            val distanceMeters = mapState.finalApproachDistanceNm * 1852.0
             val rad = Math.toRadians(heading)
             val lat1 = Math.toRadians(target.latitude)
             val lon1 = Math.toRadians(target.longitude)
@@ -769,21 +692,21 @@ fun MapViewer(
                 latitude = endpoint.latitude,
                 longitude = endpoint.longitude
             )
-            activeNavigationTarget = approachTarget
-            selectedRunwayHeading = heading
+            mapState.activeNavigationTarget = approachTarget
+            mapState.selectedRunwayHeading = heading
         }
     }
 
     // Generate and draw traffic pattern when enabled
-    LaunchedEffect(showTrafficPattern, selectedRunway, mapView, patternSize, patternDirection, originalAirportTarget, patternFinalDistanceNm) {
-        val mv = mapView ?: return@LaunchedEffect
-        val runway = selectedRunway ?: return@LaunchedEffect
-        val target = originalAirportTarget ?: return@LaunchedEffect
+    LaunchedEffect(mapState.showTrafficPattern, mapState.selectedRunway, mapState.mapView, mapState.patternSize, mapState.patternDirection, mapState.originalAirportTarget, mapState.patternFinalDistanceNm) {
+        val mv = mapState.mapView ?: return@LaunchedEffect
+        val runway = mapState.selectedRunway ?: return@LaunchedEffect
+        val target = mapState.originalAirportTarget ?: return@LaunchedEffect
         
-        if (showTrafficPattern) {
+        if (mapState.showTrafficPattern) {
             // Remove old pattern overlays
-            trafficPatternPolyline?.let { mv.overlays.remove(it) }
-            trafficPatternLabelOverlay?.let { mv.overlays.remove(it) }
+            mapState.trafficPatternPolyline?.let { mv.overlays.remove(it) }
+            mapState.trafficPatternLabelOverlay?.let { mv.overlays.remove(it) }
             
             // Extract runway heading from name or use provided heading
             val runwayHeading = runway.headingDeg ?: extractRunwayHeading(runway.name) ?: 0.0
@@ -798,9 +721,9 @@ fun MapViewer(
                 runwayThreshold = runwayThreshold,
                 runwayHeading = runwayHeading,
                 runwayLengthMeters = runwayLengthMeters,
-                patternSize = patternSize,
-                direction = patternDirection,
-                finalDistanceNm = patternFinalDistanceNm
+                patternSize = mapState.patternSize,
+                direction = mapState.patternDirection,
+                finalDistanceNm = mapState.patternFinalDistanceNm
             )
             
             // Create and add pattern polyline
@@ -810,17 +733,17 @@ fun MapViewer(
                 width = 5f
             )
             mv.overlays.add(polyline)
-            trafficPatternPolyline = polyline
+            mapState.trafficPatternPolyline = polyline
             
             // Create and add pattern labels with distance and heading information
             val labels = TrafficPatternGenerator.generatePatternLabels(
                 points = patternPoints,
-                direction = patternDirection,
+                direction = mapState.patternDirection,
                 runwayHeading = runwayHeading
             )
             val labelOverlay = PatternLabelOverlay(labels)
             mv.overlays.add(labelOverlay)
-            trafficPatternLabelOverlay = labelOverlay
+            mapState.trafficPatternLabelOverlay = labelOverlay
             
             // Set navigation target to runway threshold (landing point)
             // This creates a red line from current position to the pattern landing point
@@ -830,37 +753,37 @@ fun MapViewer(
                 latitude = runwayThreshold.latitude,
                 longitude = runwayThreshold.longitude
             )
-            activeNavigationTarget = patternTarget
+            mapState.activeNavigationTarget = patternTarget
             // Ensure UI appears when pattern is generated
-            showNavigationDetails = true
-            autoCenter = false
+            mapState.showNavigationDetails = true
+            mapState.autoCenter = false
             
             mv.invalidate()
         } else {
             // Remove pattern overlays when disabled
-            trafficPatternPolyline?.let { 
+            mapState.trafficPatternPolyline?.let { 
                 mv.overlays.remove(it)
-                trafficPatternPolyline = null
+                mapState.trafficPatternPolyline = null
             }
-            trafficPatternLabelOverlay?.let {
+            mapState.trafficPatternLabelOverlay?.let {
                 mv.overlays.remove(it)
-                trafficPatternLabelOverlay = null
+                mapState.trafficPatternLabelOverlay = null
             }
             // Clear navigation if it was pattern navigation (id = -2)
-            if (activeNavigationTarget?.id == -2) {
-                activeNavigationTarget = null
+            if (mapState.activeNavigationTarget?.id == -2) {
+                mapState.activeNavigationTarget = null
             }
             mv.invalidate()
         }
     }
 
     // Update position marker when flight data changes
-    LaunchedEffect(flightData, autoCenter) {
+    LaunchedEffect(flightData, mapState.autoCenter) {
         val data = flightData
-        val marker = positionMarker
-        val map = mapView
+        val marker = mapState.positionMarker
+        val map = mapState.mapView
 
-        Log.d(TAG, "LaunchedEffect triggered: data=$data, marker=$marker, map=$map, autoCenter=$autoCenter")
+        Log.d(TAG, "LaunchedEffect triggered: data=$data, marker=$marker, map=$map, autoCenter=${mapState.autoCenter}")
 
         if (data != null && marker != null && map != null) {
             val lat = data.latitude
@@ -871,7 +794,7 @@ fun MapViewer(
             // Validate timestamp to prevent old/cached data from resetting position
             val currentTimestamp = data.timestamp
             // local stable copy to avoid smart-cast / delegated-property issues
-            val lastTs = lastProcessedTimestamp
+            val lastTs = mapState.lastProcessedTimestamp
             if (currentTimestamp != null && lastTs != null) {
                 try {
                     val curInst = java.time.Instant.parse(currentTimestamp)
@@ -891,11 +814,11 @@ fun MapViewer(
 
             if (lat != 0.0 && lon != 0.0) {
                 // Update last processed timestamp if available
-                if (currentTimestamp != null) lastProcessedTimestamp = currentTimestamp
+                if (currentTimestamp != null) mapState.lastProcessedTimestamp = currentTimestamp
                 val newPosition = GeoPoint(lat, lon)
                 Log.d(TAG, "✅ Accepted data with timestamp=$currentTimestamp")
                 // Store as last valid position to prevent reset
-                lastValidPlayerPosition = newPosition
+                mapState.lastValidPlayerPosition = newPosition
                 marker.position = newPosition
                 // use center anchor so rotation pivots around icon center
                 marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
@@ -907,7 +830,7 @@ fun MapViewer(
                 // Adjust rotation: apply rotationOffset to compensate for emoji's default orientation
                 // 45° = 135° (previous) - 90° (to compensate for emoji default orientation)
                 val rotationOffset = 45f
-                val computedRotation = if (mapRotationMode == 1) {
+                val computedRotation = if (mapState.mapRotationMode == 1) {
                     // HDG-up mode: constant rotation (map rotates, icon stays pointing up)
                     rotationOffset
                 } else {
@@ -915,7 +838,7 @@ fun MapViewer(
                     (rotationOffset - headingDeg + 360f) % 360f
                 }
                 marker.rotation = computedRotation
-                Log.d(TAG, "headingDeg=$headingDeg rotationOffset=$rotationOffset computedRotation=$computedRotation mapRotationMode=$mapRotationMode")
+                Log.d(TAG, "headingDeg=$headingDeg rotationOffset=$rotationOffset computedRotation=$computedRotation mapRotationMode=${mapState.mapRotationMode}")
                 try {
                     val color = if (isDarkTheme) android.graphics.Color.WHITE else android.graphics.Color.BLACK
                     // rely on Marker.rotation for rotation; use unrotated bitmap
@@ -938,7 +861,7 @@ fun MapViewer(
                 marker.title = data.aircraft
 
                 // Auto-center map on position if enabled
-                if (autoCenter) {
+                if (mapState.autoCenter) {
                     Log.d(TAG, "Auto-centering enabled, animating to: $lat,$lon")
                     lastProgrammaticMove.value = System.currentTimeMillis()
                     map.controller.animateTo(newPosition)
@@ -949,18 +872,18 @@ fun MapViewer(
                 // Update overlays (compass + heading line + range rings)
                 try {
                     // compass overlay (fixed size, scales with zoom)
-                    (compassOverlay as? CompassOverlay)?.let { co ->
+                    (mapState.compassOverlay as? CompassOverlay)?.let { co ->
                         co.center = GeoPoint(lat, lon)
                         co.heading = headingDeg
                     }
                     // heading speed line overlay (length scales with speed)
-                    (headingSpeedLineOverlay as? HeadingSpeedLineOverlay)?.let { hsl ->
+                    (mapState.headingSpeedLineOverlay as? HeadingSpeedLineOverlay)?.let { hsl ->
                         hsl.center = GeoPoint(lat, lon)
                         hsl.heading = headingDeg
                         hsl.speedKts = speedKts
                     }
                     // range rings center
-                    (rangeRingsOverlay as? RangeRingsOverlay)?.let { rr ->
+                    (mapState.rangeRingsOverlay as? RangeRingsOverlay)?.let { rr ->
                         rr.center = GeoPoint(lat, lon)
                         rr.heading = headingDeg
                         // pass through speed for scaling the heading radial
@@ -991,7 +914,7 @@ fun MapViewer(
     val fabMarginPx = with(density) { 12.dp.roundToPx() }
 
     // Determine initial center/zoom: prefer last valid player position, then saved values, fall back to latest flightData, then default
-    val initialCenter: GeoPoint? = lastValidPlayerPosition
+    val initialCenter: GeoPoint? = mapState.lastValidPlayerPosition
         ?: savedCenter?.let { GeoPoint(it.first, it.second) }
         ?: flightData?.let { if (it.latitude != 0.0 && it.longitude != 0.0) GeoPoint(it.latitude, it.longitude) else null }
     val initialZoom: Double = savedZoom ?: 8.0
@@ -1032,9 +955,9 @@ fun MapViewer(
                     // Set initial view using saved or fallback values (no animation)
                     controller.setZoom(initialZoom)
                     // Only set initial center if we don't have a last valid player position (prevents reset)
-                    if (lastValidPlayerPosition == null && initialCenter != null) {
+                    if (mapState.lastValidPlayerPosition == null && initialCenter != null) {
                         controller.setCenter(initialCenter)
-                    } else if (lastValidPlayerPosition == null) {
+                    } else if (mapState.lastValidPlayerPosition == null) {
                         controller.setCenter(GeoPoint(48.0, 11.0))
                     }
 
@@ -1045,7 +968,7 @@ fun MapViewer(
                         // anchor center for correct rotation and pivot
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                         // Use last valid position if available, prevents reset
-                        lastValidPlayerPosition?.let { position = it }
+                        mapState.lastValidPlayerPosition?.let { position = it }
 
                         // initial plane icon
                         try {
@@ -1057,12 +980,12 @@ fun MapViewer(
                     }
 
                     overlays.add(marker)
-                    positionMarker = marker
+                    mapState.positionMarker = marker
                     
                     // Map click handler for symbol placement
                     val mapEventsReceiver = object : org.osmdroid.events.MapEventsReceiver {
                         override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
-                            Log.d(TAG, "singleTapConfirmedHelper called at $p, pendingMoveMarkerId=$pendingMoveMarkerId, pendingSymbolPlacement=${pendingSymbolPlacement != null}")
+                            Log.d(TAG, "singleTapConfirmedHelper called at $p, pendingMoveMarkerId=$pendingMoveMarkerId, pendingSymbolPlacement=${mapState.pendingSymbolPlacement != null}")
                             
                             p?.let { geoPoint ->
                                 // 1) If a move is pending, use this tap to set new coords for that marker
@@ -1071,7 +994,7 @@ fun MapViewer(
                                     scope.launch {
                                         try {
                                             // Get current DB and create repository fresh to avoid stale captures
-                                            val db = tacticalDb
+                                            val db = mapState.tacticalDb
                                             if (db == null) {
                                                 Log.e(TAG, "TacticalDatabase is null, cannot move marker")
                                                 return@launch
@@ -1093,7 +1016,7 @@ fun MapViewer(
                                 }
 
                                 // 2) Normal symbol placement flow
-                                val symbolPlacement = pendingSymbolPlacement
+                                val symbolPlacement = mapState.pendingSymbolPlacement
                                 if (symbolPlacement != null) {
                                     val (symbol, affiliation) = symbolPlacement
                                     Log.d(TAG, "Placing military symbol: ${symbol.name} at ${geoPoint.latitude}, ${geoPoint.longitude}")
@@ -1119,7 +1042,7 @@ fun MapViewer(
                                             )
 
                                             // Get current DB and create repository fresh to avoid stale captures
-                                            val db = tacticalDb
+                                            val db = mapState.tacticalDb
                                             if (db == null) {
                                                 Log.e(TAG, "TacticalDatabase is null, cannot save marker")
                                                 // Notify user that DB is not ready and leave the placement pending so they can try again
@@ -1134,7 +1057,7 @@ fun MapViewer(
                                             val repo = com.example.checklist_interactive.data.tactical.LocationRepositoryImpl(db.locationDao())
                                             val insertedId = repo.saveLocation(newLocation)
                                             // Only clear the pending placement after save succeeds to avoid losing the user's intent
-                                            pendingSymbolPlacement = null
+                                            mapState.pendingSymbolPlacement = null
 
                                             Log.d(TAG, "Successfully placed military symbol: ${symbol.name} at ${geoPoint.latitude}, ${geoPoint.longitude} (id=$insertedId)")
                                         } catch (e: Exception) {
@@ -1154,7 +1077,7 @@ fun MapViewer(
                     val mapEventsOverlay = org.osmdroid.views.overlay.MapEventsOverlay(mapEventsReceiver)
                     overlays.add(0, mapEventsOverlay) // Add at index 0 so it processes events first
                     
-                    mapView = this
+                    mapState.mapView = this
 
                     // Touch listener: detect long-press on markers and mark user touch to disable auto-center
                     try {
@@ -1172,7 +1095,7 @@ fun MapViewer(
                                     MotionEvent.ACTION_DOWN -> {
                                         lastUserTouch.value = System.currentTimeMillis()
                                         prefsManager.setMapAutoCenter(false)
-                                        scope.launch { autoCenter = false }
+                                        scope.launch { mapState.autoCenter = false }
 
                                         downX = ev.x
                                         downY = ev.y
@@ -1192,7 +1115,7 @@ fun MapViewer(
                                                     val radiusPx = (with(density) { 40.dp.toPx() }).toInt()
 
                                                     for (o in overlays) {
-                                                        if (o is org.osmdroid.views.overlay.Marker && o != positionMarker) {
+                                                        if (o is org.osmdroid.views.overlay.Marker && o != mapState.positionMarker) {
                                                             val p = android.graphics.Point()
                                                             projection.toPixels(o.position, p)
                                                             val dx = p.x - touchX
@@ -1253,13 +1176,13 @@ fun MapViewer(
                                                             // Show radial menu at adjusted coordinates
                                                             scope.launch {
                                                                 Log.d(TAG, "Setting radialMenu state: marker=${loc.name}, pos=($windowX,$adjY)")
-                                                                radialMenuMarker = loc
-                                                                radialMenuX = windowX
-                                                                radialMenuY = adjY
-                                                                radialMenuVisible = true
-                                                                lastLongPressedMarkerId = loc.id
-                                                                lastLongPressTime = System.currentTimeMillis()
-                                                                Log.d(TAG, "RadialMenu state set: visible=$radialMenuVisible, marker=${radialMenuMarker?.name}")
+                                                                mapState.radialMenuMarker = loc
+                                                                mapState.radialMenuX = windowX
+                                                                mapState.radialMenuY = adjY
+                                                                mapState.radialMenuVisible = true
+                                                                mapState.lastLongPressedMarkerId = loc.id
+                                                                mapState.lastLongPressTime = System.currentTimeMillis()
+                                                                Log.d(TAG, "RadialMenu state set: visible=${mapState.radialMenuVisible}, marker=${mapState.radialMenuMarker?.name}")
                                                             }
                                                         } else {
                                                             Log.d(TAG, "Long-press found nearest marker but could not resolve LocationEntity")
@@ -1309,7 +1232,7 @@ fun MapViewer(
                                     // Use coroutine scope to properly update Compose state
                                     scope.launch {
                                         Log.d(TAG, "User scroll - disabling autoCenter via scope.launch")
-                                        autoCenter = false
+                                        mapState.autoCenter = false
                                     }
                                     return true
                                 }
@@ -1340,18 +1263,18 @@ fun MapViewer(
         // Only apply theme-based tile source when user hasn't explicitly chosen one
         LaunchedEffect(isDarkTheme, savedTileId) {
             if (savedTileId == null) {
-                mapView?.setTileSource(if (isDarkTheme) darkTile else TileSourceFactory.MAPNIK)
+                mapState.mapView?.setTileSource(if (isDarkTheme) darkTile else TileSourceFactory.MAPNIK)
             }
         }
         
         // Load and display markers from database
-        LaunchedEffect(mapView, locationRepository) {
-            if (mapView != null && locationRepository != null) {
+        LaunchedEffect(mapState.mapView, locationRepository) {
+            if (mapState.mapView != null && locationRepository != null) {
                 val locFlow = locationRepository.getAllLocations()
                 locFlow.collect { markers ->
-                    mapView?.let { mv ->
+                    mapState.mapView?.let { mv ->
                         // Remove existing marker overlays (except position marker)
-                        mv.overlays.removeAll { it is org.osmdroid.views.overlay.Marker && it != positionMarker }
+                        mv.overlays.removeAll { it is org.osmdroid.views.overlay.Marker && it != mapState.positionMarker }
                         // Clear mapping to avoid holding stale references
                         markerToLocation.clear()
 
@@ -1467,13 +1390,13 @@ fun MapViewer(
                             // Attach click listener
                             osmMarker.setOnMarkerClickListener(object : org.osmdroid.views.overlay.Marker.OnMarkerClickListener {
                                 override fun onMarkerClick(markerView: org.osmdroid.views.overlay.Marker?, mapView: org.osmdroid.views.MapView?): Boolean {
-                                    if (lastLongPressedMarkerId == marker.id && System.currentTimeMillis() - lastLongPressTime < 1000L) {
-                                        lastLongPressedMarkerId = null
+                                    if (mapState.lastLongPressedMarkerId == marker.id && System.currentTimeMillis() - mapState.lastLongPressTime < 1000L) {
+                                        mapState.lastLongPressedMarkerId = null
                                         return true
                                     }
 
-                                    selectedLocation = marker
-                                    showMarkerRouteManagement = true
+                                    mapState.selectedLocation = marker
+                                    mapState.showMarkerRouteManagement = true
 
                                     (context as? android.app.Activity)?.runOnUiThread {
                                         lastProgrammaticMove.value = System.currentTimeMillis()
@@ -1510,14 +1433,14 @@ fun MapViewer(
                         // We have a live position — try to center immediately on UI thread
                         (context as? android.app.Activity)?.runOnUiThread {
                             lastProgrammaticMove.value = System.currentTimeMillis()
-                            mapView?.controller?.animateTo(GeoPoint(data.latitude, data.longitude))
-                            mapView?.invalidate()
+                            mapState.mapView?.controller?.animateTo(GeoPoint(data.latitude, data.longitude))
+                            mapState.mapView?.invalidate()
                         }
                         pendingCenter.value = null
-                        autoCenter = true
+                        mapState.autoCenter = true
                         prefsManager.setMapAutoCenter(true)
                         prefsManager.setMapCenter(data.latitude, data.longitude)
-                        Log.d(TAG, "Center FAB pressed — centering to live position ${data.latitude},${data.longitude}, autoCenter=$autoCenter")
+                        Log.d(TAG, "Center FAB pressed — centering to live position ${data.latitude},${data.longitude}, autoCenter=${mapState.autoCenter}")
                     } else {
                         // No live position yet — try to fall back to last saved center, or remember to center later
                         val saved = prefsManager.getMapCenter()
@@ -1525,32 +1448,32 @@ fun MapViewer(
                             val gp = GeoPoint(saved.first, saved.second)
                             (context as? android.app.Activity)?.runOnUiThread {
                                 lastProgrammaticMove.value = System.currentTimeMillis()
-                                mapView?.controller?.animateTo(gp)
-                                mapView?.invalidate()
+                                mapState.mapView?.controller?.animateTo(gp)
+                                mapState.mapView?.invalidate()
                             }
-                            autoCenter = true
+                            mapState.autoCenter = true
                             prefsManager.setMapAutoCenter(true)
-                            Log.d(TAG, "Center FAB pressed — centering to saved position ${saved.first},${saved.second}, autoCenter=$autoCenter")
+                            Log.d(TAG, "Center FAB pressed — centering to saved position ${saved.first},${saved.second}, autoCenter=${mapState.autoCenter}")
                         } else {
                             // no center available — remember to center once we get a valid position
                             pendingCenter.value = null // will be set when new data arrives in the flight-data effect
-                            autoCenter = true
+                            mapState.autoCenter = true
                             prefsManager.setMapAutoCenter(true)
-                            Log.d(TAG, "Center FAB pressed — no position available yet, will enable auto-centering for future updates, autoCenter=$autoCenter")
+                            Log.d(TAG, "Center FAB pressed — no position available yet, will enable auto-centering for future updates, autoCenter=${mapState.autoCenter}")
                         }
                     }
                 },
-                onLayerSelection = { showLayerDialog = true },
-                onOverlaySelection = { showOverlayDialog = true },
-                onAddMilitarySymbol = { if (repositoriesReady) showMilitarySymbolPicker = true },
-                onMarkerRouteManagement = { if (repositoriesReady) showMarkerRouteManagement = true },
+                onLayerSelection = { mapState.showLayerDialog = true },
+                onOverlaySelection = { mapState.showOverlayDialog = true },
+                onAddMilitarySymbol = { if (repositoriesReady) mapState.showMilitarySymbolPicker = true },
+                onMarkerRouteManagement = { if (repositoriesReady) mapState.showMarkerRouteManagement = true },
                 onLockScreen = onLockScreen,
                 onToggleMapRotation = {
-                    mapRotationMode = (mapRotationMode + 1) % 2
-                    if (mapRotationMode == 0) {
-                        try { mapView?.setMapOrientation(0f) } catch (_: Throwable) {}
+                    mapState.mapRotationMode = (mapState.mapRotationMode + 1) % 2
+                    if (mapState.mapRotationMode == 0) {
+                        try { mapState.mapView?.setMapOrientation(0f) } catch (_: Throwable) {}
                     } else {
-                        flightData?.let { d -> try { mapView?.setMapOrientation(-Math.toDegrees(d.heading).toFloat()) } catch (_: Throwable) {} }
+                        flightData?.let { d -> try { mapState.mapView?.setMapOrientation(-Math.toDegrees(d.heading).toFloat()) } catch (_: Throwable) {} }
                     }
                 },
                 onResetFabPositions = {
@@ -1563,13 +1486,13 @@ fun MapViewer(
                     android.widget.Toast.makeText(context, "FAB-Positionen zurückgesetzt", android.widget.Toast.LENGTH_SHORT).show()
                 },
 
-                onDataPadOpen = { if (datapadEnabled) showDataPad = true },
-                onQuickAccessOpen = { showQuickAccess = true },
+                onDataPadOpen = { if (datapadEnabled) mapState.showDataPad = true },
+                onQuickAccessOpen = { mapState.showQuickAccess = true },
                 isConnected = isConnected,
                 isScreenLocked = isScreenLocked,
-                mapRotationMode = mapRotationMode,
+                mapRotationMode = mapState.mapRotationMode,
                 repositoriesReady = repositoriesReady,
-                pendingSymbolPlacement = pendingSymbolPlacement,
+                pendingSymbolPlacement = mapState.pendingSymbolPlacement,
                 datapadEnabled = datapadEnabled,
                 containerColorConnected = MaterialTheme.colorScheme.primaryContainer,
                 containerColorDisconnected = MaterialTheme.colorScheme.surfaceVariant,
@@ -1581,7 +1504,7 @@ fun MapViewer(
         )
 
         // Active Navigation Display (top center)
-        if (activeNavigationTarget != null) {
+        if (mapState.activeNavigationTarget != null) {
             Card(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -1597,13 +1520,13 @@ fun MapViewer(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(12.dp)
-                            .clickable { showNavigationDetails = !showNavigationDetails },
+                            .clickable { mapState.showNavigationDetails = !mapState.showNavigationDetails },
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "ROUTE TO: ${activeNavigationTarget?.name ?: ""}",
+                                text = "ROUTE TO: ${mapState.activeNavigationTarget?.name ?: ""}",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onErrorContainer
@@ -1612,7 +1535,7 @@ fun MapViewer(
                                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                                 modifier = Modifier.padding(top = 4.dp)
                             ) {
-                                navigationDistanceNm?.let { dist ->
+                                mapState.navigationDistanceNm?.let { dist ->
                                     Text(
                                         text = "${String.format("%.1f", dist)} NM",
                                         style = MaterialTheme.typography.bodyMedium,
@@ -1620,7 +1543,7 @@ fun MapViewer(
                                         color = MaterialTheme.colorScheme.onErrorContainer
                                     )
                                 }
-                                navigationHeading?.let { hdg ->
+                                mapState.navigationHeading?.let { hdg ->
                                     Text(
                                         text = "HDG ${String.format("%03.0f", hdg)}°",
                                         style = MaterialTheme.typography.bodyMedium,
@@ -1630,7 +1553,7 @@ fun MapViewer(
                                 }
                             }
                             // Show final runway heading when runway selected
-                            selectedRunwayHeading?.let { rwyHdg ->
+                            mapState.selectedRunwayHeading?.let { rwyHdg ->
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     modifier = Modifier.padding(top = 4.dp)
@@ -1646,7 +1569,7 @@ fun MapViewer(
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onErrorContainer
                                     )
-                                    originalAirportTarget?.let { airport ->
+                                    mapState.originalAirportTarget?.let { airport ->
                                         val airportPos = GeoPoint(airport.latitude, airport.longitude)
                                         flightData?.let { data ->
                                             if (data.latitude != 0.0 && data.longitude != 0.0) {
@@ -1669,32 +1592,32 @@ fun MapViewer(
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             // Toggle expand/collapse button
                             IconButton(
-                                onClick = { showNavigationDetails = !showNavigationDetails }
+                                onClick = { mapState.showNavigationDetails = !mapState.showNavigationDetails }
                             ) {
                                 Icon(
-                                    imageVector = if (showNavigationDetails) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                    contentDescription = if (showNavigationDetails) "Collapse" else "Expand",
+                                    imageVector = if (mapState.showNavigationDetails) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                    contentDescription = if (mapState.showNavigationDetails) "Collapse" else "Expand",
                                     tint = MaterialTheme.colorScheme.onErrorContainer
                                 )
                             }
                             
                             // Land button (only show if target has runways)
-                            if (targetRunways.isNotEmpty()) {
+                            if (mapState.targetRunways.isNotEmpty()) {
                                 FilledTonalIconButton(
                                     onClick = {
-                                        showRunwayApproach = !showRunwayApproach
-                                        if (!showRunwayApproach) {
-                                            selectedRunwayIndex = null
-                                            selectedRunwayHeading = null
-                                            selectedRunway = null
+                                        mapState.showRunwayApproach = !mapState.showRunwayApproach
+                                        if (!mapState.showRunwayApproach) {
+                                            mapState.selectedRunwayIndex = null
+                                            mapState.selectedRunwayHeading = null
+                                            mapState.selectedRunway = null
                                         }
                                     },
                                     colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                        containerColor = if (showRunwayApproach)
+                                        containerColor = if (mapState.showRunwayApproach)
                                             MaterialTheme.colorScheme.primary
                                         else
                                             MaterialTheme.colorScheme.surfaceVariant,
-                                        contentColor = if (showRunwayApproach)
+                                        contentColor = if (mapState.showRunwayApproach)
                                             MaterialTheme.colorScheme.onPrimary
                                         else
                                             MaterialTheme.colorScheme.onSurfaceVariant
@@ -1710,12 +1633,12 @@ fun MapViewer(
                             // Cancel button
                             IconButton(
                                 onClick = {
-                                    activeNavigationTarget = null
-                                    originalAirportTarget = null
-                                    showRunwayApproach = false
-                                    selectedRunwayIndex = null
-                                    selectedRunwayHeading = null
-                                    selectedRunway = null
+                                    mapState.activeNavigationTarget = null
+                                    mapState.originalAirportTarget = null
+                                    mapState.showRunwayApproach = false
+                                    mapState.selectedRunwayIndex = null
+                                    mapState.selectedRunwayHeading = null
+                                    mapState.selectedRunway = null
                                 }
                             ) {
                                 Icon(
@@ -1729,13 +1652,13 @@ fun MapViewer(
 
                     // Collapsible details section
                     AnimatedVisibility(
-                        visible = showNavigationDetails,
+                        visible = mapState.showNavigationDetails,
                         enter = expandVertically() + fadeIn(),
                         exit = shrinkVertically() + fadeOut()
                     ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             // Runway selection (when approach mode active)
-                            if (showRunwayApproach && targetRunways.isNotEmpty()) {
+                            if (mapState.showRunwayApproach && mapState.targetRunways.isNotEmpty()) {
                         HorizontalDivider(color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.2f))
                         Column(
                             modifier = Modifier
@@ -1763,10 +1686,10 @@ fun MapViewer(
                                 ) {
                                     // Pattern button
                                     Button(
-                                        onClick = { showTrafficPattern = !showTrafficPattern },
+                                        onClick = { mapState.showTrafficPattern = !mapState.showTrafficPattern },
                                         colors = ButtonDefaults.buttonColors(
-                                            containerColor = if (showTrafficPattern) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-                                            contentColor = if (showTrafficPattern) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                                            containerColor = if (mapState.showTrafficPattern) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                                            contentColor = if (mapState.showTrafficPattern) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
                                         ),
                                         modifier = Modifier.height(28.dp),
                                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
@@ -1784,7 +1707,7 @@ fun MapViewer(
                                             onClick = { expanded = !expanded },
                                             label = {
                                                 Text(
-                                                    text = "${finalApproachDistanceNm.let { if (it == it.toInt().toDouble()) it.toInt().toString() else it.toString() }} NM",
+                                                    text = "${mapState.finalApproachDistanceNm.let { if (it == it.toInt().toDouble()) it.toInt().toString() else it.toString() }} NM",
                                                     style = MaterialTheme.typography.labelSmall
                                                 )
                                             },
@@ -1811,7 +1734,7 @@ fun MapViewer(
                                                         )
                                                     },
                                                     onClick = {
-                                                        finalApproachDistanceNm = dist
+                                                        mapState.finalApproachDistanceNm = dist
                                                         expanded = false
                                                     }
                                                 )
@@ -1822,7 +1745,7 @@ fun MapViewer(
                             }
 
                             // Pattern configuration (when pattern mode active)
-                            if (showTrafficPattern) {
+                            if (mapState.showTrafficPattern) {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 HorizontalDivider(color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.2f))
                                 Spacer(modifier = Modifier.height(8.dp))
@@ -1854,7 +1777,7 @@ fun MapViewer(
                                             onClick = { sizeExpanded = !sizeExpanded },
                                             label = {
                                                 Text(
-                                                    text = patternSize.displayName,
+                                                    text = mapState.patternSize.displayName,
                                                     style = MaterialTheme.typography.labelSmall
                                                 )
                                             },
@@ -1889,7 +1812,7 @@ fun MapViewer(
                                                         }
                                                     },
                                                     onClick = {
-                                                        patternSize = size
+                                                        mapState.patternSize = size
                                                         sizeExpanded = false
                                                     }
                                                 )
@@ -1914,8 +1837,8 @@ fun MapViewer(
                                     
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         FilterChip(
-                                            selected = patternDirection == PatternDirection.LEFT_HAND,
-                                            onClick = { patternDirection = PatternDirection.LEFT_HAND },
+                                            selected = mapState.patternDirection == PatternDirection.LEFT_HAND,
+                                            onClick = { mapState.patternDirection = PatternDirection.LEFT_HAND },
                                             label = {
                                                 Text(
                                                     text = "Left",
@@ -1926,8 +1849,8 @@ fun MapViewer(
                                         )
                                         
                                         FilterChip(
-                                            selected = patternDirection == PatternDirection.RIGHT_HAND,
-                                            onClick = { patternDirection = PatternDirection.RIGHT_HAND },
+                                            selected = mapState.patternDirection == PatternDirection.RIGHT_HAND,
+                                            onClick = { mapState.patternDirection = PatternDirection.RIGHT_HAND },
                                             label = {
                                                 Text(
                                                     text = "Right",
@@ -1962,7 +1885,7 @@ fun MapViewer(
                                             onClick = { finalExpanded = !finalExpanded },
                                             label = {
                                                 Text(
-                                                    text = "${if (patternFinalDistanceNm == patternFinalDistanceNm.toInt().toDouble()) patternFinalDistanceNm.toInt().toString() else patternFinalDistanceNm.toString()} NM",
+                                                    text = "${if (mapState.patternFinalDistanceNm == mapState.patternFinalDistanceNm.toInt().toDouble()) mapState.patternFinalDistanceNm.toInt().toString() else mapState.patternFinalDistanceNm.toString()} NM",
                                                     style = MaterialTheme.typography.labelSmall
                                                 )
                                             },
@@ -2002,7 +1925,7 @@ fun MapViewer(
                                                         }
                                                     },
                                                     onClick = {
-                                                        patternFinalDistanceNm = dist
+                                                        mapState.patternFinalDistanceNm = dist
                                                         finalExpanded = false
                                                     }
                                                 )
@@ -2025,16 +1948,16 @@ fun MapViewer(
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
-                                    IconButton(onClick = { showPatternDetails = !showPatternDetails }) {
+                                    IconButton(onClick = { mapState.showPatternDetails = !mapState.showPatternDetails }) {
                                         Icon(
-                                            imageVector = if (showPatternDetails) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                            contentDescription = if (showPatternDetails) "Collapse" else "Expand"
+                                            imageVector = if (mapState.showPatternDetails) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                            contentDescription = if (mapState.showPatternDetails) "Collapse" else "Expand"
                                         )
                                     }
                                 }
 
                                 AnimatedVisibility(
-                                    visible = showPatternDetails,
+                                    visible = mapState.showPatternDetails,
                                     enter = expandVertically() + fadeIn(),
                                     exit = shrinkVertically() + fadeOut()
                                 ) {
@@ -2048,14 +1971,14 @@ fun MapViewer(
                                             modifier = Modifier.padding(8.dp),
                                             verticalArrangement = Arrangement.spacedBy(4.dp)
                                         ) {
-                                            val sizeScale = when (patternSize) {
+                                            val sizeScale = when (mapState.patternSize) {
                                                 PatternSize.NORMAL -> 1.0
                                                 PatternSize.MEDIUM -> 1.25
                                                 PatternSize.LARGE -> 1.5
                                                 PatternSize.VERY_LARGE -> 2.0
                                             }
-                                            val turnMultiplier = if (patternDirection == PatternDirection.LEFT_HAND) -1 else 1
-                                            val selectedRwy = selectedRunway
+                                            val turnMultiplier = if (mapState.patternDirection == PatternDirection.LEFT_HAND) -1 else 1
+                                            val selectedRwy = mapState.selectedRunway
                                             val baseHdg = (selectedRwy?.headingDeg ?: extractRunwayHeading(selectedRwy?.name ?: "") ?: 0.0).toInt()
 
                                             Text(
@@ -2068,7 +1991,7 @@ fun MapViewer(
 
                                             val crosswindHdg = (baseHdg + (90 * turnMultiplier) + 360) % 360
                                             Text(
-                                                text = "• Crosswind: HDG ${String.format("%03d", crosswindHdg)}° • ${String.format("%.1f", patternSize.downwindDistanceNm * sizeScale)} NM",
+                                                text = "• Crosswind: HDG ${String.format("%03d", crosswindHdg)}° • ${String.format("%.1f", mapState.patternSize.downwindDistanceNm * sizeScale)} NM",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 fontFamily = FontFamily.Monospace,
                                                 fontSize = 11.sp,
@@ -2076,7 +1999,7 @@ fun MapViewer(
                                             )
 
                                             val downwindHdg = (baseHdg + 180) % 360
-                                            val downwindLengthNm = (selectedRwy?.lengthM?.toDouble() ?: 2000.0) / 1852.0 + patternFinalDistanceNm + (0.5 * sizeScale)
+                                            val downwindLengthNm = (selectedRwy?.lengthM?.toDouble() ?: 2000.0) / 1852.0 + mapState.patternFinalDistanceNm + (0.5 * sizeScale)
                                             Text(
                                                 text = "• Downwind: HDG ${String.format("%03d", downwindHdg)}° • ${String.format("%.1f", downwindLengthNm)} NM",
                                                 style = MaterialTheme.typography.bodySmall,
@@ -2086,9 +2009,9 @@ fun MapViewer(
                                             )
 
                                             val baseHdgValue = (baseHdg + (270 * turnMultiplier) + 360) % 360
-                                            val baseExtensionNm = (0.3 + (patternFinalDistanceNm * 0.2)) * sizeScale
+                                            val baseExtensionNm = (0.3 + (mapState.patternFinalDistanceNm * 0.2)) * sizeScale
                                             Text(
-                                                text = "• Base: HDG ${String.format("%03d", baseHdgValue)}° • ${String.format("%.1f", patternSize.downwindDistanceNm * sizeScale)} NM (turn at ${String.format("%.1f", baseExtensionNm)} NM)",
+                                                text = "• Base: HDG ${String.format("%03d", baseHdgValue)}° • ${String.format("%.1f", mapState.patternSize.downwindDistanceNm * sizeScale)} NM (turn at ${String.format("%.1f", baseExtensionNm)} NM)",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 fontFamily = FontFamily.Monospace,
                                                 fontSize = 11.sp,
@@ -2096,7 +2019,7 @@ fun MapViewer(
                                             )
 
                                             Text(
-                                                text = "• Final: HDG ${String.format("%03d", baseHdg)}° • ${String.format("%.1f", patternFinalDistanceNm)} NM",
+                                                text = "• Final: HDG ${String.format("%03d", baseHdg)}° • ${String.format("%.1f", mapState.patternFinalDistanceNm)} NM",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 fontFamily = FontFamily.Monospace,
                                                 fontSize = 11.sp,
@@ -2104,7 +2027,7 @@ fun MapViewer(
                                             )
 
                                             Text(
-                                                text = "Pattern Altitude: ${patternSize.patternAltitudeFt} ft AGL",
+                                                text = "Pattern Altitude: ${mapState.patternSize.patternAltitudeFt} ft AGL",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontWeight = FontWeight.Bold,
                                                 color = MaterialTheme.colorScheme.primary,
@@ -2117,7 +2040,7 @@ fun MapViewer(
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            targetRunways.forEachIndexed { index, runway ->
+                            mapState.targetRunways.forEachIndexed { index, runway ->
                                 val baseHeading = runway.headingDeg ?: extractRunwayHeading(runway.name) ?: 0.0
                                 val heading1 = baseHeading.toInt()
                                 val heading2 = ((heading1 + 180) % 360)
@@ -2130,25 +2053,25 @@ fun MapViewer(
                                 ) {
                                     // Direction 1
                                     FilterChip(
-                                        selected = selectedRunwayIndex == (index * 2),
+                                        selected = mapState.selectedRunwayIndex == (index * 2),
                                         onClick = {
                                             // When switching from Direction 2 to Direction 1, flip pattern direction
-                                            if (selectedRunwayIndex == (index * 2 + 1)) {
-                                                patternDirection = if (patternDirection == PatternDirection.LEFT_HAND) {
+                                            if (mapState.selectedRunwayIndex == (index * 2 + 1)) {
+                                                mapState.patternDirection = if (mapState.patternDirection == PatternDirection.LEFT_HAND) {
                                                     PatternDirection.RIGHT_HAND
                                                 } else {
                                                     PatternDirection.LEFT_HAND
                                                 }
                                             }
-                                            selectedRunwayIndex = index * 2
-                                            selectedRunway = runway
+                                            mapState.selectedRunwayIndex = index * 2
+                                            mapState.selectedRunway = runway
                                             // Store the runway heading for display
                                             val calcHeading = runway.headingDeg ?: extractRunwayHeading(runway.name) ?: 0.0
-                                            selectedRunwayHeading = calcHeading
+                                            mapState.selectedRunwayHeading = calcHeading
                                             // Create route to approach endpoint
-                                            val target = originalAirportTarget
+                                            val target = mapState.originalAirportTarget
                                             if (target != null) {
-                                                val distanceMeters = finalApproachDistanceNm * 1852.0
+                                                val distanceMeters = mapState.finalApproachDistanceNm * 1852.0
                                                 val rad = Math.toRadians(calcHeading)
                                                 val lat1 = Math.toRadians(target.latitude)
                                                 val lon1 = Math.toRadians(target.longitude)
@@ -2166,7 +2089,7 @@ fun MapViewer(
                                                     latitude = endpoint.latitude,
                                                     longitude = endpoint.longitude
                                                 )
-                                                activeNavigationTarget = approachTarget
+                                                mapState.activeNavigationTarget = approachTarget
                                                 // Keep runway approach lines visible (don't set showRunwayApproach = false)
                                             }
                                         },
@@ -2187,26 +2110,26 @@ fun MapViewer(
 
                                     // Direction 2
                                     FilterChip(
-                                        selected = selectedRunwayIndex == (index * 2 + 1),
+                                        selected = mapState.selectedRunwayIndex == (index * 2 + 1),
                                         onClick = {
                                             // When switching from Direction 1 to Direction 2, flip pattern direction
-                                            if (selectedRunwayIndex == (index * 2)) {
-                                                patternDirection = if (patternDirection == PatternDirection.LEFT_HAND) {
+                                            if (mapState.selectedRunwayIndex == (index * 2)) {
+                                                mapState.patternDirection = if (mapState.patternDirection == PatternDirection.LEFT_HAND) {
                                                     PatternDirection.RIGHT_HAND
                                                 } else {
                                                     PatternDirection.LEFT_HAND
                                                 }
                                             }
-                                            selectedRunwayIndex = index * 2 + 1
-                                            selectedRunway = runway
+                                            mapState.selectedRunwayIndex = index * 2 + 1
+                                            mapState.selectedRunway = runway
                                             // Store the opposite runway heading for display
                                             val calcHeading = runway.headingDeg ?: extractRunwayHeading(runway.name) ?: 0.0
                                             val oppositeHeading = (calcHeading + 180) % 360
-                                            selectedRunwayHeading = oppositeHeading
+                                            mapState.selectedRunwayHeading = oppositeHeading
                                             // Create route to opposite approach endpoint
-                                            val target = originalAirportTarget
+                                            val target = mapState.originalAirportTarget
                                             if (target != null) {
-                                                val distanceMeters = finalApproachDistanceNm * 1852.0
+                                                val distanceMeters = mapState.finalApproachDistanceNm * 1852.0
                                                 val heading2Rad = Math.toRadians(oppositeHeading)
                                                 val lat1 = Math.toRadians(target.latitude)
                                                 val lon1 = Math.toRadians(target.longitude)
@@ -2222,7 +2145,7 @@ fun MapViewer(
                                                     latitude = endpoint.latitude,
                                                     longitude = endpoint.longitude
                                                 )
-                                                activeNavigationTarget = approachTarget
+                                                mapState.activeNavigationTarget = approachTarget
                                                 // Keep runway approach lines visible (don't set showRunwayApproach = false)
                                             }
                                         },
@@ -2252,15 +2175,15 @@ fun MapViewer(
 
         // Connection status indicator (only show when DataPad enabled)
         // Also show DB loading indicator if DB is not ready
-        if (dbInitFailed) {
+        if (mapState.dbInitFailed) {
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(16.dp)
                     .clickable { 
                         // Retry DB init on click
-                        dbInitFailed = false
-                        dbInitError = null
+                        mapState.dbInitFailed = false
+                        mapState.dbInitError = null
                         scope.launch {
                             withContext(kotlinx.coroutines.Dispatchers.IO) {
                                 try {
@@ -2269,14 +2192,14 @@ fun MapViewer(
                                         com.example.checklist_interactive.data.tactical.TacticalDatabase.getInstance(context, useExternalPath = false)
                                     }
                                     withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                        tacticalDb = db
+                                        mapState.tacticalDb = db
                                         android.util.Log.d(TAG, "DB initialized successfully on retry")
                                     }
                                 } catch (e: Exception) {
                                     android.util.Log.e(TAG, "Retry failed", e)
                                     withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                        dbInitFailed = true
-                                        dbInitError = e.message ?: "Unbekannter Fehler"
+                                        mapState.dbInitFailed = true
+                                        mapState.dbInitError = e.message ?: "Unbekannter Fehler"
                                     }
                                 }
                             }
@@ -2296,7 +2219,7 @@ fun MapViewer(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = dbInitError ?: "Unbekannt",
+                        text = mapState.dbInitError ?: "Unbekannt",
                         color = MaterialTheme.colorScheme.onErrorContainer,
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -2366,13 +2289,13 @@ fun MapViewer(
         
         // Auto-center indicator (clickable: toggle + persist)
         if (isConnected) {
-            if (autoCenter) {
+            if (mapState.autoCenter) {
                 Surface(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(16.dp)
                         .clickable {
-                            autoCenter = false
+                            mapState.autoCenter = false
                             prefsManager.setMapAutoCenter(false)
                         },
                     color = MaterialTheme.colorScheme.primaryContainer,
@@ -2391,7 +2314,7 @@ fun MapViewer(
                         .align(Alignment.TopStart)
                         .padding(16.dp)
                         .clickable {
-                            autoCenter = true
+                            mapState.autoCenter = true
                             prefsManager.setMapAutoCenter(true)
                         },
                     color = MaterialTheme.colorScheme.surfaceVariant,
@@ -2411,7 +2334,7 @@ fun MapViewer(
         if (pendingMoveMarkerId != null) {
             // Optionally resolve name for nicer text
             LaunchedEffect(pendingMoveMarkerId) {
-                pendingMoveTargetName = try {
+                mapState.pendingMoveTargetName = try {
                     locationRepository?.getLocationById(pendingMoveMarkerId!!)?.name
                 } catch (_: Exception) {
                     null
@@ -2428,7 +2351,7 @@ fun MapViewer(
                 shape = MaterialTheme.shapes.medium
             ) {
                 Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "Move marker: ${pendingMoveTargetName ?: pendingMoveMarkerId}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                    Text(text = "Move marker: ${mapState.pendingMoveTargetName ?: pendingMoveMarkerId}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
                     Spacer(modifier = Modifier.width(12.dp))
                     TextButton(onClick = { MapActionBus.clear() }) {
                         Text("Cancel")
@@ -2503,7 +2426,7 @@ fun MapViewer(
     
         // Pending symbol placement indicator
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-            if (pendingSymbolPlacement != null) {
+            if (mapState.pendingSymbolPlacement != null) {
                 Surface(
                     modifier = Modifier
                         .padding(bottom = 16.dp)
@@ -2528,13 +2451,13 @@ fun MapViewer(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Tap on the map to place ${pendingSymbolPlacement?.first?.name}",
+                                text = "Tap on the map to place ${mapState.pendingSymbolPlacement?.first?.name}",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                         }
-                        IconButton(onClick = { pendingSymbolPlacement = null }) {
+                        IconButton(onClick = { mapState.pendingSymbolPlacement = null }) {
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Cancel",
@@ -2548,51 +2471,51 @@ fun MapViewer(
     
     // Disable auto-center when user manually moves the map
     // Also use this effect to perform any pending center once the MapView is available
-    LaunchedEffect(mapView) {
-        if (mapView != null) {
+    LaunchedEffect(mapState.mapView) {
+        if (mapState.mapView != null) {
             // If user requested center earlier but MapView wasn't ready, honor it now
             pendingCenter.value?.let { gp ->
                 lastProgrammaticMove.value = System.currentTimeMillis()
                 (context as? android.app.Activity)?.runOnUiThread {
-                    mapView?.controller?.animateTo(gp)
-                    mapView?.invalidate()
+                    mapState.mapView?.controller?.animateTo(gp)
+                    mapState.mapView?.invalidate()
                 }
                 Log.d(TAG, "Applied pending center: ${gp.latitude},${gp.longitude}")
                 pendingCenter.value = null
             }
 
             // Apply persisted overlay preferences immediately (if not already present)
-            mapView?.let { mv ->
-                if (compassEnabled && compassOverlay == null) {
+            mapState.mapView?.let { mv ->
+                if (mapState.compassEnabled && mapState.compassOverlay == null) {
                     // Fixed-size compass ring
                     val co = CompassOverlay()
                     flightData?.let { d -> if (d.latitude != 0.0 && d.longitude != 0.0) co.center = GeoPoint(d.latitude, d.longitude) }
                     flightData?.let { d -> co.heading = Math.toDegrees(d.heading).toFloat() }
                     mv.overlays.add(co)
-                    compassOverlay = co
+                    mapState.compassOverlay = co
                     
                     // Speed-based heading line
-                    if (headingSpeedLineOverlay == null) {
+                    if (mapState.headingSpeedLineOverlay == null) {
                         val hsl = HeadingSpeedLineOverlay()
                         flightData?.let { d -> if (d.latitude != 0.0 && d.longitude != 0.0) hsl.center = GeoPoint(d.latitude, d.longitude) }
                         flightData?.let { d -> hsl.heading = Math.toDegrees(d.heading).toFloat() }
                         flightData?.let { d -> hsl.speedKts = ((d.groundSpeed ?: d.trueAirspeed ?: d.indicatedAirspeed ?: 0.0) * 1.9438) }
                         mv.overlays.add(hsl)
-                        headingSpeedLineOverlay = hsl
+                        mapState.headingSpeedLineOverlay = hsl
                     }
                 }
-                if (rangeRingsEnabled && rangeRingsOverlay == null) {
+                if (mapState.rangeRingsEnabled && mapState.rangeRingsOverlay == null) {
                     val rr = RangeRingsOverlay()
-                    rr.maxNm = rangeRingsMaxNm
+                    rr.maxNm = mapState.rangeRingsMaxNm
                     rr.heading = flightData?.heading?.let { Math.toDegrees(it).toFloat() } ?: 0f
                     flightData?.let { d -> if (d.latitude != 0.0 && d.longitude != 0.0) rr.center = GeoPoint(d.latitude, d.longitude) }
                     mv.overlays.add(rr)
-                    rangeRingsOverlay = rr
+                    mapState.rangeRingsOverlay = rr
                 }
-                if (mgrsGridEnabled && mgrsGridOverlay == null) {
+                if (mapState.mgrsGridEnabled && mapState.mgrsGridOverlay == null) {
                     val mg = MgrsGridOverlay()
                     mv.overlays.add(mg)
-                    mgrsGridOverlay = mg
+                    mapState.mgrsGridOverlay = mg
                 }
                 mv.invalidate()
             }
@@ -2606,49 +2529,49 @@ fun MapViewer(
     }
     
     // Layer selection dialog
-    if (showLayerDialog) {
+    if (mapState.showLayerDialog) {
         LayerSelectionDialog(
-            onDismiss = { showLayerDialog = false },
+            onDismiss = { mapState.showLayerDialog = false },
             onLayerSelected = { id ->
                 if (id != null) {
                     val ts = tileSourceForId(id)
-                    mapView?.setTileSource(ts)
+                    mapState.mapView?.setTileSource(ts)
                     prefsManager.setMapTileSourceId(id)
                 } else {
                     // follow system theme
                     prefsManager.setMapTileSourceId(null)
-                    mapView?.setTileSource(if (isDarkTheme) darkTile else TileSourceFactory.MAPNIK)
+                    mapState.mapView?.setTileSource(if (isDarkTheme) darkTile else TileSourceFactory.MAPNIK)
                 }
-                showLayerDialog = false
+                mapState.showLayerDialog = false
             }
         )
     }
 
     // Overlay selection dialog
-    if (showOverlayDialog) {
+    if (mapState.showOverlayDialog) {
         OverlaySelectionDialog(
-            compassEnabled = compassEnabled,
-            rangeRingsEnabled = rangeRingsEnabled,
-            rangeRingsMaxNm = rangeRingsMaxNm,
-            mgrsGridEnabled = mgrsGridEnabled,
-            onDismiss = { showOverlayDialog = false },
+            compassEnabled = mapState.compassEnabled,
+            rangeRingsEnabled = mapState.rangeRingsEnabled,
+            rangeRingsMaxNm = mapState.rangeRingsMaxNm,
+            mgrsGridEnabled = mapState.mgrsGridEnabled,
+            onDismiss = { mapState.showOverlayDialog = false },
             onToggleCompass = { enabled ->
-                compassEnabled = enabled
+                mapState.compassEnabled = enabled
                 prefsManager.setMapOverlayCompassEnabled(enabled)
                 // apply immediately
-                mapView?.let { mv ->
+                mapState.mapView?.let { mv ->
                     // remove existing compass and heading line
-                    compassOverlay?.let { mv.overlays.remove(it) }
-                    compassOverlay = null
-                    headingSpeedLineOverlay?.let { mv.overlays.remove(it) }
-                    headingSpeedLineOverlay = null
+                    mapState.compassOverlay?.let { mv.overlays.remove(it) }
+                    mapState.compassOverlay = null
+                    mapState.headingSpeedLineOverlay?.let { mv.overlays.remove(it) }
+                    mapState.headingSpeedLineOverlay = null
                     if (enabled) {
                         // Fixed-size compass ring
                         val co = CompassOverlay()
                         flightData?.let { d -> if (d.latitude != 0.0 && d.longitude != 0.0) co.center = GeoPoint(d.latitude, d.longitude) }
                         flightData?.let { d -> co.heading = Math.toDegrees(d.heading).toFloat() }
                         mv.overlays.add(co)
-                        compassOverlay = co
+                        mapState.compassOverlay = co
                         
                         // Speed-based heading line
                         val hsl = HeadingSpeedLineOverlay()
@@ -2656,46 +2579,46 @@ fun MapViewer(
                         flightData?.let { d -> hsl.heading = Math.toDegrees(d.heading).toFloat() }
                         flightData?.let { d -> hsl.speedKts = ((d.groundSpeed ?: d.trueAirspeed ?: d.indicatedAirspeed ?: 0.0) * 1.9438) }
                         mv.overlays.add(hsl)
-                        headingSpeedLineOverlay = hsl
+                        mapState.headingSpeedLineOverlay = hsl
                     }
                     mv.invalidate()
                 }
             },
             onToggleRangeRings = { enabled ->
-                rangeRingsEnabled = enabled
+                mapState.rangeRingsEnabled = enabled
                 prefsManager.setMapOverlayRangeRingsEnabled(enabled)
-                mapView?.let { mv ->
-                    rangeRingsOverlay?.let { mv.overlays.remove(it) }
-                    rangeRingsOverlay = null
+                mapState.mapView?.let { mv ->
+                    mapState.rangeRingsOverlay?.let { mv.overlays.remove(it) }
+                    mapState.rangeRingsOverlay = null
                     if (enabled) {
                         val rr = RangeRingsOverlay()
-                        rr.maxNm = rangeRingsMaxNm
+                        rr.maxNm = mapState.rangeRingsMaxNm
                         rr.heading = flightData?.heading?.let { Math.toDegrees(it).toFloat() } ?: 0f
                         flightData?.let { d -> if (d.latitude != 0.0 && d.longitude != 0.0) rr.center = GeoPoint(d.latitude, d.longitude) }
                         mv.overlays.add(rr)
-                        rangeRingsOverlay = rr
+                        mapState.rangeRingsOverlay = rr
                     }
                     mv.invalidate()
                 }
             },
             onChangeRangeRingsMaxNm = { nm ->
-                rangeRingsMaxNm = nm
+                mapState.rangeRingsMaxNm = nm
                 prefsManager.setMapOverlayRangeRingsMaxNm(nm)
-                (rangeRingsOverlay as? RangeRingsOverlay)?.let { rr ->
+                (mapState.rangeRingsOverlay as? RangeRingsOverlay)?.let { rr ->
                     rr.maxNm = nm
-                    mapView?.invalidate()
+                    mapState.mapView?.invalidate()
                 }
             },
             onToggleMgrsGrid = { enabled ->
-                mgrsGridEnabled = enabled
+                mapState.mgrsGridEnabled = enabled
                 prefsManager.setMapOverlayMgrsGridEnabled(enabled)
-                mapView?.let { mv ->
-                    mgrsGridOverlay?.let { mv.overlays.remove(it) }
-                    mgrsGridOverlay = null
+                mapState.mapView?.let { mv ->
+                    mapState.mgrsGridOverlay?.let { mv.overlays.remove(it) }
+                    mapState.mgrsGridOverlay = null
                     if (enabled) {
                         val mg = MgrsGridOverlay()
                         mv.overlays.add(mg)
-                        mgrsGridOverlay = mg
+                        mapState.mgrsGridOverlay = mg
                     }
                     mv.invalidate()
                 }
@@ -2704,44 +2627,44 @@ fun MapViewer(
     }
     
     // Quick Access Bottom Sheet
-    if (showQuickAccess && quickNoteManager != null) {
+    if (mapState.showQuickAccess && quickNoteManager != null) {
         QuickAccessSheet(
-            onDismiss = { showQuickAccess = false },
+            onDismiss = { mapState.showQuickAccess = false },
             currentDocumentPath = "special://aviation_map",
             currentDocumentName = stringResource(R.string.map_aviation_map)
         )
     }
     // DataPad Popup
-    if (showDataPad && datapadEnabled) {
-        DataPadPopup(onDismiss = { showDataPad = false })
+    if (mapState.showDataPad && datapadEnabled) {
+        DataPadPopup(onDismiss = { mapState.showDataPad = false })
     }
     
     // Military Symbol Picker Dialog
-    if (showMilitarySymbolPicker) {
+    if (mapState.showMilitarySymbolPicker) {
         MilitarySymbolPickerDialog(
             onDismiss = {
                 // Only close the dialog on dismiss; do not clear pending placement here
-                showMilitarySymbolPicker = false
+                mapState.showMilitarySymbolPicker = false
             },
             onSymbolSelected = { symbol, affiliation ->
                 // Store selected symbol and close dialog; user will tap map to place it
-                pendingSymbolPlacement = symbol to affiliation
+                mapState.pendingSymbolPlacement = symbol to affiliation
                 Log.d(TAG, "Pending military symbol selected: ${symbol.name} (${affiliation.name})")
-                showMilitarySymbolPicker = false
+                mapState.showMilitarySymbolPicker = false
             }
         )
     }
     
     // Radial menu
-    if (radialMenuVisible && radialMenuMarker != null) {
-        Log.d(TAG, "Rendering RadialMenu at ($radialMenuX, $radialMenuY) for marker ${radialMenuMarker?.name}")
+    if (mapState.radialMenuVisible && mapState.radialMenuMarker != null) {
+        Log.d(TAG, "Rendering RadialMenu at (${mapState.radialMenuX}, ${mapState.radialMenuY}) for marker ${mapState.radialMenuMarker?.name}")
         val items = mutableListOf<RadialMenuItem>().apply {
             add(RadialMenuItem(
                 icon = Icons.Default.Info,
                 label = "Info",
                 onClick = {
-                    selectedLocation = radialMenuMarker
-                    showMarkerRouteManagement = true
+                    mapState.selectedLocation = mapState.radialMenuMarker
+                    mapState.showMarkerRouteManagement = true
                 }
             ))
 
@@ -2749,8 +2672,8 @@ fun MapViewer(
                 icon = Icons.Default.Edit,
                 label = "Edit",
                 onClick = {
-                    selectedLocation = radialMenuMarker
-                    showMarkerRouteManagement = true
+                    mapState.selectedLocation = mapState.radialMenuMarker
+                    mapState.showMarkerRouteManagement = true
                 }
             ))
 
@@ -2758,19 +2681,19 @@ fun MapViewer(
                 icon = Icons.Default.Navigation,
                 label = "Navigate",
                 onClick = {
-                    radialMenuMarker?.let { marker ->
-                        activeNavigationTarget = marker
+                    mapState.radialMenuMarker?.let { marker ->
+                        mapState.activeNavigationTarget = marker
                     }
                 }
             ))
 
             // Only show Delete for non-static markers
-            if (radialMenuMarker?.isStatic != 1) {
+            if (mapState.radialMenuMarker?.isStatic != 1) {
                 add(RadialMenuItem(
                     icon = Icons.Default.Delete,
                     label = "Delete",
                     onClick = {
-                        radialMenuMarker?.let { marker ->
+                        mapState.radialMenuMarker?.let { marker ->
                             scope.launch {
                                 val repo = locationRepository ?: return@launch
                                 repo.deleteLocation(marker.id)
@@ -2782,25 +2705,25 @@ fun MapViewer(
         }
 
         RadialMenu(
-            centerX = radialMenuX,
-            centerY = radialMenuY,
-            onDismiss = { radialMenuVisible = false },
+            centerX = mapState.radialMenuX,
+            centerY = mapState.radialMenuY,
+            onDismiss = { mapState.radialMenuVisible = false },
             items = items
         )
     }
     
     // Marker/Route Management Sheet (with integrated marker details)
-    if (showMarkerRouteManagement) {
+    if (mapState.showMarkerRouteManagement) {
         markerRouteViewModel?.let { vm ->
             MarkerRouteManagementSheet(
                 viewModel = vm,
                 onDismiss = { 
-                    showMarkerRouteManagement = false
-                    selectedLocation = null
+                    mapState.showMarkerRouteManagement = false
+                    mapState.selectedLocation = null
                 },
                 onMarkerClick = { marker ->
                     // Update selected location to show details in tab
-                    selectedLocation = marker
+                    mapState.selectedLocation = marker
                 },
                 onRouteClick = { route ->
                     // Load and display route on map
@@ -2824,7 +2747,7 @@ fun MapViewer(
                                 android.graphics.Color.parseColor("#00A8FF") // Default blue
                             }
 
-                            mapView?.let { mv ->
+                            mapState.mapView?.let { mv ->
                                 drawRouteOnMap(mv, waypoints, routeColor)
                                 // Center on first waypoint
                                 if (waypoints.isNotEmpty()) {
@@ -2835,36 +2758,36 @@ fun MapViewer(
                             }
                         }
                     }
-                    showMarkerRouteManagement = false
+                    mapState.showMarkerRouteManagement = false
                 },
                 onCreateRoute = {
-                    showMarkerRouteManagement = false
+                    mapState.showMarkerRouteManagement = false
                     routeCreationViewModel?.let { rvm ->
                         rvm.startRouteCreation()
-                        showRouteCreation = true
+                        mapState.showRouteCreation = true
                     }
                 },
                 onCenter = { location ->
                     // Center map on provided location
-                    mapView?.let { mv ->
+                    mapState.mapView?.let { mv ->
                         mv.controller.animateTo(GeoPoint(location.latitude, location.longitude))
                     }
                 },
-                selectedMarker = selectedLocation,
-                selectedRunways = selectedRunways,
+                selectedMarker = mapState.selectedLocation,
+                selectedRunways = mapState.selectedRunways,
                 onSetActiveRoute = { location ->
-                    activeNavigationTarget = location
+                    mapState.activeNavigationTarget = location
                     // Auto-center disabled so user can see the full route
-                    autoCenter = false
+                    mapState.autoCenter = false
                     // Optionally close the sheet
-                    showMarkerRouteManagement = false
+                    mapState.showMarkerRouteManagement = false
                 },
                 onEditRouteWaypoints = { routeId ->
                     // Open RouteCreationSheet in edit mode
                     routeCreationViewModel?.let { rvm ->
                         rvm.startRouteEditing(routeId)
-                        showMarkerRouteManagement = false
-                        showRouteCreation = true
+                        mapState.showMarkerRouteManagement = false
+                        mapState.showRouteCreation = true
                     }
                 }
             )
@@ -2872,17 +2795,17 @@ fun MapViewer(
     }
     
     // Route Creation Sheet
-    if (showRouteCreation) {
+    if (mapState.showRouteCreation) {
         routeCreationViewModel?.let { vm ->
             RouteCreationSheet(
                 viewModel = vm,
                 onDismiss = {
-                    showRouteCreation = false
+                    mapState.showRouteCreation = false
                     vm.cancelRouteCreation()
                 },
                 onWaypointClick = { location ->
                     // Center map on waypoint
-                    mapView?.controller?.animateTo(GeoPoint(location.latitude, location.longitude))
+                    mapState.mapView?.controller?.animateTo(GeoPoint(location.latitude, location.longitude))
                 },
                 onRouteFinished = { routeId ->
                     // Force refresh the route on the map
@@ -2906,63 +2829,63 @@ fun MapViewer(
     DisposableEffect(Unit) {
         onDispose {
             // Clear navigation line
-            navigationLine?.let { line ->
-                mapView?.overlays?.remove(line)
+            mapState.navigationLine?.let { line ->
+                mapState.mapView?.overlays?.remove(line)
             }
-            navigationLine = null
+            mapState.navigationLine = null
 
             // Clear runway approach lines
-            runwayApproachLines.forEach { line ->
-                mapView?.overlays?.remove(line)
+            mapState.runwayApproachLines.forEach { line ->
+                mapState.mapView?.overlays?.remove(line)
             }
-            runwayApproachLines = emptyList()
+            mapState.runwayApproachLines = emptyList()
             
             // Save navigation state before disposing
             try {
                 val navPrefs = context.getSharedPreferences("map_navigation_prefs", android.content.Context.MODE_PRIVATE)
                 navPrefs.edit().apply {
                     // Save active navigation target
-                    val targetId = activeNavigationTarget?.id ?: -999
+                    val targetId = mapState.activeNavigationTarget?.id ?: -999
                     putInt("active_nav_target_id", targetId)
                     
                     // Save runway approach state
-                    putBoolean("show_runway_approach", showRunwayApproach)
-                    putFloat("final_approach_distance_nm", finalApproachDistanceNm.toFloat())
-                    putInt("selected_runway_index", selectedRunwayIndex ?: -1)
+                    putBoolean("show_runway_approach", mapState.showRunwayApproach)
+                    putFloat("final_approach_distance_nm", mapState.finalApproachDistanceNm.toFloat())
+                    putInt("selected_runway_index", mapState.selectedRunwayIndex ?: -1)
                     
                     // Save traffic pattern state
-                    putBoolean("show_traffic_pattern", showTrafficPattern)
-                    putInt("pattern_size_ordinal", patternSize.ordinal)
-                    putBoolean("pattern_direction_left", patternDirection == PatternDirection.LEFT_HAND)
-                    putFloat("pattern_final_distance_nm", patternFinalDistanceNm.toFloat())
+                    putBoolean("show_traffic_pattern", mapState.showTrafficPattern)
+                    putInt("pattern_size_ordinal", mapState.patternSize.ordinal)
+                    putBoolean("pattern_direction_left", mapState.patternDirection == PatternDirection.LEFT_HAND)
+                    putFloat("pattern_final_distance_nm", mapState.patternFinalDistanceNm.toFloat())
                     
                     apply()
                 }
-                android.util.Log.d("MapViewer", "Saved navigation state: target=${activeNavigationTarget?.name}, approach=$showRunwayApproach, pattern=$showTrafficPattern")
+                android.util.Log.d("MapViewer", "Saved navigation state: target=${mapState.activeNavigationTarget?.name}, approach=${mapState.showRunwayApproach}, pattern=${mapState.showTrafficPattern}")
             } catch (e: Exception) {
                 android.util.Log.e("MapViewer", "Failed to save navigation state", e)
             }
             
             // Save current map center/zoom and tile preferences on dispose
             try {
-                mapView?.let { mv ->
+                mapState.mapView?.let { mv ->
                     val center = mv.mapCenter
                     prefsManager.setMapCenter(center.latitude, center.longitude)
                     prefsManager.setMapZoom(mv.zoomLevelDouble)
-                    prefsManager.setMapAutoCenter(autoCenter)
+                    prefsManager.setMapAutoCenter(mapState.autoCenter)
                     // persist overlay preferences and remove overlays
-                    prefsManager.setMapOverlayCompassEnabled(compassEnabled)
-                    prefsManager.setMapOverlayRangeRingsEnabled(rangeRingsEnabled)
-                    prefsManager.setMapOverlayRangeRingsMaxNm(rangeRingsMaxNm)
-                    try { compassOverlay?.let { mv.overlays.remove(it) } } catch (_: Exception) {}
-                    try { headingSpeedLineOverlay?.let { mv.overlays.remove(it) } } catch (_: Exception) {}
-                    try { rangeRingsOverlay?.let { mv.overlays.remove(it) } } catch (_: Exception) {}
+                    prefsManager.setMapOverlayCompassEnabled(mapState.compassEnabled)
+                    prefsManager.setMapOverlayRangeRingsEnabled(mapState.rangeRingsEnabled)
+                    prefsManager.setMapOverlayRangeRingsMaxNm(mapState.rangeRingsMaxNm)
+                    try { mapState.compassOverlay?.let { mv.overlays.remove(it) } } catch (_: Exception) {}
+                    try { mapState.headingSpeedLineOverlay?.let { mv.overlays.remove(it) } } catch (_: Exception) {}
+                    try { mapState.rangeRingsOverlay?.let { mv.overlays.remove(it) } } catch (_: Exception) {}
                     // tile source id is persisted when the user explicitly selects a layer via the dialog.
                 }
             } catch (e: Exception) {
                 // ignore
             }
-            mapView?.onDetach()
+            mapState.mapView?.onDetach()
         }
     }
 }
