@@ -1,0 +1,5 @@
+# Requirements for DCS-SCRIPTS-FOLDER-Experimental tools
+# Install with: python -m pip install -r requirements.txt
+
+# AES-GCM and ECDH support used by the scripts
+cryptography>=40.0.0
