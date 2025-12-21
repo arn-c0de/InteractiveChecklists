@@ -55,6 +55,7 @@ import com.example.checklist_interactive.ui.maps.navigation.*
 import com.example.checklist_interactive.ui.maps.ui.MapNavigationDisplay
 import com.example.checklist_interactive.ui.maps.ui.MapRadialMenuDisplay
 import com.example.checklist_interactive.ui.maps.ui.OverlaySelectionDialog
+import com.example.checklist_interactive.ui.maps.MapFlightInstruments
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
@@ -1545,6 +1546,18 @@ fun MapViewer(
         
         // Removed old DraggableFab implementations for QuickNote and DataPad
         // These are now handled by the centralized FABOverlay system above
+        
+        // Flight Instruments Overlay
+        val fd = flightData
+        if (mapState.flightInstrumentsEnabled && fd != null) {
+            MapFlightInstruments(
+                pitch = fd.pitch,
+                bank = fd.bank,
+                turnRate = 0.0, // TODO: Calculate turn rate from heading changes
+                slip = 0.0, // TODO: Add slip data to DataPad if available
+                enabled = mapState.flightInstrumentsEnabled
+            )
+        }
     }
     
         // Pending symbol placement indicator
@@ -1677,6 +1690,7 @@ fun MapViewer(
             rangeRingsEnabled = mapState.rangeRingsEnabled,
             rangeRingsMaxNm = mapState.rangeRingsMaxNm,
             mgrsGridEnabled = mapState.mgrsGridEnabled,
+            flightInstrumentsEnabled = mapState.flightInstrumentsEnabled,
             onDismiss = { mapState.showOverlayDialog = false },
             onToggleCompass = { enabled ->
                 mapState.compassEnabled = enabled
@@ -1745,6 +1759,10 @@ fun MapViewer(
                     }
                     mv.invalidate()
                 }
+            },
+            onToggleFlightInstruments = { enabled ->
+                mapState.flightInstrumentsEnabled = enabled
+                prefsManager.setMapOverlayFlightInstrumentsEnabled(enabled)
             }
         )
     }
