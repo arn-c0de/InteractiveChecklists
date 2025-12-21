@@ -1,4 +1,4 @@
-package com.example.checklist_interactive.ui.maps
+package com.example.checklist_interactive.ui.maps.marker
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

@@ -1,4 +1,4 @@
-package com.example.checklist_interactive.ui.maps
+package com.example.checklist_interactive.ui.maps.marker
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -38,6 +38,7 @@ import androidx.compose.ui.window.Dialog
 import com.example.checklist_interactive.R
 import com.example.checklist_interactive.ui.common.ModalBottomSheetImmersiveMode
 import kotlinx.coroutines.isActive
+import com.example.checklist_interactive.ui.maps.navigation.MarkerDetailsContent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.checklist_interactive.data.tactical.*
