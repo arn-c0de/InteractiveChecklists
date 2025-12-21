@@ -33,6 +33,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import android.util.Log
@@ -124,6 +130,16 @@ fun MapViewer(
     var selectedRunwayHeading by remember { mutableStateOf<Double?>(null) }
     var finalApproachDistanceNm by remember { mutableStateOf(5.0) }
     var selectedRunway by remember { mutableStateOf<com.example.checklist_interactive.data.tactical.RunwayEntity?>(null) }
+
+    // Traffic pattern mode
+    var showTrafficPattern by remember { mutableStateOf(false) }
+    var trafficPatternPolyline by remember { mutableStateOf<org.osmdroid.views.overlay.Polyline?>(null) }
+    var trafficPatternLabelOverlay by remember { mutableStateOf<PatternLabelOverlay?>(null) }
+    var patternSize by remember { mutableStateOf(PatternSize.NORMAL) }
+    var patternDirection by remember { mutableStateOf(PatternDirection.LEFT_HAND) }
+    var patternFinalDistanceNm by remember { mutableStateOf(1.0) } // Configurable final approach length
+    // Collapsible details
+    var showPatternDetails by remember { mutableStateOf(true) }
 
     // Military symbol placement state
     var pendingSymbolPlacement by remember { mutableStateOf<Pair<MilitarySymbol, SymbolAffiliation>?>(null) }
@@ -574,6 +590,83 @@ fun MapViewer(
             )
             activeNavigationTarget = approachTarget
             selectedRunwayHeading = heading
+        }
+    }
+
+    // Generate and draw traffic pattern when enabled
+    LaunchedEffect(showTrafficPattern, selectedRunway, mapView, patternSize, patternDirection, originalAirportTarget, patternFinalDistanceNm) {
+        val mv = mapView ?: return@LaunchedEffect
+        val runway = selectedRunway ?: return@LaunchedEffect
+        val target = originalAirportTarget ?: return@LaunchedEffect
+        
+        if (showTrafficPattern) {
+            // Remove old pattern overlays
+            trafficPatternPolyline?.let { mv.overlays.remove(it) }
+            trafficPatternLabelOverlay?.let { mv.overlays.remove(it) }
+            
+            // Extract runway heading from name or use provided heading
+            val runwayHeading = runway.headingDeg ?: extractRunwayHeading(runway.name) ?: 0.0
+            val runwayLengthMeters = (runway.lengthM?.toDouble() ?: runway.lengthFt?.toDouble()?.times(0.3048)) ?: 2000.0
+            val runwayThreshold = GeoPoint(
+                runway.touchdownStartLat ?: target.latitude,
+                runway.touchdownStartLon ?: target.longitude
+            )
+            
+            // Generate pattern points
+            val patternPoints = TrafficPatternGenerator.generateTrafficPattern(
+                runwayThreshold = runwayThreshold,
+                runwayHeading = runwayHeading,
+                runwayLengthMeters = runwayLengthMeters,
+                patternSize = patternSize,
+                direction = patternDirection,
+                finalDistanceNm = patternFinalDistanceNm
+            )
+            
+            // Create and add pattern polyline
+            val polyline = TrafficPatternGenerator.createPatternPolyline(
+                points = patternPoints,
+                color = 0xFF00FF00.toInt(), // Green for pattern
+                width = 5f
+            )
+            mv.overlays.add(polyline)
+            trafficPatternPolyline = polyline
+            
+            // Create and add pattern labels with distance and heading information
+            val labels = TrafficPatternGenerator.generatePatternLabels(
+                points = patternPoints,
+                direction = patternDirection,
+                runwayHeading = runwayHeading
+            )
+            val labelOverlay = PatternLabelOverlay(labels)
+            mv.overlays.add(labelOverlay)
+            trafficPatternLabelOverlay = labelOverlay
+            
+            // Set navigation target to runway threshold (landing point)
+            // This creates a red line from current position to the pattern landing point
+            val patternTarget = target.copy(
+                id = -2, // Special ID for pattern navigation
+                name = "${target.name} PATTERN ${String.format("%02d", runwayHeading.toInt() / 10)}",
+                latitude = runwayThreshold.latitude,
+                longitude = runwayThreshold.longitude
+            )
+            activeNavigationTarget = patternTarget
+            
+            mv.invalidate()
+        } else {
+            // Remove pattern overlays when disabled
+            trafficPatternPolyline?.let { 
+                mv.overlays.remove(it)
+                trafficPatternPolyline = null
+            }
+            trafficPatternLabelOverlay?.let {
+                mv.overlays.remove(it)
+                trafficPatternLabelOverlay = null
+            }
+            // Clear navigation if it was pattern navigation (id = -2)
+            if (activeNavigationTarget?.id == -2) {
+                activeNavigationTarget = null
+            }
+            mv.invalidate()
         }
     }
 
@@ -1461,42 +1554,358 @@ fun MapViewer(
                                 var expanded by remember { mutableStateOf(false) }
                                 val distances = listOf(2.5, 5.0, 10.0, 15.0, 25.0)
 
-                                Box {
-                                    FilterChip(
-                                        selected = false,
-                                        onClick = { expanded = !expanded },
-                                        label = {
-                                            Text(
-                                                text = "${finalApproachDistanceNm.let { if (it == it.toInt().toDouble()) it.toInt().toString() else it.toString() }} NM",
-                                                style = MaterialTheme.typography.labelSmall
-                                            )
-                                        },
-                                        trailingIcon = {
-                                            Icon(
-                                                imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        },
-                                        modifier = Modifier.height(28.dp)
-                                    )
-
-                                    DropdownMenu(
-                                        expanded = expanded,
-                                        onDismissRequest = { expanded = false }
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Pattern button
+                                    Button(
+                                        onClick = { showTrafficPattern = !showTrafficPattern },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = if (showTrafficPattern) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                                            contentColor = if (showTrafficPattern) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                                        ),
+                                        modifier = Modifier.height(28.dp),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
                                     ) {
-                                        distances.forEach { dist ->
-                                            DropdownMenuItem(
-                                                text = {
-                                                    Text(
-                                                        text = "${if (dist == dist.toInt().toDouble()) dist.toInt().toString() else dist.toString()} NM Final",
-                                                        style = MaterialTheme.typography.bodySmall
-                                                    )
-                                                },
-                                                onClick = {
-                                                    finalApproachDistanceNm = dist
-                                                    expanded = false
-                                                }
+                                        Text(
+                                            text = "PATTERN",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+
+                                    Box {
+                                        FilterChip(
+                                            selected = false,
+                                            onClick = { expanded = !expanded },
+                                            label = {
+                                                Text(
+                                                    text = "${finalApproachDistanceNm.let { if (it == it.toInt().toDouble()) it.toInt().toString() else it.toString() }} NM",
+                                                    style = MaterialTheme.typography.labelSmall
+                                                )
+                                            },
+                                            trailingIcon = {
+                                                Icon(
+                                                    imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            },
+                                            modifier = Modifier.height(28.dp)
+                                        )
+
+                                        DropdownMenu(
+                                            expanded = expanded,
+                                            onDismissRequest = { expanded = false }
+                                        ) {
+                                            distances.forEach { dist ->
+                                                DropdownMenuItem(
+                                                    text = {
+                                                        Text(
+                                                            text = "${if (dist == dist.toInt().toDouble()) dist.toInt().toString() else dist.toString()} NM Final",
+                                                            style = MaterialTheme.typography.bodySmall
+                                                        )
+                                                    },
+                                                    onClick = {
+                                                        finalApproachDistanceNm = dist
+                                                        expanded = false
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Pattern configuration (when pattern mode active)
+                            if (showTrafficPattern) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.2f))
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                Text(
+                                    text = "PATTERN CONFIGURATION",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
+                                )
+                                
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                // Pattern size selector
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Size:",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                    
+                                    var sizeExpanded by remember { mutableStateOf(false) }
+                                    Box {
+                                        FilterChip(
+                                            selected = false,
+                                            onClick = { sizeExpanded = !sizeExpanded },
+                                            label = {
+                                                Text(
+                                                    text = patternSize.displayName,
+                                                    style = MaterialTheme.typography.labelSmall
+                                                )
+                                            },
+                                            trailingIcon = {
+                                                Icon(
+                                                    imageVector = if (sizeExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            },
+                                            modifier = Modifier.height(28.dp)
+                                        )
+                                        
+                                        DropdownMenu(
+                                            expanded = sizeExpanded,
+                                            onDismissRequest = { sizeExpanded = false }
+                                        ) {
+                                            PatternSize.values().forEach { size ->
+                                                DropdownMenuItem(
+                                                    text = {
+                                                        Column {
+                                                            Text(
+                                                                text = size.displayName,
+                                                                style = MaterialTheme.typography.bodySmall,
+                                                                fontWeight = FontWeight.Bold
+                                                            )
+                                                            Text(
+                                                                text = "${size.downwindDistanceNm} NM • ${size.patternAltitudeFt} ft",
+                                                                style = MaterialTheme.typography.labelSmall,
+                                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                                            )
+                                                        }
+                                                    },
+                                                    onClick = {
+                                                        patternSize = size
+                                                        sizeExpanded = false
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                // Pattern direction selector
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Direction:",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                    
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        FilterChip(
+                                            selected = patternDirection == PatternDirection.LEFT_HAND,
+                                            onClick = { patternDirection = PatternDirection.LEFT_HAND },
+                                            label = {
+                                                Text(
+                                                    text = "Left",
+                                                    style = MaterialTheme.typography.labelSmall
+                                                )
+                                            },
+                                            modifier = Modifier.height(28.dp)
+                                        )
+                                        
+                                        FilterChip(
+                                            selected = patternDirection == PatternDirection.RIGHT_HAND,
+                                            onClick = { patternDirection = PatternDirection.RIGHT_HAND },
+                                            label = {
+                                                Text(
+                                                    text = "Right",
+                                                    style = MaterialTheme.typography.labelSmall
+                                                )
+                                            },
+                                            modifier = Modifier.height(28.dp)
+                                        )
+                                    }
+                                }
+                                
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                // Final approach distance selector
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Final Length:",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                    
+                                    var finalExpanded by remember { mutableStateOf(false) }
+                                    val finalDistances = listOf(0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0)
+                                    
+                                    Box {
+                                        FilterChip(
+                                            selected = false,
+                                            onClick = { finalExpanded = !finalExpanded },
+                                            label = {
+                                                Text(
+                                                    text = "${if (patternFinalDistanceNm == patternFinalDistanceNm.toInt().toDouble()) patternFinalDistanceNm.toInt().toString() else patternFinalDistanceNm.toString()} NM",
+                                                    style = MaterialTheme.typography.labelSmall
+                                                )
+                                            },
+                                            trailingIcon = {
+                                                Icon(
+                                                    imageVector = if (finalExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            },
+                                            modifier = Modifier.height(28.dp)
+                                        )
+                                        
+                                        DropdownMenu(
+                                            expanded = finalExpanded,
+                                            onDismissRequest = { finalExpanded = false }
+                                        ) {
+                                            finalDistances.forEach { dist ->
+                                                DropdownMenuItem(
+                                                    text = {
+                                                        Column {
+                                                            Text(
+                                                                text = "${if (dist == dist.toInt().toDouble()) dist.toInt().toString() else dist.toString()} NM Final",
+                                                                style = MaterialTheme.typography.bodySmall,
+                                                                fontWeight = FontWeight.Bold
+                                                            )
+                                                            Text(
+                                                                text = when {
+                                                                    dist <= 1.0 -> "Short - Quick pattern"
+                                                                    dist <= 3.0 -> "Medium - Standard"
+                                                                    dist <= 5.0 -> "Long - More time"
+                                                                    else -> "Very Long - Training"
+                                                                },
+                                                                style = MaterialTheme.typography.labelSmall,
+                                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                                            )
+                                                        }
+                                                    },
+                                                    onClick = {
+                                                        patternFinalDistanceNm = dist
+                                                        finalExpanded = false
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                // Pattern details header with collapsible body
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Pattern Details",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    IconButton(onClick = { showPatternDetails = !showPatternDetails }) {
+                                        Icon(
+                                            imageVector = if (showPatternDetails) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                            contentDescription = if (showPatternDetails) "Collapse" else "Expand"
+                                        )
+                                    }
+                                }
+
+                                AnimatedVisibility(
+                                    visible = showPatternDetails,
+                                    enter = expandVertically() + fadeIn(),
+                                    exit = shrinkVertically() + fadeOut()
+                                ) {
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                        )
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(8.dp),
+                                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            val sizeScale = when (patternSize) {
+                                                PatternSize.NORMAL -> 1.0
+                                                PatternSize.MEDIUM -> 1.25
+                                                PatternSize.LARGE -> 1.5
+                                                PatternSize.VERY_LARGE -> 2.0
+                                            }
+                                            val turnMultiplier = if (patternDirection == PatternDirection.LEFT_HAND) -1 else 1
+                                            val selectedRwy = selectedRunway
+                                            val baseHdg = (selectedRwy?.headingDeg ?: extractRunwayHeading(selectedRwy?.name ?: "") ?: 0.0).toInt()
+
+                                            Text(
+                                                text = "• Departure: HDG ${String.format("%03d", baseHdg)}° • ${String.format("%.1f", 0.5 * sizeScale)} NM",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+
+                                            val crosswindHdg = (baseHdg + (90 * turnMultiplier) + 360) % 360
+                                            Text(
+                                                text = "• Crosswind: HDG ${String.format("%03d", crosswindHdg)}° • ${String.format("%.1f", patternSize.downwindDistanceNm * sizeScale)} NM",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+
+                                            val downwindHdg = (baseHdg + 180) % 360
+                                            val downwindLengthNm = (selectedRwy?.lengthM?.toDouble() ?: 2000.0) / 1852.0 + patternFinalDistanceNm + (0.5 * sizeScale)
+                                            Text(
+                                                text = "• Downwind: HDG ${String.format("%03d", downwindHdg)}° • ${String.format("%.1f", downwindLengthNm)} NM",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+
+                                            val baseHdgValue = (baseHdg + (270 * turnMultiplier) + 360) % 360
+                                            val baseExtensionNm = (0.3 + (patternFinalDistanceNm * 0.2)) * sizeScale
+                                            Text(
+                                                text = "• Base: HDG ${String.format("%03d", baseHdgValue)}° • ${String.format("%.1f", patternSize.downwindDistanceNm * sizeScale)} NM (turn at ${String.format("%.1f", baseExtensionNm)} NM)",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+
+                                            Text(
+                                                text = "• Final: HDG ${String.format("%03d", baseHdg)}° • ${String.format("%.1f", patternFinalDistanceNm)} NM",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+
+                                            Text(
+                                                text = "Pattern Altitude: ${patternSize.patternAltitudeFt} ft AGL",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.padding(top = 4.dp)
                                             )
                                         }
                                     }
@@ -1520,6 +1929,14 @@ fun MapViewer(
                                     FilterChip(
                                         selected = selectedRunwayIndex == (index * 2),
                                         onClick = {
+                                            // When switching from Direction 2 to Direction 1, flip pattern direction
+                                            if (selectedRunwayIndex == (index * 2 + 1)) {
+                                                patternDirection = if (patternDirection == PatternDirection.LEFT_HAND) {
+                                                    PatternDirection.RIGHT_HAND
+                                                } else {
+                                                    PatternDirection.LEFT_HAND
+                                                }
+                                            }
                                             selectedRunwayIndex = index * 2
                                             selectedRunway = runway
                                             // Store the runway heading for display
@@ -1569,6 +1986,14 @@ fun MapViewer(
                                     FilterChip(
                                         selected = selectedRunwayIndex == (index * 2 + 1),
                                         onClick = {
+                                            // When switching from Direction 1 to Direction 2, flip pattern direction
+                                            if (selectedRunwayIndex == (index * 2)) {
+                                                patternDirection = if (patternDirection == PatternDirection.LEFT_HAND) {
+                                                    PatternDirection.RIGHT_HAND
+                                                } else {
+                                                    PatternDirection.LEFT_HAND
+                                                }
+                                            }
                                             selectedRunwayIndex = index * 2 + 1
                                             selectedRunway = runway
                                             // Store the opposite runway heading for display
