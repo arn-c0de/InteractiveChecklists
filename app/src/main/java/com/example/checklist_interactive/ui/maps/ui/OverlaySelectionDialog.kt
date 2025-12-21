@@ -23,11 +23,13 @@ fun OverlaySelectionDialog(
     rangeRingsEnabled: Boolean,
     rangeRingsMaxNm: Int,
     mgrsGridEnabled: Boolean,
+    flightInstrumentsEnabled: Boolean,
     onDismiss: () -> Unit,
     onToggleCompass: (Boolean) -> Unit,
     onToggleRangeRings: (Boolean) -> Unit,
     onChangeRangeRingsMaxNm: (Int) -> Unit,
-    onToggleMgrsGrid: (Boolean) -> Unit
+    onToggleMgrsGrid: (Boolean) -> Unit,
+    onToggleFlightInstruments: (Boolean) -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -71,6 +73,14 @@ fun OverlaySelectionDialog(
                         Text("Military Grid Reference System overlay", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(checked = mgrsGridEnabled, onCheckedChange = onToggleMgrsGrid)
+                }
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Column {
+                        Text("Flight Instruments", style = MaterialTheme.typography.bodyMedium)
+                        Text("Live attitude and turn indicators (drag to reposition)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = flightInstrumentsEnabled, onCheckedChange = onToggleFlightInstruments)
                 }
             }
         },

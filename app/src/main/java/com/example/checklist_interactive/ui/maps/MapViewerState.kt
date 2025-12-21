@@ -59,6 +59,7 @@ class MapViewerState(
     var rangeRingsEnabled by mutableStateOf(prefsManager.isMapOverlayRangeRingsEnabled())
     var rangeRingsMaxNm by mutableStateOf(prefsManager.getMapOverlayRangeRingsMaxNm())
     var mgrsGridEnabled by mutableStateOf(prefsManager.isMapOverlayMgrsGridEnabled())
+    var flightInstrumentsEnabled by mutableStateOf(prefsManager.isMapOverlayFlightInstrumentsEnabled())
     
     // Overlay instances
     var compassOverlay by mutableStateOf<Overlay?>(null)
