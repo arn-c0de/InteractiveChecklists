@@ -189,9 +189,9 @@ object TrafficPatternGenerator {
         val departureHdg = calculateBearing(points[0], points[1]).toInt()
         val crosswindHdg = calculateBearing(points[2], points[3]).toInt()
         val downwindHdg = calculateBearing(points[3], points[5]).toInt()
-        val baseHdg = calculateBearing(points[7], points[8]).toInt()
+        // Base leg heading is the heading flown from base turn point to base point
+        val baseHdg = calculateBearing(points[6], points[7]).toInt()
         val finalHdg = calculateBearing(points[9], points[10]).toInt()
-
         // Compute midpoints where needed
         val crosswindMid = run {
             val distMeters = calculateDistance(points[2], points[3])
