@@ -118,7 +118,50 @@ fun MapNavigationDisplay(
                         }
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        // Compact pattern altitude + current altitude + indicator (visible when collapsed)
+                        val patternAltCompact = mapState.patternSize.patternAltitudeFt
+                        val currentAltMetersCompact = flightData?.altitude?.let { it.toDouble() } ?: Double.NaN
+                        val currentAltCompact = if (currentAltMetersCompact.isNaN()) Double.NaN else currentAltMetersCompact * 3.28084 // convert m -> ft
+                        val currentAltCompactDisplay = if (currentAltCompact.isNaN()) "n/a" else String.format("%d ft", currentAltCompact.toInt())
+                        val diffCompact = if (currentAltCompact.isNaN()) null else currentAltCompact - patternAltCompact
+                        val smallTolerance = mapState.patternAltitudeSmallToleranceFt
+                        val warningTol = mapState.patternAltitudeWarningToleranceFt
+
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = "P:${patternAltCompact}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+
+                            // compact indicator
+                            if (diffCompact != null) {
+                                val absDiff = kotlin.math.abs(diffCompact)
+                                when {
+                                    absDiff <= smallTolerance -> {
+                                        Text(text = "≈", color = androidx.compose.ui.graphics.Color(0xFF00C853))
+                                    }
+                                    else -> {
+                                        val col = if (absDiff <= warningTol) androidx.compose.ui.graphics.Color(0xFFFFA000) else androidx.compose.ui.graphics.Color(0xFFD50000)
+                                        if (diffCompact < 0) {
+                                            Icon(imageVector = Icons.Default.KeyboardArrowUp, contentDescription = "Need to climb", tint = col)
+                                        } else {
+                                            Icon(imageVector = Icons.Default.KeyboardArrowDown, contentDescription = "Need to descend", tint = col)
+                                        }
+                                    }
+                                }
+                            } else {
+                                Text(text = "?", color = MaterialTheme.colorScheme.onErrorContainer)
+                            }
+
+                            Text(
+                                text = "C:${currentAltCompactDisplay}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.9f)
+                            )
+                        }
+
                         // Toggle expand/collapse button
                         IconButton(
                             onClick = { mapState.showNavigationDetails = !mapState.showNavigationDetails }
@@ -465,6 +508,50 @@ fun MapNavigationDisplay(
 
                             Spacer(modifier = Modifier.height(8.dp))
 
+                            // Threshold controls for pattern altitude indicator
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                var smallTolText by remember { mutableStateOf(mapState.patternAltitudeSmallToleranceFt.toInt().toString()) }
+                                var warnTolText by remember { mutableStateOf(mapState.patternAltitudeWarningToleranceFt.toInt().toString()) }
+
+                                OutlinedTextField(
+                                    value = smallTolText,
+                                    onValueChange = { v ->
+                                        smallTolText = v.filter { it.isDigit() }
+                                        val intVal = smallTolText.toIntOrNull()
+                                        if (intVal != null) {
+                                            mapState.patternAltitudeSmallToleranceFt = intVal.toDouble()
+                                            mapState.saveNavigationState()
+                                        }
+                                    },
+                                    label = { Text("Level tol (ft)") },
+                                    singleLine = true,
+                                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                OutlinedTextField(
+                                    value = warnTolText,
+                                    onValueChange = { v ->
+                                        warnTolText = v.filter { it.isDigit() }
+                                        val intVal = warnTolText.toIntOrNull()
+                                        if (intVal != null) {
+                                            mapState.patternAltitudeWarningToleranceFt = intVal.toDouble()
+                                            mapState.saveNavigationState()
+                                        }
+                                    },
+                                    label = { Text("Warn tol (ft)") },
+                                    singleLine = true,
+                                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
                             // Pattern details header with collapsible body
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -555,13 +642,79 @@ fun MapNavigationDisplay(
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
 
-                                        Text(
-                                            text = "Pattern Altitude: ${mapState.patternSize.patternAltitudeFt} ft AGL",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.padding(top = 4.dp)
-                                        )
+                                        // Show pattern altitude and current altitude with indicator
+                                        val patternAlt = mapState.patternSize.patternAltitudeFt
+                                        val currentAltMeters = flightData?.altitude?.let { it.toDouble() } ?: Double.NaN
+                                        val currentAlt = if (currentAltMeters.isNaN()) Double.NaN else currentAltMeters * 3.28084 // convert m -> ft
+                                        val currentAltDisplay = if (currentAlt.isNaN()) "n/a" else String.format("%d ft", currentAlt.toInt())
+                                        val diff = if (currentAlt.isNaN()) null else currentAlt - patternAlt
+                                        val smallTolerance = mapState.patternAltitudeSmallToleranceFt
+                                        val warningTol = mapState.patternAltitudeWarningToleranceFt
+
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.Start
+                                        ) {
+                                            Text(
+                                                text = "Pattern Altitude: $patternAlt ft AGL",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+
+                                            Spacer(modifier = Modifier.width(8.dp))
+
+                                            // Indicator between pattern and current altitude
+                                            if (diff != null) {
+                                                val absDiff = kotlin.math.abs(diff)
+                                                when {
+                                                    // Within small tolerance -> show green '≈'
+                                                    absDiff <= smallTolerance -> {
+                                                        Text(
+                                                            text = "≈",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = androidx.compose.ui.graphics.Color(0xFF00C853)
+                                                        )
+                                                    }
+                                                    else -> {
+                                                        // Use yellow when within warningTol, red when beyond
+                                                        val col = if (absDiff <= warningTol) androidx.compose.ui.graphics.Color(0xFFFFA000) else androidx.compose.ui.graphics.Color(0xFFD50000)
+                                                        if (diff < 0) {
+                                                            // Below pattern -> show UP arrow
+                                                            Icon(
+                                                                imageVector = Icons.Default.KeyboardArrowUp,
+                                                                contentDescription = "Need to climb",
+                                                                tint = col
+                                                            )
+                                                        } else {
+                                                            // Above pattern -> show DOWN arrow
+                                                            Icon(
+                                                                imageVector = Icons.Default.KeyboardArrowDown,
+                                                                contentDescription = "Need to descend",
+                                                                tint = col
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            } else {
+                                                Text(
+                                                    text = "?",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+
+                                            Spacer(modifier = Modifier.width(8.dp))
+
+                                            Text(
+                                                text = "Current: $currentAltDisplay",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                     }
                                 }
                             }
