@@ -19,12 +19,16 @@ import kotlin.math.*
 
 /**
  * Pattern size presets
+ *
+ * NOTE: sizes increased slightly for more realistic military patterns; an EXTRA_LARGE
+ * preset is available for military operations (larger lateral spacing and higher pattern altitude).
  */
 enum class PatternSize(val displayName: String, val downwindDistanceNm: Double, val patternAltitudeFt: Int) {
-    NORMAL("Normal", 0.5, 1000),
-    MEDIUM("Medium", 0.75, 1000),
-    LARGE("Large", 1.0, 1200),
-    VERY_LARGE("Very Large", 1.5, 1500);
+    NORMAL("Normal", 0.75, 1200),
+    MEDIUM("Medium", 1.0, 1400),
+    LARGE("Large", 1.5, 1800),
+    VERY_LARGE("Very Large", 2.0, 2200),
+    EXTRA_LARGE("Extra Large", 3.0, 3000);
     
     companion object {
         fun fromOrdinal(ordinal: Int): PatternSize = values().getOrNull(ordinal) ?: NORMAL
@@ -77,11 +81,13 @@ object TrafficPatternGenerator {
         val points = mutableListOf<GeoPoint>()
         
         // Scale factor for longitudinal distances based on size preset
+        // Increased multipliers for larger presets (EXTRA_LARGE used for military / high-alt patterns)
         val sizeScale = when (patternSize) {
-            PatternSize.NORMAL -> 1.0
-            PatternSize.MEDIUM -> 1.25
-            PatternSize.LARGE -> 1.5
-            PatternSize.VERY_LARGE -> 2.0
+            PatternSize.NORMAL -> 1.25
+            PatternSize.MEDIUM -> 1.5
+            PatternSize.LARGE -> 1.75
+            PatternSize.VERY_LARGE -> 2.25
+            PatternSize.EXTRA_LARGE -> 3.0
         }
 
         // Lateral downwind distance (NM -> meters) and base uses same lateral distance
@@ -174,7 +180,8 @@ object TrafficPatternGenerator {
     fun generatePatternLabels(
         points: List<GeoPoint>,
         direction: PatternDirection,
-        runwayHeading: Double
+        runwayHeading: Double,
+        patternSize: PatternSize = PatternSize.NORMAL
     ): List<Pair<GeoPoint, String>> {
         if (points.size < 11) return emptyList()
 
@@ -198,40 +205,29 @@ object TrafficPatternGenerator {
             val bearing = calculateBearing(points[2], points[3])
             calculateDestination(points[2], bearing, distMeters / 2.0)
         }
-        val downwindMid = points[4] // already computed as the downwind midpoint in generator
+        // DOWNWIND label at the corner (entry point) between Crosswind and Downwind
+        val downwindCorner = points[3] // downwindEntryPoint
 
-        // Place FINAL slightly offset from the exact corner along the angle bisector so the label sits
-        // visually at the Base->Final turn instead of overlapping the corner line
-        val finalLabelPoint = run {
-            val corner = points[8]
-            val prev = points[7]
-            val next = points[9]
-            val b1 = Math.toRadians(calculateBearing(corner, prev))
-            val b2 = Math.toRadians(calculateBearing(corner, next))
-            val x = cos(b1) + cos(b2)
-            val y = sin(b1) + sin(b2)
-            var bisector = if (x == 0.0 && y == 0.0) {
-                // opposing vectors (rare) — fallback to heading toward runway
-                calculateBearing(corner, points[10])
-            } else {
-                normalizeHeading(Math.toDegrees(atan2(y, x)))
-            }
-            // Offset distance: use a small absolute value (100m) or a fraction of adjacent leg length
-            val adjLen = calculateDistance(corner, prev)
-            val offsetMeters = max(100.0, adjLen * 0.15)
-            calculateDestination(corner, bisector, offsetMeters)
-        }
+        // Determine the true Base->Final corner by intersecting the Base leg (points[6]->points[7])
+        // with the Final approach line (runway threshold -> points[8]). If lines are parallel fall back to points[8].
+        // points[0] is the runway threshold (first point in the pattern)
+        val intersection = calculateLineIntersection(points[6], points[7], points[0], points[8])
+        val finalCorner = intersection ?: points[8]
+        // Use the computed corner directly for the FINAL label so it sits at the turn point between Base and Final
+        val finalLabelPoint = finalCorner
+
+        val altFt = patternSize.patternAltitudeFt
 
         return listOf(
             // DEPARTURE at end of climb-out
             points[1] to String.format("DEPARTURE\nHDG %03d°\n%.1f NM", departureHdg, departureDist),
             // CROSSWIND shown at midpoint of the crosswind leg
             crosswindMid to String.format("CROSSWIND\nHDG %03d°\n%.1f NM", crosswindHdg, crosswindDist),
-            // DOWNWIND shown at the computed downwind midpoint
-            downwindMid to String.format("DOWNWIND\nHDG %03d°\n%.1f NM", downwindHdg, downwindDist),
+            // DOWNWIND shown at the corner between Crosswind and Downwind (includes pattern altitude)
+            downwindCorner to String.format("DOWNWIND\nHDG %03d°\n%.1f NM\nALT %d ft", downwindHdg, downwindDist, altFt),
             // BASE at the base-turn corner
             points[6] to String.format("BASE\nHDG %03d°\n%.1f NM", baseHdg, baseDist),
-            // FINAL near the Base->Final turn (offset outwards for readability)
+            // FINAL offset a little from the corner to avoid overlapping the final leg
             finalLabelPoint to String.format("FINAL\nHDG %03d°\n%.1f NM", finalHdg, finalDist)
         )
     }
@@ -354,6 +350,41 @@ object TrafficPatternGenerator {
      */
     fun rotatePoints180(points: List<GeoPoint>, center: GeoPoint): List<GeoPoint> {
         return points.map { p -> rotate180Around(center, p) }
+    }
+
+    /**
+     * Calculate intersection of two lines (p1->p2) and (p3->p4) using a simple local equirectangular projection.
+     * Returns null if lines are parallel.
+     */
+    private fun calculateLineIntersection(p1: GeoPoint, p2: GeoPoint, p3: GeoPoint, p4: GeoPoint): GeoPoint? {
+        // Use p1 as origin for local projection
+        val originLat = Math.toRadians(p1.latitude)
+        val originLon = Math.toRadians(p1.longitude)
+        val r = 6371000.0
+
+        fun toXY(pt: GeoPoint): Pair<Double, Double> {
+            val lat = Math.toRadians(pt.latitude)
+            val lon = Math.toRadians(pt.longitude)
+            val x = r * (lon - originLon) * cos(originLat)
+            val y = r * (lat - originLat)
+            return Pair(x, y)
+        }
+
+        val (x1, y1) = toXY(p1)
+        val (x2, y2) = toXY(p2)
+        val (x3, y3) = toXY(p3)
+        val (x4, y4) = toXY(p4)
+
+        val denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+        if (abs(denom) < 1e-6) return null // parallel or nearly parallel
+
+        val px = ((x1*y2 - y1*x2)*(x3 - x4) - (x1 - x2)*(x3*y4 - y3*x4)) / denom
+        val py = ((x1*y2 - y1*x2)*(y3 - y4) - (y1 - y2)*(x3*y4 - y3*x4)) / denom
+
+        // Convert back to lat/lon
+        val lat = Math.toDegrees(originLat + (py / r))
+        val lon = Math.toDegrees(originLon + (px / (r * cos(originLat))))
+        return GeoPoint(lat, lon)
     }
 }
 
