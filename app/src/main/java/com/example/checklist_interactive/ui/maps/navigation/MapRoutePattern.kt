@@ -186,19 +186,54 @@ object TrafficPatternGenerator {
         val baseHdg = normalizeHeading(runwayHeading + (270.0 * turnMultiplier)).toInt()
         val finalHdg = normalizeHeading(runwayHeading).toInt()
         
-        // Calculate distances for each leg in NM
+        // Distances for each leg in NM (use the actual leg endpoints)
         val departureDist = calculateDistance(points[0], points[1]) / 1852.0
         val crosswindDist = calculateDistance(points[2], points[3]) / 1852.0
-        val downwindDist = calculateDistance(points[3], points[6]) / 1852.0
-        val baseDist = calculateDistance(points[7], points[8]) / 1852.0
-        val finalDist = calculateDistance(points[9], points[10]) / 1852.0
+        val downwindDist = calculateDistance(points[3], points[5]) / 1852.0
+        val baseDist = calculateDistance(points[6], points[7]) / 1852.0
+        val finalDist = calculateDistance(points[8], points[10]) / 1852.0
+        
+        // Compute midpoints where needed
+        val crosswindMid = run {
+            val distMeters = calculateDistance(points[2], points[3])
+            val bearing = calculateBearing(points[2], points[3])
+            calculateDestination(points[2], bearing, distMeters / 2.0)
+        }
+        val downwindMid = points[4] // already computed as the downwind midpoint in generator
+
+        // Place FINAL slightly offset from the exact corner along the angle bisector so the label sits
+        // visually at the Base->Final turn instead of overlapping the corner line
+        val finalLabelPoint = run {
+            val corner = points[8]
+            val prev = points[7]
+            val next = points[9]
+            val b1 = Math.toRadians(calculateBearing(corner, prev))
+            val b2 = Math.toRadians(calculateBearing(corner, next))
+            val x = cos(b1) + cos(b2)
+            val y = sin(b1) + sin(b2)
+            var bisector = if (x == 0.0 && y == 0.0) {
+                // opposing vectors (rare) — fallback to heading toward runway
+                calculateBearing(corner, points[10])
+            } else {
+                normalizeHeading(Math.toDegrees(atan2(y, x)))
+            }
+            // Offset distance: use a small absolute value (100m) or a fraction of adjacent leg length
+            val adjLen = calculateDistance(corner, prev)
+            val offsetMeters = max(100.0, adjLen * 0.15)
+            calculateDestination(corner, bisector, offsetMeters)
+        }
         
         return listOf(
+            // DEPARTURE at end of climb-out
             points[1] to String.format("DEPARTURE\nHDG %03d°\n%.1f NM", departureHdg, departureDist),
-            points[3] to String.format("CROSSWIND\nHDG %03d°\n%.1f NM", crosswindHdg, crosswindDist),
-            points[5] to String.format("DOWNWIND\nHDG %03d°\n%.1f NM", downwindHdg, downwindDist),
-            points[7] to String.format("BASE\nHDG %03d°\n%.1f NM", baseHdg, baseDist),
-            points[9] to String.format("FINAL\nHDG %03d°\n%.1f NM", finalHdg, finalDist)
+            // CROSSWIND shown at midpoint of the crosswind leg
+            crosswindMid to String.format("CROSSWIND\nHDG %03d°\n%.1f NM", crosswindHdg, crosswindDist),
+            // DOWNWIND shown at the computed downwind midpoint
+            downwindMid to String.format("DOWNWIND\nHDG %03d°\n%.1f NM", downwindHdg, downwindDist),
+            // BASE at the base-turn corner
+            points[6] to String.format("BASE\nHDG %03d°\n%.1f NM", baseHdg, baseDist),
+            // FINAL near the Base->Final turn (offset outwards for readability)
+            finalLabelPoint to String.format("FINAL\nHDG %03d°\n%.1f NM", finalHdg, finalDist)
         )
     }
     
