@@ -177,22 +177,21 @@ object TrafficPatternGenerator {
         runwayHeading: Double
     ): List<Pair<GeoPoint, String>> {
         if (points.size < 11) return emptyList()
-        
-        // Calculate headings for each leg
-        val turnMultiplier = if (direction == PatternDirection.LEFT_HAND) -1.0 else 1.0
-        val departureHdg = normalizeHeading(runwayHeading).toInt()
-        val crosswindHdg = normalizeHeading(runwayHeading + (90.0 * turnMultiplier)).toInt()
-        val downwindHdg = normalizeHeading(runwayHeading + 180.0).toInt()
-        val baseHdg = normalizeHeading(runwayHeading + (270.0 * turnMultiplier)).toInt()
-        val finalHdg = normalizeHeading(runwayHeading).toInt()
-        
+
         // Distances for each leg in NM (use the actual leg endpoints)
         val departureDist = calculateDistance(points[0], points[1]) / 1852.0
         val crosswindDist = calculateDistance(points[2], points[3]) / 1852.0
         val downwindDist = calculateDistance(points[3], points[5]) / 1852.0
         val baseDist = calculateDistance(points[6], points[7]) / 1852.0
         val finalDist = calculateDistance(points[8], points[10]) / 1852.0
-        
+
+        // Compute headings for each leg based on actual points (more robust when points are transformed)
+        val departureHdg = calculateBearing(points[0], points[1]).toInt()
+        val crosswindHdg = calculateBearing(points[2], points[3]).toInt()
+        val downwindHdg = calculateBearing(points[3], points[5]).toInt()
+        val baseHdg = calculateBearing(points[7], points[8]).toInt()
+        val finalHdg = calculateBearing(points[9], points[10]).toInt()
+
         // Compute midpoints where needed
         val crosswindMid = run {
             val distMeters = calculateDistance(points[2], points[3])
@@ -222,7 +221,7 @@ object TrafficPatternGenerator {
             val offsetMeters = max(100.0, adjLen * 0.15)
             calculateDestination(corner, bisector, offsetMeters)
         }
-        
+
         return listOf(
             // DEPARTURE at end of climb-out
             points[1] to String.format("DEPARTURE\nHDG %03d°\n%.1f NM", departureHdg, departureDist),
@@ -310,6 +309,49 @@ object TrafficPatternGenerator {
         
         val bearing = Math.toDegrees(atan2(y, x))
         return normalizeHeading(bearing)
+    }
+
+    /**
+     * Reflect a point across a line passing through `origin` with heading `lineBearing`.
+     * Reflection formula: newBearing = 2*lineBearing - originalBearing (keeps distance).
+     */
+    fun reflectPointAcrossLine(origin: GeoPoint, lineBearing: Double, point: GeoPoint): GeoPoint {
+        val d = calculateDistance(origin, point)
+        val originalBearing = calculateBearing(origin, point)
+        val reflectedBearing = normalizeHeading(2 * lineBearing - originalBearing)
+        return calculateDestination(origin, reflectedBearing, d)
+    }
+
+    /**
+     * Rotate a point 180° around `center` (equivalent to mirroring both axes)
+     */
+    fun rotate180Around(center: GeoPoint, point: GeoPoint): GeoPoint {
+        val d = calculateDistance(center, point)
+        val b = calculateBearing(center, point)
+        return calculateDestination(center, normalizeHeading(b + 180.0), d)
+    }
+
+    /**
+     * Apply reflection across runway centerline (horizontal axis) to all points
+     */
+    fun reflectAcrossRunwayCenterline(points: List<GeoPoint>, runwayThreshold: GeoPoint, runwayBearing: Double): List<GeoPoint> {
+        return points.map { p -> reflectPointAcrossLine(runwayThreshold, runwayBearing, p) }
+    }
+
+    /**
+     * Apply reflection perpendicular to runway (vertical axis) to all points
+     * This is used when switching pattern direction (LEFT_HAND ↔ RIGHT_HAND)
+     */
+    fun reflectPerpendicularToRunway(points: List<GeoPoint>, runwayThreshold: GeoPoint, runwayBearing: Double): List<GeoPoint> {
+        val perpendicularBearing = normalizeHeading(runwayBearing + 90.0)
+        return points.map { p -> reflectPointAcrossLine(runwayThreshold, perpendicularBearing, p) }
+    }
+
+    /**
+     * Rotate all points 180° around a given center
+     */
+    fun rotatePoints180(points: List<GeoPoint>, center: GeoPoint): List<GeoPoint> {
+        return points.map { p -> rotate180Around(center, p) }
     }
 }
 
