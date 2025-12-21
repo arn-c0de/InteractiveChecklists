@@ -29,6 +29,7 @@ import org.osmdroid.util.GeoPoint
 /**
  * Active Navigation Display - Shows route information and runway approach options
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapNavigationDisplay(
     mapState: MapViewerState,
@@ -623,11 +624,13 @@ fun MapNavigationDisplay(
                                         modifier = Modifier.padding(8.dp),
                                         verticalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
+                                        // Use same multipliers as the generator to keep UI and calculations consistent
                                         val sizeScale = when (mapState.patternSize) {
-                                            PatternSize.NORMAL -> 1.0
-                                            PatternSize.MEDIUM -> 1.25
-                                            PatternSize.LARGE -> 1.5
-                                            PatternSize.VERY_LARGE -> 2.0
+                                            PatternSize.NORMAL -> 1.25
+                                            PatternSize.MEDIUM -> 1.5
+                                            PatternSize.LARGE -> 1.75
+                                            PatternSize.VERY_LARGE -> 2.25
+                                            PatternSize.EXTRA_LARGE -> 3.0
                                         }
                                         val turnMultiplier = if (mapState.patternDirection == PatternDirection.LEFT_HAND) -1 else 1
                                         val selectedRwy = mapState.selectedRunway
@@ -687,6 +690,97 @@ fun MapNavigationDisplay(
                                             fontSize = 11.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
+
+                                        // Pattern settings: size, direction, final distance, and show toggle
+                                        Spacer(modifier = Modifier.height(6.dp))
+
+                                        Column(modifier = Modifier.fillMaxWidth()) {
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                                // Pattern size dropdown
+                                                var sizeExpanded by remember { mutableStateOf(false) }
+                                                ExposedDropdownMenuBox(
+                                                    expanded = sizeExpanded,
+                                                    onExpandedChange = { sizeExpanded = !sizeExpanded },
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
+                                                    OutlinedTextField(
+                                                        value = mapState.patternSize.displayName,
+                                                        onValueChange = {},
+                                                        readOnly = true,
+                                                        label = { Text("Pattern Size") },
+                                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = sizeExpanded) },
+                                                        modifier = Modifier.menuAnchor()
+                                                    )
+                                                    ExposedDropdownMenu(
+                                                        expanded = sizeExpanded,
+                                                        onDismissRequest = { sizeExpanded = false }
+                                                    ) {
+                                                        PatternSize.values().forEach { size ->
+                                                            DropdownMenuItem(
+                                                                text = { Text(size.displayName) },
+                                                                onClick = {
+                                                                    mapState.patternSize = size
+                                                                    mapState.saveNavigationState()
+                                                                    sizeExpanded = false
+                                                                }
+                                                            )
+                                                        }
+                                                    }
+                                                }
+
+                                                // Pattern direction buttons
+                                                Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                    Button(
+                                                        onClick = {
+                                                            mapState.patternDirection = PatternDirection.LEFT_HAND
+                                                            mapState.saveNavigationState()
+                                                        },
+                                                        colors = if (mapState.patternDirection == PatternDirection.LEFT_HAND) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary) else ButtonDefaults.buttonColors()
+                                                    ) {
+                                                        Text("Left")
+                                                    }
+                                                    Button(
+                                                        onClick = {
+                                                            mapState.patternDirection = PatternDirection.RIGHT_HAND
+                                                            mapState.saveNavigationState()
+                                                        },
+                                                        colors = if (mapState.patternDirection == PatternDirection.RIGHT_HAND) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary) else ButtonDefaults.buttonColors()
+                                                    ) {
+                                                        Text("Right")
+                                                    }
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(8.dp))
+
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                                var finalDistText by remember { mutableStateOf(String.format("%.1f", mapState.patternFinalDistanceNm)) }
+                                                OutlinedTextField(
+                                                    value = finalDistText,
+                                                    onValueChange = { v ->
+                                                        val filtered = v.filter { it.isDigit() || it == '.' }
+                                                        finalDistText = filtered
+                                                        val d = filtered.toDoubleOrNull()
+                                                        if (d != null) {
+                                                            mapState.patternFinalDistanceNm = d
+                                                            mapState.saveNavigationState()
+                                                        }
+                                                    },
+                                                    label = { Text("Final dist (NM)") },
+                                                    singleLine = true,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(text = "Show pattern")
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Switch(checked = mapState.showTrafficPattern, onCheckedChange = {
+                                                        mapState.showTrafficPattern = it
+                                                        mapState.saveNavigationState()
+                                                    })
+                                                }
+                                            }
+                                        }
 
                                         // Show pattern altitude and current altitude with indicator
                                         val patternAlt = mapState.patternSize.patternAltitudeFt
