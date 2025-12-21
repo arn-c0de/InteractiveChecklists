@@ -17,9 +17,6 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Navigation
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FlightLand
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -56,6 +53,7 @@ import com.example.checklist_interactive.ui.common.MapViewerFABs
 import com.example.checklist_interactive.ui.maps.marker.*
 import com.example.checklist_interactive.ui.maps.navigation.*
 import com.example.checklist_interactive.ui.maps.ui.MapNavigationDisplay
+import com.example.checklist_interactive.ui.maps.ui.MapRadialMenuDisplay
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
@@ -1996,61 +1994,11 @@ fun MapViewer(
     }
     
     // Radial menu
-    if (mapState.radialMenuVisible && mapState.radialMenuMarker != null) {
-        Log.d(TAG, "Rendering RadialMenu at (${mapState.radialMenuX}, ${mapState.radialMenuY}) for marker ${mapState.radialMenuMarker?.name}")
-        val items = mutableListOf<RadialMenuItem>().apply {
-            add(RadialMenuItem(
-                icon = Icons.Default.Info,
-                label = "Info",
-                onClick = {
-                    mapState.selectedLocation = mapState.radialMenuMarker
-                    mapState.showMarkerRouteManagement = true
-                }
-            ))
-
-            add(RadialMenuItem(
-                icon = Icons.Default.Edit,
-                label = "Edit",
-                onClick = {
-                    mapState.selectedLocation = mapState.radialMenuMarker
-                    mapState.showMarkerRouteManagement = true
-                }
-            ))
-
-            add(RadialMenuItem(
-                icon = Icons.Default.Navigation,
-                label = "Navigate",
-                onClick = {
-                    mapState.radialMenuMarker?.let { marker ->
-                        mapState.activeNavigationTarget = marker
-                    }
-                }
-            ))
-
-            // Only show Delete for non-static markers
-            if (mapState.radialMenuMarker?.isStatic != 1) {
-                add(RadialMenuItem(
-                    icon = Icons.Default.Delete,
-                    label = "Delete",
-                    onClick = {
-                        mapState.radialMenuMarker?.let { marker ->
-                            scope.launch {
-                                val repo = locationRepository ?: return@launch
-                                repo.deleteLocation(marker.id)
-                            }
-                        }
-                    }
-                ))
-            }
-        }
-
-        RadialMenu(
-            centerX = mapState.radialMenuX,
-            centerY = mapState.radialMenuY,
-            onDismiss = { mapState.radialMenuVisible = false },
-            items = items
-        )
-    }
+    MapRadialMenuDisplay(
+        mapState = mapState,
+        locationRepository = locationRepository,
+        scope = scope
+    )
     
     // Marker/Route Management Sheet (with integrated marker details)
     if (mapState.showMarkerRouteManagement) {
