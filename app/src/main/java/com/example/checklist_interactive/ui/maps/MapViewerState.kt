@@ -94,6 +94,11 @@ class MapViewerState(
     var patternDirection by mutableStateOf(PatternDirection.LEFT_HAND)
     var patternFinalDistanceNm by mutableStateOf(1.0)
     var showPatternDetails by mutableStateOf(true)
+
+    // Pattern altitude indicator thresholds (in feet)
+    // Small tolerance (≈) and a larger warning tolerance (yellow) used for color coding
+    var patternAltitudeSmallToleranceFt by mutableStateOf(50.0)
+    var patternAltitudeWarningToleranceFt by mutableStateOf(500.0)
     
     // Military symbol placement state
     var pendingSymbolPlacement by mutableStateOf<Pair<MilitarySymbol, SymbolAffiliation>?>(null)
@@ -269,6 +274,10 @@ class MapViewerState(
         patternSize = PatternSize.fromOrdinal(prefs.getInt("pattern_size_ordinal", PatternSize.NORMAL.ordinal))
         patternDirection = if (prefs.getBoolean("pattern_direction_left", true)) PatternDirection.LEFT_HAND else PatternDirection.RIGHT_HAND
 
+        // Restore pattern altitude thresholds
+        patternAltitudeSmallToleranceFt = prefs.getFloat("pattern_alt_small_tolerance_ft", 50.0f).toDouble()
+        patternAltitudeWarningToleranceFt = prefs.getFloat("pattern_alt_warning_tolerance_ft", 500.0f).toDouble()
+
         // Small delay before marking as restored
         delay(50)
         navigationRestored = true
@@ -321,6 +330,9 @@ class MapViewerState(
                 putInt("pattern_size_ordinal", patternSize.ordinal)
                 putBoolean("pattern_direction_left", patternDirection == PatternDirection.LEFT_HAND)
                 putFloat("pattern_final_distance_nm", patternFinalDistanceNm.toFloat())
+                // Save pattern altitude thresholds
+                putFloat("pattern_alt_small_tolerance_ft", patternAltitudeSmallToleranceFt.toFloat())
+                putFloat("pattern_alt_warning_tolerance_ft", patternAltitudeWarningToleranceFt.toFloat())
 
                 // Save the original airport id used for pattern/approach navigation (if any)
                 putInt("pattern_airport_id", originalAirportTarget?.id ?: -999)
