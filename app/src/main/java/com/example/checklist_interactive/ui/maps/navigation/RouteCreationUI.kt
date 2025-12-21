@@ -1,4 +1,4 @@
-package com.example.checklist_interactive.ui.maps
+package com.example.checklist_interactive.ui.maps.navigation
 
 // This file now serves as a compatibility layer
 // Core multi-waypoint route functionality has been moved to MultiWaypointRouteNavigation.kt

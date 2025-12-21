@@ -1,4 +1,4 @@
-package com.example.checklist_interactive.ui.maps
+package com.example.checklist_interactive.ui.maps.navigation
 
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -20,6 +20,8 @@ import com.example.checklist_interactive.data.tactical.LocationEntity
 import com.example.checklist_interactive.data.tactical.RunwayEntity
 import com.example.checklist_interactive.data.tactical.TacticalDatabase
 import org.json.JSONObject
+import com.example.checklist_interactive.ui.maps.MapActionBus
+import com.example.checklist_interactive.ui.maps.marker.LocationEditDialog
 
 /**
  * Single marker navigation and details display

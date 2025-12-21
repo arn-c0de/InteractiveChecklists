@@ -1,4 +1,4 @@
-package com.example.checklist_interactive.ui.maps
+package com.example.checklist_interactive.ui.maps.navigation
 
 import android.app.Application
 import android.graphics.Canvas
