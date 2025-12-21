@@ -1,15 +1,25 @@
 package com.example.checklist_interactive.ui.maps
 
 import android.content.Context
+import android.util.Log
 import androidx.compose.runtime.*
 import com.example.checklist_interactive.data.prefs.PreferencesManager
 import com.example.checklist_interactive.data.tactical.LocationEntity
+import com.example.checklist_interactive.data.tactical.LocationRepository
+import com.example.checklist_interactive.data.tactical.RouteRepository
 import com.example.checklist_interactive.data.tactical.RunwayEntity
+import com.example.checklist_interactive.data.tactical.TacticalDatabase
+import com.example.checklist_interactive.ui.maps.marker.MarkerRouteViewModel
 import com.example.checklist_interactive.ui.maps.marker.MilitarySymbol
 import com.example.checklist_interactive.ui.maps.marker.SymbolAffiliation
 import com.example.checklist_interactive.ui.maps.navigation.PatternDirection
 import com.example.checklist_interactive.ui.maps.navigation.PatternLabelOverlay
 import com.example.checklist_interactive.ui.maps.navigation.PatternSize
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
@@ -22,9 +32,10 @@ import org.osmdroid.views.overlay.Polyline
  */
 @Stable
 class MapViewerState(
-    context: Context
+    private val context: Context
 ) {
     private val prefsManager = PreferencesManager(context)
+    private val TAG = "MapViewerState"
     
     // Map state
     var mapView by mutableStateOf<MapView?>(null)
@@ -114,6 +125,303 @@ class MapViewerState(
     // Restoration tracking
     var routesRestored by mutableStateOf(false)
     var navigationRestored by mutableStateOf(false)
+
+    // ============================================================================
+    // BUSINESS LOGIC METHODS
+    // Methods extracted from LaunchedEffect blocks for better separation of concerns
+    // ============================================================================
+
+    /**
+     * Initialize the TacticalDatabase.
+     * Should be called once when the MapViewer is composed.
+     */
+    suspend fun initializeDatabase() {
+        Log.d(TAG, "Starting TacticalDatabase initialization...")
+        withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "Calling TacticalDatabase.getInstance()...")
+                val db = withTimeout(10000L) { // 10 second timeout
+                    TacticalDatabase.getInstance(context, useExternalPath = false)
+                }
+                Log.d(TAG, "TacticalDatabase.getInstance() completed successfully")
+                withContext(Dispatchers.Main) {
+                    tacticalDb = db
+                    Log.d(TAG, "TacticalDatabase assigned to state variable - DB ready!")
+                }
+            } catch (e: TimeoutCancellationException) {
+                Log.e(TAG, "TacticalDatabase initialization timed out after 10 seconds", e)
+                withContext(Dispatchers.Main) {
+                    dbInitFailed = true
+                    dbInitError = "Zeitüberschreitung beim Laden der Datenbank"
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to initialize TacticalDatabase", e)
+                e.printStackTrace()
+                withContext(Dispatchers.Main) {
+                    dbInitFailed = true
+                    dbInitError = e.message ?: "Unbekannter Fehler"
+                }
+            }
+        }
+    }
+
+    /**
+     * Restore visible routes from SharedPreferences.
+     * Should be called when MarkerRouteViewModel becomes available.
+     */
+    suspend fun restoreVisibleRoutes(markerRouteViewModel: MarkerRouteViewModel?) {
+        // Reset flag each time the viewmodel instance changes
+        routesRestored = false
+
+        val vm = markerRouteViewModel
+        if (vm == null) {
+            Log.d(TAG, "MarkerRouteViewModel not ready - deferring route restoration")
+            return
+        }
+
+        val prefs = context.getSharedPreferences("map_routes_prefs", Context.MODE_PRIVATE)
+        val savedRouteIds = prefs.getStringSet("visible_route_ids", emptySet())
+            ?.mapNotNull { it.toIntOrNull() }
+            ?.toSet() ?: emptySet()
+
+        vm.setVisibleRoutes(savedRouteIds)
+        Log.d(TAG, "Restored visible routes: $savedRouteIds")
+
+        // Small delay to ensure collectors process the change before we re-enable saving
+        delay(50)
+        routesRestored = true
+    }
+
+    /**
+     * Restore navigation state from SharedPreferences.
+     * Should be called when database and locationRepository are ready.
+     */
+    suspend fun restoreNavigationState(locationRepository: LocationRepository?) {
+        if (tacticalDb == null || locationRepository == null) {
+            Log.d(TAG, "Navigation restore deferred: dbReady=${tacticalDb != null}, locationRepository=${locationRepository != null}")
+            return
+        }
+        navigationRestored = false
+
+        val prefs = context.getSharedPreferences("map_navigation_prefs", Context.MODE_PRIVATE)
+
+        // Restore active navigation target
+        val navTargetId = prefs.getInt("active_nav_target_id", -999)
+        Log.d(TAG, "Attempting to restore navigation target with ID: $navTargetId")
+
+        if (navTargetId == -2 || navTargetId == -1) {
+            // Special-case: Pattern (-2) and approach (-1) navigation
+            val patternAirportId = prefs.getInt("nav_airport_id", prefs.getInt("pattern_airport_id", -999))
+            if (patternAirportId > 0) {
+                try {
+                    val airport = withContext(Dispatchers.IO) {
+                        locationRepository.getLocationById(patternAirportId)
+                    }
+                    if (airport != null) {
+                        activeNavigationTarget = airport
+                        showNavigationDetails = true
+                        autoCenter = false
+                        Log.d(TAG, "✅ Restored navigation airport: ${airport.name} (id=$patternAirportId) for special target id=$navTargetId")
+                    } else {
+                        Log.w(TAG, "⚠️ Navigation airport with ID $patternAirportId not found in database")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "❌ Failed to restore navigation airport", e)
+                }
+            } else {
+                Log.w(TAG, "⚠️ No navigation airport id saved; cannot fully restore special navigation (id=$navTargetId)")
+            }
+        } else if (navTargetId > 0) {
+            try {
+                val target = withContext(Dispatchers.IO) {
+                    locationRepository.getLocationById(navTargetId)
+                }
+
+                if (target != null) {
+                    activeNavigationTarget = target
+                    originalAirportTarget = target
+                    showNavigationDetails = true
+                    autoCenter = false
+                    Log.d(TAG, "✅ Restored navigation target: ${target.name} (id=$navTargetId)")
+                } else {
+                    Log.w(TAG, "⚠️ Navigation target with ID $navTargetId not found in database")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Failed to restore navigation target", e)
+            }
+        } else {
+            Log.d(TAG, "No active navigation target to restore (id=$navTargetId)")
+        }
+
+        // Restore runway approach mode
+        showRunwayApproach = prefs.getBoolean("show_runway_approach", false)
+        finalApproachDistanceNm = prefs.getFloat("final_approach_distance_nm", 5.0f).toDouble()
+
+        val selectedRwyIdx = prefs.getInt("selected_runway_index", -1)
+        if (selectedRwyIdx >= 0) {
+            selectedRunwayIndex = selectedRwyIdx
+            Log.d(TAG, "Restored selected runway index: $selectedRwyIdx")
+        }
+
+        // Restore traffic pattern mode
+        showTrafficPattern = prefs.getBoolean("show_traffic_pattern", false)
+        patternFinalDistanceNm = prefs.getFloat("pattern_final_distance_nm", 1.0f).toDouble()
+        patternSize = PatternSize.fromOrdinal(prefs.getInt("pattern_size_ordinal", PatternSize.NORMAL.ordinal))
+        patternDirection = if (prefs.getBoolean("pattern_direction_left", true)) PatternDirection.LEFT_HAND else PatternDirection.RIGHT_HAND
+
+        // Small delay before marking as restored
+        delay(50)
+        navigationRestored = true
+    }
+
+    /**
+     * Save visible routes to SharedPreferences.
+     */
+    fun saveVisibleRoutes(visibleRouteIds: Set<Int>) {
+        if (!routesRestored) {
+            Log.d(TAG, "Skipping save - routes not yet restored")
+            return
+        }
+
+        val prefs = context.getSharedPreferences("map_routes_prefs", Context.MODE_PRIVATE)
+        prefs.edit()
+            .putStringSet("visible_route_ids", visibleRouteIds.map { it.toString() }.toSet())
+            .apply()
+        Log.d(TAG, "Saved visible routes: $visibleRouteIds")
+    }
+
+    /**
+     * Save navigation state to SharedPreferences.
+     */
+    fun saveNavigationState() {
+        if (!navigationRestored) {
+            Log.d(TAG, "Skipping navigation save - not yet restored")
+            return
+        }
+
+        try {
+            val prefs = context.getSharedPreferences("map_navigation_prefs", Context.MODE_PRIVATE)
+            prefs.edit().apply {
+                // Save active navigation target. Prefer pattern sentinel if a pattern is active or requested,
+                // because activeNavigationTarget might be a temporary object and null during brief restore transitions.
+                val targetId = when {
+                    showTrafficPattern -> -2
+                    activeNavigationTarget != null -> activeNavigationTarget!!.id
+                    else -> -999
+                }
+                putInt("active_nav_target_id", targetId)
+
+                // Save runway approach state
+                putBoolean("show_runway_approach", showRunwayApproach)
+                putFloat("final_approach_distance_nm", finalApproachDistanceNm.toFloat())
+                putInt("selected_runway_index", selectedRunwayIndex ?: -1)
+
+                // Save traffic pattern state
+                putBoolean("show_traffic_pattern", showTrafficPattern)
+                putInt("pattern_size_ordinal", patternSize.ordinal)
+                putBoolean("pattern_direction_left", patternDirection == PatternDirection.LEFT_HAND)
+                putFloat("pattern_final_distance_nm", patternFinalDistanceNm.toFloat())
+
+                // Save the original airport id used for pattern/approach navigation (if any)
+                putInt("pattern_airport_id", originalAirportTarget?.id ?: -999)
+                // Backwards-compatible key used for both pattern and approach restores
+                putInt("nav_airport_id", originalAirportTarget?.id ?: -999)
+
+                apply()
+            }
+            Log.d(TAG, "💾 Saved navigation state: target=${activeNavigationTarget?.name}, approach=$showRunwayApproach, pattern=$showTrafficPattern, patternSize=$patternSize")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save navigation state", e)
+        }
+    }
+
+    /**
+     * Load runways for the selected location.
+     * Should be called when selected location changes.
+     */
+    suspend fun loadRunwaysForSelectedLocation() {
+        val locId = selectedLocation?.id
+        if (tacticalDb == null) {
+            selectedRunways = emptyList()
+            return
+        }
+        if (locId != null) {
+            tacticalDb!!.runwayDao().getRunwaysByLocation(locId).collect { list ->
+                selectedRunways = list
+            }
+        } else {
+            selectedRunways = emptyList()
+        }
+    }
+
+    /**
+     * Load runways for the active navigation target.
+     * Should be called when active navigation target changes.
+     */
+    suspend fun loadRunwaysForActiveTarget() {
+        val target = activeNavigationTarget
+        // Only update original airport if it's a real location (not a temporary approach point)
+        if (target != null && target.id > 0) {
+            originalAirportTarget = target
+            // Load runways from database
+            val db = TacticalDatabase.getInstance(context, useExternalPath = false)
+            db.runwayDao().getRunwaysByLocation(target.id).collect { runways ->
+                targetRunways = runways
+
+                // Restore selected runway if we have a saved index
+                val savedIdx = selectedRunwayIndex
+                if (savedIdx != null && savedIdx >= 0 && runways.isNotEmpty()) {
+                    // Calculate which runway based on index (each runway has 2 directions)
+                    val runwayIdx = savedIdx / 2
+                    if (runwayIdx < runways.size) {
+                        selectedRunway = runways[runwayIdx]
+                        Log.d(TAG, "✅ Restored selected runway: ${selectedRunway?.name} (index=$savedIdx)")
+                    }
+                }
+            }
+        } else if (target == null) {
+            // Navigation cleared completely
+            targetRunways = emptyList()
+            originalAirportTarget = null
+            showRunwayApproach = false
+            selectedRunwayIndex = null
+            selectedRunwayHeading = null
+            selectedRunway = null
+        }
+        // If target.id == -1, it's an approach point - keep original airport and runways
+    }
+
+    /**
+     * Helper function to extract runway heading from runway name.
+     */
+    fun extractRunwayHeading(runwayName: String): Double? {
+        // Parse runway name like "12/30", "09/27", "13L/31R"
+        // Extract first number before "/" and multiply by 10
+        val match = runwayName.trim().split("/").firstOrNull()?.trim()
+        return match?.replace(Regex("[LCR]"), "")?.toIntOrNull()?.times(10)?.toDouble()
+    }
+
+    /**
+     * Initialize osmdroid configuration.
+     */
+    fun initializeOsmdroidConfig() {
+        org.osmdroid.config.Configuration.getInstance().userAgentValue = context.packageName
+        org.osmdroid.config.Configuration.getInstance().load(
+            context,
+            context.getSharedPreferences("osmdroid", android.content.Context.MODE_PRIVATE)
+        )
+    }
+
+    /**
+     * Resolve and store the name for a pending move marker.
+     */
+    suspend fun resolvePendingMoveTargetName(markerId: Int, locationRepository: LocationRepository?) {
+        pendingMoveTargetName = try {
+            locationRepository?.getLocationById(markerId)?.name
+        } catch (_: Exception) {
+            null
+        }
+    }
 }
 
 /**
