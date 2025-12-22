@@ -1,21 +1,35 @@
 package com.example.checklist_interactive.ui.maps.ui
 
+import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.FlightLand
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Opacity
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -27,6 +41,7 @@ import com.example.checklist_interactive.ui.maps.MapViewerState
 import com.example.checklist_interactive.ui.maps.navigation.PatternDirection
 import com.example.checklist_interactive.ui.maps.navigation.PatternSize
 import org.osmdroid.util.GeoPoint
+import kotlin.math.abs
 
 /**
  * Active Navigation Display - Shows route information and runway approach options
@@ -71,16 +86,49 @@ fun MapNavigationDisplay(
     onPatternAltitudeWarningToleranceFtChange: (Double) -> Unit,
     saveNavigationState: () -> Unit
 ) {
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    
+    // Persistent height fraction (0.0 to 1.0 of screen height)
+    val prefs = context.getSharedPreferences("map_navigation_prefs", Context.MODE_PRIVATE)
+    val KEY_HEIGHT_FRACTION = "nav_display_height_fraction"
+    val savedFraction = prefs.getFloat(KEY_HEIGHT_FRACTION, 0.35f)
+    val heightMin = 0.15f
+    val heightMax = 0.7f
+    var heightFraction by rememberSaveable { mutableStateOf(savedFraction.coerceIn(heightMin, heightMax)) }
+    
+    // Persist height when changed
+    LaunchedEffect(heightFraction) {
+        prefs.edit().putFloat(KEY_HEIGHT_FRACTION, heightFraction).apply()
+    }
+    
+    // Persistent opacity
+    val KEY_OPACITY = "nav_display_opacity"
+    val savedOpacity = prefs.getFloat(KEY_OPACITY, 1.0f)
+    var cardOpacity by rememberSaveable { mutableStateOf(savedOpacity.coerceIn(0.25f, 1.0f)) }
+    var showOpacitySlider by remember { mutableStateOf(false) }
+    
+    // Persist opacity when changed
+    LaunchedEffect(cardOpacity) {
+        prefs.edit().putFloat(KEY_OPACITY, cardOpacity).apply()
+    }
+    
+    val cardHeightDp = (configuration.screenHeightDp.toFloat() * heightFraction).dp
+    
     if (activeNavigationTarget != null) {
-        Card(
-            modifier = modifier
-                .widthIn(max = 500.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.errorContainer
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-        ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
+        Box(modifier = modifier.widthIn(max = 500.dp)) {
+            Card(
+                modifier = Modifier
+                    .height(cardHeightDp)
+                    .fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = cardOpacity)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            ) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // Fixed header (always visible, non-scrollable)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -261,13 +309,18 @@ fun MapNavigationDisplay(
                     }
                 }
 
-                // Collapsible details section
+                // Collapsible details section (scrollable)
                 AnimatedVisibility(
                     visible = showNavigationDetails,
                     enter = expandVertically() + fadeIn(),
                     exit = shrinkVertically() + fadeOut()
                 ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f, fill = false)
+                            .verticalScroll(rememberScrollState())
+                    ) {
                         // Runway selection (when approach mode active)
                         if (showRunwayApproach && targetRunways.isNotEmpty()) {
                             HorizontalDivider(color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.2f))
@@ -628,6 +681,7 @@ fun MapNavigationDisplay(
                                     Spacer(modifier = Modifier.height(8.dp))
 
                                     // Pattern details header with collapsible body
+                                    var showPatternDetails by rememberSaveable { mutableStateOf(true) }
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -639,16 +693,16 @@ fun MapNavigationDisplay(
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
-                                        IconButton(onClick = { onShowNavigationDetailsChange(!showNavigationDetails) }) {
+                                        IconButton(onClick = { showPatternDetails = !showPatternDetails }) {
                                             Icon(
-                                                imageVector = if (showNavigationDetails) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                                contentDescription = if (showNavigationDetails) "Collapse" else "Expand"
+                                                imageVector = if (showPatternDetails) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                contentDescription = if (showPatternDetails) "Collapse" else "Expand"
                                             )
                                         }
                                     }
 
                                     AnimatedVisibility(
-                                        visible = showNavigationDetails,
+                                        visible = showPatternDetails,
                                         enter = expandVertically() + fadeIn(),
                                         exit = shrinkVertically() + fadeOut()
                                     ) {
@@ -1057,10 +1111,85 @@ fun MapNavigationDisplay(
                         }
                     }
                 }
+                    } // End AnimatedVisibility (scrollable details section)
+                    
+                    // Opacity slider (collapsible, fixed at bottom)
+                    AnimatedVisibility(visible = showOpacitySlider) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.9f))
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                text = "Transparency",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Slider(
+                                value = cardOpacity,
+                                onValueChange = { cardOpacity = it },
+                                valueRange = 0.25f..1.0f,
+                                colors = SliderDefaults.colors(
+                                    thumbColor = MaterialTheme.colorScheme.primary,
+                                    activeTrackColor = MaterialTheme.colorScheme.primary
+                                )
+                            )
+                        }
+                    }
+                    
+                    // Drag handle at bottom
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(32.dp)
+                            .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.9f))
+                            .pointerInput(Unit) {
+                                detectDragGestures { change, dragAmount ->
+                                    change.consume()
+                                    val dragDp = with(density) { dragAmount.y.toDp() }
+                                    val screenHeightDp = configuration.screenHeightDp.dp
+                                    val deltaFraction = dragDp / screenHeightDp
+                                    heightFraction = (heightFraction + deltaFraction).coerceIn(heightMin, heightMax)
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DragHandle,
+                                contentDescription = "Drag to resize",
+                                tint = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.6f)
+                            )
+
+                            // Circular percentage badge showing current opacity (click to toggle slider)
+                            val opacityPercent = (cardOpacity * 100).toInt()
+                            Surface(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clickable { showOpacitySlider = !showOpacitySlider },
+                                shape = CircleShape,
+                                tonalElevation = 0.dp,
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.06f)
+                            ) {
+                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                    Text(
+                                        text = "${'$'}opacityPercent%",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                        modifier = Modifier.padding(2.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } // End outer Column
             }
         }
     }
-}
 
 /**
  * Helper function to extract runway heading from name
