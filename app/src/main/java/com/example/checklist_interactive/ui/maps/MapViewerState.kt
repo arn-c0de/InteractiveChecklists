@@ -122,6 +122,7 @@ class MapViewerState(
     var radialMenuX by mutableStateOf(0)
     var radialMenuY by mutableStateOf(0)
     var radialMenuMarker by mutableStateOf<LocationEntity?>(null)
+    var radialMenuType by mutableStateOf(com.example.checklist_interactive.ui.maps.components.RadialMenuType.MARKER)
     
     // Marker interaction tracking
     var lastLongPressedMarkerId by mutableStateOf<Int?>(null)

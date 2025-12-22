@@ -1109,7 +1109,9 @@ fun MapViewer(
                                                         }
                                                     }
 
-                                                    nearestMarker?.let { nm ->
+                                                    if (nearestMarker != null) {
+                                                        // Marker found - show marker radial menu
+                                                        val nm = nearestMarker
                                                         // Prefer mapping lookup; fall back to relatedObject
                                                         val loc = markerToLocation[nm] ?: try { nm.relatedObject as? com.example.checklist_interactive.data.tactical.LocationEntity } catch (_: Throwable) { null }
                                                         
@@ -1160,12 +1162,28 @@ fun MapViewer(
                                                                 mapState.radialMenuX = windowX
                                                                 mapState.radialMenuY = adjY
                                                                 mapState.radialMenuVisible = true
+                                                                mapState.radialMenuType = com.example.checklist_interactive.ui.maps.components.RadialMenuType.MARKER
                                                                 mapState.lastLongPressedMarkerId = loc.id
                                                                 mapState.lastLongPressTime = System.currentTimeMillis()
                                                                 Log.d(TAG, "RadialMenu state set: visible=${mapState.radialMenuVisible}, marker=${mapState.radialMenuMarker?.name}")
                                                             }
                                                         } else {
                                                             Log.d(TAG, "Long-press found nearest marker but could not resolve LocationEntity")
+                                                        }
+                                                    } else {
+                                                        // No marker found - show drawing radial menu
+                                                        Log.d(TAG, "Long-press without marker - showing drawing menu")
+                                                        val mapLoc = IntArray(2)
+                                                        this@apply.getLocationInWindow(mapLoc)
+                                                        val windowX = mapLoc[0] + touchX
+                                                        val windowY = mapLoc[1] + touchY
+                                                        
+                                                        scope.launch {
+                                                            mapState.radialMenuMarker = null
+                                                            mapState.radialMenuX = windowX
+                                                            mapState.radialMenuY = windowY
+                                                            mapState.radialMenuVisible = true
+                                                            mapState.radialMenuType = com.example.checklist_interactive.ui.maps.components.RadialMenuType.DRAWING
                                                         }
                                                     }
 
@@ -1269,9 +1287,6 @@ fun MapViewer(
         )
         
         // Drawing overlay - ALWAYS renders strokes, input only when drawing mode active
-        var showDrawingRadialMenu by remember { mutableStateOf(false) }
-        var drawingRadialMenuPosition by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
-        
         MapDrawingOverlay(
             mapView = mapState.mapView,
             drawingState = drawingState,
@@ -1289,33 +1304,18 @@ fun MapViewer(
                 // Then remove from UI list
                 mapDrawings.removeAll(erasedStrokes.toSet())
             },
-            onLongPress = if (drawingState.isDrawingMode) {
-                { offset ->
-                    drawingRadialMenuPosition = offset
-                    showDrawingRadialMenu = true
-                }
-            } else null,
+            onLongPress = { offset ->
+                // Open drawing radial menu
+                val windowOffset = IntArray(2)
+                mapState.mapView?.getLocationInWindow(windowOffset)
+                mapState.radialMenuMarker = null
+                mapState.radialMenuX = windowOffset[0] + offset.x.toInt()
+                mapState.radialMenuY = windowOffset[1] + offset.y.toInt()
+                mapState.radialMenuVisible = true
+                mapState.radialMenuType = com.example.checklist_interactive.ui.maps.components.RadialMenuType.DRAWING
+            },
             modifier = Modifier.fillMaxSize()
         )
-        
-        // Drawing radial menu
-        if (showDrawingRadialMenu && drawingState.isDrawingMode) {
-            DrawingRadialMenu(
-                centerX = drawingRadialMenuPosition.x.toInt(),
-                centerY = drawingRadialMenuPosition.y.toInt(),
-                drawingState = drawingState,
-                onDismiss = { showDrawingRadialMenu = false },
-                onBrushSelected = { brushType ->
-                    drawingState = drawingState.copy(brushType = brushType, isEraseMode = false)
-                },
-                onColorSelected = { color ->
-                    drawingState = drawingState.copy(selectedColor = color)
-                },
-                onEraseToggle = {
-                    drawingState = drawingState.copy(isEraseMode = !drawingState.isEraseMode)
-                }
-            )
-        }
 
         // Update tile source when theme changes (applies immediately on theme toggle)
         // Only apply theme-based tile source when user hasn't explicitly chosen one
@@ -2214,7 +2214,11 @@ fun MapViewer(
     MapRadialMenuDisplay(
         mapState = mapState,
         locationRepository = locationRepository,
-        scope = scope
+        scope = scope,
+        drawingState = drawingState,
+        onDrawingStateChange = { newState ->
+            drawingState = newState
+        }
     )
     
     // Marker/Route Management Sheet (with integrated marker details)
