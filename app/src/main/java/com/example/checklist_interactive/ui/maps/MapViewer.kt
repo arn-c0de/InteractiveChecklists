@@ -557,6 +557,7 @@ fun MapViewer(
             mapState.activeNavigationTarget = patternTarget
             // Ensure UI appears when pattern is generated
             mapState.showNavigationDetails = true
+            mapState.saveNavigationState()
             mapState.autoCenter = false
             
             mv.invalidate()
@@ -1564,6 +1565,13 @@ fun MapViewer(
                 bank = if (fd != null) Math.toDegrees(fd.bank) else 0.0,
                 verticalSpeed = fd?.verticalSpeed,
                 airspeed = fd?.indicatedAirspeed ?: fd?.trueAirspeed ?: fd?.groundSpeed,
+                altitude = fd?.altitude,
+                heading = if (fd != null) Math.toDegrees(fd.heading) else null,
+                angleOfAttack = fd?.angleOfAttack,
+                gLoad = fd?.gLoad?.z ?: fd?.gLoad?.y,
+                fuelRemaining = fd?.fuel?.remaining,
+                fuelTotal = fd?.fuel?.total,
+                mach = fd?.mach,
                 enabled = mapState.flightInstrumentsEnabled,
                 dataAvailable = instrumentsDataAvailable
             )
