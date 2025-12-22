@@ -67,22 +67,22 @@ fun MapFlightInstruments(
     ) {
         androidx.compose.material3.Surface(
             modifier = Modifier
-                .padding(bottom = 16.dp)
+                .padding(bottom = 12.dp)
                 .wrapContentSize(),
-            tonalElevation = 8.dp,
+            tonalElevation = 4.dp,
             shape = MaterialTheme.shapes.large,
-            color = Color(0xCC000000) // Semi-transparent black background
+            color = Color.Transparent // make outer panel transparent so instrument circles stand out
         ) {
             // Use a Box so we can overlay a "NO DATA" indicator when no flight data exists
             Box {
                 Column(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // Primary flight instruments (top row)
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Airspeed Indicator
@@ -108,7 +108,7 @@ fun MapFlightInstruments(
 
                     // Secondary instruments (bottom row - compact)
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Altimeter
