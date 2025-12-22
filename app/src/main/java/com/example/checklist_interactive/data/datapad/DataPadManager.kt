@@ -6,6 +6,10 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.sample
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
@@ -23,6 +27,7 @@ import java.util.Base64
 /**
  * Manages UDP reception of live flight data and provides state for UI consumption
  */
+@OptIn(FlowPreview::class)
 class DataPadManager(private val context: Context) {
     companion object {
         private const val TAG = "DataPadManager"
@@ -52,7 +57,9 @@ class DataPadManager(private val context: Context) {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     
     private val _flightData = MutableStateFlow<FlightData?>(null)
-    val flightData: StateFlow<FlightData?> = _flightData.asStateFlow()
+    val flightData: StateFlow<FlightData?> = _flightData
+        .sample(33) // ~30fps
+        .stateIn(scope, SharingStarted.WhileSubscribed(5000), _flightData.value)
     
     private val _isConnected = MutableStateFlow(false)
     val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
