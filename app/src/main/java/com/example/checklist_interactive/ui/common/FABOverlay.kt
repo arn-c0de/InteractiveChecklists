@@ -101,6 +101,7 @@ object MapViewerFABs {
         onMarkerRouteManagement: () -> Unit,
         onLockScreen: () -> Unit,
         onToggleMapRotation: () -> Unit,
+        onToggleRotationGesture: () -> Unit,
         onDrawingTools: () -> Unit,
         onResetFabPositions: () -> Unit,
         onDataPadOpen: () -> Unit,
@@ -108,6 +109,7 @@ object MapViewerFABs {
         isConnected: Boolean = false,
         isScreenLocked: Boolean = false,
         mapRotationMode: Int = 0,
+        rotationGestureEnabled: Boolean = true,
         isDrawingMode: Boolean = false,
         repositoriesReady: Boolean = false,
         pendingSymbolPlacement: Any? = null,
@@ -194,13 +196,23 @@ object MapViewerFABs {
             scope = "map"
         ),
         FABConfig(
+            id = "map_rotation_gesture",
+            icon = Icons.Default.RotateRight,
+            contentDescription = "Toggle 2-finger rotation gesture",
+            onClick = onToggleRotationGesture,
+            containerColor = if (rotationGestureEnabled) containerColorPrimary else containerColorSurface,
+            defaultX = 0.95f,
+            defaultY = 0.40f,
+            scope = "map"
+        ),
+        FABConfig(
             id = "map_drawing",
             icon = Icons.Default.Edit,
             contentDescription = "Drawing Tools",
             onClick = onDrawingTools,
             containerColor = if (isDrawingMode) containerColorPrimary else containerColorTertiary,
             defaultX = 0.95f,
-            defaultY = 0.40f,
+            defaultY = 0.45f,
             scope = "map"
         ),
         FABConfig(

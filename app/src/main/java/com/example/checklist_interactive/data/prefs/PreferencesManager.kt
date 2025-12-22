@@ -51,6 +51,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_MAP_OVERLAY_RINGS_MAX_NM = "map_overlay_rings_max_nm"
         private const val KEY_MAP_OVERLAY_MGRS_GRID = "map_overlay_mgrs_grid"
         private const val KEY_MAP_OVERLAY_FLIGHT_INSTRUMENTS = "map_overlay_flight_instruments"
+        private const val KEY_MAP_ROTATION_GESTURE = "map_rotation_gesture"
         private const val KEY_SCREEN_LOCKED = "screen_locked"
 
         // Application language preference (ISO code, e.g., "en", "de")
@@ -408,6 +409,14 @@ class PreferencesManager(context: Context) {
 
     fun isMapOverlayFlightInstrumentsEnabled(): Boolean {
         return prefs.getBoolean(KEY_MAP_OVERLAY_FLIGHT_INSTRUMENTS, false)
+    }
+
+    fun setMapRotationGestureEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_MAP_ROTATION_GESTURE, enabled).apply()
+    }
+
+    fun isMapRotationGestureEnabled(): Boolean {
+        return prefs.getBoolean(KEY_MAP_ROTATION_GESTURE, true)
     }
 
     /**

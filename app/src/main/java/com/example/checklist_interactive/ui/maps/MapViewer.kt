@@ -1175,7 +1175,7 @@ fun MapViewer(
                                         }
                                     }
                                     MotionEvent.ACTION_POINTER_DOWN -> {
-                                        if (ev.pointerCount == 2) {
+                                        if (ev.pointerCount == 2 && mapState.rotationGestureEnabled) {
                                             longPressJob?.cancel() // Cancel long press if a second finger goes down
                                             inRotationGesture = true
                                             val dx = ev.getX(0) - ev.getX(1)
@@ -1185,7 +1185,7 @@ fun MapViewer(
                                     }
                                     MotionEvent.ACTION_MOVE -> {
                                         lastUserTouch.value = System.currentTimeMillis()
-                                        if (inRotationGesture && ev.pointerCount >= 2) {
+                                        if (inRotationGesture && ev.pointerCount >= 2 && mapState.rotationGestureEnabled) {
                                             val dx = ev.getX(0) - ev.getX(1)
                                             val dy = ev.getY(0) - ev.getY(1)
                                             val currentAngle = Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat()
@@ -1534,6 +1534,15 @@ fun MapViewer(
                         flightData?.let { d -> try { mapState.mapView?.setMapOrientation(-Math.toDegrees(d.heading).toFloat()) } catch (_: Throwable) {} }
                     }
                 },
+                onToggleRotationGesture = {
+                    mapState.rotationGestureEnabled = !mapState.rotationGestureEnabled
+                    prefsManager.setMapRotationGestureEnabled(mapState.rotationGestureEnabled)
+                    android.widget.Toast.makeText(
+                        context, 
+                        if (mapState.rotationGestureEnabled) "2-Finger Rotation aktiviert" else "2-Finger Rotation deaktiviert",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                },
                 onDrawingTools = { 
                     if (drawingState.isDrawingMode) {
                         // Deactivate drawing mode and close popup
@@ -1560,6 +1569,7 @@ fun MapViewer(
                 isConnected = isConnected,
                 isScreenLocked = isScreenLocked,
                 mapRotationMode = mapState.mapRotationMode,
+                rotationGestureEnabled = mapState.rotationGestureEnabled,
                 isDrawingMode = drawingState.isDrawingMode,
                 repositoriesReady = repositoriesReady,
                 pendingSymbolPlacement = mapState.pendingSymbolPlacement,

@@ -70,6 +70,9 @@ class MapViewerState(
     // Map rotation: 0 = North-up, 1 = HDG-up (follow aircraft heading)
     var mapRotationMode by mutableStateOf(0)
     
+    // 2-finger rotation gesture control
+    var rotationGestureEnabled by mutableStateOf(prefsManager.isMapRotationGestureEnabled())
+    
     // Navigation state
     var activeNavigationTarget by mutableStateOf<LocationEntity?>(null)
     var navigationLine by mutableStateOf<Polyline?>(null)
