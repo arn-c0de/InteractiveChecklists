@@ -322,7 +322,7 @@ fun MapNavigationDisplay(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f, fill = true)
+                            .weight(1f, fill = false)
                             .verticalScroll(rememberScrollState())
                     ) {
                         // Runway selection (when approach mode active)
@@ -1181,7 +1181,7 @@ fun MapNavigationDisplay(
                             ) {
                                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                     Text(
-                                        text = "$opacityPercent%",
+                                        text = "${'$'}opacityPercent%",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onErrorContainer,
                                         modifier = Modifier.padding(2.dp)
