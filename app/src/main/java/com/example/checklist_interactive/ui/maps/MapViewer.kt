@@ -13,6 +13,8 @@ import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
@@ -54,6 +56,7 @@ import com.example.checklist_interactive.ui.common.FABOverlay
 import com.example.checklist_interactive.ui.common.MapViewerFABs
 import com.example.checklist_interactive.ui.maps.marker.*
 import com.example.checklist_interactive.ui.maps.navigation.*
+import com.example.checklist_interactive.ui.maps.drawing.*
 import com.example.checklist_interactive.data.tactical.LocationEntity
 import com.example.checklist_interactive.data.tactical.RunwayEntity
 import com.example.checklist_interactive.ui.maps.ui.MapNavigationDisplay
@@ -70,6 +73,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.first
 import androidx.compose.foundation.isSystemInDarkTheme
 
 /**
@@ -198,6 +202,70 @@ fun MapViewer(
     // Save visible routes to SharedPreferences when they change (but only after initial restoration completes)
     LaunchedEffect(visibleRouteIds, mapState.routesRestored) {
         mapState.saveVisibleRoutes(visibleRouteIds)
+    }
+    
+    // Drawing state
+    var drawingState by remember { mutableStateOf(MapDrawingState()) }
+    var showDrawingToolPopup by remember { mutableStateOf(false) }
+    val mapDrawings = remember { mutableStateListOf<MapDrawingStroke>() }
+    var currentDrawingStroke by remember { mutableStateOf<MapDrawingStroke?>(null) }
+    
+    // Load drawings from database when DB is ready
+    LaunchedEffect(mapState.tacticalDb) {
+        mapState.tacticalDb?.let { db ->
+            try {
+                val entities = db.mapDrawingDao().getAllDrawings().first()
+                val strokes = entities.map { MapDrawingStroke.fromEntity(it) }
+                mapDrawings.clear()
+                mapDrawings.addAll(strokes)
+                android.util.Log.d("MapViewer", "Loaded ${strokes.size} drawings from database")
+            } catch (e: Exception) {
+                android.util.Log.e("MapViewer", "Failed to load drawings", e)
+            }
+        }
+    }
+    
+    // Save drawings to database
+    fun saveDrawings() {
+        scope.launch {
+            mapState.tacticalDb?.let { db ->
+                try {
+                    val timestamp = java.time.Instant.now().toString()
+                    // Only save strokes that don't have an ID yet (new strokes)
+                    val newStrokesIndices = mapDrawings.withIndex().filter { it.value.id == 0 }
+                    
+                    if (newStrokesIndices.isNotEmpty()) {
+                        newStrokesIndices.forEach { (index, stroke) ->
+                            val entity = stroke.toEntity(timestamp, timestamp)
+                            val insertedId = db.mapDrawingDao().insertDrawing(entity)
+                            // Update the stroke in the list with the new ID
+                            mapDrawings[index] = stroke.copy(id = insertedId.toInt())
+                        }
+                        android.util.Log.d("MapViewer", "Saved ${newStrokesIndices.size} new drawings")
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("MapViewer", "Failed to save drawings", e)
+                }
+            }
+        }
+    }
+    
+    // Delete drawings from database
+    fun deleteDrawings(strokes: List<MapDrawingStroke>) {
+        scope.launch {
+            mapState.tacticalDb?.let { db ->
+                try {
+                    // Only delete strokes that have an ID (already in DB)
+                    val toDelete = strokes.filter { it.id != 0 }
+                    toDelete.forEach { stroke ->
+                        db.mapDrawingDao().deleteDrawingById(stroke.id)
+                    }
+                    android.util.Log.d("MapViewer", "Deleted ${toDelete.size} drawings from database")
+                } catch (e: Exception) {
+                    android.util.Log.e("MapViewer", "Failed to delete drawings", e)
+                }
+            }
+        }
     }
 
     // Save navigation state when it changes (but only after initial restoration completes)
@@ -1192,8 +1260,62 @@ fun MapViewer(
             },
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = with(density) { 0.dp })
+                .padding(top = with(density) { 0.dp }),
+            update = { mapView ->
+                // Disable map interactions when in drawing mode
+                mapView.setMultiTouchControls(!drawingState.isDrawingMode)
+                mapView.isClickable = !drawingState.isDrawingMode
+            }
         )
+        
+        // Drawing overlay - ALWAYS renders strokes, input only when drawing mode active
+        var showDrawingRadialMenu by remember { mutableStateOf(false) }
+        var drawingRadialMenuPosition by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+        
+        MapDrawingOverlay(
+            mapView = mapState.mapView,
+            drawingState = drawingState,
+            strokes = mapDrawings,
+            currentStroke = currentDrawingStroke,
+            onStrokeComplete = { stroke ->
+                mapDrawings.add(stroke)
+                currentDrawingStroke = null
+                // Auto-save after each stroke
+                saveDrawings()
+            },
+            onStrokesErased = { erasedStrokes ->
+                // Delete from database first
+                deleteDrawings(erasedStrokes)
+                // Then remove from UI list
+                mapDrawings.removeAll(erasedStrokes.toSet())
+            },
+            onLongPress = if (drawingState.isDrawingMode) {
+                { offset ->
+                    drawingRadialMenuPosition = offset
+                    showDrawingRadialMenu = true
+                }
+            } else null,
+            modifier = Modifier.fillMaxSize()
+        )
+        
+        // Drawing radial menu
+        if (showDrawingRadialMenu && drawingState.isDrawingMode) {
+            DrawingRadialMenu(
+                centerX = drawingRadialMenuPosition.x.toInt(),
+                centerY = drawingRadialMenuPosition.y.toInt(),
+                drawingState = drawingState,
+                onDismiss = { showDrawingRadialMenu = false },
+                onBrushSelected = { brushType ->
+                    drawingState = drawingState.copy(brushType = brushType, isEraseMode = false)
+                },
+                onColorSelected = { color ->
+                    drawingState = drawingState.copy(selectedColor = color)
+                },
+                onEraseToggle = {
+                    drawingState = drawingState.copy(isEraseMode = !drawingState.isEraseMode)
+                }
+            )
+        }
 
         // Update tile source when theme changes (applies immediately on theme toggle)
         // Only apply theme-based tile source when user hasn't explicitly chosen one
@@ -1412,6 +1534,17 @@ fun MapViewer(
                         flightData?.let { d -> try { mapState.mapView?.setMapOrientation(-Math.toDegrees(d.heading).toFloat()) } catch (_: Throwable) {} }
                     }
                 },
+                onDrawingTools = { 
+                    if (drawingState.isDrawingMode) {
+                        // Deactivate drawing mode and close popup
+                        drawingState = drawingState.copy(isDrawingMode = false, isEraseMode = false)
+                        showDrawingToolPopup = false
+                    } else {
+                        // Activate drawing mode and show popup
+                        drawingState = drawingState.copy(isDrawingMode = true)
+                        showDrawingToolPopup = true
+                    }
+                },
                 onResetFabPositions = {
                     try {
                         prefsManager.resetFabPositions("map")
@@ -1427,6 +1560,7 @@ fun MapViewer(
                 isConnected = isConnected,
                 isScreenLocked = isScreenLocked,
                 mapRotationMode = mapState.mapRotationMode,
+                isDrawingMode = drawingState.isDrawingMode,
                 repositoriesReady = repositoriesReady,
                 pendingSymbolPlacement = mapState.pendingSymbolPlacement,
                 datapadEnabled = datapadEnabled,
@@ -1708,8 +1842,37 @@ fun MapViewer(
             }
         }
 
+        // Drawing mode indicator (top-right, shows when drawing is active)
+        if (drawingState.isDrawingMode) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 8.dp, end = 12.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.95f),
+                shape = MaterialTheme.shapes.small
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (drawingState.isEraseMode) Icons.Default.Delete else Icons.Default.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        text = if (drawingState.isEraseMode) "Eraser Mode" else "Drawing Mode",
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    )
+                }
+            }
+        }
+
         // Small tip when map lock is disabled (top-right, smaller to avoid overlapping datapad HUD)
-        if (!isScreenLocked) {
+        if (!isScreenLocked && !drawingState.isDrawingMode) {
             Surface(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -1728,6 +1891,30 @@ fun MapViewer(
         
         // Removed old DraggableFab implementations for QuickNote and DataPad
         // These are now handled by the centralized FABOverlay system above
+        
+        // Drawing Tool Popup
+        if (showDrawingToolPopup) {
+            MapDrawingToolPopup(
+                state = drawingState,
+                onStateChange = { newState ->
+                    drawingState = newState
+                },
+                onDismiss = {
+                    // Just close the popup, keep drawing mode active
+                    showDrawingToolPopup = false
+                },
+                onClearAll = {
+                    mapDrawings.clear()
+                    scope.launch {
+                        mapState.tacticalDb?.mapDrawingDao()?.deleteAllDrawings()
+                    }
+                },
+                onSave = {
+                    saveDrawings()
+                    android.widget.Toast.makeText(context, "Drawings saved", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            )
+        }
         
         // Flight Instruments Overlay
         val fd = flightData
