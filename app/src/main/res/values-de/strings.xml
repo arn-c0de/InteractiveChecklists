@@ -645,6 +645,7 @@
     <string name="datapad_toggle_reception_off">Empfang aktivieren</string>
     <string name="datapad_connected">Verbunden</string>
     <string name="datapad_waiting_for_data">Warte auf Daten</string>
+    <string name="datapad_last_heartbeat">Letzter Heartbeat: %1$s</string>
     <string name="datapad_no_data">Noch keine Flugdaten empfangen</string>
     <string name="datapad_expected_command">Erwarteter Befehl:</string>
     <string name="datapad_aircraft">Flugzeug</string>

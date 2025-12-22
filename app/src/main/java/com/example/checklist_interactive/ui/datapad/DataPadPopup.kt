@@ -381,7 +381,7 @@ fun DataPadPopup(
                     udpPort = udpPort,
                     isRunning = isRunning,
                     onToggleEnabled = { if (isRunning) manager.disconnect() else manager.connect() }
-                )
+                ) // ConnectionStatusCard will also display last heartbeat time (if available)
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -437,6 +437,29 @@ private fun ConnectionStatusCard(
         }
     }
 
+    // Collect last heartbeat time and connection health from manager to display next to waiting status
+    val manager = LocalDataPadManager.current
+    val lastHeartbeat by manager.lastHeartbeatTime.collectAsState()
+    val connHealth by manager.connectionHealth.collectAsState()
+
+    var lastHeartbeatText by remember { mutableStateOf("--") }
+    LaunchedEffect(lastHeartbeat) {
+        while (true) {
+            val hb = lastHeartbeat
+            lastHeartbeatText = if (hb != null) {
+                val seconds = (System.currentTimeMillis() - hb) / 1000
+                when {
+                    seconds < 60 -> context.getString(com.example.checklist_interactive.R.string.datapad_time_seconds_ago, seconds)
+                    seconds < 3600 -> context.getString(com.example.checklist_interactive.R.string.datapad_time_minutes_ago, seconds / 60)
+                    else -> context.getString(com.example.checklist_interactive.R.string.datapad_time_hours_ago, seconds / 3600)
+                }
+            } else {
+                "--"
+            }
+            kotlinx.coroutines.delay(1000)
+        }
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -465,11 +488,18 @@ private fun ConnectionStatusCard(
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(modifier = Modifier.width(8.dp))
+                    val indicatorColor = when (connHealth) {
+                        com.example.checklist_interactive.data.datapad.DataPadManager.ConnectionHealth.HEALTHY -> Color(0xFFB9F6CA)
+                        com.example.checklist_interactive.data.datapad.DataPadManager.ConnectionHealth.WARNING -> Color(0xFFFFC107)
+                        com.example.checklist_interactive.data.datapad.DataPadManager.ConnectionHealth.STALE -> Color.Red
+                        else -> Color.Gray
+                    }
+
                     Box(
                         modifier = Modifier
                             .size(8.dp)
                             .background(
-                                color = if (isConnected) Color(0xFFB9F6CA) else Color.Gray,
+                                color = indicatorColor,
                                 shape = MaterialTheme.shapes.small
                             )
                     )
@@ -480,6 +510,15 @@ private fun ConnectionStatusCard(
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 14.sp
                     )
+
+                    if (lastHeartbeat != null && !isConnected) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "• ${context.getString(com.example.checklist_interactive.R.string.datapad_last_heartbeat, lastHeartbeatText)}",
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 11.sp
+                        )
+                    }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
