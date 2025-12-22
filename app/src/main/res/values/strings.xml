@@ -690,6 +690,7 @@
     <string name="settings_language_label">Language</string>
     <string name="language_english">English</string>
     <string name="language_german">Deutsch</string>
+    <string name="language_spanish">Español</string>
     <string name="settings_language_restart_message">Language saved. Please restart the app for changes to take effect.</string>
 
     <!-- ═══════════════════════════════════════════════════════════════════════ -->

@@ -646,7 +646,11 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        val languages = listOf("en" to stringResource(R.string.language_english), "de" to stringResource(R.string.language_german))
+                        val languages = listOf(
+                            "en" to stringResource(R.string.language_english),
+                            "de" to stringResource(R.string.language_german),
+                            "es" to stringResource(R.string.language_spanish)
+                        )
                         var expandedLang by remember { mutableStateOf(false) }
                         var selectedLang by remember { mutableStateOf(prefsManager.getAppLanguage()) }
                         val selectedLabel = languages.find { it.first == selectedLang }?.second ?: stringResource(R.string.language_english)
