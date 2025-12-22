@@ -45,11 +45,12 @@ fun MapFlightInstruments(
     slip: Double = 0.0,
     verticalSpeed: Double? = null,
     airspeed: Double? = null,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    dataAvailable: Boolean = true
 ) {
     // Log when the instruments composable is active and whenever data changes
-    LaunchedEffect(enabled, pitch, bank, turnRate, slip, verticalSpeed, airspeed) {
-        Log.d("MapFlightInstruments", "composed enabled=$enabled pitch=$pitch bank=$bank turnRate=$turnRate slip=$slip vs=$verticalSpeed ias=$airspeed")
+    LaunchedEffect(enabled, pitch, bank, turnRate, slip, verticalSpeed, airspeed, dataAvailable) {
+        Log.d("MapFlightInstruments", "composed enabled=$enabled dataAvailable=$dataAvailable pitch=$pitch bank=$bank turnRate=$turnRate slip=$slip vs=$verticalSpeed ias=$airspeed")
     }
 
     if (!enabled) return
@@ -67,36 +68,51 @@ fun MapFlightInstruments(
             shape = MaterialTheme.shapes.large,
             color = Color(0xCC000000) // Semi-transparent black background
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Airspeed Indicator
-                AirspeedIndicator(
-                    airspeed = airspeed ?: 0.0,
-                    size = 120.dp
-                )
+            // Use a Box so we can overlay a "NO DATA" indicator when no flight data exists
+            Box {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Airspeed Indicator
+                    AirspeedIndicator(
+                        airspeed = airspeed ?: 0.0,
+                        size = 120.dp
+                    )
 
-                // Attitude Indicator
-                AttitudeIndicator(
-                    pitch = pitch,
-                    bank = bank,
-                    size = 120.dp
-                )
+                    // Attitude Indicator
+                    AttitudeIndicator(
+                        pitch = pitch,
+                        bank = bank,
+                        size = 120.dp
+                    )
 
-                // Vertical Speed Indicator
-                VerticalSpeedIndicator(
-                    verticalSpeed = verticalSpeed ?: 0.0,
-                    size = 120.dp
-                )
+                    // Vertical Speed Indicator
+                    VerticalSpeedIndicator(
+                        verticalSpeed = verticalSpeed ?: 0.0,
+                        size = 120.dp
+                    )
 
-                // Turn and Slip Indicator
-                TurnAndSlipIndicator(
-                    turnRate = turnRate,
-                    slip = slip,
-                    size = 120.dp
-                )
+                    // Turn and Slip Indicator
+                    TurnAndSlipIndicator(
+                        turnRate = turnRate,
+                        slip = slip,
+                        size = 120.dp
+                    )
+                }
+
+                if (!dataAvailable) {
+                    // Semi-transparent overlay with a small notice to indicate lack of live data
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(Color(0x88000000)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = "NO DATA", color = Color.Yellow, fontSize = 12.sp)
+                    }
+                }
             }
         }
     }
