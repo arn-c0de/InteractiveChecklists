@@ -121,17 +121,19 @@ fun MapNavigationDisplay(
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         // Compact pattern altitude + current altitude + indicator (visible when collapsed)
-                        val patternAltCompact = mapState.patternSize.patternAltitudeFt
+                        val runwayElevationFt = (mapState.originalAirportTarget?.elevationM?.times(3.28084))?.toInt() ?: 0
+                        val patternAltAglCompact = mapState.customPatternAltitudeAglFt ?: mapState.patternSize.patternAltitudeAglFt
+                        val patternAltMslCompact = patternAltAglCompact + runwayElevationFt
                         val currentAltMetersCompact = flightData?.altitude?.let { it.toDouble() } ?: Double.NaN
                         val currentAltCompact = if (currentAltMetersCompact.isNaN()) Double.NaN else currentAltMetersCompact * 3.28084 // convert m -> ft
                         val currentAltCompactDisplay = if (currentAltCompact.isNaN()) "n/a" else String.format("%d ft", currentAltCompact.toInt())
-                        val diffCompact = if (currentAltCompact.isNaN()) null else currentAltCompact - patternAltCompact
+                        val diffCompact = if (currentAltCompact.isNaN()) null else currentAltCompact - patternAltMslCompact
                         val smallTolerance = mapState.patternAltitudeSmallToleranceFt
                         val warningTol = mapState.patternAltitudeWarningToleranceFt
 
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
-                                text = "P:${patternAltCompact}",
+                                text = "P:${patternAltMslCompact}",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
@@ -379,7 +381,7 @@ fun MapNavigationDisplay(
                                                             fontWeight = FontWeight.Bold
                                                         )
                                                         Text(
-                                                            text = "${size.downwindDistanceNm} NM • ${size.patternAltitudeFt} ft",
+                                                            text = "${size.downwindDistanceNm} NM • ${size.patternAltitudeAglFt} ft AGL",
                                                             style = MaterialTheme.typography.labelSmall,
                                                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                                                         )
@@ -784,11 +786,14 @@ fun MapNavigationDisplay(
                                         }
 
                                         // Show pattern altitude and current altitude with indicator
-                                        val patternAlt = mapState.patternSize.patternAltitudeFt
+                                        var showAltitudeEditDialog by remember { mutableStateOf(false) }
+                                        val runwayElevationFt = (mapState.originalAirportTarget?.elevationM?.times(3.28084))?.toInt() ?: 0
+                                        val patternAltAgl = mapState.customPatternAltitudeAglFt ?: mapState.patternSize.patternAltitudeAglFt
+                                        val patternAltMsl = patternAltAgl + runwayElevationFt
                                         val currentAltMeters = flightData?.altitude?.let { it.toDouble() } ?: Double.NaN
                                         val currentAlt = if (currentAltMeters.isNaN()) Double.NaN else currentAltMeters * 3.28084 // convert m -> ft
                                         val currentAltDisplay = if (currentAlt.isNaN()) "n/a" else String.format("%d ft", currentAlt.toInt())
-                                        val diff = if (currentAlt.isNaN()) null else currentAlt - patternAlt
+                                        val diff = if (currentAlt.isNaN()) null else currentAlt - patternAltMsl
                                         val smallTolerance = mapState.patternAltitudeSmallToleranceFt
                                         val warningTol = mapState.patternAltitudeWarningToleranceFt
 
@@ -799,12 +804,37 @@ fun MapNavigationDisplay(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.Start
                                         ) {
-                                            Text(
-                                                text = "Pattern Altitude: $patternAlt ft AGL",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.primary
+                                            Column(
+                                                modifier = Modifier.clickable { showAltitudeEditDialog = true }
+                                            ) {
+                                                Text(
+                                                    text = "Pattern Altitude: ${patternAltMsl} ft MSL ✎",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                                Text(
+                                                    text = "(${patternAltAgl} ft AGL + ${runwayElevationFt} ft field elev)${if (mapState.customPatternAltitudeAglFt != null) " [Custom]" else ""}",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        
+                                        // Altitude edit dialog
+                                        if (showAltitudeEditDialog) {
+                                            PatternAltitudeEditDialog(
+                                                currentAltitudeAgl = patternAltAgl,
+                                                onDismiss = { showAltitudeEditDialog = false },
+                                                onSave = { newAltitude ->
+                                                    mapState.customPatternAltitudeAglFt = newAltitude
+                                                    mapState.saveNavigationState()
+                                                },
+                                                onReset = {
+                                                    mapState.customPatternAltitudeAglFt = null
+                                                    mapState.saveNavigationState()
+                                                }
                                             )
+                                        }
 
                                             Spacer(modifier = Modifier.width(8.dp))
 
@@ -1014,4 +1044,79 @@ private fun normalizeHeading(heading: Double): Double {
     var h = heading % 360.0
     if (h < 0) h += 360.0
     return h
+}
+
+/**
+ * Dialog for editing custom pattern altitude (AGL)
+ */
+@Composable
+fun PatternAltitudeEditDialog(
+    currentAltitudeAgl: Int,
+    onDismiss: () -> Unit,
+    onSave: (Int) -> Unit,
+    onReset: () -> Unit = {}
+) {
+    var altitudeText by remember { mutableStateOf(currentAltitudeAgl.toString()) }
+    var isValid by remember { mutableStateOf(true) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Pattern Altitude (AGL)") },
+        text = {
+            Column {
+                Text(
+                    text = "Enter pattern altitude above ground level (AGL) in feet:",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = altitudeText,
+                    onValueChange = { 
+                        altitudeText = it.filter { ch -> ch.isDigit() }
+                        isValid = altitudeText.toIntOrNull()?.let { alt -> alt in 500..5000 } ?: false
+                    },
+                    label = { Text("Altitude (ft AGL)") },
+                    isError = !isValid,
+                    supportingText = {
+                        if (!isValid) {
+                            Text("Enter a value between 500 and 5000 ft", color = MaterialTheme.colorScheme.error)
+                        } else {
+                            Text("Typical pattern altitudes: 1000-2000 ft AGL")
+                        }
+                    },
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(
+                    onClick = {
+                        onReset()
+                        onDismiss()
+                    }
+                ) {
+                    Text("Reset to Default")
+                }
+                TextButton(
+                    onClick = {
+                        altitudeText.toIntOrNull()?.let { altitude ->
+                            if (altitude in 500..5000) {
+                                onSave(altitude)
+                                onDismiss()
+                            }
+                        }
+                    },
+                    enabled = isValid
+                ) {
+                    Text("Save")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
