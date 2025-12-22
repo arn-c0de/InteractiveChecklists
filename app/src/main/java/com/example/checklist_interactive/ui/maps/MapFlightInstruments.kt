@@ -41,16 +41,21 @@ fun MapFlightInstruments(
     modifier: Modifier = Modifier,
     pitch: Double = 0.0,
     bank: Double = 0.0,
-    turnRate: Double = 0.0,
-    slip: Double = 0.0,
     verticalSpeed: Double? = null,
     airspeed: Double? = null,
+    altitude: Double? = null,
+    heading: Double? = null,
+    angleOfAttack: Double? = null,
+    gLoad: Double? = null,
+    fuelRemaining: Double? = null,
+    fuelTotal: Double? = null,
+    mach: Double? = null,
     enabled: Boolean = true,
     dataAvailable: Boolean = true
 ) {
     // Log when the instruments composable is active and whenever data changes
-    LaunchedEffect(enabled, pitch, bank, turnRate, slip, verticalSpeed, airspeed, dataAvailable) {
-        Log.d("MapFlightInstruments", "composed enabled=$enabled dataAvailable=$dataAvailable pitch=$pitch bank=$bank turnRate=$turnRate slip=$slip vs=$verticalSpeed ias=$airspeed")
+    LaunchedEffect(enabled, pitch, bank, verticalSpeed, airspeed, altitude, heading, angleOfAttack, gLoad, dataAvailable) {
+        Log.d("MapFlightInstruments", "composed enabled=$enabled dataAvailable=$dataAvailable pitch=$pitch bank=$bank vs=$verticalSpeed ias=$airspeed alt=$altitude hdg=$heading aoa=$angleOfAttack g=$gLoad")
     }
 
     if (!enabled) return
@@ -70,36 +75,73 @@ fun MapFlightInstruments(
         ) {
             // Use a Box so we can overlay a "NO DATA" indicator when no flight data exists
             Box {
-                Row(
+                Column(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Airspeed Indicator
-                    AirspeedIndicator(
-                        airspeed = airspeed ?: 0.0,
-                        size = 120.dp
-                    )
+                    // Primary flight instruments (top row)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Airspeed Indicator
+                        AirspeedIndicator(
+                            airspeed = airspeed ?: 0.0,
+                            mach = mach,
+                            size = 120.dp
+                        )
 
-                    // Attitude Indicator
-                    AttitudeIndicator(
-                        pitch = pitch,
-                        bank = bank,
-                        size = 120.dp
-                    )
+                        // Attitude Indicator (larger, centered)
+                        AttitudeIndicator(
+                            pitch = pitch,
+                            bank = bank,
+                            size = 160.dp
+                        )
 
-                    // Vertical Speed Indicator
-                    VerticalSpeedIndicator(
-                        verticalSpeed = verticalSpeed ?: 0.0,
-                        size = 120.dp
-                    )
+                        // Vertical Speed Indicator
+                        VerticalSpeedIndicator(
+                            verticalSpeed = verticalSpeed ?: 0.0,
+                            size = 120.dp
+                        )
+                    }
 
-                    // Turn and Slip Indicator
-                    TurnAndSlipIndicator(
-                        turnRate = turnRate,
-                        slip = slip,
-                        size = 120.dp
-                    )
+                    // Secondary instruments (bottom row - compact)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Altimeter
+                        AltimeterIndicator(
+                            altitude = altitude ?: 0.0,
+                            size = 64.dp
+                        )
+
+                        // Heading Indicator
+                        HeadingIndicator(
+                            heading = heading ?: 0.0,
+                            size = 64.dp
+                        )
+
+                        // Angle of Attack
+                        AoAIndicator(
+                            aoa = angleOfAttack ?: 0.0,
+                            size = 64.dp
+                        )
+
+                        // G-Meter
+                        GMeterIndicator(
+                            gLoad = gLoad ?: 1.0,
+                            size = 64.dp
+                        )
+
+                        // Fuel Indicator
+                        FuelIndicator(
+                            fuelRemaining = fuelRemaining ?: 0.0,
+                            fuelTotal = fuelTotal ?: 1.0,
+                            size = 64.dp
+                        )
+                    }
                 }
 
                 if (!dataAvailable) {
@@ -315,166 +357,20 @@ private fun DrawScope.drawAircraftSymbol(centerX: Float, centerY: Float, width: 
     )
 }
 
-/**
- * Turn and Slip Indicator
- * Shows turn rate and slip/skid
- */
-@Composable
-fun TurnAndSlipIndicator(
-    turnRate: Double,
-    slip: Double,
-    size: androidx.compose.ui.unit.Dp,
-    modifier: Modifier = Modifier
-) {
-    LaunchedEffect(turnRate, slip) {
-        Log.d("TurnAndSlipIndicator", "turnRate=$turnRate slip=$slip")
-    }
-
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier
-    ) {
-        Box(
-            modifier = Modifier
-                .size(size)
-                .clip(CircleShape)
-                .background(Color(0xFF1A1A1A))
-        ) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val centerX = this.size.width / 2
-                val centerY = this.size.height / 2
-                val radius = this.size.minDimension / 2
-                
-                // Turn coordinator (upper half)
-                drawTurnCoordinator(centerX, centerY * 0.6f, radius * 0.7f, turnRate)
-                
-                // Slip indicator (lower half)
-                drawSlipIndicator(centerX, centerY * 1.4f, radius * 0.8f, slip)
-            }
-        }
-        
-        Text(
-            text = "TURN & SLIP",
-            fontSize = 10.sp,
-            color = Color.White,
-            modifier = Modifier.padding(top = 4.dp)
-        )
-    }
-}
-
-/**
- * Draw turn coordinator (miniature aircraft tilting)
- */
-private fun DrawScope.drawTurnCoordinator(
-    centerX: Float,
-    centerY: Float,
-    size: Float,
-    turnRate: Double
-) {
-    // Standard rate turn is 3°/sec, max deflection at 6°/sec
-    val maxDeflection = 30.0
-    val deflection = (turnRate * 5).coerceIn(-maxDeflection, maxDeflection)
-    
-    // Reference marks (L and R)
-    drawLine(
-        color = Color.White,
-        start = Offset(centerX - size * 0.8f, centerY),
-        end = Offset(centerX - size * 0.7f, centerY),
-        strokeWidth = 2f
-    )
-    drawLine(
-        color = Color.White,
-        start = Offset(centerX + size * 0.7f, centerY),
-        end = Offset(centerX + size * 0.8f, centerY),
-        strokeWidth = 2f
-    )
-    
-    // Miniature aircraft
-    rotate(deflection.toFloat(), Offset(centerX, centerY)) {
-        // Wings
-        drawLine(
-            color = Color.White,
-            start = Offset(centerX - size * 0.5f, centerY),
-            end = Offset(centerX + size * 0.5f, centerY),
-            strokeWidth = 3f
-        )
-        // Fuselage
-        drawLine(
-            color = Color.White,
-            start = Offset(centerX, centerY - size * 0.15f),
-            end = Offset(centerX, centerY + size * 0.3f),
-            strokeWidth = 3f
-        )
-    }
-}
-
-/**
- * Draw slip/skid indicator (ball in tube)
- */
-private fun DrawScope.drawSlipIndicator(
-    centerX: Float,
-    centerY: Float,
-    width: Float,
-    slip: Double
-) {
-    val tubeWidth = width
-    val tubeHeight = 20f
-    val ballRadius = 8f
-    
-    // Tube outline
-    drawRoundRect(
-        color = Color.White,
-        topLeft = Offset(centerX - tubeWidth / 2, centerY - tubeHeight / 2),
-        size = Size(tubeWidth, tubeHeight),
-        cornerRadius = androidx.compose.ui.geometry.CornerRadius(tubeHeight / 2, tubeHeight / 2),
-        style = Stroke(width = 2f)
-    )
-    
-    // Reference marks
-    val markWidth = 2f
-    drawLine(
-        color = Color.White,
-        start = Offset(centerX - markWidth, centerY - tubeHeight * 0.7f),
-        end = Offset(centerX - markWidth, centerY + tubeHeight * 0.7f),
-        strokeWidth = 2f
-    )
-    drawLine(
-        color = Color.White,
-        start = Offset(centerX + markWidth, centerY - tubeHeight * 0.7f),
-        end = Offset(centerX + markWidth, centerY + tubeHeight * 0.7f),
-        strokeWidth = 2f
-    )
-    
-    // Ball (moves with slip, clamped to tube)
-    val maxDeflection = tubeWidth / 2 - ballRadius - 4f
-    val ballOffset = (slip * 20).coerceIn(-maxDeflection.toDouble(), maxDeflection.toDouble()).toFloat()
-    
-    drawCircle(
-        color = Color.White,
-        radius = ballRadius,
-        center = Offset(centerX + ballOffset, centerY)
-    )
-    
-    // Shading for 3D effect
-    drawCircle(
-        color = Color.White.copy(alpha = 0.3f),
-        radius = ballRadius * 0.6f,
-        center = Offset(centerX + ballOffset - 2f, centerY - 2f)
-    )
-}
 
 /**
  * Airspeed Indicator
- * Shows indicated airspeed in knots
+ * Shows indicated airspeed in knots with optional Mach display
  */
 @Composable
 fun AirspeedIndicator(
     airspeed: Double,
+    mach: Double? = null,
     size: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier
 ) {
-    LaunchedEffect(airspeed) {
-        Log.d("AirspeedIndicator", "airspeed=$airspeed")
+    LaunchedEffect(airspeed, mach) {
+        Log.d("AirspeedIndicator", "airspeed=$airspeed mach=$mach")
     }
 
     Column(
@@ -574,6 +470,23 @@ fun AirspeedIndicator(
                     centerY + radius * 0.5f,
                     textPaint
                 )
+
+                // Mach number (if available and > 0.3)
+                if (mach != null && mach > 0.3) {
+                    val machText = "M${String.format("%.2f", mach)}"
+                    val machPaint = android.graphics.Paint().apply {
+                        isAntiAlias = true
+                        color = android.graphics.Color.CYAN
+                        textSize = 14f
+                        textAlign = android.graphics.Paint.Align.CENTER
+                    }
+                    drawContext.canvas.nativeCanvas.drawText(
+                        machText,
+                        centerX,
+                        centerY + radius * 0.7f,
+                        machPaint
+                    )
+                }
             }
         }
 
@@ -717,6 +630,300 @@ fun VerticalSpeedIndicator(
             fontSize = 10.sp,
             color = Color.White,
             modifier = Modifier.padding(top = 4.dp)
+        )
+    }
+}
+
+/**
+ * Altimeter Indicator
+ * Shows altitude in feet
+ */
+@Composable
+fun AltimeterIndicator(
+    altitude: Double,
+    size: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier
+) {
+    // Convert meters to feet (1m = 3.28084ft)
+    val altFeet = (altitude * 3.28084).toInt()
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+    ) {
+        Box(
+            modifier = Modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(Color(0xFF1A1A1A)),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "${altFeet}",
+                    fontSize = 18.sp,
+                    color = Color.White,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                )
+                Text(
+                    text = "ft",
+                    fontSize = 10.sp,
+                    color = Color.Gray
+                )
+            }
+        }
+        Text(
+            text = "ALT",
+            fontSize = 8.sp,
+            color = Color.White,
+            modifier = Modifier.padding(top = 2.dp)
+        )
+    }
+}
+
+/**
+ * Heading Indicator (Compass)
+ * Shows heading in degrees
+ */
+@Composable
+fun HeadingIndicator(
+    heading: Double,
+    size: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier
+) {
+    // Convert radians to degrees if needed
+    val headingDeg = if (heading > 6.28) heading else Math.toDegrees(heading)
+    val normalizedHeading = ((headingDeg % 360) + 360) % 360
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+    ) {
+        Box(
+            modifier = Modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(Color(0xFF1A1A1A))
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val centerX = this.size.width / 2
+                val centerY = this.size.height / 2
+                val radius = this.size.minDimension / 2
+
+                // Draw compass rose
+                val cardinals = listOf("N", "E", "S", "W")
+                for (i in 0 until 4) {
+                    val angle = i * 90.0
+                    val rad = Math.toRadians(angle - normalizedHeading - 90)
+                    val textRadius = radius * 0.6f
+                    val x = centerX + (textRadius * cos(rad)).toFloat()
+                    val y = centerY + (textRadius * sin(rad)).toFloat()
+
+                    val paint = android.graphics.Paint().apply {
+                        isAntiAlias = true
+                        color = if (i == 0) android.graphics.Color.RED else android.graphics.Color.WHITE
+                        textSize = 20f
+                        textAlign = android.graphics.Paint.Align.CENTER
+                    }
+                    drawContext.canvas.nativeCanvas.drawText(
+                        cardinals[i],
+                        x,
+                        y + 7f,
+                        paint
+                    )
+                }
+
+                // Digital readout
+                val hdgText = "${normalizedHeading.toInt()}°"
+                val textPaint = android.graphics.Paint().apply {
+                    isAntiAlias = true
+                    color = android.graphics.Color.CYAN
+                    textSize = 16f
+                    textAlign = android.graphics.Paint.Align.CENTER
+                }
+                drawContext.canvas.nativeCanvas.drawText(
+                    hdgText,
+                    centerX,
+                    centerY + radius * 0.8f,
+                    textPaint
+                )
+            }
+        }
+        Text(
+            text = "HDG",
+            fontSize = 8.sp,
+            color = Color.White,
+            modifier = Modifier.padding(top = 2.dp)
+        )
+    }
+}
+
+/**
+ * Angle of Attack Indicator
+ * Shows AoA in degrees
+ */
+@Composable
+fun AoAIndicator(
+    aoa: Double,
+    size: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier
+) {
+    // Color based on AoA value
+    val aoaColor = when {
+        aoa > 20.0 -> Color.Red
+        aoa > 15.0 -> Color.Yellow
+        aoa < -5.0 -> Color.Cyan
+        else -> Color.Green
+    }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+    ) {
+        Box(
+            modifier = Modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(Color(0xFF1A1A1A)),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "${String.format("%.1f", aoa)}°",
+                    fontSize = 18.sp,
+                    color = aoaColor,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                )
+                Text(
+                    text = "AoA",
+                    fontSize = 10.sp,
+                    color = Color.Gray
+                )
+            }
+        }
+        Text(
+            text = "AoA",
+            fontSize = 8.sp,
+            color = Color.White,
+            modifier = Modifier.padding(top = 2.dp)
+        )
+    }
+}
+
+/**
+ * G-Meter Indicator
+ * Shows G-load
+ */
+@Composable
+fun GMeterIndicator(
+    gLoad: Double,
+    size: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier
+) {
+    // Color based on G value
+    val gColor = when {
+        gLoad > 7.0 -> Color.Red
+        gLoad > 5.0 -> Color.Yellow
+        gLoad < 0.0 -> Color.Cyan
+        else -> Color.White
+    }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+    ) {
+        Box(
+            modifier = Modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(Color(0xFF1A1A1A)),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "${String.format("%.1f", gLoad)}",
+                    fontSize = 20.sp,
+                    color = gColor,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                )
+                Text(
+                    text = "G",
+                    fontSize = 12.sp,
+                    color = Color.Gray
+                )
+            }
+        }
+        Text(
+            text = "G-LOAD",
+            fontSize = 8.sp,
+            color = Color.White,
+            modifier = Modifier.padding(top = 2.dp)
+        )
+    }
+}
+
+/**
+ * Fuel Indicator
+ * Shows fuel remaining as percentage
+ */
+@Composable
+fun FuelIndicator(
+    fuelRemaining: Double,
+    fuelTotal: Double,
+    size: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier
+) {
+    val fuelPercent = if (fuelTotal > 0) ((fuelRemaining / fuelTotal) * 100).toInt() else 0
+    
+    // Color based on fuel level
+    val fuelColor = when {
+        fuelPercent < 15 -> Color.Red
+        fuelPercent < 30 -> Color.Yellow
+        else -> Color.Green
+    }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+    ) {
+        Box(
+            modifier = Modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(Color(0xFF1A1A1A)),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "$fuelPercent%",
+                    fontSize = 18.sp,
+                    color = fuelColor,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                )
+                Text(
+                    text = "${fuelRemaining.toInt()}kg",
+                    fontSize = 9.sp,
+                    color = Color.Gray
+                )
+            }
+        }
+        Text(
+            text = "FUEL",
+            fontSize = 8.sp,
+            color = Color.White,
+            modifier = Modifier.padding(top = 2.dp)
         )
     }
 }
