@@ -60,8 +60,8 @@ fun MapFlightInstruments(
     dataAvailable: Boolean = true
 ) {
     // Log when the instruments composable is active and whenever data changes
-    LaunchedEffect(enabled, pitch, bank, verticalSpeed, airspeed, altitude, heading, angleOfAttack, gLoad, dataAvailable) {
-        Log.d("MapFlightInstruments", "composed enabled=$enabled dataAvailable=$dataAvailable pitch=$pitch bank=$bank vs=$verticalSpeed ias=$airspeed alt=$altitude hdg=$heading aoa=$angleOfAttack g=$gLoad rpm_l=$engineRpmLeft rpm_r=$engineRpmRight wind=${windSpeed}@${windDirection}° flares=$flareCount chaff=$chaffCount")
+    LaunchedEffect(enabled, pitch, bank, verticalSpeed, airspeed, altitude, heading, angleOfAttack, gLoad, dataAvailable, fuelRemaining, fuelTotal) {
+        Log.d("MapFlightInstruments", "composed enabled=$enabled dataAvailable=$dataAvailable pitch=$pitch bank=$bank vs=$verticalSpeed ias=$airspeed alt=$altitude hdg=$heading aoa=$angleOfAttack g=$gLoad rpm_l=$engineRpmLeft rpm_r=$engineRpmRight wind=${windSpeed}@${windDirection}° flares=$flareCount chaff=$chaffCount fuelRem=$fuelRemaining fuelTot=$fuelTotal")
     }
 
     if (!enabled) return
@@ -908,14 +908,20 @@ fun GMeterIndicator(
 @Composable
 fun FuelIndicator(
     fuelRemaining: Double,
-    fuelTotal: Double,
+    fuelTotal: Double?,
     size: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier
 ) {
-    val fuelPercent = if (fuelTotal > 0) ((fuelRemaining / fuelTotal) * 100).toInt() else 0
-    
-    // Color based on fuel level
+    // Compute percent only if we have a valid total > 0
+    val fuelPercent: Int? = if (fuelTotal != null && fuelTotal > 0.0) {
+        ((fuelRemaining / fuelTotal) * 100).toInt()
+    } else {
+        null
+    }
+
+    // Color based on fuel level; unknown -> neutral gray
     val fuelColor = when {
+        fuelPercent == null -> Color.LightGray
         fuelPercent < 15 -> Color.Red
         fuelPercent < 30 -> Color.Yellow
         else -> Color.Green
@@ -936,14 +942,15 @@ fun FuelIndicator(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
+                // Show percentage when total is known, otherwise show remaining (absolute) or "--"
                 Text(
-                    text = "$fuelPercent%",
+                    text = if (fuelPercent != null) "${fuelPercent}%" else if (fuelRemaining > 0.0) "${fuelRemaining.toInt()}" else "--",
                     fontSize = 18.sp,
                     color = fuelColor,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                 )
                 Text(
-                    text = "${fuelRemaining.toInt()}kg",
+                    text = if (fuelTotal != null && fuelTotal > 0.0) "of ${fuelTotal.toInt()}kg" else "",
                     fontSize = 9.sp,
                     color = Color.Gray
                 )

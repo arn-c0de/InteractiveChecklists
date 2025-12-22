@@ -443,17 +443,20 @@ private fun ConnectionStatusCard(
     val connHealth by manager.connectionHealth.collectAsState()
 
     var lastHeartbeatText by remember { mutableStateOf("--") }
+    var heartbeatColor by remember { mutableStateOf(Color.White.copy(alpha = 0.9f)) }
     LaunchedEffect(lastHeartbeat) {
         while (true) {
             val hb = lastHeartbeat
             lastHeartbeatText = if (hb != null) {
                 val seconds = (System.currentTimeMillis() - hb) / 1000
+                heartbeatColor = if (seconds < 35) Color.Green else Color.Red
                 when {
                     seconds < 60 -> context.getString(com.example.checklist_interactive.R.string.datapad_time_seconds_ago, seconds)
                     seconds < 3600 -> context.getString(com.example.checklist_interactive.R.string.datapad_time_minutes_ago, seconds / 60)
                     else -> context.getString(com.example.checklist_interactive.R.string.datapad_time_hours_ago, seconds / 3600)
                 }
             } else {
+                heartbeatColor = Color.White.copy(alpha = 0.9f)
                 "--"
             }
             kotlinx.coroutines.delay(1000)
@@ -515,7 +518,7 @@ private fun ConnectionStatusCard(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "• ${context.getString(com.example.checklist_interactive.R.string.datapad_last_heartbeat, lastHeartbeatText)}",
-                            color = Color.White.copy(alpha = 0.9f),
+                            color = heartbeatColor,
                             fontSize = 11.sp
                         )
                     }

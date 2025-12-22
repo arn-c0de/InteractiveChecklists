@@ -215,6 +215,21 @@ def validate_data_message(data: bytes, encrypt: bool = True) -> bool:
     return True
 
 
+def find_device_for_session(session_mgr: 'SessionManager', session_id: str) -> str | None:
+    """Return the device_id associated with the given session_id, or None if not found.
+
+    This helper performs a safe lookup in SessionManager.device_sessions.
+    """
+    try:
+        for device_id, sid in session_mgr.device_sessions.items():
+            if sid == session_id:
+                return device_id
+    except Exception:
+        # Defensive: if device_sessions isn't available or not a mapping
+        pass
+    return None
+
+
 # Timestamp filtering to prevent forwarding of old/cached data
 # Stores last processed timestamp as ISO-8601 string (or None)
 _last_processed_timestamp = None
@@ -620,6 +635,31 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                             handshake_sock.sendto(response_json, addr)
                             if response.get('status') == 'ready':
                                 logger.info(f"✅ Session established with device {msg.get('sessionId', 'unknown')[:8]}...")
+
+                                # Send one immediate heartbeat to the newly established device so it has
+                                # a fresh timestamp and avoids rejected/old-data behavior.
+                                session_id = msg.get('sessionId')
+                                device_id = find_device_for_session(session_mgr, session_id) if session_id else None
+                                if device_id:
+                                    heartbeat_data = {
+                                        "type": "heartbeat",
+                                        "timestamp": datetime.now().isoformat() + 'Z',
+                                        "message": "Initial heartbeat after handshake"
+                                    }
+                                    heartbeat_json = json.dumps(heartbeat_data).encode('utf-8')
+                                    try:
+                                        if send_udp(heartbeat_json, host, port, handshake_sock,
+                                                    session_mgr=session_mgr, device_id=device_id):
+                                            logger.info(f"💓 Initial heartbeat sent to {device_id[:8]}...")
+                                            # Update last_data_sent_time so we don't immediately send another heartbeat
+                                            try:
+                                                last_data_sent_time = time.time()
+                                            except Exception:
+                                                pass
+                                        else:
+                                            logger.warning(f"⚠️ Failed to send initial heartbeat to {device_id[:8]} (session may have expired)")
+                                    except Exception as e:
+                                        logger.warning(f"⚠️ Error sending initial heartbeat: {e}")
                     except Exception as decode_err:
                         # Not a handshake message or malformed, ignore
                         logger.debug(f"Failed to parse handshake: {decode_err}")
@@ -888,6 +928,31 @@ def repeat_last_line(path: str, host: str, port: int, session_mgr: 'SessionManag
                             handshake_sock.sendto(response_json, addr)
                             if response.get('status') == 'ready':
                                 logger.info(f"✅ Session established with device {msg.get('sessionId', 'unknown')[:8]}...")
+
+                                # Send one immediate heartbeat to the newly established device so it has
+                                # a fresh timestamp and avoids rejected/old-data behavior.
+                                session_id = msg.get('sessionId')
+                                device_id = find_device_for_session(session_mgr, session_id) if session_id else None
+                                if device_id:
+                                    heartbeat_data = {
+                                        "type": "heartbeat",
+                                        "timestamp": datetime.now().isoformat() + 'Z',
+                                        "message": "Initial heartbeat after handshake"
+                                    }
+                                    heartbeat_json = json.dumps(heartbeat_data).encode('utf-8')
+                                    try:
+                                        if send_udp(heartbeat_json, host, port, handshake_sock,
+                                                    session_mgr=session_mgr, device_id=device_id):
+                                            logger.info(f"💓 Initial heartbeat sent to {device_id[:8]}...")
+                                            # Update last_data_sent_time so we don't immediately send another heartbeat
+                                            try:
+                                                last_data_sent_time = time.time()
+                                            except Exception:
+                                                pass
+                                        else:
+                                            logger.warning(f"⚠️ Failed to send initial heartbeat to {device_id[:8]} (session may have expired)")
+                                    except Exception as e:
+                                        logger.warning(f"⚠️ Error sending initial heartbeat: {e}")
                     except Exception as decode_err:
                         # Not a handshake message or malformed, ignore
                         logger.debug(f"Failed to parse handshake: {decode_err}")
