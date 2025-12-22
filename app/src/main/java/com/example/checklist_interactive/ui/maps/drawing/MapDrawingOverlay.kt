@@ -17,6 +17,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.delay
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
+import android.graphics.PointF
 import kotlin.math.sqrt
 
 /**
@@ -40,11 +41,71 @@ fun MapDrawingOverlay(
     var showRadialMenu by remember { mutableStateOf(false) }
     var radialMenuPosition by remember { mutableStateOf(Offset.Zero) }
     
+    // Track map changes to force canvas redraw when map moves/zooms/rotates
+    var mapInvalidationKey by remember { mutableStateOf(0L) }
+    
+    // Listen to ALL map events to trigger canvas recomposition
+    DisposableEffect(mapView) {
+        val currentMapView = mapView ?: return@DisposableEffect onDispose {}
+        
+        // Listener for scroll and zoom events
+        val mapListener = object : org.osmdroid.events.MapListener {
+            override fun onScroll(event: org.osmdroid.events.ScrollEvent?): Boolean {
+                mapInvalidationKey = System.currentTimeMillis()
+                return true
+            }
+            
+            override fun onZoom(event: org.osmdroid.events.ZoomEvent?): Boolean {
+                mapInvalidationKey = System.currentTimeMillis()
+                return true
+            }
+        }
+        
+        currentMapView.addMapListener(mapListener)
+        
+        // Additional listener specifically for rotation
+        val rotationGestureOverlay = currentMapView.overlayManager.firstOrNull { 
+            it is org.osmdroid.views.overlay.gestures.RotationGestureOverlay 
+        } as? org.osmdroid.views.overlay.gestures.RotationGestureOverlay
+        
+        // Force invalidation on every frame when map transforms (rotation, pan, zoom) might be active
+        // by observing mapOrientation, map center and zoom level changes
+        val invalidationRunnable = object : Runnable {
+            private var lastOrientation = currentMapView.mapOrientation
+            private var lastCenter = currentMapView.mapCenter?.let { Pair(it.latitude, it.longitude) }
+            private var lastZoom = currentMapView.zoomLevelDouble
+
+            override fun run() {
+                val currentOrientation = currentMapView.mapOrientation
+                val center = currentMapView.mapCenter
+                val currentCenter = center?.let { Pair(it.latitude, it.longitude) }
+                val currentZoom = currentMapView.zoomLevelDouble
+
+                if (currentOrientation != lastOrientation || currentCenter != lastCenter || currentZoom != lastZoom) {
+                    mapInvalidationKey = System.currentTimeMillis()
+                    lastOrientation = currentOrientation
+                    lastCenter = currentCenter
+                    lastZoom = currentZoom
+                }
+                currentMapView.postDelayed(this, 16) // ~60fps
+            }
+        }
+        
+        currentMapView.post(invalidationRunnable)
+        
+        onDispose {
+            currentMapView.removeMapListener(mapListener)
+            currentMapView.removeCallbacks(invalidationRunnable)
+        }
+    }
+    
     Box(modifier = modifier.fillMaxSize()) {
         // Canvas for rendering strokes (always visible)
-        Canvas(
-            modifier = Modifier
-                .fillMaxSize()
+        // Use mapInvalidationKey to force redraw when map moves
+        key(mapInvalidationKey) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
                 .then(
                     // Only enable input when drawing mode is active
                     if (drawingState.isDrawingMode) {
@@ -74,7 +135,21 @@ fun MapDrawingOverlay(
                             // Start drawing
                             try {
                                 val projection = currentMapView.projection
-                                val geoPoint = projection.fromPixels(offset.x.toInt(), offset.y.toInt()) as? GeoPoint
+                                // MapView may be offset within the parent, convert pointer position to MapView-local coords
+                                val mapLeft = currentMapView.left.toFloat()
+                                val mapTop = currentMapView.top.toFloat()
+                                val px = offset.x - mapLeft
+                                val py = offset.y - mapTop
+                                // inverse-rotate around map center to convert overlay point into projection's (north-up) pixel space
+                                val centerPoint = projection.toPixels(currentMapView.mapCenter, null)
+                                val angleRadInv = Math.toRadians(-currentMapView.mapOrientation.toDouble())
+                                val cosAInv = kotlin.math.cos(angleRadInv)
+                                val sinAInv = kotlin.math.sin(angleRadInv)
+                                val dx = px - centerPoint.x
+                                val dy = py - centerPoint.y
+                                val unrotX = dx * cosAInv - dy * sinAInv + centerPoint.x
+                                val unrotY = dx * sinAInv + dy * cosAInv + centerPoint.y
+                                val geoPoint = projection.fromPixels(unrotX.toInt(), unrotY.toInt()) as? GeoPoint
                                 geoPoint?.let { currentGeoPoints.add(it) }
                             } catch (e: Exception) {
                                 android.util.Log.e("MapDrawingOverlay", "Error converting to GeoPoint", e)
@@ -86,6 +161,9 @@ fun MapDrawingOverlay(
                         val offset = change.position
                         pointerPosition = offset
                         
+                        val mapLeft = currentMapView.left.toFloat()
+                        val mapTop = currentMapView.top.toFloat()
+                        
                         if (drawingState.isEraseMode) {
                             // Erase strokes near pointer
                             val toErase = mutableListOf<MapDrawingStroke>()
@@ -95,8 +173,19 @@ fun MapDrawingOverlay(
                                 // Check if any point in the stroke is within erase radius
                                 val shouldErase = stroke.geoPoints.any { geoPoint ->
                                     val screenPoint = projection.toPixels(geoPoint, null)
-                                    val dx = screenPoint.x - offset.x
-                                    val dy = screenPoint.y - offset.y
+                                    // rotate around map center then translate to overlay coords
+                                    val centerPoint = projection.toPixels(currentMapView.mapCenter, null)
+                                    val angleRad = Math.toRadians(currentMapView.mapOrientation.toDouble())
+                                    val cosA = kotlin.math.cos(angleRad)
+                                    val sinA = kotlin.math.sin(angleRad)
+                                    val dx0 = screenPoint.x - centerPoint.x
+                                    val dy0 = screenPoint.y - centerPoint.y
+                                    val rotX = dx0 * cosA - dy0 * sinA + centerPoint.x
+                                    val rotY = dx0 * sinA + dy0 * cosA + centerPoint.y
+                                    val sx = rotX + mapLeft
+                                    val sy = rotY + mapTop
+                                    val dx = sx - offset.x
+                                    val dy = sy - offset.y
                                     val distance = sqrt(dx * dx + dy * dy)
                                     distance <= drawingState.eraseRadius
                                 }
@@ -112,8 +201,18 @@ fun MapDrawingOverlay(
                             // Continue drawing
                             try {
                                 val projection = currentMapView.projection
-                                val geoPoint = projection.fromPixels(offset.x.toInt(), offset.y.toInt()) as? GeoPoint
-                                geoPoint?.let { 
+                                val px = (change.position.x - mapLeft)
+                                val py = (change.position.y - mapTop)
+                                val centerPoint = projection.toPixels(currentMapView.mapCenter, null)
+                                val angleRadInv = Math.toRadians(-currentMapView.mapOrientation.toDouble())
+                                val cosAInv = kotlin.math.cos(angleRadInv)
+                                val sinAInv = kotlin.math.sin(angleRadInv)
+                                val dx = px - centerPoint.x
+                                val dy = py - centerPoint.y
+                                val unrotX = dx * cosAInv - dy * sinAInv + centerPoint.x
+                                val unrotY = dx * sinAInv + dy * cosAInv + centerPoint.y
+                                val geoPoint = projection.fromPixels(unrotX.toInt(), unrotY.toInt()) as? GeoPoint
+                                geoPoint?.let {
                                     // Add point if it's far enough from the last one (to avoid too many points)
                                     val lastPoint = currentGeoPoints.lastOrNull()
                                     if (lastPoint == null || lastPoint.distanceToAsDouble(it) > 0.00001) {
@@ -149,7 +248,13 @@ fun MapDrawingOverlay(
                     }
                 )
         ) {
-            val projection = mapView?.projection ?: return@Canvas
+            // CRITICAL: Get fresh projection on EVERY draw to handle map rotation/zoom/pan
+            // The projection object contains the current map transformation state
+            val currentMapView = mapView ?: return@Canvas
+            val projection = currentMapView.projection
+            // MapView may be offset in the parent; account for its left/top when translating
+            val mapLeft = currentMapView.left.toFloat()
+            val mapTop = currentMapView.top.toFloat()
         
         // Draw all saved strokes
         strokes.forEach { stroke ->
@@ -157,8 +262,18 @@ fun MapDrawingOverlay(
             
             val path = Path()
             stroke.geoPoints.forEachIndexed { index, geoPoint ->
+                // Convert GeoPoint to screen coordinates using current projection (relative to MapView)
                 val screenPoint = projection.toPixels(geoPoint, null)
-                val offset = Offset(screenPoint.x.toFloat(), screenPoint.y.toFloat())
+                // Rotate around map center by current map orientation, then translate to overlay coords
+                val centerPoint = projection.toPixels(currentMapView.mapCenter, null)
+                val angleRad = Math.toRadians(currentMapView.mapOrientation.toDouble())
+                val cosA = kotlin.math.cos(angleRad)
+                val sinA = kotlin.math.sin(angleRad)
+                val dx = screenPoint.x - centerPoint.x
+                val dy = screenPoint.y - centerPoint.y
+                val rotX = dx * cosA - dy * sinA + centerPoint.x
+                val rotY = dx * sinA + dy * cosA + centerPoint.y
+                val offset = Offset(rotX.toFloat() + mapLeft, rotY.toFloat() + mapTop)
                 
                 if (index == 0) {
                     path.moveTo(offset.x, offset.y)
@@ -193,7 +308,16 @@ fun MapDrawingOverlay(
             val path = Path()
             currentGeoPoints.forEachIndexed { index, geoPoint ->
                 val screenPoint = projection.toPixels(geoPoint, null)
-                val offset = Offset(screenPoint.x.toFloat(), screenPoint.y.toFloat())
+                // rotate around map center
+                val centerPoint = projection.toPixels(currentMapView.mapCenter, null)
+                val angleRad = Math.toRadians(currentMapView.mapOrientation.toDouble())
+                val cosA = kotlin.math.cos(angleRad)
+                val sinA = kotlin.math.sin(angleRad)
+                val dx = screenPoint.x - centerPoint.x
+                val dy = screenPoint.y - centerPoint.y
+                val rotX = dx * cosA - dy * sinA + centerPoint.x
+                val rotY = dx * sinA + dy * cosA + centerPoint.y
+                val offset = Offset(rotX.toFloat() + mapLeft, rotY.toFloat() + mapTop)
                 
                 if (index == 0) {
                     path.moveTo(offset.x, offset.y)
@@ -261,5 +385,6 @@ fun MapDrawingOverlay(
                 }
             }
         }
+        } // end of key(mapInvalidationKey)
     }
 }
