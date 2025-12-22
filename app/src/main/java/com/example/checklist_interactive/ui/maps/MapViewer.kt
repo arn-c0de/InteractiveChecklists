@@ -1569,6 +1569,23 @@ fun MapViewer(
 
             android.util.Log.d("MapViewer", "fuel rem=$fuelRemainingValue total=$fuelTotalValue fuelObj=${fd?.fuel}")
 
+            // Compute sensible gLoad value: prefer vertical axis (y), then z, else use vector magnitude
+            val gLoadValue: Double? = fd?.gLoad?.let { g ->
+                val y = g.y
+                val z = g.z
+                val x = g.x
+                when {
+                    kotlin.math.abs(y) >= 0.05 -> y
+                    kotlin.math.abs(z) >= 0.05 -> z
+                    else -> {
+                        val mag = Math.sqrt(x * x + y * y + z * z)
+                        if (mag > 0.05) mag else null
+                    }
+                }
+            }
+
+            android.util.Log.d("MapViewer", "gLoadObj=${fd?.gLoad} selected_g=${gLoadValue}")
+
             MapFlightInstruments(
                 pitch = if (fd != null) Math.toDegrees(fd.pitch) else 0.0, // Convert radians to degrees if available, otherwise placeholder
                 bank = if (fd != null) Math.toDegrees(fd.bank) else 0.0,
@@ -1577,7 +1594,7 @@ fun MapViewer(
                 altitude = fd?.altitude,
                 heading = if (fd != null) Math.toDegrees(fd.heading) else null,
                 angleOfAttack = fd?.angleOfAttack,
-                gLoad = fd?.gLoad?.z ?: fd?.gLoad?.y,
+                gLoad = gLoadValue,
                 fuelRemaining = fuelRemainingValue,
                 fuelTotal = fuelTotalValue,
                 mach = fd?.mach,

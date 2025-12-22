@@ -12,11 +12,15 @@ pcall(function()
 	local lastWrite = 0
 	local lastCommandCheck = 0
 	local COMMAND_CHECK_INTERVAL = 2.0 -- check for command file every 2 seconds
-	local STREAMER_VERSION = "1.0.3"
+	local STREAMER_VERSION = "1.0.4"
 	-- Maximum number of JSON lines to keep in the output file. Set to 0 to disable trimming.
 	local MAX_JSON_LINES = 10000
 	-- If true, clear the JSON/log/debug files once when the export starts
 	local CLEAR_ON_START = true
+
+	-- State variables for smoothing/filtering telemetry values
+	local lastAoA = nil
+	local aoaHistory = {} -- ring buffer for moving average
 
 	local function format_pos(p)
 		if not p then return 'N/A' end
@@ -197,23 +201,54 @@ pcall(function()
 		if vs then data.verticalSpeed = vs end
 		if mach then data.mach = mach end
 
-		-- Angle of Attack (AoA)
+		-- Angle of Attack (AoA) with outlier filtering
 		local aoa = safe_get(function() return LoGetAngleOfAttack() end, nil)
 		if aoa then
-			-- Some aircraft/modules return AoA in radians; convert to degrees if value looks like radians
-			if math.abs(aoa) < 6.283185307179586 then
+			local aoa_raw = aoa
+			-- DCS Export API returns AoA in degrees for most modules (FA-18C, F-16C, etc.)
+			-- Only convert if value is very small (< 0.5), indicating it might be in radians
+			-- Typical AoA range: -20° to +30° for normal flight
+			if math.abs(aoa) < 0.5 then
 				aoa = math.deg(aoa)
 			end
-			-- Normalize angle to [-180, 180)
+			-- Normalize angle to [-180, 180) for edge cases
 			while aoa > 180 do aoa = aoa - 360 end
 			while aoa <= -180 do aoa = aoa + 360 end
+			
+			-- Outlier detection: if AoA changes by more than 15° from last frame, treat as suspect
+			-- DCS sometimes delivers bad frames (~0°) when aircraft is taxiing or in certain states
+			local aoaValid = true
+			if lastAoA ~= nil then
+				local delta = math.abs(aoa - lastAoA)
+				if delta > 15 and math.abs(lastAoA) > 5 then
+					-- Large jump detected; if new value is near zero but last was not, it's likely a bad frame
+					if math.abs(aoa) < 3 and math.abs(lastAoA) > 10 then
+						aoaValid = false
+						debug_log('AOA outlier rejected: raw=' .. tostring(aoa_raw) .. ' computed=' .. tostring(aoa) .. ' last=' .. tostring(lastAoA) .. ' delta=' .. tostring(delta))
+					end
+				end
+			end
+			
+			if aoaValid then
+				-- Apply simple moving average (5 samples) for smoothing
+				table.insert(aoaHistory, aoa)
+				if #aoaHistory > 5 then
+					table.remove(aoaHistory, 1) -- keep only last 5
+				end
+				local sum = 0
+				for _, v in ipairs(aoaHistory) do
+					sum = sum + v
+				end
+				aoa = sum / #aoaHistory
+				lastAoA = aoa
+			else
+				-- Use last valid value
+				aoa = lastAoA
+			end
+			
 			-- Round to 2 decimals for compactness
 			aoa = round(aoa, 2)
 			data.angleOfAttack = aoa
-			-- Flag unusually large AoA values to debug log
-			if math.abs(aoa) > 90 then
-				debug_log('AOA unusual: ' .. tostring(aoa))
-			end
 		end
 
 		-- G-Load (x, y, z)
