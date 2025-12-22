@@ -402,6 +402,24 @@ fun AirspeedIndicator(
         Log.d("AirspeedIndicator", "airspeed=$airspeed mach=$mach")
     }
 
+    val textPaint = remember {
+        android.graphics.Paint().apply {
+            isAntiAlias = true
+            color = android.graphics.Color.WHITE
+            textSize = 24f
+            textAlign = android.graphics.Paint.Align.CENTER
+        }
+    }
+
+    val machPaint = remember {
+        android.graphics.Paint().apply {
+            isAntiAlias = true
+            color = android.graphics.Color.CYAN
+            textSize = 14f
+            textAlign = android.graphics.Paint.Align.CENTER
+        }
+    }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
@@ -487,12 +505,6 @@ fun AirspeedIndicator(
 
                 // Digital readout
                 val speedText = "${speedKts.toInt()}"
-                val textPaint = android.graphics.Paint().apply {
-                    isAntiAlias = true
-                    color = android.graphics.Color.WHITE
-                    textSize = 24f
-                    textAlign = android.graphics.Paint.Align.CENTER
-                }
                 drawContext.canvas.nativeCanvas.drawText(
                     speedText,
                     centerX,
@@ -503,12 +515,6 @@ fun AirspeedIndicator(
                 // Mach number (if available and > 0.3)
                 if (mach != null && mach > 0.3) {
                     val machText = "M${String.format("%.2f", mach)}"
-                    val machPaint = android.graphics.Paint().apply {
-                        isAntiAlias = true
-                        color = android.graphics.Color.CYAN
-                        textSize = 14f
-                        textAlign = android.graphics.Paint.Align.CENTER
-                    }
                     drawContext.canvas.nativeCanvas.drawText(
                         machText,
                         centerX,
@@ -540,6 +546,14 @@ fun VerticalSpeedIndicator(
 ) {
     LaunchedEffect(verticalSpeed) {
         Log.d("VerticalSpeedIndicator", "verticalSpeed=$verticalSpeed")
+    }
+
+    val textPaint = remember {
+        android.graphics.Paint().apply {
+            isAntiAlias = true
+            textSize = 20f
+            textAlign = android.graphics.Paint.Align.CENTER
+        }
     }
 
     Column(
@@ -635,15 +649,10 @@ fun VerticalSpeedIndicator(
 
                 // Digital readout
                 val vsText = if (vsFpm >= 0) "+${vsFpm.toInt()}" else "${vsFpm.toInt()}"
-                val textPaint = android.graphics.Paint().apply {
-                    isAntiAlias = true
-                    color = when {
-                        vsFpm > 100 -> android.graphics.Color.GREEN
-                        vsFpm < -100 -> android.graphics.Color.RED
-                        else -> android.graphics.Color.WHITE
-                    }
-                    textSize = 20f
-                    textAlign = android.graphics.Paint.Align.CENTER
+                textPaint.color = when {
+                    vsFpm > 100 -> android.graphics.Color.GREEN
+                    vsFpm < -100 -> android.graphics.Color.RED
+                    else -> android.graphics.Color.WHITE
                 }
                 drawContext.canvas.nativeCanvas.drawText(
                     vsText,
@@ -750,6 +759,22 @@ fun HeadingIndicator(
     val headingDeg = if (heading > 6.28) heading else Math.toDegrees(heading)
     val normalizedHeading = ((headingDeg % 360) + 360) % 360
 
+    val paint = remember {
+        android.graphics.Paint().apply {
+            isAntiAlias = true
+            textSize = 20f
+            textAlign = android.graphics.Paint.Align.CENTER
+        }
+    }
+    val textPaint = remember {
+        android.graphics.Paint().apply {
+            isAntiAlias = true
+            color = android.graphics.Color.CYAN
+            textSize = 16f
+            textAlign = android.graphics.Paint.Align.CENTER
+        }
+    }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
@@ -775,12 +800,7 @@ fun HeadingIndicator(
                     val x = centerX + (textRadius * cos(rad)).toFloat()
                     val y = centerY + (textRadius * sin(rad)).toFloat()
 
-                    val paint = android.graphics.Paint().apply {
-                        isAntiAlias = true
-                        color = if (i == 0) android.graphics.Color.RED else android.graphics.Color.WHITE
-                        textSize = 20f
-                        textAlign = android.graphics.Paint.Align.CENTER
-                    }
+                    paint.color = if (i == 0) android.graphics.Color.RED else android.graphics.Color.WHITE
                     // smaller vertical nudge so the labels sit neatly on the ring without overlapping the heading number
                     drawContext.canvas.nativeCanvas.drawText(
                         cardinals[i],
@@ -792,12 +812,6 @@ fun HeadingIndicator(
 
                 // Digital readout (placed clearly below the compass and centered)
                 val hdgText = "${normalizedHeading.toInt()}°"
-                val textPaint = android.graphics.Paint().apply {
-                    isAntiAlias = true
-                    color = android.graphics.Color.CYAN
-                    textSize = 16f
-                    textAlign = android.graphics.Paint.Align.CENTER
-                }
                 // Nudged slightly higher to sit closer to the compass but avoid overlapping the 'S'
                 drawContext.canvas.nativeCanvas.drawText(
                     hdgText,
