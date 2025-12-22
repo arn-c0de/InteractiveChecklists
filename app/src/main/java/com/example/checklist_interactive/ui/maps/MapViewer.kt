@@ -80,6 +80,36 @@ import androidx.compose.foundation.isSystemInDarkTheme
  * - Smooth position updates
  * - Map controls (center, zoom, layers)
  */
+/**
+ * MapViewer - Aviation map display with live position tracking
+ * 
+ * Features:
+ * - OpenStreetMap base layer
+ * - Aviation overlays (sectional charts)
+ * - Live position marker from DataPad
+ * - Smooth position updates
+ * - Map controls (center, zoom, layers)
+ */
+// Helper: create an airplane emoji bitmap drawable (no rotation - handled by Marker.rotation)
+private fun createPlaneDrawable(ctx: Context, sizeDp: Float, color: Int): BitmapDrawable {
+    val emoji = "\u2708\uFE0F"
+    val metrics = ctx.resources.displayMetrics
+    val sizePx = (sizeDp * metrics.density).toInt().coerceAtLeast(16)
+    val paint = android.graphics.Paint().apply {
+        isAntiAlias = true
+        textSize = sizePx.toFloat()
+        this.color = color
+        textAlign = android.graphics.Paint.Align.CENTER
+    }
+    val baseline = -paint.ascent()
+    val width = sizePx
+    val height = (baseline + paint.descent()).toInt().coerceAtLeast(sizePx)
+    val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bitmap)
+    canvas.drawText(emoji, width / 2f, baseline, paint)
+    return BitmapDrawable(ctx.resources, bitmap)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapViewer(
@@ -271,26 +301,22 @@ fun MapViewer(
     // Map theme helper
     val isDarkTheme = isSystemInDarkTheme()
 
-    // Helper: create an airplane emoji bitmap drawable (no rotation - handled by Marker.rotation)
-    fun createPlaneDrawable(ctx: Context, sizeDp: Float, color: Int): BitmapDrawable {
-        val emoji = "\u2708\uFE0F"
-        val metrics = ctx.resources.displayMetrics
-        val sizePx = (sizeDp * metrics.density).toInt().coerceAtLeast(16)
-        val paint = android.graphics.Paint().apply {
-            isAntiAlias = true
-            textSize = sizePx.toFloat()
-            this.color = color
-            textAlign = android.graphics.Paint.Align.CENTER
-        }
-        val baseline = -paint.ascent()
-        val width = sizePx
-        val height = (baseline + paint.descent()).toInt().coerceAtLeast(sizePx)
-        val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
-        val canvas = android.graphics.Canvas(bitmap)
-        canvas.drawText(emoji, width / 2f, baseline, paint)
-        return BitmapDrawable(ctx.resources, bitmap)
+    // Create and cache the drawables for the plane icon
+    val planeDrawableDark = remember(context) {
+        createPlaneDrawable(context, 28f, android.graphics.Color.WHITE)
+    }
+    val planeDrawableLight = remember(context) {
+        createPlaneDrawable(context, 28f, android.graphics.Color.BLACK)
     }
 
+    // Update the marker icon whenever the theme changes
+    LaunchedEffect(isDarkTheme, mapState.positionMarker) {
+        mapState.positionMarker?.let { marker ->
+            marker.icon = if (isDarkTheme) planeDrawableDark else planeDrawableLight
+            mapState.mapView?.invalidate()
+        }
+    }
+    
     // Separate effect for map rotation to prevent flicker from frequent data updates
     LaunchedEffect(mapState.mapRotationMode) {
         val map = mapState.mapView
@@ -640,15 +666,6 @@ fun MapViewer(
                     }
                     marker.rotation = computedRotation
                     
-                    // Update marker icon less frequently (cached)
-                    try {
-                        val color = if (isDarkTheme) android.graphics.Color.WHITE else android.graphics.Color.BLACK
-                        marker.icon = createPlaneDrawable(context, 28f, color)
-                        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                    } catch (e: Exception) {
-                        // ignore
-                    }
-
                     // Update marker snippet with altitude and speed
                     val altFt = (data.altitude * 3.28084).toInt()
                     val speedSource = data.groundSpeed ?: data.trueAirspeed ?: data.indicatedAirspeed ?: 0.0
@@ -733,9 +750,6 @@ fun MapViewer(
     }
     val initialTileSource = savedTileId?.let { tileSourceForId(it) } ?: if (isDarkTheme) darkTile else TileSourceFactory.MAPNIK
 
-    // createPlaneDrawable moved earlier to be visible to flight-data LaunchedEffect
-
-
     Box(modifier = modifier.fillMaxSize()) {
 
         AndroidView(
@@ -767,8 +781,7 @@ fun MapViewer(
 
                         // initial plane icon
                         try {
-                            val color = if (isDarkTheme) android.graphics.Color.WHITE else android.graphics.Color.BLACK
-                            icon = createPlaneDrawable(ctx, 28f, color)
+                            icon = if (isDarkTheme) planeDrawableDark else planeDrawableLight
                         } catch (e: Exception) {
                             // Use default marker
                         }
@@ -1300,11 +1313,44 @@ fun MapViewer(
 
         // Active Navigation Display (top center)
         MapNavigationDisplay(
-            mapState = mapState,
             flightData = flightData,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = 16.dp)
+                .padding(top = 16.dp),
+            activeNavigationTarget = mapState.activeNavigationTarget,
+            navigationDistanceNm = mapState.navigationDistanceNm,
+            navigationHeading = mapState.navigationHeading,
+            showNavigationDetails = mapState.showNavigationDetails,
+            onShowNavigationDetailsChange = { mapState.showNavigationDetails = it },
+            selectedRunwayHeading = mapState.selectedRunwayHeading,
+            originalAirportTarget = mapState.originalAirportTarget,
+            targetRunways = mapState.targetRunways,
+            showRunwayApproach = mapState.showRunwayApproach,
+            onShowRunwayApproachChange = { mapState.showRunwayApproach = it },
+            finalApproachDistanceNm = mapState.finalApproachDistanceNm,
+            onFinalApproachDistanceNmChange = { mapState.finalApproachDistanceNm = it },
+            showTrafficPattern = mapState.showTrafficPattern,
+            onShowTrafficPatternChange = { mapState.showTrafficPattern = it },
+            patternSize = mapState.patternSize,
+            onPatternSizeChange = { mapState.patternSize = it },
+            patternDirection = mapState.patternDirection,
+            onPatternDirectionChange = { mapState.patternDirection = it },
+            patternFinalDistanceNm = mapState.patternFinalDistanceNm,
+            onPatternFinalDistanceNmChange = { mapState.patternFinalDistanceNm = it },
+            selectedRunwayIndex = mapState.selectedRunwayIndex,
+            onSelectedRunwayIndexChange = { mapState.selectedRunwayIndex = it },
+            selectedRunway = mapState.selectedRunway,
+            onSelectedRunwayChange = { mapState.selectedRunway = it },
+            onActiveNavigationTargetChange = { mapState.activeNavigationTarget = it },
+            onOriginalAirportTargetChange = { mapState.originalAirportTarget = it },
+            onSelectedRunwayHeadingChange = { mapState.selectedRunwayHeading = it },
+            customPatternAltitudeAglFt = mapState.customPatternAltitudeAglFt,
+            onCustomPatternAltitudeAglFtChange = { mapState.customPatternAltitudeAglFt = it },
+            patternAltitudeSmallToleranceFt = mapState.patternAltitudeSmallToleranceFt,
+            onPatternAltitudeSmallToleranceFtChange = { mapState.patternAltitudeSmallToleranceFt = it },
+            patternAltitudeWarningToleranceFt = mapState.patternAltitudeWarningToleranceFt,
+            onPatternAltitudeWarningToleranceFtChange = { mapState.patternAltitudeWarningToleranceFt = it },
+            saveNavigationState = { mapState.saveNavigationState() }
         )
 
         // Connection status indicator (only show when DataPad enabled)

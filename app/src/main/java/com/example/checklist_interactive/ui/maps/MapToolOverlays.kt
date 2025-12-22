@@ -34,6 +34,41 @@ class CompassOverlay : Overlay() {
         color = android.graphics.Color.argb(0xCC, 0xFF, 0xFF, 0xFF)
         textSize = 32f
     }
+    private val circlePaint = Paint(paint).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = paint.strokeWidth
+    }
+    private val smallTickPaint = Paint().apply {
+        isAntiAlias = true
+        color = android.graphics.Color.WHITE
+        strokeWidth = 1f
+    }
+    private val majorTickPaint = Paint().apply {
+        isAntiAlias = true
+        color = android.graphics.Color.WHITE
+        strokeWidth = 2f
+    }
+    private val labelSize = Paint(textPaint).apply {
+        textSize = 18f
+    }
+    private val headingPaint = Paint().apply {
+        isAntiAlias = true
+        color = android.graphics.Color.YELLOW
+        style = Paint.Style.FILL
+    }
+    private val outlinePaint = Paint().apply {
+        isAntiAlias = true
+        color = android.graphics.Color.BLACK
+        style = Paint.Style.STROKE
+        strokeWidth = 2f
+    }
+    private val headingTextPaint = Paint(textPaint).apply {
+        color = android.graphics.Color.YELLOW
+        textSize = 24f
+    }
+    private val headingTextShadowPaint = Paint(headingTextPaint).apply {
+        color = android.graphics.Color.argb(0xCC, 0, 0, 0)
+    }
 
     override fun draw(canvas: android.graphics.Canvas?, mapView: org.osmdroid.views.MapView?, shadow: Boolean) {
         if (shadow) return
@@ -49,7 +84,6 @@ class CompassOverlay : Overlay() {
         val baseRadius = ((40f + (zoomLevel.toFloat() - 8f) * 20f) * 2.2f).coerceIn(88f, 528f)
 
         // outer circle
-        val circlePaint = Paint(paint).apply { style = Paint.Style.STROKE; strokeWidth = paint.strokeWidth }
         canvas?.drawCircle(centerPt.x.toFloat(), centerPt.y.toFloat(), baseRadius, circlePaint)
 
         // Cardinal radial lines and labels (N, E, S, W)
@@ -71,10 +105,7 @@ class CompassOverlay : Overlay() {
         // - Minor ticks every 5° (small)
         // - Major ticks every 30° (long)
         // - Numeric labels at 0°, 90°, 180°, 270°
-        val smallTickPaint = Paint().apply { isAntiAlias = true; color = android.graphics.Color.WHITE; strokeWidth = 1f }
-        val majorTickPaint = Paint().apply { isAntiAlias = true; color = android.graphics.Color.WHITE; strokeWidth = 2f }
-        val labelSize = Paint(textPaint).apply { textSize = 18f }
-
+        
         // Minor ticks (every 5° excluding the major tick positions)
         for (a in 0 until 360 step 5) {
             if (a % 30 == 0) continue // skip majors
@@ -113,20 +144,17 @@ class CompassOverlay : Overlay() {
         val dxH = (Math.sin(radH) * baseRadius).toFloat()
         val dyH = (-Math.cos(radH) * baseRadius).toFloat()
         // Draw a small circle marker at the heading position on the ring
-        val headingPaint = Paint().apply { isAntiAlias = true; color = android.graphics.Color.YELLOW; style = Paint.Style.FILL }
         // Draw a small circle marker at the heading position
         canvas?.drawCircle(centerPt.x + dxH, centerPt.y + dyH, 8f, headingPaint)
         // Outline for visibility
-        val outlinePaint = Paint().apply { isAntiAlias = true; color = android.graphics.Color.BLACK; style = Paint.Style.STROKE; strokeWidth = 2f }
         canvas?.drawCircle(centerPt.x + dxH, centerPt.y + dyH, 8f, outlinePaint)
         
         // Label with heading near the marker
         val label = "HDG ${headingNorm}°"
         val labelX = centerPt.x + (dxH * 1.25f)
         val labelY = centerPt.y + (dyH * 1.25f)
-        val headingTextPaint = Paint(textPaint).apply { color = android.graphics.Color.YELLOW; textSize = 24f }
         // Draw shadow for readability
-        canvas?.drawText(label, labelX + 2f, labelY + 2f, Paint(headingTextPaint).apply { color = android.graphics.Color.argb(0xCC, 0, 0, 0) })
+        canvas?.drawText(label, labelX + 2f, labelY + 2f, headingTextShadowPaint)
         canvas?.drawText(label, labelX, labelY, headingTextPaint)
     }
 }
@@ -241,6 +269,22 @@ class RangeRingsOverlay : Overlay() {
         color = android.graphics.Color.WHITE
         textSize = 22f
     }
+    private val tickPaint = Paint().apply {
+        isAntiAlias = true
+        color = android.graphics.Color.argb(0xCC, 0xFF, 0xFF, 0xFF)
+        strokeWidth = 2f
+    }
+    private val smallText = Paint(textPaint).apply {
+        textSize = 18f
+    }
+    private val headingPaint = Paint(textPaint).apply {
+        color = android.graphics.Color.YELLOW
+        textSize = textPaint.textSize + 2f
+    }
+    private val headingLinePaint = Paint(paint).apply {
+        color = android.graphics.Color.argb(0xCC, 0xFF, 0xFF, 0x00)
+        strokeWidth = 4f
+    }
 
     private fun generateDistancesMeters(): List<Double> {
         // Generate sequence 1,2,5,10,20,50,100,200,... up to maxNm
@@ -296,9 +340,7 @@ class RangeRingsOverlay : Overlay() {
             // Draw cardinal radial lines through the outermost ring and label them
             val cardinals = listOf(0, 90, 180, 270)
             val labelMap = mapOf(0 to "N", 90 to "O", 180 to "S", 270 to "W")
-            val tickPaint = Paint().apply { isAntiAlias = true; color = android.graphics.Color.argb(0xCC, 0xFF, 0xFF, 0xFF); strokeWidth = 2f }
-            val smallText = Paint(textPaint).apply { textSize = 18f }
-
+            
             for (angle in cardinals) {
                 val rad = Math.toRadians(angle.toDouble())
                 val dx = (Math.sin(rad) * outerRadiusPx).toFloat()
@@ -346,9 +388,7 @@ class RangeRingsOverlay : Overlay() {
             val hx = centerPt.x + (Math.sin(hRad) * headingRadius).toFloat()
             val hy = centerPt.y + (-Math.cos(hRad) * headingRadius).toFloat()
             val headingLabel = "${headingNorm}°"
-            val headingPaint = Paint(textPaint).apply { color = android.graphics.Color.YELLOW; textSize = textPaint.textSize + 2f }
             // Draw a highlighted radial for heading (slightly transparent)
-            val headingLinePaint = Paint(paint).apply { color = android.graphics.Color.argb(0xCC, 0xFF, 0xFF, 0x00); strokeWidth = 4f }
             canvas?.drawLine(centerPt.x.toFloat(), centerPt.y.toFloat(), hx, hy, headingLinePaint)
 
             // Draw heading label
