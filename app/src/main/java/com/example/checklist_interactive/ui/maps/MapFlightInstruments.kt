@@ -50,12 +50,18 @@ fun MapFlightInstruments(
     fuelRemaining: Double? = null,
     fuelTotal: Double? = null,
     mach: Double? = null,
+    engineRpmLeft: Double? = null,
+    engineRpmRight: Double? = null,
+    windSpeed: Double? = null,
+    windDirection: Double? = null,
+    flareCount: Int? = null,
+    chaffCount: Int? = null,
     enabled: Boolean = true,
     dataAvailable: Boolean = true
 ) {
     // Log when the instruments composable is active and whenever data changes
     LaunchedEffect(enabled, pitch, bank, verticalSpeed, airspeed, altitude, heading, angleOfAttack, gLoad, dataAvailable) {
-        Log.d("MapFlightInstruments", "composed enabled=$enabled dataAvailable=$dataAvailable pitch=$pitch bank=$bank vs=$verticalSpeed ias=$airspeed alt=$altitude hdg=$heading aoa=$angleOfAttack g=$gLoad")
+        Log.d("MapFlightInstruments", "composed enabled=$enabled dataAvailable=$dataAvailable pitch=$pitch bank=$bank vs=$verticalSpeed ias=$airspeed alt=$altitude hdg=$heading aoa=$angleOfAttack g=$gLoad rpm_l=$engineRpmLeft rpm_r=$engineRpmRight wind=${windSpeed}@${windDirection}° flares=$flareCount chaff=$chaffCount")
     }
 
     if (!enabled) return
@@ -111,12 +117,6 @@ fun MapFlightInstruments(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Altimeter
-                        AltimeterIndicator(
-                            altitude = altitude ?: 0.0,
-                            size = 64.dp
-                        )
-
                         // Heading Indicator
                         HeadingIndicator(
                             heading = heading ?: 0.0,
@@ -129,16 +129,43 @@ fun MapFlightInstruments(
                             size = 64.dp
                         )
 
-                        // G-Meter
+                        // G-Meter (left side)
                         GMeterIndicator(
                             gLoad = gLoad ?: 1.0,
                             size = 64.dp
                         )
 
-                        // Fuel Indicator
+                        // Altimeter (center-left)
+                        AltimeterIndicator(
+                            altitude = altitude ?: 0.0,
+                            size = 64.dp
+                        )
+
+                        // Engine RPM Indicator (center-right)
+                        EngineRPMIndicator(
+                            rpmLeft = engineRpmLeft ?: 0.0,
+                            rpmRight = engineRpmRight,
+                            size = 64.dp
+                        )
+
+                        // Fuel Indicator (right side)
                         FuelIndicator(
                             fuelRemaining = fuelRemaining ?: 0.0,
                             fuelTotal = fuelTotal ?: 1.0,
+                            size = 64.dp
+                        )
+
+                        // Wind Indicator
+                        WindIndicator(
+                            windSpeed = windSpeed ?: 0.0,
+                            windDirection = windDirection ?: 0.0,
+                            size = 64.dp
+                        )
+
+                        // Countermeasures Indicator
+                        CountermeasuresIndicator(
+                            flareCount = flareCount ?: 0,
+                            chaffCount = chaffCount ?: 0,
                             size = 64.dp
                         )
                     }
@@ -718,7 +745,8 @@ fun HeadingIndicator(
                 for (i in 0 until 4) {
                     val angle = i * 90.0
                     val rad = Math.toRadians(angle - normalizedHeading - 90)
-                    val textRadius = radius * 0.6f
+                    // Pull the cardinal labels slightly inward so they don't clash with the numeric readout
+                    val textRadius = radius * 0.55f
                     val x = centerX + (textRadius * cos(rad)).toFloat()
                     val y = centerY + (textRadius * sin(rad)).toFloat()
 
@@ -728,15 +756,16 @@ fun HeadingIndicator(
                         textSize = 20f
                         textAlign = android.graphics.Paint.Align.CENTER
                     }
+                    // smaller vertical nudge so the labels sit neatly on the ring without overlapping the heading number
                     drawContext.canvas.nativeCanvas.drawText(
                         cardinals[i],
                         x,
-                        y + 7f,
+                        y + 4f,
                         paint
                     )
                 }
 
-                // Digital readout
+                // Digital readout (placed clearly below the compass and centered)
                 val hdgText = "${normalizedHeading.toInt()}°"
                 val textPaint = android.graphics.Paint().apply {
                     isAntiAlias = true
@@ -744,10 +773,11 @@ fun HeadingIndicator(
                     textSize = 16f
                     textAlign = android.graphics.Paint.Align.CENTER
                 }
+                // Nudged slightly higher to sit closer to the compass but avoid overlapping the 'S'
                 drawContext.canvas.nativeCanvas.drawText(
                     hdgText,
                     centerX,
-                    centerY + radius * 0.8f,
+                    centerY + radius * 0.90f + 2f,
                     textPaint
                 )
             }
@@ -921,6 +951,359 @@ fun FuelIndicator(
         }
         Text(
             text = "FUEL",
+            fontSize = 8.sp,
+            color = Color.White,
+            modifier = Modifier.padding(top = 2.dp)
+        )
+    }
+}
+
+/**
+ * Engine RPM Indicator
+ * Shows engine RPM with warning zones (yellow >90%, red >100%)
+ * Supports single or dual engine display
+ */
+@Composable
+fun EngineRPMIndicator(
+    rpmLeft: Double,
+    rpmRight: Double? = null,
+    size: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier
+) {
+    // Color based on RPM level (assuming percentage 0-100+)
+    val rpmColorLeft = when {
+        rpmLeft > 100.0 -> Color.Red
+        rpmLeft > 90.0 -> Color.Yellow
+        else -> Color.Green
+    }
+    
+    val rpmColorRight = rpmRight?.let {
+        when {
+            it > 100.0 -> Color.Red
+            it > 90.0 -> Color.Yellow
+            else -> Color.Green
+        }
+    }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+    ) {
+        Box(
+            modifier = Modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(Color(0xFF1A1A1A))
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val centerX = this.size.width / 2
+                val centerY = this.size.height / 2
+                val radius = this.size.minDimension / 2
+
+                // Draw RPM arc scale (0-110%)
+                // Green zone: 0-90°, Yellow: 90-100°, Red: 100-110°
+                val startAngle = 135f
+                val sweepAngle = 270f
+                
+                // Green zone (0-90%)
+                drawArc(
+                    color = Color.Green.copy(alpha = 0.3f),
+                    startAngle = startAngle,
+                    sweepAngle = sweepAngle * 0.818f, // 90% of 110%
+                    useCenter = false,
+                    topLeft = Offset(centerX - radius * 0.8f, centerY - radius * 0.8f),
+                    size = Size(radius * 1.6f, radius * 1.6f),
+                    style = Stroke(width = 8f)
+                )
+                
+                // Yellow zone (90-100%)
+                drawArc(
+                    color = Color.Yellow.copy(alpha = 0.3f),
+                    startAngle = startAngle + sweepAngle * 0.818f,
+                    sweepAngle = sweepAngle * 0.091f, // 10% of 110%
+                    useCenter = false,
+                    topLeft = Offset(centerX - radius * 0.8f, centerY - radius * 0.8f),
+                    size = Size(radius * 1.6f, radius * 1.6f),
+                    style = Stroke(width = 8f)
+                )
+                
+                // Red zone (100-110%)
+                drawArc(
+                    color = Color.Red.copy(alpha = 0.3f),
+                    startAngle = startAngle + sweepAngle * 0.909f,
+                    sweepAngle = sweepAngle * 0.091f, // 10% of 110%
+                    useCenter = false,
+                    topLeft = Offset(centerX - radius * 0.8f, centerY - radius * 0.8f),
+                    size = Size(radius * 1.6f, radius * 1.6f),
+                    style = Stroke(width = 8f)
+                )
+                
+                // Draw needle for left engine (or single engine)
+                val rpmAngle = startAngle + (rpmLeft.coerceIn(0.0, 110.0) / 110.0) * sweepAngle
+                val rpmRad = Math.toRadians(rpmAngle.toDouble())
+                val needleLength = radius * 0.65f
+                val needleEndX = centerX + (needleLength * cos(rpmRad)).toFloat()
+                val needleEndY = centerY + (needleLength * sin(rpmRad)).toFloat()
+                
+                drawLine(
+                    color = rpmColorLeft,
+                    start = Offset(centerX, centerY),
+                    end = Offset(needleEndX, needleEndY),
+                    strokeWidth = 3f,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+                
+                // If dual engine, draw second needle slightly offset
+                if (rpmRight != null) {
+                    val rpmAngle2 = startAngle + (rpmRight.coerceIn(0.0, 110.0) / 110.0) * sweepAngle
+                    val rpmRad2 = Math.toRadians(rpmAngle2)
+                    val needleEndX2 = centerX + (needleLength * cos(rpmRad2)).toFloat()
+                    val needleEndY2 = centerY + (needleLength * sin(rpmRad2)).toFloat()
+                    
+                    drawLine(
+                        color = rpmColorRight ?: Color.Gray,
+                        start = Offset(centerX, centerY),
+                        end = Offset(needleEndX2, needleEndY2),
+                        strokeWidth = 2f,
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round
+                    )
+                }
+                
+                // Center hub
+                drawCircle(
+                    color = Color(0xFF444444),
+                    radius = 6f,
+                    center = Offset(centerX, centerY)
+                )
+            }
+            
+            // Digital readout at bottom
+            Column(
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "${rpmLeft.toInt()}%",
+                    fontSize = 12.sp,
+                    color = rpmColorLeft,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                )
+                if (rpmRight != null) {
+                    Text(
+                        text = "${rpmRight.toInt()}%",
+                        fontSize = 10.sp,
+                        color = rpmColorRight ?: Color.Gray
+                    )
+                }
+            }
+        }
+        Text(
+            text = "RPM",
+            fontSize = 8.sp,
+            color = Color.White,
+            modifier = Modifier.padding(top = 2.dp)
+        )
+    }
+}
+
+/**
+ * Wind Indicator
+ * Shows wind speed and direction as an arrow/compass
+ */
+@Composable
+fun WindIndicator(
+    windSpeed: Double,
+    windDirection: Double,
+    size: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier
+) {
+    // Convert wind speed from m/s to knots
+    val windKts = (windSpeed * 1.9438).toInt()
+    
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+    ) {
+        Box(
+            modifier = Modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(Color(0xFF1A1A1A))
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val centerX = this.size.width / 2
+                val centerY = this.size.height / 2
+                val radius = this.size.minDimension / 2
+                
+                // Draw compass ring
+                drawCircle(
+                    color = Color(0xFF2A2A2A),
+                    radius = radius * 0.85f,
+                    center = Offset(centerX, centerY),
+                    style = Stroke(width = 2f)
+                )
+                
+                // Draw cardinal directions
+                val cardinals = listOf("N", "E", "S", "W")
+                for (i in 0 until 4) {
+                    val angle = i * 90.0 - 90.0
+                    val rad = Math.toRadians(angle)
+                    val textRadius = radius * 0.65f
+                    val x = centerX + (textRadius * cos(rad)).toFloat()
+                    val y = centerY + (textRadius * sin(rad)).toFloat()
+                    
+                    val paint = android.graphics.Paint().apply {
+                        isAntiAlias = true
+                        color = android.graphics.Color.GRAY
+                        textSize = 12f
+                        textAlign = android.graphics.Paint.Align.CENTER
+                    }
+                    drawContext.canvas.nativeCanvas.drawText(
+                        cardinals[i],
+                        x,
+                        y + 4f,
+                        paint
+                    )
+                }
+                
+                // Draw wind arrow
+                val windRad = Math.toRadians(windDirection - 90.0)
+                val arrowLength = radius * 0.5f
+                val arrowEndX = centerX + (arrowLength * cos(windRad)).toFloat()
+                val arrowEndY = centerY + (arrowLength * sin(windRad)).toFloat()
+                
+                // Arrow shaft
+                drawLine(
+                    color = Color.Cyan,
+                    start = Offset(centerX, centerY),
+                    end = Offset(arrowEndX, arrowEndY),
+                    strokeWidth = 3f,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+                
+                // Arrow head
+                val arrowHeadSize = 8f
+                val arrowAngle1 = windRad + Math.toRadians(150.0)
+                val arrowAngle2 = windRad - Math.toRadians(150.0)
+                
+                drawLine(
+                    color = Color.Cyan,
+                    start = Offset(arrowEndX, arrowEndY),
+                    end = Offset(
+                        arrowEndX + (arrowHeadSize * cos(arrowAngle1)).toFloat(),
+                        arrowEndY + (arrowHeadSize * sin(arrowAngle1)).toFloat()
+                    ),
+                    strokeWidth = 3f,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+                
+                drawLine(
+                    color = Color.Cyan,
+                    start = Offset(arrowEndX, arrowEndY),
+                    end = Offset(
+                        arrowEndX + (arrowHeadSize * cos(arrowAngle2)).toFloat(),
+                        arrowEndY + (arrowHeadSize * sin(arrowAngle2)).toFloat()
+                    ),
+                    strokeWidth = 3f,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+            }
+            
+            // Wind speed readout at bottom
+            Column(
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "${windKts}kt",
+                    fontSize = 11.sp,
+                    color = Color.Cyan,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                )
+                Text(
+                    text = "${windDirection.toInt()}°",
+                    fontSize = 9.sp,
+                    color = Color.Gray
+                )
+            }
+        }
+        Text(
+            text = "WIND",
+            fontSize = 8.sp,
+            color = Color.White,
+            modifier = Modifier.padding(top = 2.dp)
+        )
+    }
+}
+
+/**
+ * Countermeasures Indicator
+ * Shows remaining flares and chaff counts
+ */
+@Composable
+fun CountermeasuresIndicator(
+    flareCount: Int,
+    chaffCount: Int,
+    size: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+    ) {
+        Box(
+            modifier = Modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(Color(0xFF1A1A1A)),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.padding(4.dp)
+            ) {
+                // Flares (hot)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = "🔥",
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "$flareCount",
+                        fontSize = 14.sp,
+                        color = if (flareCount < 10) Color.Red else if (flareCount < 20) Color.Yellow else Color.Green,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                        modifier = Modifier.padding(start = 2.dp)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                // Chaff (metallic)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = "⚡",
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "$chaffCount",
+                        fontSize = 14.sp,
+                        color = if (chaffCount < 10) Color.Red else if (chaffCount < 20) Color.Yellow else Color.Green,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                        modifier = Modifier.padding(start = 2.dp)
+                    )
+                }
+            }
+        }
+        Text(
+            text = "CMDS",
             fontSize = 8.sp,
             color = Color.White,
             modifier = Modifier.padding(top = 2.dp)
