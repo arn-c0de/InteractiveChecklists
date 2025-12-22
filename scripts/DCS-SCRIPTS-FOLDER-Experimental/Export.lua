@@ -246,18 +246,31 @@ pcall(function()
 			end
 		end
 
-		-- Fuel
-		local fuelInternal = safe_get(function() return LoGetFuelWeight() end, 0)
-		local fuelExternal = safe_get(function() return LoGetFuelWeight() end, 0) -- DCS doesn't separate easily
-		if fuelInternal and fuelInternal > 0 then
+		-- Fuel (attempt to derive total from internal + external when available)
+		local fuelInternal = safe_get(function() return LoGetFuelWeight() end, nil)
+		-- Try to read external fuel if the export API provides it; fallback to nil
+		local fuelExternal = nil
+		fuelExternal = fuelExternal or safe_get(function() return LoGetFuelExternalWeight() end, nil)
+		fuelExternal = fuelExternal or safe_get(function() return LoGetFuelExternalWeightKg and LoGetFuelExternalWeightKg() end, nil)
+		-- As a last resort, do not duplicate internal value for external; keep external nil
+
+		if (fuelInternal and fuelInternal > 0) or (fuelExternal and fuelExternal > 0) then
+			local total = 0
+			if fuelInternal and fuelInternal > 0 then total = total + fuelInternal end
+			if fuelExternal and fuelExternal > 0 then total = total + fuelExternal end
+
+			local remaining = fuelInternal and fuelInternal or (fuelExternal and fuelExternal) or nil
+
 			data.fuel = {
-				total = fuelInternal,
-				remaining = fuelInternal,
+				total = (total > 0) and total or nil,
+				remaining = remaining,
 				internal = fuelInternal,
-				external = 0,
+				external = fuelExternal or 0,
 				endurance = nil, -- calculated externally if flow known
 				fuelFlow = nil
 			}
+
+			debug_log('Fuel: internal=' .. tostring(fuelInternal) .. ' external=' .. tostring(fuelExternal) .. ' total=' .. tostring(total) .. ' remaining=' .. tostring(remaining))
 		end
 
 		-- Engine Data (RPM, EGT, Throttle, Afterburner)

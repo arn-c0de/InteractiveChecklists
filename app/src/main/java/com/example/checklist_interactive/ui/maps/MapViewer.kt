@@ -1560,6 +1560,15 @@ fun MapViewer(
 
         // Always show instruments when the overlay is enabled, even if we don't have flight data yet.
         if (mapState.flightInstrumentsEnabled) {
+            // Derived fuel values: some streams omit `total` but provide `internal`/`external`; prefer remaining when available
+            val fuelRemainingValue = fd?.fuel?.remaining ?: fd?.fuel?.internal ?: 0.0
+            val fuelTotalValue = fd?.fuel?.total ?: run {
+                val internal = fd?.fuel?.internal
+                if (internal != null) internal + (fd?.fuel?.external ?: 0.0) else null
+            }
+
+            android.util.Log.d("MapViewer", "fuel rem=$fuelRemainingValue total=$fuelTotalValue fuelObj=${fd?.fuel}")
+
             MapFlightInstruments(
                 pitch = if (fd != null) Math.toDegrees(fd.pitch) else 0.0, // Convert radians to degrees if available, otherwise placeholder
                 bank = if (fd != null) Math.toDegrees(fd.bank) else 0.0,
@@ -1569,9 +1578,15 @@ fun MapViewer(
                 heading = if (fd != null) Math.toDegrees(fd.heading) else null,
                 angleOfAttack = fd?.angleOfAttack,
                 gLoad = fd?.gLoad?.z ?: fd?.gLoad?.y,
-                fuelRemaining = fd?.fuel?.remaining,
-                fuelTotal = fd?.fuel?.total,
+                fuelRemaining = fuelRemainingValue,
+                fuelTotal = fuelTotalValue,
                 mach = fd?.mach,
+                engineRpmLeft = fd?.engines?.rpm?.left,
+                engineRpmRight = fd?.engines?.rpm?.right,
+                windSpeed = fd?.environment?.windSpeed,
+                windDirection = fd?.environment?.windDirection,
+                flareCount = fd?.countermeasures?.flareCount,
+                chaffCount = fd?.countermeasures?.chaffCount,
                 enabled = mapState.flightInstrumentsEnabled,
                 dataAvailable = instrumentsDataAvailable
             )
