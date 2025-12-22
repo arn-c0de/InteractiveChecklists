@@ -176,6 +176,15 @@ pcall(function()
 			data.country = selfData.Country or 0
 			data.group = selfData.GroupName or ''
 			data.unitID = tostring(selfData.ID or selfData.UnitId or 'N/A')
+			
+			-- Terrain elevation (for AGL calculation)
+			local terrainAlt = safe_get(function() return LoGetAltitudeAboveSeaLevel() end, nil)
+			local groundAlt = safe_get(function() return LoGetAltitudeAboveGroundLevel() end, nil)
+			if terrainAlt and groundAlt and data.alt then
+				data.terrainElevation = data.alt - groundAlt
+			else
+				data.terrainElevation = nil
+			end
 		end
 
 		-- Position (DCS coordinates)

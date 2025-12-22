@@ -44,6 +44,7 @@ fun MapFlightInstruments(
     verticalSpeed: Double? = null,
     airspeed: Double? = null,
     altitude: Double? = null,
+    terrainElevation: Double? = null,
     heading: Double? = null,
     angleOfAttack: Double? = null,
     gLoad: Double? = null,
@@ -138,6 +139,7 @@ fun MapFlightInstruments(
                         // Altimeter (center-left)
                         AltimeterIndicator(
                             altitude = altitude ?: 0.0,
+                            terrainElevation = terrainElevation,
                             size = 64.dp
                         )
 
@@ -663,16 +665,23 @@ fun VerticalSpeedIndicator(
 
 /**
  * Altimeter Indicator
- * Shows altitude in feet
+ * Shows altitude MSL (top) and AGL (bottom) in feet
  */
 @Composable
 fun AltimeterIndicator(
     altitude: Double,
+    terrainElevation: Double? = null,
     size: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier
 ) {
     // Convert meters to feet (1m = 3.28084ft)
     val altFeet = (altitude * 3.28084).toInt()
+    // Calculate AGL: if terrain elevation is available, subtract it from altitude
+    val aglFeet = if (terrainElevation != null) {
+        ((altitude - terrainElevation) * 3.28084).toInt()
+    } else {
+        altFeet // Fallback: show MSL if terrain unknown
+    }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -689,15 +698,31 @@ fun AltimeterIndicator(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
+                // ALT (MSL)
                 Text(
                     text = "${altFeet}",
-                    fontSize = 18.sp,
+                    fontSize = 16.sp,
                     color = Color.White,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                 )
                 Text(
-                    text = "ft",
-                    fontSize = 10.sp,
+                    text = "ALT",
+                    fontSize = 8.sp,
+                    color = Color.Gray
+                )
+                
+                Spacer(modifier = Modifier.height(2.dp))
+                
+                // AGL (Above Ground Level)
+                Text(
+                    text = "${aglFeet}",
+                    fontSize = 14.sp,
+                    color = Color.Yellow,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                )
+                Text(
+                    text = "AGL",
+                    fontSize = 8.sp,
                     color = Color.Gray
                 )
             }

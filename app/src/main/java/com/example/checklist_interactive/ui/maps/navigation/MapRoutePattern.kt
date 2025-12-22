@@ -23,7 +23,7 @@ import kotlin.math.*
  * NOTE: sizes increased slightly for more realistic military patterns; an EXTRA_LARGE
  * preset is available for military operations (larger lateral spacing and higher pattern altitude).
  */
-enum class PatternSize(val displayName: String, val downwindDistanceNm: Double, val patternAltitudeFt: Int) {
+enum class PatternSize(val displayName: String, val downwindDistanceNm: Double, val patternAltitudeAglFt: Int) {
     NORMAL("Normal", 0.75, 1200),
     MEDIUM("Medium", 1.0, 1400),
     LARGE("Large", 1.5, 1800),
@@ -181,7 +181,9 @@ object TrafficPatternGenerator {
         points: List<GeoPoint>,
         direction: PatternDirection,
         runwayHeading: Double,
-        patternSize: PatternSize = PatternSize.NORMAL
+        patternSize: PatternSize = PatternSize.NORMAL,
+        runwayElevationFt: Int = 0,
+        customAltitudeAglFt: Int? = null
     ): List<Pair<GeoPoint, String>> {
         if (points.size < 11) return emptyList()
 
@@ -216,15 +218,16 @@ object TrafficPatternGenerator {
         // Use the computed corner directly for the FINAL label so it sits at the turn point between Base and Final
         val finalLabelPoint = finalCorner
 
-        val altFt = patternSize.patternAltitudeFt
+        val altAglFt = customAltitudeAglFt ?: patternSize.patternAltitudeAglFt
+        val altMslFt = altAglFt + runwayElevationFt
 
         return listOf(
             // DEPARTURE at end of climb-out
             points[1] to String.format("DEPARTURE\nHDG %03d°\n%.1f NM", departureHdg, departureDist),
             // CROSSWIND shown at midpoint of the crosswind leg
             crosswindMid to String.format("CROSSWIND\nHDG %03d°\n%.1f NM", crosswindHdg, crosswindDist),
-            // DOWNWIND shown at the corner between Crosswind and Downwind (includes pattern altitude)
-            downwindCorner to String.format("DOWNWIND\nHDG %03d°\n%.1f NM\nALT %d ft", downwindHdg, downwindDist, altFt),
+            // DOWNWIND shown at the corner between Crosswind and Downwind (includes pattern altitude with both MSL and AGL)
+            downwindCorner to String.format("DOWNWIND\nHDG %03d°\n%.1f NM\n%d ft MSL (%d AGL)", downwindHdg, downwindDist, altMslFt, altAglFt),
             // BASE at the base-turn corner
             points[6] to String.format("BASE\nHDG %03d°\n%.1f NM", baseHdg, baseDist),
             // FINAL offset a little from the corner to avoid overlapping the final leg
