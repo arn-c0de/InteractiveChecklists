@@ -101,12 +101,14 @@ object MapViewerFABs {
         onMarkerRouteManagement: () -> Unit,
         onLockScreen: () -> Unit,
         onToggleMapRotation: () -> Unit,
+        onDrawingTools: () -> Unit,
         onResetFabPositions: () -> Unit,
         onDataPadOpen: () -> Unit,
         onQuickAccessOpen: () -> Unit,
         isConnected: Boolean = false,
         isScreenLocked: Boolean = false,
         mapRotationMode: Int = 0,
+        isDrawingMode: Boolean = false,
         repositoriesReady: Boolean = false,
         pendingSymbolPlacement: Any? = null,
         datapadEnabled: Boolean = false,
@@ -189,6 +191,16 @@ object MapViewerFABs {
             containerColor = if (mapRotationMode == 1) containerColorPrimary else containerColorSurface,
             defaultX = 0.95f,
             defaultY = 0.35f,
+            scope = "map"
+        ),
+        FABConfig(
+            id = "map_drawing",
+            icon = Icons.Default.Edit,
+            contentDescription = "Drawing Tools",
+            onClick = onDrawingTools,
+            containerColor = if (isDrawingMode) containerColorPrimary else containerColorTertiary,
+            defaultX = 0.95f,
+            defaultY = 0.40f,
             scope = "map"
         ),
         FABConfig(

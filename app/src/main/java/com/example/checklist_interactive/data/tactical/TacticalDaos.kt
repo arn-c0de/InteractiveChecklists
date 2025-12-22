@@ -304,3 +304,44 @@ interface NavaidDao {
     @Query("DELETE FROM navaids WHERE id = :id")
     suspend fun deleteNavaidById(id: Int)
 }
+
+/**
+ * DAO for Map Drawing operations
+ */
+@Dao
+interface MapDrawingDao {
+    @Query("SELECT * FROM map_drawings ORDER BY created_at DESC")
+    fun getAllDrawings(): Flow<List<MapDrawingEntity>>
+    
+    @Query("SELECT * FROM map_drawings WHERE id = :id")
+    suspend fun getDrawingById(id: Int): MapDrawingEntity?
+    
+    @Query("SELECT * FROM map_drawings WHERE map_region = :region ORDER BY created_at DESC")
+    fun getDrawingsByRegion(region: String): Flow<List<MapDrawingEntity>>
+    
+    @Query("""
+        SELECT * FROM map_drawings 
+        WHERE map_region IS NULL OR map_region = :region
+        ORDER BY created_at DESC
+    """)
+    fun getAllDrawingsForRegion(region: String?): Flow<List<MapDrawingEntity>>
+    
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDrawing(drawing: MapDrawingEntity): Long
+    
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDrawings(drawings: List<MapDrawingEntity>)
+    
+    @Update
+    suspend fun updateDrawing(drawing: MapDrawingEntity)
+    
+    @Delete
+    suspend fun deleteDrawing(drawing: MapDrawingEntity)
+    
+    @Query("DELETE FROM map_drawings WHERE id = :id")
+    suspend fun deleteDrawingById(id: Int)
+    
+    @Query("DELETE FROM map_drawings")
+    suspend fun deleteAllDrawings()
+}
+

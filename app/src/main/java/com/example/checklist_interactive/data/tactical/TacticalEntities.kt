@@ -455,3 +455,40 @@ data class WaypointWithLocation(
     )
     val location: LocationEntity
 )
+
+/**
+ * Map drawing entity - stores freehand drawings on the map
+ */
+@Entity(
+    tableName = "map_drawings",
+    indices = [
+        Index(value = ["created_at"]),
+        Index(value = ["map_region"])
+    ]
+)
+data class MapDrawingEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Int = 0,
+    
+    @ColumnInfo(name = "map_region")
+    val mapRegion: String? = null,  // Optional region/area identifier for organizing drawings
+    
+    val color: Long,  // ARGB color value
+    
+    @ColumnInfo(name = "stroke_width")
+    val strokeWidth: Float,
+    
+    @ColumnInfo(name = "brush_type")
+    val brushType: String,  // "pen", "marker", "special"
+    
+    val points: String,  // JSON array of [lat, lon] coordinate pairs
+    
+    @ColumnInfo(name = "is_highlight", defaultValue = "0")
+    val isHighlight: Int = 0,  // 0=no, 1=yes (for semi-transparent marker strokes)
+    
+    @ColumnInfo(name = "created_at")
+    val createdAt: String,  // ISO 8601 timestamp
+    
+    @ColumnInfo(name = "modified_at")
+    val modifiedAt: String  // ISO 8601 timestamp
+)

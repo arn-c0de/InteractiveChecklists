@@ -23,9 +23,10 @@ import java.io.File
         MediaEntity::class,
         TagEntity::class,
         LocationTagCrossRef::class,
-        NavaidEntity::class
+        NavaidEntity::class,
+        MapDrawingEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class TacticalDatabase : RoomDatabase() {
@@ -37,6 +38,7 @@ abstract class TacticalDatabase : RoomDatabase() {
     abstract fun mediaDao(): MediaDao
     abstract fun tagDao(): TagDao
     abstract fun navaidDao(): NavaidDao
+    abstract fun mapDrawingDao(): MapDrawingDao
     
     companion object {
         @Volatile
@@ -304,6 +306,27 @@ abstract class TacticalDatabase : RoomDatabase() {
             }
         }
         
+        // Migration from v4 to v5: add map_drawings table
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS map_drawings (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        map_region TEXT,
+                        color INTEGER NOT NULL,
+                        stroke_width REAL NOT NULL,
+                        brush_type TEXT NOT NULL,
+                        points TEXT NOT NULL,
+                        is_highlight INTEGER NOT NULL DEFAULT 0,
+                        created_at TEXT NOT NULL,
+                        modified_at TEXT NOT NULL
+                    )
+                """)
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_map_drawings_created_at ON map_drawings(created_at)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_map_drawings_map_region ON map_drawings(map_region)")
+            }
+        }
+        
         /**
          * Get database instance
          * 
@@ -445,7 +468,7 @@ abstract class TacticalDatabase : RoomDatabase() {
                 DATABASE_NAME
             )
                 .createFromAsset("databases/$DATABASE_NAME")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
 
             if (allowDestructiveMigration) {
                 builder.fallbackToDestructiveMigration()
@@ -467,7 +490,7 @@ abstract class TacticalDatabase : RoomDatabase() {
                 TacticalDatabase::class.java,
                 dbFile.absolutePath
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
 
             if (allowDestructiveMigration) {
                 builder.fallbackToDestructiveMigration()
