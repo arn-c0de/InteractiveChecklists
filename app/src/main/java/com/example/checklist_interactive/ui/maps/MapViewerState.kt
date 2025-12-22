@@ -226,7 +226,7 @@ class MapViewerState(
                     }
                     if (airport != null) {
                         activeNavigationTarget = airport
-                        showNavigationDetails = true
+                        // Do not force the navigation panel open here; respect saved user preference
                         autoCenter = false
                         Log.d(TAG, "✅ Restored navigation airport: ${airport.name} (id=$patternAirportId) for special target id=$navTargetId")
                     } else {
@@ -247,7 +247,7 @@ class MapViewerState(
                 if (target != null) {
                     activeNavigationTarget = target
                     originalAirportTarget = target
-                    showNavigationDetails = true
+                    // Respect saved collapsed/expanded state of the navigation panel
                     autoCenter = false
                     Log.d(TAG, "✅ Restored navigation target: ${target.name} (id=$navTargetId)")
                 } else {
