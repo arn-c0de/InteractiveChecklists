@@ -5,11 +5,13 @@ All relevant changes are summarized here by version.
 ## [1.0.15] - 2025-12-19
 
 ### Summary
-- Major refactor of FAB overlays and map UI components
-- Improved route planning and marker management
-- Enhanced security: sensitive logging fixes, CodeQL and git hook improvements
-- MapDatabaseTools: JSON encryption patch
-- Various bugfixes and translation updates (EN/DE)
+- Security & CI: Added multi-language CodeQL support (Python + Kotlin), overhauled pre-push Git hooks for safer and faster checks, moved git-safety scripts into .githooks, and disabled the heavy secret-scan on pre-push in favor of CodeQL. Various CodeQL alerts were fixed across branches.
+- Hardening & Privacy: Removed sensitive audit files from the repository, fixed sensitive/cleartext logging, enforced safer default binding behavior for the DataPad receiver (default to localhost), blocked binding to 0.0.0.0, and improved audit/log handling and session timeouts.
+- Telemetry Security: Strengthened DataPad forwarder and handshake: added nonce and replay protection, per-client nonce management, public-key validation, whitelist/blacklist handling, rate-limit/auth improvements, and other encryption provider fixes.
+- Maps & UX: Major map feature work — marker popups, route display and waypoint routing, MGRS support, new base icon sets (NATO Joint Military Symbols), map tools (compass, range/ruler), dynamic icon loading, and multiple visualization/route fixes (player icon rotation, map rotation, route coloring).
+- MapDatabaseTools: Added JSON encryption and icon/visibility fixes to improve security and consistency between Python tools and the app.
+- DataPad & Forwarder: Continued DataPad and forwarder stability and UX improvements (ECDH handshake phase 2, AES-GCM UDP flow, status visible in the flight mini-status bar, parser/forwarder fixes and robustness improvements).
+- Misc & Fixes: Database and fresh-install fixes, full folder import support, multiple small bugfixes and translation updates (EN/DE), updates to roadmap and docs.
 
 ## [1.0.14] - 2025-12-18
 ### Added
