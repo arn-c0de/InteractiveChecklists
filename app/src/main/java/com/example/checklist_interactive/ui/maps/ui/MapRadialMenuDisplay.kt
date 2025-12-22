@@ -7,59 +7,87 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import com.example.checklist_interactive.data.tactical.LocationRepository
 import com.example.checklist_interactive.ui.maps.MapViewerState
 import com.example.checklist_interactive.ui.maps.components.RadialMenu
 import com.example.checklist_interactive.ui.maps.components.RadialMenuItem
+import com.example.checklist_interactive.ui.maps.components.RadialMenuType
+import com.example.checklist_interactive.ui.maps.drawing.MapBrushType
+import com.example.checklist_interactive.ui.maps.drawing.MapDrawingState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 private const val TAG = "MapRadialMenuDisplay"
 
 /**
- * Displays the radial menu for marker interactions.
- * Shows options for Info, Edit, Navigate, and Delete (if not static).
+ * Displays the unified radial menu for both marker and drawing interactions.
  *
  * @param mapState The map viewer state containing radial menu state
  * @param locationRepository Repository for location/marker operations
  * @param scope Coroutine scope for async operations
+ * @param drawingState Current drawing state (for drawing menu)
+ * @param onDrawingStateChange Callback to update drawing state
  */
 @Composable
 fun MapRadialMenuDisplay(
     mapState: MapViewerState,
     locationRepository: LocationRepository?,
-    scope: CoroutineScope
+    scope: CoroutineScope,
+    drawingState: MapDrawingState? = null,
+    onDrawingStateChange: ((MapDrawingState) -> Unit)? = null
 ) {
-    // Only show radial menu if visible and marker is selected
-    if (!mapState.radialMenuVisible || mapState.radialMenuMarker == null) {
+    // Only show radial menu if visible
+    if (!mapState.radialMenuVisible) {
         return
     }
 
-    Log.d(TAG, "Rendering RadialMenu at (${mapState.radialMenuX}, ${mapState.radialMenuY}) for marker ${mapState.radialMenuMarker?.name}")
+    Log.d(TAG, "Rendering RadialMenu at (${mapState.radialMenuX}, ${mapState.radialMenuY}) type=${mapState.radialMenuType}")
 
-    val items = buildRadialMenuItems(
-        mapState = mapState,
-        locationRepository = locationRepository,
-        scope = scope
-    )
+    when (mapState.radialMenuType) {
+        RadialMenuType.MARKER -> {
+            if (mapState.radialMenuMarker == null) return
+            
+            val items = buildMarkerMenuItems(
+                mapState = mapState,
+                locationRepository = locationRepository,
+                scope = scope
+            )
 
-    RadialMenu(
-        centerX = mapState.radialMenuX,
-        centerY = mapState.radialMenuY,
-        onDismiss = { mapState.radialMenuVisible = false },
-        items = items
-    )
+            RadialMenu(
+                centerX = mapState.radialMenuX,
+                centerY = mapState.radialMenuY,
+                onDismiss = { mapState.radialMenuVisible = false },
+                menuType = RadialMenuType.MARKER,
+                items = items
+            )
+        }
+        
+        RadialMenuType.DRAWING -> {
+            if (drawingState == null || onDrawingStateChange == null) return
+            
+            RadialMenu(
+                centerX = mapState.radialMenuX,
+                centerY = mapState.radialMenuY,
+                onDismiss = { mapState.radialMenuVisible = false },
+                menuType = RadialMenuType.DRAWING,
+                drawingState = drawingState,
+                onDrawingStateChange = onDrawingStateChange,
+                onBrushSelected = { brushType ->
+                    onDrawingStateChange(drawingState.copy(brushType = brushType, isEraseMode = false))
+                },
+                onColorSelected = { color ->
+                    onDrawingStateChange(drawingState.copy(selectedColor = color))
+                }
+            )
+        }
+    }
 }
 
 /**
- * Builds the list of radial menu items based on the selected marker.
- *
- * @param mapState The map viewer state
- * @param locationRepository Repository for location operations
- * @param scope Coroutine scope for async operations
- * @return List of RadialMenuItem to display
+ * Builds the list of radial menu items for marker interactions.
  */
-private fun buildRadialMenuItems(
+private fun buildMarkerMenuItems(
     mapState: MapViewerState,
     locationRepository: LocationRepository?,
     scope: CoroutineScope
