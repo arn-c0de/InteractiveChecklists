@@ -86,6 +86,13 @@ fun FlightMiniStatusBar(noteManager: QuickNoteManager, onClick: (() -> Unit)? = 
     val com1Mode by noteManager.com1Mode.collectAsState()
     val com2 by noteManager.com2.collectAsState()
     val com2Mode by noteManager.com2Mode.collectAsState()
+    
+    // DataPad status for position display
+    val dataPadManager = LocalDataPadManager.current
+    val flightData by dataPadManager.flightData.collectAsState()
+    val dpConnected by dataPadManager.isConnected.collectAsState()
+    val dpEnabled by dataPadManager.isEnabled.collectAsState()
+    val hasValidPosition = flightData?.let { it.latitude != 0.0 && it.longitude != 0.0 } ?: false
 
 
 
@@ -113,31 +120,6 @@ fun FlightMiniStatusBar(noteManager: QuickNoteManager, onClick: (() -> Unit)? = 
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // DataPad connection status indicator: only visible when DataPad is enabled
-        val dataPadManager = LocalDataPadManager.current
-        val dpConnected by dataPadManager.isConnected.collectAsState()
-        val dpEnabled by dataPadManager.isEnabled.collectAsState()
-
-        if (dpEnabled) {
-            val indicatorColor = when {
-                dpConnected -> Color(0xFF4CAF50) // green
-                else -> Color(0xFFFFC107) // amber/yellow (enabled but not connected)
-            }
-
-            Box(
-                modifier = Modifier
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(indicatorColor)
-                    .semantics { contentDescription = when {
-                        dpConnected -> "DataPad verbunden"
-                        else -> "DataPad aktiviert, aber nicht verbunden"
-                    } }
-            )
-        }
-
-        Spacer(modifier = Modifier.width(6.dp))
-
         Text(text = (callsign.ifBlank { stringResource(R.string.common_placeholder_dash) }), style = MaterialTheme.typography.labelSmall)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(text = stringResource(R.string.quick_notes_status_label) + ":", style = MaterialTheme.typography.labelSmall)
@@ -149,6 +131,32 @@ fun FlightMiniStatusBar(noteManager: QuickNoteManager, onClick: (() -> Unit)? = 
         }
         Text(text = stringResource(R.string.quick_notes_com1_label) + ": ${com1.ifBlank { stringResource(R.string.common_placeholder_dash) }.replace(',', '.')} ${com1Mode}", style = MaterialTheme.typography.labelSmall)
         Text(text = stringResource(R.string.quick_notes_com2_label) + ": ${com2.ifBlank { stringResource(R.string.common_placeholder_dash) }.replace(',', '.')} ${com2Mode}", style = MaterialTheme.typography.labelSmall)
+        
+        // DataPad connection status indicator (centered)
+        Spacer(modifier = Modifier.weight(1f))
+        
+        if (dpEnabled) {
+            val indicatorColor = when {
+                !dpConnected -> Color(0xFFFF5252) // red - not connected
+                !hasValidPosition -> Color(0xFFFFC107) // amber/yellow - connected but no position
+                else -> Color(0xFF4CAF50) // green - connected and valid position
+            }
+            
+            val statusText = when {
+                !dpConnected -> stringResource(R.string.map_no_datapad_connection)
+                !hasValidPosition -> stringResource(R.string.map_waiting_for_valid_position)
+                else -> "Position OK"
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(indicatorColor)
+                    .semantics { contentDescription = statusText }
+            )
+        }
+
         Spacer(modifier = Modifier.weight(1f))
 
         // Live clock (HH:mm:ss)

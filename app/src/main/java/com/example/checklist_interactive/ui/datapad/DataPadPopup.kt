@@ -22,6 +22,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -252,6 +253,7 @@ fun DataPadPopup(
             .fillMaxWidth()
             .height(sheetHeightDp)
             .padding(horizontal = 16.dp)
+            .alpha(sheetOpacity)
         ) {
             // Drag handle at top (drag vertically to resize and swipe down from the handle to dismiss)
             Box(
