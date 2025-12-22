@@ -1615,8 +1615,7 @@ fun MapViewer(
             saveNavigationState = { mapState.saveNavigationState() }
         )
 
-        // Connection status indicator (only show when DataPad enabled)
-        // Also show DB loading indicator if DB is not ready
+        // DB loading/error indicators only (DataPad status moved to FlightMiniStatusBar)
         if (mapState.dbInitFailed) {
             Surface(
                 modifier = Modifier
@@ -1696,36 +1695,6 @@ fun MapViewer(
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
-            }
-        } else if (datapadEnabled && !isConnected) {
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(16.dp),
-                color = MaterialTheme.colorScheme.errorContainer,
-                shape = MaterialTheme.shapes.medium
-            ) {
-                Text(
-                    text = stringResource(R.string.map_no_datapad_connection),
-                    modifier = Modifier.padding(12.dp),
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        } else if (datapadEnabled && (flightData?.latitude == 0.0 || flightData?.longitude == 0.0)) {
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(16.dp),
-                color = MaterialTheme.colorScheme.tertiaryContainer,
-                shape = MaterialTheme.shapes.medium
-            ) {
-                Text(
-                    text = stringResource(R.string.map_waiting_for_valid_position),
-                    modifier = Modifier.padding(12.dp),
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
-                    style = MaterialTheme.typography.bodySmall
-                )
             }
         }
         
