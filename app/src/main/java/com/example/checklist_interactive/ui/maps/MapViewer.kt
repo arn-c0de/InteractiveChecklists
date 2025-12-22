@@ -986,7 +986,7 @@ fun MapViewer(
                     
                     mapState.mapView = this
 
-                    // Touch listener: detect long-press on markers and mark user touch to disable auto-center
+                    // Touch listener: detect long-press on markers, handle rotation, and mark user touch to disable auto-center
                     try {
                         var downX = 0f
                         var downY = 0f
@@ -996,9 +996,13 @@ fun MapViewer(
                         val longPressTimeoutMs = 600L
                         val moveThresholdPx = with(density) { 10.dp.toPx() }
 
+                        // Variables for rotation
+                        var lastAngle = 0f
+                        var inRotationGesture = false
+
                         setOnTouchListener { _, ev ->
                             try {
-                                when (ev.action) {
+                                when (ev.action and MotionEvent.ACTION_MASK) {
                                     MotionEvent.ACTION_DOWN -> {
                                         lastUserTouch.value = System.currentTimeMillis()
                                         prefsManager.setMapAutoCenter(false)
@@ -1008,10 +1012,11 @@ fun MapViewer(
                                         downY = ev.y
                                         moved = false
                                         isDown = true
+                                        inRotationGesture = false
 
                                         longPressJob?.cancel()
                                         longPressJob = scope.launch {
-                                            kotlinx.coroutines.delay(longPressTimeoutMs)
+                                            delay(longPressTimeoutMs)
                                             if (isDown && !moved) {
                                                 try {
                                                     // Find nearest marker within radius
@@ -1101,24 +1106,48 @@ fun MapViewer(
                                             }
                                         }
                                     }
-
+                                    MotionEvent.ACTION_POINTER_DOWN -> {
+                                        if (ev.pointerCount == 2) {
+                                            longPressJob?.cancel() // Cancel long press if a second finger goes down
+                                            inRotationGesture = true
+                                            val dx = ev.getX(0) - ev.getX(1)
+                                            val dy = ev.getY(0) - ev.getY(1)
+                                            lastAngle = Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat()
+                                        }
+                                    }
                                     MotionEvent.ACTION_MOVE -> {
                                         lastUserTouch.value = System.currentTimeMillis()
-                                        if (kotlin.math.hypot((ev.x - downX).toDouble(), (ev.y - downY).toDouble()) > moveThresholdPx) {
-                                            moved = true
-                                            longPressJob?.cancel()
+                                        if (inRotationGesture && ev.pointerCount >= 2) {
+                                            val dx = ev.getX(0) - ev.getX(1)
+                                            val dy = ev.getY(0) - ev.getY(1)
+                                            val currentAngle = Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat()
+                                            val deltaAngle = currentAngle - lastAngle
+                                            
+                                            this@apply.mapOrientation = this@apply.mapOrientation + deltaAngle
+                                            this@apply.invalidate()
+                                            
+                                            lastAngle = currentAngle
+                                        } else if (!inRotationGesture && ev.pointerCount == 1) {
+                                            if (kotlin.math.hypot((ev.x - downX).toDouble(), (ev.y - downY).toDouble()) > moveThresholdPx) {
+                                                moved = true
+                                                longPressJob?.cancel()
+                                            }
                                         }
                                     }
 
                                     MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                                         isDown = false
                                         longPressJob?.cancel()
+                                        inRotationGesture = false
+                                    }
+                                    MotionEvent.ACTION_POINTER_UP -> {
+                                        inRotationGesture = false
                                     }
                                 }
                             } catch (_: Exception) {
                             }
 
-                            // Let MapView handle the touch normally (click listeners will be invoked unless suppressed)
+                            // Let MapView handle the touch normally for panning and zooming
                             false
                         }
                     } catch (_: Exception) {

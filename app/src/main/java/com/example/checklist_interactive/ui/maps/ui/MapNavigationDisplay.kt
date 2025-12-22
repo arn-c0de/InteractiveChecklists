@@ -6,6 +6,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -120,14 +121,17 @@ fun MapNavigationDisplay(
         Box(modifier = modifier.widthIn(max = 500.dp)) {
             Card(
                 modifier = Modifier
-                    .height(cardHeightDp)
-                    .fillMaxWidth(),
+                    // When details are visible, use the persisted height; otherwise let the card wrap to content
+                    .then(if (showNavigationDetails) Modifier.height(cardHeightDp) else Modifier.wrapContentHeight())
+                    .fillMaxWidth()
+                    .animateContentSize(),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = cardOpacity)
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
-                Column(modifier = Modifier.fillMaxSize()) {
+                // Don't force the column to fill the card's max size so the card can shrink when collapsed
+                Column(modifier = Modifier.fillMaxWidth()) {
                     // Fixed header (always visible, non-scrollable)
                 Row(
                     modifier = Modifier
@@ -318,7 +322,7 @@ fun MapNavigationDisplay(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f, fill = false)
+                            .weight(1f, fill = true)
                             .verticalScroll(rememberScrollState())
                     ) {
                         // Runway selection (when approach mode active)
@@ -1177,7 +1181,7 @@ fun MapNavigationDisplay(
                             ) {
                                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                     Text(
-                                        text = "${'$'}opacityPercent%",
+                                        text = "$opacityPercent%",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onErrorContainer,
                                         modifier = Modifier.padding(2.dp)
