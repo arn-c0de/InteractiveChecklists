@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * - Multiple open tabs with persistence
  * - Active tab tracking
  * - Tab history for quick navigation
- * - Support for both MD and PDF files
+ * - Support for both MD, PDF files and aviationmap
  */
 class TabManager(private val context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("tab_manager", Context.MODE_PRIVATE)
