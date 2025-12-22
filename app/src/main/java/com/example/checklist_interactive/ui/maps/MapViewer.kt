@@ -1562,8 +1562,6 @@ fun MapViewer(
             MapFlightInstruments(
                 pitch = if (fd != null) Math.toDegrees(fd.pitch) else 0.0, // Convert radians to degrees if available, otherwise placeholder
                 bank = if (fd != null) Math.toDegrees(fd.bank) else 0.0,
-                turnRate = 0.0, // TODO: Calculate turn rate from heading changes
-                slip = 0.0, // TODO: Add slip data to DataPad if available
                 verticalSpeed = fd?.verticalSpeed,
                 airspeed = fd?.indicatedAirspeed ?: fd?.trueAirspeed ?: fd?.groundSpeed,
                 enabled = mapState.flightInstrumentsEnabled,
