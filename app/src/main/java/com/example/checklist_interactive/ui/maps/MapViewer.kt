@@ -1553,18 +1553,21 @@ fun MapViewer(
         
         // Flight Instruments Overlay
         val fd = flightData
+        val instrumentsDataAvailable = fd != null
         // Debug log to help diagnose visibility
-        android.util.Log.d("MapViewer", "flightInstrumentsEnabled=${mapState.flightInstrumentsEnabled} flightDataPresent=${fd != null} pitch=${fd?.pitch} bank=${fd?.bank} vs=${fd?.verticalSpeed} ias=${fd?.indicatedAirspeed}")
+        android.util.Log.d("MapViewer", "flightInstrumentsEnabled=${mapState.flightInstrumentsEnabled} flightDataPresent=${instrumentsDataAvailable} pitch=${fd?.pitch} bank=${fd?.bank} vs=${fd?.verticalSpeed} ias=${fd?.indicatedAirspeed}")
 
-        if (mapState.flightInstrumentsEnabled && fd != null) {
+        // Always show instruments when the overlay is enabled, even if we don't have flight data yet.
+        if (mapState.flightInstrumentsEnabled) {
             MapFlightInstruments(
-                pitch = Math.toDegrees(fd.pitch), // Convert radians to degrees
-                bank = Math.toDegrees(fd.bank), // Convert radians to degrees
+                pitch = if (fd != null) Math.toDegrees(fd.pitch) else 0.0, // Convert radians to degrees if available, otherwise placeholder
+                bank = if (fd != null) Math.toDegrees(fd.bank) else 0.0,
                 turnRate = 0.0, // TODO: Calculate turn rate from heading changes
                 slip = 0.0, // TODO: Add slip data to DataPad if available
-                verticalSpeed = fd.verticalSpeed ?: 0.0,
-                airspeed = fd.indicatedAirspeed ?: fd.trueAirspeed ?: fd.groundSpeed ?: 0.0,
-                enabled = mapState.flightInstrumentsEnabled
+                verticalSpeed = fd?.verticalSpeed,
+                airspeed = fd?.indicatedAirspeed ?: fd?.trueAirspeed ?: fd?.groundSpeed,
+                enabled = mapState.flightInstrumentsEnabled,
+                dataAvailable = instrumentsDataAvailable
             )
         }
 
