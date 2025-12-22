@@ -6,10 +6,6 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.sample
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
@@ -27,7 +23,6 @@ import java.util.Base64
 /**
  * Manages UDP reception of live flight data and provides state for UI consumption
  */
-@OptIn(FlowPreview::class)
 class DataPadManager(private val context: Context) {
     companion object {
         private const val TAG = "DataPadManager"
@@ -57,9 +52,7 @@ class DataPadManager(private val context: Context) {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     
     private val _flightData = MutableStateFlow<FlightData?>(null)
-    val flightData: StateFlow<FlightData?> = _flightData
-        .sample(33) // ~30fps
-        .stateIn(scope, SharingStarted.WhileSubscribed(5000), _flightData.value)
+    val flightData: StateFlow<FlightData?> = _flightData.asStateFlow()
     
     private val _isConnected = MutableStateFlow(false)
     val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
@@ -114,6 +107,17 @@ class DataPadManager(private val context: Context) {
     private val HEARTBEAT_WARNING_MS = 30000L // 30 seconds - show yellow
     private val HEARTBEAT_TIMEOUT_MS = 35000L  // 35 seconds - show red
 
+    // Interarrival time tracking for performance diagnostics
+    private var lastPacketTime: Long = 0L
+    private val interarrivalTimes = mutableListOf<Long>()  // Store last N interarrival times
+    private val MAX_INTERARRIVAL_SAMPLES = 100  // Rolling window size
+    private val _minInterarrivalMs = MutableStateFlow<Long?>(null)
+    val minInterarrivalMs: StateFlow<Long?> = _minInterarrivalMs.asStateFlow()
+    private val _maxInterarrivalMs = MutableStateFlow<Long?>(null)
+    val maxInterarrivalMs: StateFlow<Long?> = _maxInterarrivalMs.asStateFlow()
+    private val _avgInterarrivalMs = MutableStateFlow<Long?>(null)
+    val avgInterarrivalMs: StateFlow<Long?> = _avgInterarrivalMs.asStateFlow()
+
     // ECDH components
     private val keyManager = KeyManager(context)
     private var encryptionProvider: EcdhEncryption? = null
@@ -166,6 +170,40 @@ class DataPadManager(private val context: Context) {
         }
     }
     
+    /**
+     * Track packet interarrival time and update statistics
+     * Excludes heartbeats and extreme outliers for realistic statistics
+     */
+    private fun trackInterarrival(isHeartbeat: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if (lastPacketTime > 0L) {
+            val interarrival = now - lastPacketTime
+            
+            // Only track normal data packets (exclude heartbeats and extreme gaps > 5s)
+            // Heartbeats arrive every ~30s and would skew statistics
+            if (!isHeartbeat && interarrival < 5000) {
+                synchronized(interarrivalTimes) {
+                    interarrivalTimes.add(interarrival)
+                    // Keep only last MAX_INTERARRIVAL_SAMPLES
+                    if (interarrivalTimes.size > MAX_INTERARRIVAL_SAMPLES) {
+                        interarrivalTimes.removeAt(0)
+                    }
+                    // Update statistics
+                    if (interarrivalTimes.isNotEmpty()) {
+                        _minInterarrivalMs.value = interarrivalTimes.minOrNull()
+                        _maxInterarrivalMs.value = interarrivalTimes.maxOrNull()
+                        _avgInterarrivalMs.value = (interarrivalTimes.average().toLong())
+                    }
+                }
+            }
+            
+            if (interarrival > 200) {  // Log gaps > 200ms
+                udpLogD("Packet gap: ${interarrival}ms${if (isHeartbeat) " (heartbeat)" else ""}")
+            }
+        }
+        lastPacketTime = now
+    }
+
     /**
      * Get the device's local IP address
      */
@@ -302,6 +340,10 @@ class DataPadManager(private val context: Context) {
                         udpSocket?.receive(packet)
                         val receivedData = packet.data.copyOfRange(0, packet.length)
                         val senderIp = packet.address.hostAddress
+                        
+                        // Note: trackInterarrival will be called from handleIncomingMessage
+                        // after we know if it's a heartbeat or not
+                        
                         udpLogD("UDP packet received (${packet.length} bytes) from $senderIp:${packet.port}")
 
                         // Filter out packets from own IP address (broadcast echoes)
@@ -761,11 +803,13 @@ class DataPadManager(private val context: Context) {
                     
                     // Check if this is a heartbeat message
                     if (flightData.type == "heartbeat") {
+                        trackInterarrival(isHeartbeat = true)
                         udpLogD("💓 Received heartbeat from $senderIp: ${flightData.message}")
                         // Update connection health but don't update flight data
                         _connectionHealth.value = ConnectionHealth.HEALTHY
                         _lastHeartbeatTime.value = System.currentTimeMillis()
                     } else {
+                        trackInterarrival(isHeartbeat = false)
                         // Normal flight data
                         _flightData.value = flightData
                         _lastUpdateTime.value = System.currentTimeMillis()
