@@ -553,6 +553,10 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
         logger.info(f"📤 Will send data to {host}:{port}")
     handshake_sock = sock  # Use same socket for handshake and data
 
+    # Heartbeat tracking: send heartbeat every 30 seconds when no new data
+    last_data_sent_time = time.time()
+    HEARTBEAT_INTERVAL = 30.0  # seconds
+
     def open_for_tail(read_existing: bool = False):
         f = open(path, 'r', encoding='utf-8', errors='ignore')
         if not read_existing:
@@ -562,6 +566,27 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
     f = open_for_tail()
     try:
         while True:
+            # Check heartbeat FIRST (independent of data availability)
+            current_time = time.time()
+            if current_time - last_data_sent_time >= HEARTBEAT_INTERVAL:
+                heartbeat_data = {
+                    "type": "heartbeat",
+                    "timestamp": datetime.now().isoformat() + 'Z',
+                    "message": "No new flight data - connection alive"
+                }
+                heartbeat_json = json.dumps(heartbeat_data).encode('utf-8')
+                
+                # Send heartbeat to all active sessions
+                heartbeat_sent = False
+                for device_id in list(session_mgr.device_sessions.keys()):
+                    if send_udp(heartbeat_json, host, port, sock,
+                               session_mgr=session_mgr, device_id=device_id):
+                        logger.info(f"💓 Heartbeat sent to {device_id[:8]}...")
+                        heartbeat_sent = True
+                
+                if heartbeat_sent:
+                    last_data_sent_time = current_time
+
             # In ECDH mode: check for incoming handshake messages
             if handshake_sock:
                 try:
@@ -687,6 +712,11 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                     logger.warning(f"⚠️ Failed to send to {device_name} (session may have expired)")
 
             sent = sent_count > 0
+            
+            # Update last data sent time on successful send
+            if sent:
+                last_data_sent_time = time.time()
+            
             if verbose or show_env:
                 ts = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
                 if sent:
@@ -781,6 +811,10 @@ def repeat_last_line(path: str, host: str, port: int, session_mgr: 'SessionManag
         logger.info(f"📤 Will send data to {host}:{port}")
     handshake_sock = sock  # Use same socket for handshake and data
     
+    # Heartbeat tracking: send heartbeat every 30 seconds when no new data
+    last_data_sent_time = time.time()
+    HEARTBEAT_INTERVAL = 30.0  # seconds
+    
     try:
         last_sent = None
         last_send_time = 0
@@ -788,6 +822,27 @@ def repeat_last_line(path: str, host: str, port: int, session_mgr: 'SessionManag
         cached_last_line = None  # Cache the last line to avoid unnecessary reads
         
         while True:
+            # Check heartbeat FIRST (independent of data availability)
+            current_time = time.time()
+            if current_time - last_data_sent_time >= HEARTBEAT_INTERVAL:
+                heartbeat_data = {
+                    "type": "heartbeat",
+                    "timestamp": datetime.now().isoformat() + 'Z',
+                    "message": "No new flight data - connection alive"
+                }
+                heartbeat_json = json.dumps(heartbeat_data).encode('utf-8')
+                
+                # Send heartbeat to all active sessions
+                heartbeat_sent = False
+                for device_id in list(session_mgr.device_sessions.keys()):
+                    if send_udp(heartbeat_json, host, port, sock,
+                               session_mgr=session_mgr, device_id=device_id):
+                        logger.info(f"💓 Heartbeat sent to {device_id[:8]}...")
+                        heartbeat_sent = True
+                
+                if heartbeat_sent:
+                    last_data_sent_time = current_time
+
             # In ECDH mode: check for incoming handshake messages
             if handshake_sock:
                 try:
@@ -919,6 +974,10 @@ def repeat_last_line(path: str, host: str, port: int, session_mgr: 'SessionManag
                     else:
                         logger.warning(f"⚠️ Failed to send to {device_name} (session may have expired)")
                 sent = sent_count > 0
+                
+                # Update last data sent time on successful send
+                if sent:
+                    last_data_sent_time = current_time
                 
                 last_send_time = current_time
                 if verbose or show_env:

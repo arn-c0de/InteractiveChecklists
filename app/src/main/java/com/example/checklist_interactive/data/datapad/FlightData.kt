@@ -9,6 +9,13 @@ import kotlinx.serialization.SerialName
  */
 @Serializable
 data class FlightData(
+    // === Message Type (for heartbeat detection) ===
+    @SerialName("type")
+    val type: String? = null,  // "heartbeat" for keep-alive messages, null for normal data
+    
+    @SerialName("message")
+    val message: String? = null,  // Optional message from server
+    
     // === Basic Identity ===
     @SerialName("aircraft")
     val aircraft: String = "",

@@ -87,6 +87,26 @@ class DataPadManager(private val context: Context) {
     private val _handshakeStatus = MutableStateFlow<String?>(null)
     val handshakeStatus: StateFlow<String?> = _handshakeStatus.asStateFlow()
 
+    // Connection health tracking (for heartbeat monitoring)
+    enum class ConnectionHealth {
+        DISCONNECTED,  // No connection
+        HEALTHY,       // Data received recently (green)
+        WARNING,       // No message for ~30s (yellow)
+        STALE,         // No message for 35+ seconds (red)
+    }
+    
+    private val _connectionHealth = MutableStateFlow(ConnectionHealth.DISCONNECTED)
+    val connectionHealth: StateFlow<ConnectionHealth> = _connectionHealth.asStateFlow()
+    
+    // Expose last heartbeat timestamp so UI can show when the last heartbeat arrived
+    private val _lastHeartbeatTime = MutableStateFlow<Long?>(null)
+    val lastHeartbeatTime: StateFlow<Long?> = _lastHeartbeatTime.asStateFlow()
+
+    private var lastMessageReceivedTime: Long = 0L
+    private var healthCheckJob: Job? = null
+    private val HEARTBEAT_WARNING_MS = 30000L // 30 seconds - show yellow
+    private val HEARTBEAT_TIMEOUT_MS = 35000L  // 35 seconds - show red
+
     // ECDH components
     private val keyManager = KeyManager(context)
     private var encryptionProvider: EcdhEncryption? = null
@@ -228,6 +248,9 @@ class DataPadManager(private val context: Context) {
                 udpLogD("Socket local port: ${udpSocket?.localPort}")
                 udpLogD("Waiting for UDP packets on ${if (_bindIp.value.isNotEmpty()) _bindIp.value else deviceIp}:${_udpPort.value}...")
 
+                // Start health check monitoring job
+                startHealthCheckJob()
+
                 // Perform ECDH handshake in background (concurrently with receive loop)
                 handshakeJob = scope.launch {
                     try {
@@ -314,6 +337,9 @@ class DataPadManager(private val context: Context) {
         isStarted = false
         receiveJob?.cancel()
         receiveJob = null
+        healthCheckJob?.cancel()
+        healthCheckJob = null
+        _connectionHealth.value = ConnectionHealth.DISCONNECTED
         // Cancel any in-progress handshake job as well
         handshakeJob?.cancel()
         handshakeJob = null
@@ -350,6 +376,38 @@ class DataPadManager(private val context: Context) {
     fun cleanup() {
         stop()
         scope.cancel()
+    }
+    
+    /**
+     * Start periodic health check to monitor connection status
+     * Checks every 5 seconds if messages are still being received
+     */
+    private fun startHealthCheckJob() {
+        healthCheckJob?.cancel()
+        lastMessageReceivedTime = System.currentTimeMillis()
+        _connectionHealth.value = ConnectionHealth.HEALTHY
+        
+        healthCheckJob = scope.launch {
+            while (isActive) {
+                delay(5000) // Check every 5 seconds
+                
+                val timeSinceLastMessage = System.currentTimeMillis() - lastMessageReceivedTime
+                
+                _connectionHealth.value = when {
+                    timeSinceLastMessage > HEARTBEAT_TIMEOUT_MS -> {
+                        udpLogD("⚠️ Connection STALE: No message for ${timeSinceLastMessage / 1000}s")
+                        ConnectionHealth.STALE
+                    }
+                    timeSinceLastMessage > HEARTBEAT_WARNING_MS -> {
+                        udpLogD("⚠️ Connection WARNING: No message for ${timeSinceLastMessage / 1000}s")
+                        ConnectionHealth.WARNING
+                    }
+                    else -> {
+                        ConnectionHealth.HEALTHY
+                    }
+                }
+            }
+        }
     }
     
     /**
@@ -691,12 +749,27 @@ class DataPadManager(private val context: Context) {
                 if (currentSession == null) {
                     udpLogE("Received flight data from $senderIp but no active session - rejecting")
                 } else {
-                    _flightData.value = flightData
-                    _lastUpdateTime.value = System.currentTimeMillis()
-                    _isConnected.value = true
-                    currentSession?.let {
-                        udpLogD("✅ Received encrypted flight data from $senderIp: ${flightData.aircraft} at ${flightData.altitude}m (session: ${it.sessionId.take(8)}...)")
-                    } ?: udpLogD("✅ Received encrypted flight data from $senderIp: ${flightData.aircraft} at ${flightData.altitude}m")
+                    // Update last message received time for health monitoring
+                    lastMessageReceivedTime = System.currentTimeMillis()
+                    
+                    // Check if this is a heartbeat message
+                    if (flightData.type == "heartbeat") {
+                        udpLogD("💓 Received heartbeat from $senderIp: ${flightData.message}")
+                        // Update connection health but don't update flight data
+                        _connectionHealth.value = ConnectionHealth.HEALTHY
+                        _lastHeartbeatTime.value = System.currentTimeMillis()
+                    } else {
+                        // Normal flight data
+                        _flightData.value = flightData
+                        _lastUpdateTime.value = System.currentTimeMillis()
+                        _isConnected.value = true
+                        _connectionHealth.value = ConnectionHealth.HEALTHY
+                        // Also update heartbeat timestamp for normal messages (treated as activity)
+                        _lastHeartbeatTime.value = System.currentTimeMillis()
+                        currentSession?.let {
+                            udpLogD("✅ Received encrypted flight data from $senderIp: ${flightData.aircraft} at ${flightData.altitude}m (session: ${it.sessionId.take(8)}...)")
+                        } ?: udpLogD("✅ Received encrypted flight data from $senderIp: ${flightData.aircraft} at ${flightData.altitude}m")
+                    }
                 }
             } catch (e: Exception) {
                 udpLogE("Failed to parse flight data from $senderIp: ${e.message}", e)
