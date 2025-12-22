@@ -1,6 +1,8 @@
 # Changelog
 
 All relevant changes are summarized here by version.
+## [1.0.16] - 2025-12-22
+
 
 ## [1.0.15] - 2025-12-19
 
