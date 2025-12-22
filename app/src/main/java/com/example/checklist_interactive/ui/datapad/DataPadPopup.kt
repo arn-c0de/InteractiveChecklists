@@ -549,6 +549,21 @@ private fun ConnectionStatusCard(
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Medium
             )
+            
+            // Interarrival time statistics (diagnostic info)
+            val minInterarrival by manager.minInterarrivalMs.collectAsState()
+            val maxInterarrival by manager.maxInterarrivalMs.collectAsState()
+            val avgInterarrival by manager.avgInterarrivalMs.collectAsState()
+            
+            if (isConnected && minInterarrival != null && maxInterarrival != null && avgInterarrival != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Packet timing: ${minInterarrival}ms / ${avgInterarrival}ms / ${maxInterarrival}ms (min/avg/max)",
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Light
+                )
+            }
         }
     }
 }

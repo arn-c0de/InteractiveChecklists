@@ -21,6 +21,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.checklist_interactive.data.datapad.FlightData
+import com.example.checklist_interactive.data.tactical.LocationEntity
+import com.example.checklist_interactive.data.tactical.RunwayEntity
 import com.example.checklist_interactive.ui.maps.MapViewerState
 import com.example.checklist_interactive.ui.maps.navigation.PatternDirection
 import com.example.checklist_interactive.ui.maps.navigation.PatternSize

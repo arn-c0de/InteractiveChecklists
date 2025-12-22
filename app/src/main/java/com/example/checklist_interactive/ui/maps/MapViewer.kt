@@ -54,6 +54,8 @@ import com.example.checklist_interactive.ui.common.FABOverlay
 import com.example.checklist_interactive.ui.common.MapViewerFABs
 import com.example.checklist_interactive.ui.maps.marker.*
 import com.example.checklist_interactive.ui.maps.navigation.*
+import com.example.checklist_interactive.data.tactical.LocationEntity
+import com.example.checklist_interactive.data.tactical.RunwayEntity
 import com.example.checklist_interactive.ui.maps.ui.MapNavigationDisplay
 import com.example.checklist_interactive.ui.maps.ui.MapRadialMenuDisplay
 import com.example.checklist_interactive.ui.maps.ui.OverlaySelectionDialog
@@ -611,7 +613,75 @@ fun MapViewer(
     // Update position marker when flight data changes (throttled to prevent UI blocking)
     LaunchedEffect(Unit) {
         var lastUpdateTime = 0L
-        val minUpdateIntervalMs = 100L // Limit position updates to max 10 Hz to prevent stuttering
+        val minUpdateIntervalMs = 20L // Allow up to 50 Hz updates (interpolation handles smoothing)
+        
+        // Position interpolation state
+        var interpolationStartPos: GeoPoint? = null
+        var interpolationTargetPos: GeoPoint? = null
+        var interpolationStartTime = 0L
+        var interpolationDuration = 0L
+        var interpolationTargetHeading = 0f
+        var interpolationStartHeading = 0f
+        
+        // Launch interpolation job that runs at higher frequency
+        val interpolationJob = launch {
+            val interpolationFps = 30 // 30 FPS for smooth animation
+            val interpolationIntervalMs = 1000L / interpolationFps
+            
+            while (isActive) {
+                delay(interpolationIntervalMs)
+                
+                val marker = mapState.positionMarker
+                val map = mapState.mapView
+                
+                if (marker == null || map == null || interpolationStartPos == null || interpolationTargetPos == null) {
+                    continue
+                }
+                
+                val elapsed = System.currentTimeMillis() - interpolationStartTime
+                if (elapsed >= interpolationDuration) {
+                    // Interpolation complete, snap to target
+                    marker.position = interpolationTargetPos!!
+                    marker.rotation = interpolationTargetHeading
+                    
+                    // Clear interpolation state
+                    interpolationStartPos = null
+                    interpolationTargetPos = null
+                    continue
+                }
+                
+                // Linear interpolation factor (0.0 to 1.0)
+                val t = elapsed.toFloat() / interpolationDuration.toFloat()
+                
+                // Interpolate position
+                val startLat = interpolationStartPos!!.latitude
+                val startLon = interpolationStartPos!!.longitude
+                val targetLat = interpolationTargetPos!!.latitude
+                val targetLon = interpolationTargetPos!!.longitude
+                
+                val interpLat = startLat + (targetLat - startLat) * t
+                val interpLon = startLon + (targetLon - startLon) * t
+                val interpPos = GeoPoint(interpLat, interpLon)
+                
+                // Interpolate heading (handle 360° wrap-around)
+                var headingDelta = interpolationTargetHeading - interpolationStartHeading
+                if (headingDelta > 180f) headingDelta -= 360f
+                if (headingDelta < -180f) headingDelta += 360f
+                val interpHeading = (interpolationStartHeading + headingDelta * t + 360f) % 360f
+                
+                // Update marker
+                marker.position = interpPos
+                marker.rotation = interpHeading
+                
+                // Auto-center if enabled
+                if (mapState.autoCenter) {
+                    lastProgrammaticMove.value = System.currentTimeMillis()
+                    map.controller.setCenter(interpPos)
+                }
+                
+                map.invalidate()
+            }
+        }
         
         snapshotFlow { flightData }
             .collect { data ->
@@ -625,6 +695,7 @@ fun MapViewer(
                 if (now - lastUpdateTime < minUpdateIntervalMs) {
                     return@collect
                 }
+                val deltaTime = now - lastUpdateTime
                 lastUpdateTime = now
 
                 val lat = data.latitude
@@ -652,19 +723,45 @@ fun MapViewer(
                     if (currentTimestamp != null) mapState.lastProcessedTimestamp = currentTimestamp
                     val newPosition = GeoPoint(lat, lon)
                     mapState.lastValidPlayerPosition = newPosition
-                    marker.position = newPosition
-                    marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-
-                    // Use raw datapad heading for the player marker
-                    val rawHeading = data.heading.toFloat()
-                    val headingDeg = Math.toDegrees(rawHeading.toDouble()).toFloat()
-                    val rotationOffset = 45f
-                    val computedRotation = if (mapState.mapRotationMode == 1) {
-                        rotationOffset
+                    
+                    // Setup interpolation instead of direct position update
+                    val currentPos = marker.position
+                    if (currentPos != null) {
+                        interpolationStartPos = currentPos
+                        interpolationTargetPos = newPosition
+                        interpolationStartTime = now
+                        // Use measured delta time for interpolation duration
+                        // Cap at 500ms for responsiveness (was 1000ms)
+                        interpolationDuration = deltaTime.coerceIn(50L, 500L)
+                        
+                        // Setup heading interpolation
+                        interpolationStartHeading = marker.rotation
+                        val rawHeading = data.heading.toFloat()
+                        val headingDeg = Math.toDegrees(rawHeading.toDouble()).toFloat()
+                        val rotationOffset = 45f
+                        interpolationTargetHeading = if (mapState.mapRotationMode == 1) {
+                            rotationOffset
+                        } else {
+                            (rotationOffset - headingDeg + 360f) % 360f
+                        }
                     } else {
-                        (rotationOffset - headingDeg + 360f) % 360f
+                        // First position update - no interpolation
+                        marker.position = newPosition
+                        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                        
+                        // Use raw datapad heading for the player marker
+                        val rawHeading = data.heading.toFloat()
+                        val headingDeg = Math.toDegrees(rawHeading.toDouble()).toFloat()
+                        val rotationOffset = 45f
+                        val computedRotation = if (mapState.mapRotationMode == 1) {
+                            rotationOffset
+                        } else {
+                            (rotationOffset - headingDeg + 360f) % 360f
+                        }
+                        marker.rotation = computedRotation
                     }
-                    marker.rotation = computedRotation
+                    
+                    marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                     
                     // Update marker snippet with altitude and speed
                     val altFt = (data.altitude * 3.28084).toInt()
@@ -677,12 +774,13 @@ fun MapViewer(
                         baseSnippet
                     }
                     marker.title = data.aircraft
+                    
+                    // Use raw datapad heading for overlay updates
+                    val rawHeading = data.heading.toFloat()
+                    val headingDeg = Math.toDegrees(rawHeading.toDouble()).toFloat()
 
-                    // Auto-center map on position if enabled
-                    if (mapState.autoCenter) {
-                        lastProgrammaticMove.value = System.currentTimeMillis()
-                        map.controller.animateTo(newPosition)
-                    }
+                    // NOTE: Auto-center is now handled by interpolation job above
+                    // (no need to set center here as it would interfere with smooth interpolation)
 
                     // Update overlays efficiently (batch updates)
                     try {
