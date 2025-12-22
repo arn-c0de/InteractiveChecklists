@@ -1,73 +1,119 @@
 [← Back to README](README.md)
 
-# 🚀 Contributing Guide
+# 🤝 Contributing to InteractiveChecklists
 
-Thank you for your interest in making InteractiveChecklists better! This guide will help you get started, contribute effectively, and understand our process.
-
----
-
-## 📋 Quick Start
-
-1. **Fork** the repository and clone your fork.
-2. **Create a branch:**
-	 - `git checkout -b feat/short-description`
-3. **Develop locally:**
-	 - Add or update tests for your change.
-	 - Use these commands:
-		 - Build: `./gradlew assembleDebug`
-		 - Test: `./gradlew test`
-		 - Lint: `./gradlew lint`
-4. **Commit & PR:**
-	 - Write a clear commit message.
-	 - Open a pull request (PR) against `main`.
+Thanks for helping improve InteractiveChecklists! This guide covers everything you need to get started.
 
 ---
 
-## 🛠️ Contribution Process
+## 🚀 Quick Start
 
-- **Propose features or report bugs:**
-	- File an issue with a clear title, steps to reproduce (if needed), and expected behavior.
-- **Reference issues:**
-	- Use `Fixes #<issue-number>` in your PR if it resolves an issue.
-- **Keep PRs focused:**
-	- Small, focused PRs are easier to review. Split large changes into multiple PRs.
+```bash
+# 1. Fork & clone
+git clone https://github.com/arn-c0de/InteractiveChecklists.git
+cd InteractiveChecklists
+
+# 2. Create a feature branch
+git checkout -b feat/your-feature-name
+
+# 3. Build & test
+./gradlew assembleDebug
+./gradlew test
+./gradlew lint
+
+# 4. Commit & push
+git commit -m "feat: add your feature description"
+git push origin feat/your-feature-name
+
+# 5. Open a Pull Request on GitHub
+```
+
+---
+
+## 🌿 Branch Naming
+
+| Type | Pattern | Example |
+|------|---------|---------|
+| Feature | `feat/short-description` | `feat/map-zoom-controls` |
+| Bug fix | `fix/short-description` | `fix/datapad-reconnect` |
+| Docs | `docs/short-description` | `docs/setup-guide` |
+| Refactor | `refactor/short-description` | `refactor/file-manager` |
+
+---
+
+## 💡 How to Contribute
+
+### 🐛 Report Bugs
+Open an issue with:
+- Clear title
+- Steps to reproduce
+- Expected vs. actual behavior
+- Device/Android version info
+
+### ✨ Suggest Features
+Open an issue describing:
+- The problem you're solving
+- Your proposed solution
+- Any alternatives you considered
+
+### 📝 Submit Code
+1. Check existing issues — maybe someone's already working on it
+2. For large changes, open an issue first to discuss
+3. Keep PRs small and focused
+4. Reference issues with `Fixes #123` in your PR description
 
 ---
 
 ## ✅ PR Checklist
 
-- [ ] Link to a related issue (if any)
-- [ ] Clear description of what changed and why
-- [ ] Add or update tests
-- [ ] Project builds and checks pass locally
-- [ ] Code style matches project conventions
+Before submitting:
+
+- [ ] Linked to related issue (if any)
+- [ ] Clear description of changes
+- [ ] Tests added/updated
+- [ ] `./gradlew assembleDebug` passes
+- [ ] `./gradlew test` passes
+- [ ] `./gradlew lint` passes
+- [ ] Code follows project style
 
 ---
 
-## 💡 Coding Guidelines
+## 🎨 Code Style
 
-- Use idiomatic Kotlin and Jetpack Compose patterns
-- Keep UI changes small and easy to review visually
-- Minimize new dependencies and explain additions
-
----
-
-## 💬 Communication & Support
-
-- Use **GitHub Issues** and **Pull Requests** for discussion and review
-- For planning or coordination, use **GitHub Discussions** (if enabled) or open an issue with the `discussion` tag
+- **Kotlin** — idiomatic patterns, no Java-style code
+- **Compose** — follow official Compose guidelines
+- **Naming** — clear, descriptive names; no abbreviations
+- **Comments** — explain *why*, not *what*
+- **Dependencies** — minimize new ones; justify in PR if needed
 
 ---
 
-## 🤝 Code of Conduct & License
+## 🙌 Areas Where Help is Needed
 
-- Please follow our Code of Conduct (see `CODE_OF_CONDUCT.md` if present)
-- Be respectful and inclusive in all project spaces
-- By contributing, you agree to the repository license
-- Large contributions may require a signed CLA (at maintainer's discretion)
+| Area | Skills | Issue Label |
+|------|--------|-------------|
+| 🌍 Translations | Native speaker | `translations` |
+| 📚 Documentation | Technical writing | `documentation` |
+| ⚡ Performance | Profiling, optimization | `performance` |
+| 🧪 Testing | Unit/UI tests | `testing` |
+| 🎨 UI/UX | Design, accessibility | `ui` |
+
+Check issues labeled [`help wanted`](https://github.com/arn-c0de/InteractiveChecklists/labels/help%20wanted) or [`good first issue`](https://github.com/arn-c0de/InteractiveChecklists/labels/good%20first%20issue).
 
 ---
 
-## 🙏 Thank You
+## 💬 Communication
 
-We appreciate your time and effort — your contributions make InteractiveChecklists better for everyone!
+- **Questions?** Open a [Discussion](https://github.com/arn-c0de/InteractiveChecklists/discussions) or issue with `question` label
+- **PR feedback?** Respond in the PR thread
+- **Security issues?** See [SECURITY.md](SECURITY.md) — do not post publicly
+
+---
+
+## 📄 License
+
+By contributing, you agree that your contributions will be licensed under the project's [CC BY-NC-SA 4.0](LICENSE) license.
+
+---
+
+Thanks for contributing! 🎉
