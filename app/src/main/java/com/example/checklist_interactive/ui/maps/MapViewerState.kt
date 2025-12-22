@@ -263,6 +263,9 @@ class MapViewerState(
         showRunwayApproach = prefs.getBoolean("show_runway_approach", false)
         finalApproachDistanceNm = prefs.getFloat("final_approach_distance_nm", 5.0f).toDouble()
 
+        // Restore whether the navigation details panel was expanded or collapsed
+        showNavigationDetails = prefs.getBoolean("show_navigation_details", showNavigationDetails)
+
         val selectedRwyIdx = prefs.getInt("selected_runway_index", -1)
         if (selectedRwyIdx >= 0) {
             selectedRunwayIndex = selectedRwyIdx
@@ -340,9 +343,12 @@ class MapViewerState(
                 // Backwards-compatible key used for both pattern and approach restores
                 putInt("nav_airport_id", originalAirportTarget?.id ?: -999)
 
+                // Save whether the navigation details panel is expanded
+                putBoolean("show_navigation_details", showNavigationDetails)
+
                 apply()
             }
-            Log.d(TAG, "💾 Saved navigation state: target=${activeNavigationTarget?.name}, approach=$showRunwayApproach, pattern=$showTrafficPattern, patternSize=$patternSize")
+            Log.d(TAG, "💾 Saved navigation state: target=${activeNavigationTarget?.name}, approach=$showRunwayApproach, pattern=$showTrafficPattern, patternSize=$patternSize, navDetailsExpanded=$showNavigationDetails")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to save navigation state", e)
         }

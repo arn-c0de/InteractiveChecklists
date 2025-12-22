@@ -50,7 +50,7 @@ fun MapNavigationDisplay(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(12.dp)
-                        .clickable { mapState.showNavigationDetails = !mapState.showNavigationDetails },
+                        .clickable { mapState.showNavigationDetails = !mapState.showNavigationDetails; mapState.saveNavigationState() },
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -165,7 +165,7 @@ fun MapNavigationDisplay(
 
                         // Toggle expand/collapse button
                         IconButton(
-                            onClick = { mapState.showNavigationDetails = !mapState.showNavigationDetails }
+                            onClick = { mapState.showNavigationDetails = !mapState.showNavigationDetails; mapState.saveNavigationState() }
                         ) {
                             Icon(
                                 imageVector = if (mapState.showNavigationDetails) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
@@ -212,6 +212,7 @@ fun MapNavigationDisplay(
                                 mapState.selectedRunwayIndex = null
                                 mapState.selectedRunwayHeading = null
                                 mapState.selectedRunway = null
+                                mapState.saveNavigationState()
                             }
                         ) {
                             Icon(
