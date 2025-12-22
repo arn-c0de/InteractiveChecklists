@@ -36,6 +36,9 @@ data class FlightData(
     @SerialName("alt")
     val altitude: Double = 0.0,
     
+    @SerialName("terrainElevation")
+    val terrainElevation: Double? = null,
+    
     @SerialName("heading")
     val heading: Double = 0.0,
     

@@ -491,7 +491,7 @@ fun MapViewer(
     }
 
     // Generate and draw traffic pattern when enabled
-    LaunchedEffect(mapState.showTrafficPattern, mapState.selectedRunway, mapState.mapView, mapState.patternSize, mapState.patternDirection, mapState.originalAirportTarget, mapState.patternFinalDistanceNm) {
+    LaunchedEffect(mapState.showTrafficPattern, mapState.selectedRunway, mapState.mapView, mapState.patternSize, mapState.patternDirection, mapState.originalAirportTarget, mapState.patternFinalDistanceNm, mapState.customPatternAltitudeAglFt) {
         val mv = mapState.mapView ?: return@LaunchedEffect
         val runway = mapState.selectedRunway ?: return@LaunchedEffect
         val target = mapState.originalAirportTarget ?: return@LaunchedEffect
@@ -536,11 +536,14 @@ fun MapViewer(
             mapState.trafficPatternPolyline = polyline
 
             // Create and add pattern labels with distance and heading information
+            val runwayElevationFt = (target.elevationM?.times(3.28084))?.toInt() ?: 0
             val labels = TrafficPatternGenerator.generatePatternLabels(
                 points = patternPoints,
                 direction = mapState.patternDirection,
                 runwayHeading = headingForPattern,
-                patternSize = mapState.patternSize
+                patternSize = mapState.patternSize,
+                runwayElevationFt = runwayElevationFt,
+                customAltitudeAglFt = mapState.customPatternAltitudeAglFt
             )
             val labelOverlay = PatternLabelOverlay(labels)
             mv.overlays.add(labelOverlay)
@@ -1592,6 +1595,7 @@ fun MapViewer(
                 verticalSpeed = fd?.verticalSpeed,
                 airspeed = fd?.indicatedAirspeed ?: fd?.trueAirspeed ?: fd?.groundSpeed,
                 altitude = fd?.altitude,
+                terrainElevation = fd?.terrainElevation,
                 heading = if (fd != null) Math.toDegrees(fd.heading) else null,
                 angleOfAttack = fd?.angleOfAttack,
                 gLoad = gLoadValue,
