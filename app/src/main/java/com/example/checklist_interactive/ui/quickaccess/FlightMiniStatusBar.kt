@@ -93,6 +93,11 @@ fun FlightMiniStatusBar(noteManager: QuickNoteManager, onClick: (() -> Unit)? = 
     val dpConnected by dataPadManager.isConnected.collectAsState()
     val dpEnabled by dataPadManager.isEnabled.collectAsState()
     val hasValidPosition = flightData?.let { it.latitude != 0.0 && it.longitude != 0.0 } ?: false
+    
+    // Interarrival time statistics
+    val minInterarrival by dataPadManager.minInterarrivalMs.collectAsState()
+    val maxInterarrival by dataPadManager.maxInterarrivalMs.collectAsState()
+    val avgInterarrival by dataPadManager.avgInterarrivalMs.collectAsState()
 
 
 
@@ -155,6 +160,16 @@ fun FlightMiniStatusBar(noteManager: QuickNoteManager, onClick: (() -> Unit)? = 
                     .background(indicatorColor)
                     .semantics { contentDescription = statusText }
             )
+            
+            // Show interarrival stats when connected and receiving data
+            if (dpConnected && minInterarrival != null && maxInterarrival != null && avgInterarrival != null) {
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "${minInterarrival}/${avgInterarrival}/${maxInterarrival}ms",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFF4CAF50)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.weight(1f))

@@ -8,13 +8,12 @@ ECDH with APP
 
 **CHANGE TO YOUR IP address**
 
-python forward_parsed_udp.py --repeat-last --interval 100 --host 192.168.178.131 --port 5010 --verbose --authorized-devices authorized_devices.json --bind-ip 192.168.178.100
+python forward_parsed_udp.py --repeat-last --interval 500 --host 192.168.178.131 --port 5010 --verbose --authorized-devices authorized_devices.json --bind-ip 192.168.178.100
 
-python forward_parsed_udp.py --repeat-last --interval 50 --host 192.168.178.132 --port 5010 --verbose --authorized-devices authorized_devices.json --bind-i 192.168.178.100   
-
+python forward_parsed_udp.py --repeat-last --interval 500 --host 192.168.178.132 --port 5010 --verbose --authorized-devices authorized_devices.json --bind-i 192.168.178.100 
 
 ________________________________________________________________________________________
 
 Map-Tools
 
-python forward_parsed_udp.py --repeat-last --interval 300 --host 192.168.178.100 --port 5010 --verbose  --authorized-devices authorized_devices.json --bind-ip 192.168.178.100 --handshake-port 5011
+python forward_parsed_udp.py --repeat-last --interval 500 --host 192.168.178.100 --port 5010 --verbose  --authorized-devices authorized_devices.json --bind-ip 192.168.178.100 --handshake-port 5011
