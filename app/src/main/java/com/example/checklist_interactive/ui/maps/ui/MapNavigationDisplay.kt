@@ -121,8 +121,8 @@ fun MapNavigationDisplay(
         Box(modifier = modifier.widthIn(max = 500.dp)) {
             Card(
                 modifier = Modifier
-                    // When details are visible, use the persisted height; otherwise let the card wrap to content
-                    .then(if (showNavigationDetails) Modifier.height(cardHeightDp) else Modifier.wrapContentHeight())
+                    // When details are visible, use the persisted height as a maximum so the card can shrink if content is smaller; otherwise let the card wrap to content
+                    .then(if (showNavigationDetails) Modifier.heightIn(max = cardHeightDp) else Modifier.wrapContentHeight())
                     .fillMaxWidth()
                     .animateContentSize(),
                 colors = CardDefaults.cardColors(
@@ -324,7 +324,6 @@ fun MapNavigationDisplay(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f, fill = false)
                             .verticalScroll(rememberScrollState())
                     ) {
                         // Runway selection (when approach mode active)
