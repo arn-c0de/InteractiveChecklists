@@ -1299,9 +1299,9 @@ fun MapViewer(
                 .fillMaxSize()
                 .padding(top = with(density) { 0.dp }),
             update = { mapView ->
-                // Disable map interactions when in drawing mode
-                mapView.setMultiTouchControls(!drawingState.isDrawingMode)
-                mapView.isClickable = !drawingState.isDrawingMode
+                    // MapView interactions immer aktiv lassen, damit RadialMenu auch im Drawing Mode funktioniert
+                    mapView.setMultiTouchControls(true)
+                    mapView.isClickable = true
             }
         )
         
