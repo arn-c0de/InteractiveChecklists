@@ -1091,6 +1091,8 @@ fun MapViewer(
                                                     // Find nearest marker within radius
                                                     val touchX = ev.x.toInt()
                                                     val touchY = ev.y.toInt()
+                                                    val rawX = ev.rawX.toInt()
+                                                    val rawY = ev.rawY.toInt()
                                                     var nearestMarker: org.osmdroid.views.overlay.Marker? = null
                                                     var bestDist2 = Int.MAX_VALUE
                                                     val radiusPx = (with(density) { 40.dp.toPx() }).toInt()
@@ -1116,10 +1118,9 @@ fun MapViewer(
                                                         // Prefer mapping lookup; fall back to relatedObject
                                                         val loc = markerToLocation[nm] ?: try { nm.relatedObject as? com.example.checklist_interactive.data.tactical.LocationEntity } catch (_: Throwable) { null }
                                                         
-                                                        // Get marker position in screen coordinates
-                                                        // Use the raw touch coordinates as they are already in the correct screen space
-                                                        val screenX = touchX
-                                                        val screenY = touchY
+                                                        // Use raw screen coords for popup placement (more reliable across window insets)
+                                                        val screenX = rawX
+                                                        val screenY = rawY
                                                         
                                                         // If the marker has an icon, adjust for its size so the menu appears centered
                                                         var iconWidth = 0
@@ -1141,13 +1142,15 @@ fun MapViewer(
                                                             iconHeight = 64
                                                         }
                                                         
-                                                        // Get MapView position in window to convert touch coordinates to window coordinates
+                                                        // Use raw screen coordinates (ev.rawX/rawY) for popup placement — these are already in screen/window space
+                                                        val windowX = screenX
+                                                        val windowY = screenY
+                                                        // Debug: also log map/window/screen info for verification
                                                         val mapLoc = IntArray(2)
                                                         this@apply.getLocationInWindow(mapLoc)
-                                                        
-                                                        // Convert MapView-local touch coordinates to window coordinates
-                                                        val windowX = mapLoc[0] + screenX
-                                                        val windowY = mapLoc[1] + screenY
+                                                        val screenLoc = IntArray(2)
+                                                        this@apply.getLocationOnScreen(screenLoc)
+                                                        Log.d(TAG, "Popup placement: rawScreen=($screenX,$screenY) mapWindow=(${mapLoc[0]},${mapLoc[1]}) mapOnScreen=(${screenLoc[0]},${screenLoc[1]}) -> usedWindow=($windowX,$windowY)")
                                                         
                                                         // Offset up slightly so menu doesn't overlap marker
                                                         val extraUpPx = with(density) { 40.dp.toPx().toInt() }
@@ -1174,10 +1177,14 @@ fun MapViewer(
                                                     } else {
                                                         // No marker found - show drawing radial menu
                                                         Log.d(TAG, "Long-press without marker - showing drawing menu")
+                                                        // Use raw screen coordinates for popup placement
+                                                        val windowX = rawX
+                                                        val windowY = rawY
                                                         val mapLoc = IntArray(2)
                                                         this@apply.getLocationInWindow(mapLoc)
-                                                        val windowX = mapLoc[0] + touchX
-                                                        val windowY = mapLoc[1] + touchY
+                                                        val screenLoc = IntArray(2)
+                                                        this@apply.getLocationOnScreen(screenLoc)
+                                                        Log.d(TAG, "Coord conversion (no marker): rawScreen=($rawX,$rawY) mapInWindow=(${mapLoc[0]},${mapLoc[1]}) mapOnScreen=(${screenLoc[0]},${screenLoc[1]}) -> window=($windowX,$windowY)")
                                                         
                                                         scope.launch {
                                                             mapState.radialMenuMarker = null
@@ -1309,9 +1316,13 @@ fun MapViewer(
                 // Open drawing radial menu
                 val windowOffset = IntArray(2)
                 mapState.mapView?.getLocationInWindow(windowOffset)
+                // Also log screen coords for debugging
+                val screenOffset = IntArray(2)
+                mapState.mapView?.getLocationOnScreen(screenOffset)
                 mapState.radialMenuMarker = null
                 mapState.radialMenuX = windowOffset[0] + offset.x.toInt()
                 mapState.radialMenuY = windowOffset[1] + offset.y.toInt()
+                Log.d(TAG, "Coord conversion (compose overlay): mapInWindow=(${windowOffset[0]},${windowOffset[1]}) mapOnScreen=(${screenOffset[0]},${screenOffset[1]}) offset=(${offset.x},${offset.y}) -> window=(${mapState.radialMenuX},${mapState.radialMenuY})")
                 mapState.radialMenuVisible = true
                 mapState.radialMenuType = com.example.checklist_interactive.ui.maps.components.RadialMenuType.DRAWING
             },
