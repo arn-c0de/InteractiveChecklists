@@ -928,6 +928,9 @@ fun MapViewer(
                     // Set padding so map content doesn't hide under the TabBar
                     setPadding(0, tabBarHeightPx, 0, 0)
 
+                    // Improve zoom performance by preventing white flash on tile load
+                    overlayManager.tilesOverlay.setLoadingBackgroundColor(android.graphics.Color.TRANSPARENT)
+
                     // Set initial view using saved or fallback values (no animation)
                     controller.setZoom(initialZoom)
                     // Only set initial center if we don't have a last valid player position (prevents reset)
