@@ -592,8 +592,7 @@
     <string name="contributors_title">Contribuyentes</string>
     <string name="contributors_explain">Ver y gestionar contribuyentes del proyecto</string>
     <string name="error_encoding_contributors">Error codificando datos contribuyentes</string>
-    <string name="role_label">Rol: %1$s</string>
-    <string name="document_sources_title">Fuentes Documentos</string>
+    <string name="role_label">Rol: %1$s</string>    <string name="contributor_date">Añadido el %1$s</string>    <string name="document_sources_title">Fuentes Documentos</string>
     <string name="document_sources_explain">Gestionar referencias de fuentes de documentos</string>
     <string name="license_label">Licencia: %1$s</string>
     <string name="settings_visibility">Visibilidad Aeronaves</string>

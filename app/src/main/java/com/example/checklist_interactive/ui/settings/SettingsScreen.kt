@@ -170,7 +170,19 @@ fun SettingsScreen(
     // Contributors
     var showContributorsJsonDialog by remember { mutableStateOf(false) }
     var contributorsJsonContent by remember { mutableStateOf("") }
-    val contributors = remember { androidx.compose.runtime.mutableStateListOf<ContributorEntry>().apply { addAll(prefsManager.getContributors()) } }
+    var contributors by remember { mutableStateOf(listOf<ContributorEntry>()) }
+    LaunchedEffect(Unit) {
+        try {
+            val assetManager = context.assets
+            val jsonStr = assetManager.open("contributors.json").bufferedReader().use { it.readText() }
+            contributors = Json.decodeFromString(
+                kotlinx.serialization.builtins.ListSerializer(ContributorEntry.serializer()),
+                jsonStr
+            )
+        } catch (e: Exception) {
+            contributors = emptyList()
+        }
+    }
 
     // Collapsible section states (kept local to each section to reduce recompositions)
 
@@ -702,68 +714,99 @@ fun SettingsScreen(
             }
 
             item {
+                var contributorsExpanded by remember { mutableStateOf(false) }
+                val contributorsRotation by animateFloatAsState(targetValue = if (contributorsExpanded) 180f else 0f)
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = stringResource(R.string.contributors_title),
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = stringResource(R.string.contributors_explain),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Button(onClick = {
-                                try {
-                                    val jsonString = json.encodeToString(
-                                        kotlinx.serialization.builtins.ListSerializer(ContributorEntry.serializer()),
-                                        contributors
-                                    )
-                                    contributorsJsonContent = jsonString
-                                } catch (e: Exception) {
-                                    contributorsJsonContent = context.getString(R.string.error_encoding_contributors, e.message ?: "")
-                                }
-                                showContributorsJsonDialog = true
-                            }) {
-                                Text(stringResource(R.string.settings_view_contributors_json))
-                            }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { contributorsExpanded = !contributorsExpanded },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = stringResource(R.string.contributors_title),
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = if (contributorsExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
+                                modifier = Modifier.rotate(contributorsRotation)
+                            )
                         }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Column {
-                            contributors.forEachIndexed { idx, entry ->
-                                Column(modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 8.dp)) {
-                                    Column(modifier = Modifier.fillMaxWidth()) {
-                                        Text(entry.name, fontWeight = FontWeight.Bold)
-                                        if (!entry.website.isNullOrBlank()) {
-                                            Text(
-                                                text = entry.website,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.clickable {
-                                                    try {
-                                                        val intent = Intent(Intent.ACTION_VIEW)
-                                                        intent.data = android.net.Uri.parse(entry.website)
-                                                        context.startActivity(intent)
-                                                    } catch (_: Exception) { }
-                                                }
+                        AnimatedVisibility(
+                            visible = contributorsExpanded,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            Column {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = stringResource(R.string.contributors_explain),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Button(onClick = {
+                                        try {
+                                            val jsonString = json.encodeToString(
+                                                kotlinx.serialization.builtins.ListSerializer(ContributorEntry.serializer()),
+                                                contributors
                                             )
+                                            contributorsJsonContent = jsonString
+                                        } catch (e: Exception) {
+                                            contributorsJsonContent = context.getString(R.string.error_encoding_contributors, e.message ?: "")
                                         }
-                                        if (!entry.role.isNullOrBlank()) {
-                                            Text(
-                                                text = stringResource(R.string.role_label, entry.role),
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
+                                        showContributorsJsonDialog = true
+                                    }) {
+                                        Text(stringResource(R.string.settings_view_contributors_json))
                                     }
                                 }
-                                HorizontalDivider()
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Column {
+                                    contributors.forEachIndexed { idx, entry ->
+                                        Column(modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 8.dp)) {
+                                            Column(modifier = Modifier.fillMaxWidth()) {
+                                                Text(entry.name, fontWeight = FontWeight.Bold)
+                                                if (!entry.website.isNullOrBlank()) {
+                                                    Text(
+                                                        text = entry.website,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.clickable {
+                                                            try {
+                                                                val intent = Intent(Intent.ACTION_VIEW)
+                                                                intent.data = android.net.Uri.parse(entry.website)
+                                                                context.startActivity(intent)
+                                                            } catch (_: Exception) { }
+                                                        }
+                                                    )
+                                                }
+                                                if (!entry.role.isNullOrBlank()) {
+                                                    Text(
+                                                        text = stringResource(R.string.role_label, entry.role),
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+
+                                                if (!entry.date.isNullOrBlank()) {
+                                                    Text(
+                                                        text = stringResource(R.string.contributor_date, entry.date),
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        HorizontalDivider()
+                                    }
+                                }
                             }
                         }
                     }
