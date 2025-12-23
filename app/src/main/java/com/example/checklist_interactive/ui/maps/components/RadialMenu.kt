@@ -111,15 +111,28 @@ fun RadialMenu(
                     onDismiss()
                 }
         ) {
-            // Center point indicator (visual reference)
+            // Center point indicator (visual reference) - RED for debugging exact position
             Box(
                 modifier = Modifier
-                    .offset { IntOffset(centerX - 8, centerY - 8) }
-                    .size(16.dp)
+                    .offset { IntOffset(centerX - 12, centerY - 12) }
+                    .size(24.dp)
                     .scale(scale)
                     .alpha(alpha)
                     .background(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                        Color.Red.copy(alpha = 0.8f),
+                        CircleShape
+                    )
+            )
+            
+            // Inner dot to show exact center pixel
+            Box(
+                modifier = Modifier
+                    .offset { IntOffset(centerX - 2, centerY - 2) }
+                    .size(4.dp)
+                    .scale(scale)
+                    .alpha(alpha)
+                    .background(
+                        Color.Yellow,
                         CircleShape
                     )
             )
