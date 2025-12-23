@@ -1537,11 +1537,7 @@ fun MapViewer(
                 onToggleRotationGesture = {
                     mapState.rotationGestureEnabled = !mapState.rotationGestureEnabled
                     prefsManager.setMapRotationGestureEnabled(mapState.rotationGestureEnabled)
-                    android.widget.Toast.makeText(
-                        context, 
-                        if (mapState.rotationGestureEnabled) "2-Finger Rotation aktiviert" else "2-Finger Rotation deaktiviert",
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
+                    android.util.Log.d(TAG, "Rotation gesture toggled: enabled=${mapState.rotationGestureEnabled}")
                 },
                 onDrawingTools = { 
                     if (drawingState.isDrawingMode) {
