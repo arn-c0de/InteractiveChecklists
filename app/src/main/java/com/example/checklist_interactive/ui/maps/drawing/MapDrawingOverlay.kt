@@ -14,7 +14,13 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
-import kotlinx.coroutines.delay
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.input.pointer.changedToUp
+import androidx.compose.ui.input.pointer.changedToDown
+import androidx.compose.ui.input.pointer.PointerEventPass
+import kotlinx.coroutines.withTimeoutOrNull
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import android.graphics.PointF
@@ -113,12 +119,77 @@ fun MapDrawingOverlay(
                             val currentMapView = mapView
                             if (currentMapView == null) return@pointerInput
                             
-                            // Detect long press for radial menu
-                            detectTapGestures(
-                                onLongPress = { offset ->
-                                    onLongPress?.invoke(offset)
+                            // Detect long press for radial menu, but only with a single finger
+                            awaitPointerEventScope {
+                                while (true) {
+                                    // Read raw initial event so we see simultaneous touches reliably
+                                    val down = awaitPointerEvent(PointerEventPass.Initial)
+                                    
+                                    // Debug log
+                                    android.util.Log.d("MapDrawingOverlay", "LongPress: initial event pointers=${down.changes.size}")
+                                    
+                                    // Only process if exactly one pointer is down
+                                    if (down.changes.size == 1) {
+                                        val pointer = down.changes.first()
+                                        val downPosition = pointer.position
+                                        val initialId = pointer.id
+                                        val downTime = System.currentTimeMillis()
+                                        
+                                        // Use withTimeoutOrNull to wait for long press duration
+                                        var lastEvent: androidx.compose.ui.input.pointer.PointerEvent? = null
+                                        val longPressResult = withTimeoutOrNull(500) {
+                                            // Wait for events while checking conditions (raw pass)
+                                            while (true) {
+                                                val event = awaitPointerEvent(PointerEventPass.Initial)
+                                                lastEvent = event
+                                                
+                                                val pressed = event.changes.filter { it.pressed }
+                                                // Debug log
+                                                android.util.Log.d("MapDrawingOverlay", "LongPress: event pointers=${pressed.size} (initialId=$initialId)")
+                                                
+                                                // If more than one pointer, cancel long press
+                                                if (pressed.size > 1) {
+                                                    android.util.Log.d("MapDrawingOverlay", "LongPress cancelled: multiple pointers")
+                                                    return@withTimeoutOrNull false
+                                                }
+                                                if (pressed.size == 1 && pressed.first().id != initialId) {
+                                                    // A different pointer pressed -> cancel
+                                                    android.util.Log.d("MapDrawingOverlay", "LongPress cancelled: different pointer pressed (id=${pressed.first().id})")
+                                                    return@withTimeoutOrNull false
+                                                }
+                                                
+                                                val change = event.changes.firstOrNull { it.id == initialId } ?: event.changes.firstOrNull()
+                                                if (change == null) {
+                                                    android.util.Log.d("MapDrawingOverlay", "LongPress cancelled: no change for initial pointer")
+                                                    return@withTimeoutOrNull false
+                                                }
+                                                
+                                                // If pointer moved significantly, cancel long press
+                                                if (change.positionChanged()) {
+                                                    val delta = change.position - downPosition
+                                                    if (delta.getDistance() > 10f) {
+                                                        android.util.Log.d("MapDrawingOverlay", "LongPress cancelled: moved (dx=${delta.x}, dy=${delta.y})")
+                                                        return@withTimeoutOrNull false
+                                                    }
+                                                }
+                                                
+                                                // If pointer lifted, cancel
+                                                if (change.changedToUp()) {
+                                                    android.util.Log.d("MapDrawingOverlay", "LongPress cancelled: pointer lifted")
+                                                    return@withTimeoutOrNull false
+                                                }
+                                            }
+                                        }
+                                        
+                                        // If timeout occurred (500ms passed) and last known event still has exactly the initial pointer pressed, trigger long press
+                                        val finalPressed = lastEvent?.changes?.filter { it.pressed } ?: emptyList()
+                                        if (longPressResult == null && finalPressed.size == 1 && finalPressed.first().id == initialId) {
+                                            android.util.Log.d("MapDrawingOverlay", "LongPress detected: showing radial menu")
+                                            onLongPress?.invoke(downPosition)
+                                        }
+                                    }
                                 }
-                            )
+                            }
                         }.pointerInput(drawingState, mapView, showRadialMenu) {
                             val currentMapView = mapView
                             if (currentMapView == null) return@pointerInput

@@ -1085,7 +1085,8 @@ fun MapViewer(
                                         longPressJob?.cancel()
                                         longPressJob = scope.launch {
                                             delay(longPressTimeoutMs)
-                                            if (isDown && !moved) {
+                                            // CRITICAL: Check if still single-finger press before processing long press
+                                            if (isDown && !moved && ev.pointerCount == 1 && !inRotationGesture) {
                                                 try {
                                                     // Find nearest marker within radius
                                                     val touchX = ev.x.toInt()
