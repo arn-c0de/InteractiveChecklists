@@ -61,3 +61,7 @@ codeql-py-analysis.sarif
 .kotlin
 
 .vscode
+
+
+security_audit.jsonl
+security_audit.key

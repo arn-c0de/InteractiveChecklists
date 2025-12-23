@@ -74,6 +74,9 @@ fun MapNavigationDisplay(
     onPatternFinalDistanceNmChange: (Double) -> Unit,
     selectedRunwayIndex: Int?,
     onSelectedRunwayIndexChange: (Int?) -> Unit,
+    /* Pattern details visibility (hoisted) */
+    showPatternDetails: Boolean,
+    onShowPatternDetailsChange: (Boolean) -> Unit,
     selectedRunway: RunwayEntity?,
     onSelectedRunwayChange: (RunwayEntity?) -> Unit,
     onActiveNavigationTargetChange: (LocationEntity?) -> Unit,
@@ -821,8 +824,7 @@ fun MapNavigationDisplay(
 
                                     Spacer(modifier = Modifier.height(8.dp))
 
-                                    // Pattern details header with collapsible body
-                                    var showPatternDetails by rememberSaveable { mutableStateOf(true) }
+                                    // Pattern details header with collapsible body (visibility hoisted to parent state)
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -834,7 +836,7 @@ fun MapNavigationDisplay(
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
-                                        IconButton(onClick = { showPatternDetails = !showPatternDetails }) {
+                                        IconButton(onClick = { onShowPatternDetailsChange(!showPatternDetails) }) {
                                             Icon(
                                                 imageVector = if (showPatternDetails) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                                                 contentDescription = if (showPatternDetails) "Collapse" else "Expand"
