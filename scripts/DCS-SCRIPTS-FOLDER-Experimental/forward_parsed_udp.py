@@ -562,7 +562,8 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
     # Use handshake_port if specified, otherwise use data port
     listen_port = handshake_port if handshake_port is not None else port
     sock.bind((bind_ip, listen_port))  # Bind to specified IP (default: localhost)
-    sock.settimeout(1.0)  # Non-blocking with timeout
+    # Use configured interval for socket timeout (non-blocking with fast response)
+    sock.settimeout(max(0.01, interval))  # At least 10ms, use configured interval
     logger.info(f"🔐 Listening for handshakes on {bind_ip}:{listen_port}")
     if handshake_port is not None and handshake_port != port:
         logger.info(f"📤 Will send data to {host}:{port}")
@@ -845,7 +846,8 @@ def repeat_last_line(path: str, host: str, port: int, session_mgr: 'SessionManag
     # Use handshake_port if specified, otherwise use data port
     listen_port = handshake_port if handshake_port is not None else port
     sock.bind((bind_ip, listen_port))  # Bind to specified IP (default: localhost)
-    sock.settimeout(0.1)  # Non-blocking with short timeout
+    # Use configured interval for socket timeout (non-blocking with fast response)
+    sock.settimeout(max(0.01, interval))  # At least 10ms, use configured interval
     logger.info(f"🔐 Listening for handshakes on {bind_ip}:{listen_port}")
     if handshake_port is not None and handshake_port != port:
         logger.info(f"📤 Will send data to {host}:{port}")
@@ -969,7 +971,7 @@ def repeat_last_line(path: str, host: str, port: int, session_mgr: 'SessionManag
             # Send data at regular interval
             current_time = time.time()
             if current_time - last_send_time < interval:
-                time.sleep(0.1)  # Short sleep to check handshakes frequently
+                # Don't sleep - socket timeout handles the wait
                 continue
             
             try:
@@ -977,7 +979,6 @@ def repeat_last_line(path: str, host: str, port: int, session_mgr: 'SessionManag
                 try:
                     file_mtime = os.path.getmtime(path)
                 except OSError:
-                    time.sleep(0.1)
                     continue
                 
                 # Only read file if it has been modified OR we haven't cached anything yet
@@ -988,7 +989,6 @@ def repeat_last_line(path: str, host: str, port: int, session_mgr: 'SessionManag
                         last_file_mtime = file_mtime
                         logger.debug(f"📄 Updated cached line from file (mtime: {file_mtime})")
                     else:
-                        time.sleep(0.1)
                         continue
                 else:
                     # Use cached line (file hasn't changed)
@@ -996,18 +996,15 @@ def repeat_last_line(path: str, host: str, port: int, session_mgr: 'SessionManag
                     logger.debug("📦 Using cached last line (file unchanged)")
                 
                 if not last_line:
-                    time.sleep(0.1)
                     continue
                     
                 jsonpart = extract_json_from_line(last_line)
                 if not jsonpart:
-                    time.sleep(0.1)
                     continue
 
                 # Validate that the extracted substring is valid JSON before sending
                 parsed = safe_json_parse(jsonpart, max_size=_MAX_DATA_MESSAGE_SIZE)
                 if parsed is None:
-                    time.sleep(0.1)
                     continue
 
                 # Timestamp validation: reject old/cached messages
@@ -1018,7 +1015,6 @@ def repeat_last_line(path: str, host: str, port: int, session_mgr: 'SessionManag
 
                 if not _timestamp_is_newer(cur_ts, _last_processed_timestamp):
                     logger.warning(f"⚠️ REJECTED OLD DATA: timestamp={cur_ts} (last={_last_processed_timestamp}) - preventing position reset!")
-                    time.sleep(0.1)
                     continue
 
                 # Accept and record timestamp
