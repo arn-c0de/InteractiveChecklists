@@ -53,7 +53,7 @@ InteractiveChecklists is an Android application for viewing and interacting with
 ## Features
 
 - **Unified File System:** Manage files from bundled assets and internal storage in a single hierarchical view.
-- **Multilanguage Support:** The app supports both English and German. You can switch the language in the Settings menu. All UI text is available in English; most screens are also available in German.
+- **Multilanguage Support:** The app supports English, Spanish and German. You can switch the language in the Settings menu. All UI text is available in English.
 - **Multi-Tab System:** Open multiple documents (MD/PDF) with a scrollable tab bar, quick tab switcher, swipe navigation, and tab persistence.
 - **PDF Viewer:** PDF viewer with annotations (draw/highlight/erase), pinch-to-zoom, page snapping, and color inversion.
 - **Interactive Markdown Checklists:** Stateful checkboxes and collapsible sections for interactive checklists.
