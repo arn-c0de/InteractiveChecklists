@@ -513,8 +513,7 @@
     <string name="settings_reset_bundled_imports_message">Dies löscht alle Dateien aus dem internen Speicher und importiert die mitgelieferten Assets neu. Fortfahren?</string>
     <string name="settings_importing">Importiere…</string>
     <string name="settings_processing">Verarbeite…</string>
-    <string name="role_label">Rolle: %1$s</string>
-    <string name="document_sources_title">Dokumentquellen</string>
+    <string name="role_label">Rolle: %1$s</string>    <string name="contributor_date">Hinzugefügt am %1$s</string>    <string name="document_sources_title">Dokumentquellen</string>
     <string name="document_sources_explain">Dokumentquellenreferenzen verwalten</string>
     <string name="license_label">Lizenz: %1$s</string>
     <string name="settings_visibility">Flugzeugsichtbarkeit</string>
