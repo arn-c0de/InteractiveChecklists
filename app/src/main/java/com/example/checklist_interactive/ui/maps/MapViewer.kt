@@ -965,6 +965,14 @@ fun MapViewer(
                         override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
                             Log.d(TAG, "singleTapConfirmedHelper called at $p, pendingMoveMarkerId=$pendingMoveMarkerId, pendingSymbolPlacement=${mapState.pendingSymbolPlacement != null}")
                             
+                            // If navigation details are open and the user taps on the map (beside the card),
+                            // collapse the details to the compact info bar. Skip collapsing when a move
+                            // or symbol placement is in progress as these taps are intentional.
+                            if (mapState.showNavigationDetails && pendingMoveMarkerId == null && mapState.pendingSymbolPlacement == null) {
+                                mapState.showNavigationDetails = false
+                                mapState.saveNavigationState()
+                            }
+
                             p?.let { geoPoint ->
                                 // 1) If a move is pending, use this tap to set new coords for that marker
                                 if (pendingMoveMarkerId != null) {
@@ -1618,6 +1626,8 @@ fun MapViewer(
             onPatternSizeChange = { mapState.patternSize = it },
             patternDirection = mapState.patternDirection,
             onPatternDirectionChange = { mapState.patternDirection = it },
+            showPatternDetails = mapState.showPatternDetails,
+            onShowPatternDetailsChange = { mapState.showPatternDetails = it },
             patternFinalDistanceNm = mapState.patternFinalDistanceNm,
             onPatternFinalDistanceNmChange = { mapState.patternFinalDistanceNm = it },
             selectedRunwayIndex = mapState.selectedRunwayIndex,
