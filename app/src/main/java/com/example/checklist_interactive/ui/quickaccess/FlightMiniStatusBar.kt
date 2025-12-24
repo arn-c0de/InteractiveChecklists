@@ -74,7 +74,8 @@ fun BatteryLevelIndicator(
     }
 
     percent?.let {
-        Text(text = "$it%", style = MaterialTheme.typography.labelSmall, modifier = modifier.semantics { contentDescription = "Battery level $it percent" })
+        val batteryText = stringResource(R.string.mini_status_bar_battery_level, it)
+        Text(text = batteryText, style = MaterialTheme.typography.labelSmall, modifier = modifier.semantics { contentDescription = batteryText })
     }
 }
 
@@ -150,7 +151,7 @@ fun FlightMiniStatusBar(noteManager: QuickNoteManager, onClick: (() -> Unit)? = 
             val statusText = when {
                 !dpConnected -> stringResource(R.string.map_no_datapad_connection)
                 !hasValidPosition -> stringResource(R.string.map_waiting_for_valid_position)
-                else -> "Position OK"
+                else -> stringResource(R.string.mini_status_bar_position_ok)
             }
 
             Box(
@@ -165,7 +166,7 @@ fun FlightMiniStatusBar(noteManager: QuickNoteManager, onClick: (() -> Unit)? = 
             if (dpConnected && minInterarrival != null && maxInterarrival != null && avgInterarrival != null) {
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "${minInterarrival}/${avgInterarrival}/${maxInterarrival}ms",
+                    text = stringResource(R.string.mini_status_bar_interarrival_stats, minInterarrival ?: 0, avgInterarrival ?: 0, maxInterarrival ?: 0),
                     style = MaterialTheme.typography.labelSmall,
                     color = Color(0xFF4CAF50)
                 )

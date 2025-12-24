@@ -31,6 +31,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -41,6 +42,7 @@ import com.example.checklist_interactive.data.tactical.RunwayEntity
 import com.example.checklist_interactive.ui.maps.MapViewerState
 import com.example.checklist_interactive.ui.maps.navigation.PatternDirection
 import com.example.checklist_interactive.ui.maps.navigation.PatternSize
+import com.example.checklist_interactive.R
 import org.osmdroid.util.GeoPoint
 import kotlin.math.abs
 
@@ -146,7 +148,7 @@ fun MapNavigationDisplay(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "ROUTE TO: ${activeNavigationTarget?.name ?: ""}",
+                            text = stringResource(R.string.map_nav_route_to, activeNavigationTarget?.name ?: ""),
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onErrorContainer
@@ -157,7 +159,7 @@ fun MapNavigationDisplay(
                         ) {
                             navigationDistanceNm?.let { dist ->
                                 Text(
-                                    text = "${String.format("%.1f", dist)} NM",
+                                    text = stringResource(R.string.map_nav_dist_nm, dist),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onErrorContainer
@@ -165,7 +167,7 @@ fun MapNavigationDisplay(
                             }
                             navigationHeading?.let { hdg ->
                                 Text(
-                                    text = "HDG ${String.format("%03.0f", hdg)}°",
+                                    text = stringResource(R.string.map_nav_hdg, hdg),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onErrorContainer
@@ -179,12 +181,12 @@ fun MapNavigationDisplay(
                                 modifier = Modifier.padding(top = 4.dp)
                             ) {
                                 Text(
-                                    text = "FINAL:",
+                                    text = stringResource(R.string.map_nav_final),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
                                 )
                                 Text(
-                                    text = "RWY ${String.format("%03.0f", rwyHdg)}°",
+                                    text = stringResource(R.string.map_nav_rwy, rwyHdg),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onErrorContainer
@@ -199,7 +201,7 @@ fun MapNavigationDisplay(
                                     val distanceMeters = playerPos.distanceToAsDouble(airportPos)
                                     val distanceNm = distanceMeters / 1852.0
                                     Text(
-                                        text = "${String.format("%.1f", distanceNm)} NM",
+                                        text = stringResource(R.string.map_nav_dist_nm, distanceNm),
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = FontWeight.Medium,
                                         color = MaterialTheme.colorScheme.onErrorContainer
@@ -216,14 +218,14 @@ fun MapNavigationDisplay(
                         val patternAltMslCompact = patternAltAglCompact + runwayElevationFt
                         val currentAltMetersCompact = flightData?.altitude?.let { it.toDouble() } ?: Double.NaN
                         val currentAltCompact = if (currentAltMetersCompact.isNaN()) Double.NaN else currentAltMetersCompact * 3.28084 // convert m -> ft
-                        val currentAltCompactDisplay = if (currentAltCompact.isNaN()) "n/a" else String.format("%d ft", currentAltCompact.toInt())
+                        val currentAltCompactDisplay = if (currentAltCompact.isNaN()) stringResource(R.string.map_nav_current_alt_unavailable) else stringResource(R.string.map_nav_current_alt_ft, currentAltCompact.toInt())
                         val diffCompact = if (currentAltCompact.isNaN()) null else currentAltCompact - patternAltMslCompact
                         val smallTolerance = patternAltitudeSmallToleranceFt
                         val warningTol = patternAltitudeWarningToleranceFt
 
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
-                                text = "P:${patternAltMslCompact}",
+                                text = stringResource(R.string.map_nav_pattern_alt, patternAltMslCompact),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
@@ -238,9 +240,9 @@ fun MapNavigationDisplay(
                                     else -> {
                                         val col = if (absDiff <= warningTol) androidx.compose.ui.graphics.Color(0xFFFFA000) else androidx.compose.ui.graphics.Color(0xFFD50000)
                                         if (diffCompact < 0) {
-                                            Icon(imageVector = Icons.Default.KeyboardArrowUp, contentDescription = "Need to climb", tint = col)
+                                            Icon(imageVector = Icons.Default.KeyboardArrowUp, contentDescription = stringResource(R.string.map_nav_alt_climb), tint = col)
                                         } else {
-                                            Icon(imageVector = Icons.Default.KeyboardArrowDown, contentDescription = "Need to descend", tint = col)
+                                            Icon(imageVector = Icons.Default.KeyboardArrowDown, contentDescription = stringResource(R.string.map_nav_alt_descend), tint = col)
                                         }
                                     }
                                 }
@@ -261,7 +263,7 @@ fun MapNavigationDisplay(
                         ) {
                             Icon(
                                 imageVector = if (showNavigationDetails) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                contentDescription = if (showNavigationDetails) "Collapse" else "Expand",
+                                contentDescription = if (showNavigationDetails) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
                                 tint = MaterialTheme.colorScheme.onErrorContainer
                             )
                         }
@@ -290,7 +292,7 @@ fun MapNavigationDisplay(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.FlightLand,
-                                    contentDescription = "Landing approach"
+                                    contentDescription = stringResource(R.string.map_nav_approach_button)
                                 )
                             }
                         }
@@ -309,12 +311,11 @@ fun MapNavigationDisplay(
                                 saveNavigationState()
                             }
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Cancel navigation",
-                                tint = MaterialTheme.colorScheme.onErrorContainer
-                            )
-                        }
+                                                            Icon(
+                                                                imageVector = Icons.Default.Close,
+                                                                contentDescription = stringResource(R.string.map_nav_cancel_button),
+                                                                tint = MaterialTheme.colorScheme.onErrorContainer
+                                                            )                        }
                     }
                 }
 
@@ -343,9 +344,9 @@ fun MapNavigationDisplay(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "SELECT RUNWAY",
+                                        text = stringResource(R.string.map_nav_select_runway),
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
+                                        color = MaterialTheme.colorScheme.onErrorContainer
                                     )
 
                                     // Final approach distance dropdown
@@ -367,7 +368,7 @@ fun MapNavigationDisplay(
                                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
                                         ) {
                                             Text(
-                                                text = "PATTERN",
+                                                text = stringResource(R.string.map_nav_pattern_button),
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontSize = 11.sp
                                             )
@@ -379,7 +380,7 @@ fun MapNavigationDisplay(
                                                 onClick = { expanded = !expanded },
                                                 label = {
                                                     Text(
-                                                        text = "${finalApproachDistanceNm.let { if (it == it.toInt().toDouble()) it.toInt().toString() else it.toString() }} NM",
+                                                        text = stringResource(R.string.map_nav_final_dist_nm, finalApproachDistanceNm.let { if (it == it.toInt().toDouble()) it.toInt().toString() else it.toString() }),
                                                         style = MaterialTheme.typography.labelSmall
                                                     )
                                                 },
@@ -418,12 +419,6 @@ fun MapNavigationDisplay(
 
                                 // Runway selection (moved up so available without opening pattern config)
                                 if (targetRunways.isNotEmpty()) {
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = "SELECT RUNWAY",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
-                                    )
                                     Spacer(modifier = Modifier.height(8.dp))
 
                                     // Runway chips
@@ -471,7 +466,7 @@ fun MapNavigationDisplay(
                                                         // Update navigation to approach endpoint (red line will auto-update)
                                                         val approachTarget = target.copy(
                                                             id = -1,
-                                                            name = "${target.name} RWY ${String.format("%02d", heading1 / 10)}",
+                                                            name = context.getString(R.string.map_nav_approach_target_name, target.name, heading1 / 10),
                                                             latitude = endpoint.latitude,
                                                             longitude = endpoint.longitude
                                                         )
@@ -480,7 +475,7 @@ fun MapNavigationDisplay(
                                                 },
                                                 label = {
                                                     Text(
-                                                        text = "RWY ${String.format("%02d", heading1 / 10)} (${heading1}°)",
+                                                        text = stringResource(R.string.map_nav_rwy_chip, heading1 / 10, heading1),
                                                         style = MaterialTheme.typography.labelSmall
                                                     )
                                                 },
@@ -524,7 +519,7 @@ fun MapNavigationDisplay(
 
                                                         val approachTarget = target.copy(
                                                             id = -1,
-                                                            name = "${target.name} RWY ${String.format("%02d", heading2 / 10)}",
+                                                            name = context.getString(R.string.map_nav_approach_target_name, target.name, heading2 / 10),
                                                             latitude = endpoint.latitude,
                                                             longitude = endpoint.longitude
                                                         )
@@ -533,7 +528,7 @@ fun MapNavigationDisplay(
                                                 },
                                                 label = {
                                                     Text(
-                                                        text = "RWY ${String.format("%02d", heading2 / 10)} (${heading2}°)",
+                                                        text = stringResource(R.string.map_nav_rwy_chip, heading2 / 10, heading2),
                                                         style = MaterialTheme.typography.labelSmall
                                                     )
                                                 },
@@ -556,7 +551,7 @@ fun MapNavigationDisplay(
                                     Spacer(modifier = Modifier.height(8.dp))
 
                                     Text(
-                                        text = "PATTERN CONFIGURATION",
+                                        text = stringResource(R.string.map_nav_pattern_config),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
                                     )
@@ -573,7 +568,7 @@ fun MapNavigationDisplay(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            text = "Size:",
+                                            text = stringResource(R.string.map_nav_pattern_size),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onErrorContainer
                                         )
@@ -613,7 +608,7 @@ fun MapNavigationDisplay(
                                                                     fontWeight = FontWeight.Bold
                                                                 )
                                                                 Text(
-                                                                    text = "${size.downwindDistanceNm} NM • ${size.patternAltitudeAglFt} ft AGL",
+                                                                    text = stringResource(R.string.map_nav_pattern_size_desc, size.downwindDistanceNm, size.patternAltitudeAglFt),
                                                                     style = MaterialTheme.typography.labelSmall,
                                                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                                                                 )
@@ -638,7 +633,7 @@ fun MapNavigationDisplay(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            text = "Direction:",
+                                            text = stringResource(R.string.map_nav_pattern_direction),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onErrorContainer
                                         )
@@ -679,7 +674,7 @@ fun MapNavigationDisplay(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            text = "Final Length:",
+                                            text = stringResource(R.string.map_nav_final_length),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onErrorContainer
                                         )
@@ -693,7 +688,7 @@ fun MapNavigationDisplay(
                                                 onClick = { finalExpanded = !finalExpanded },
                                                 label = {
                                                     Text(
-                                                        text = "${if (patternFinalDistanceNm == patternFinalDistanceNm.toInt().toDouble()) patternFinalDistanceNm.toInt().toString() else patternFinalDistanceNm.toString()} NM",
+                                                        text = stringResource(R.string.map_nav_pattern_final_dist_nm, patternFinalDistanceNm.let { if (it == it.toInt().toDouble()) it.toInt().toString() else it.toString() }),
                                                         style = MaterialTheme.typography.labelSmall
                                                     )
                                                 },
@@ -716,16 +711,16 @@ fun MapNavigationDisplay(
                                                         text = {
                                                             Column {
                                                                 Text(
-                                                                    text = "${if (dist == dist.toInt().toDouble()) dist.toInt().toString() else dist.toString()} NM Final",
+                                                                    text = stringResource(R.string.map_nav_final_dist_nm, if (dist == dist.toInt().toDouble()) dist.toInt().toString() else dist.toString()),
                                                                     style = MaterialTheme.typography.bodySmall,
                                                                     fontWeight = FontWeight.Bold
                                                                 )
                                                                 Text(
                                                                     text = when {
-                                                                        dist <= 1.0 -> "Short - Quick pattern"
-                                                                        dist <= 3.0 -> "Medium - Standard"
-                                                                        dist <= 5.0 -> "Long - More time"
-                                                                        else -> "Very Long - Training"
+                                                                        dist <= 1.0 -> stringResource(R.string.map_nav_pattern_final_desc_short)
+                                                                        dist <= 3.0 -> stringResource(R.string.map_nav_pattern_final_desc_medium)
+                                                                        dist <= 5.0 -> stringResource(R.string.map_nav_pattern_final_desc_long)
+                                                                        else -> stringResource(R.string.map_nav_pattern_final_desc_very_long)
                                                                     },
                                                                     style = MaterialTheme.typography.labelSmall,
                                                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
@@ -760,7 +755,7 @@ fun MapNavigationDisplay(
                                                 horizontalArrangement = Arrangement.SpaceBetween
                                             ) {
                                                 Text(
-                                                    text = "Altitude Indicator Settings",
+                                                    text = stringResource(R.string.map_nav_alt_indicator_settings),
                                                     style = MaterialTheme.typography.labelSmall,
                                                     fontWeight = FontWeight.Bold
                                                 )
@@ -796,8 +791,7 @@ fun MapNavigationDisplay(
                                                                 saveNavigationState()
                                                             }
                                                         },
-                                                        label = { Text("Level tol (ft)") },
-                                                        singleLine = true,
+                                                                                                                    label = { Text(stringResource(R.string.map_nav_level_tolerance_ft)) },                                                        singleLine = true,
                                                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
                                                         modifier = Modifier.weight(1f)
                                                     )
@@ -812,8 +806,7 @@ fun MapNavigationDisplay(
                                                                 saveNavigationState()
                                                             }
                                                         },
-                                                        label = { Text("Warn tol (ft)") },
-                                                        singleLine = true,
+                                                                                                                    label = { Text(stringResource(R.string.map_nav_warn_tolerance_ft)) },                                                        singleLine = true,
                                                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
                                                         modifier = Modifier.weight(1f)
                                                     )
@@ -831,7 +824,7 @@ fun MapNavigationDisplay(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            text = "Pattern Details",
+                                            text = stringResource(R.string.map_nav_pattern_details),
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -839,7 +832,7 @@ fun MapNavigationDisplay(
                                         IconButton(onClick = { onShowPatternDetailsChange(!showPatternDetails) }) {
                                             Icon(
                                                 imageVector = if (showPatternDetails) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                                contentDescription = if (showPatternDetails) "Collapse" else "Expand"
+                                                contentDescription = if (showPatternDetails) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand)
                                             )
                                         }
                                     }
@@ -885,7 +878,7 @@ fun MapNavigationDisplay(
                                                 val finalHdgInt = finalHdg.toInt()
 
                                                 Text(
-                                                    text = "• Departure: HDG ${String.format("%03d", departureHdgInt)}° • ${String.format("%.1f", 0.5 * sizeScale)} NM",
+                                                    text = stringResource(R.string.map_nav_pattern_leg_departure, departureHdgInt, (0.5 * sizeScale).toFloat()),
                                                     style = MaterialTheme.typography.bodySmall,
                                                     fontFamily = FontFamily.Monospace,
                                                     fontSize = 11.sp,
@@ -893,7 +886,7 @@ fun MapNavigationDisplay(
                                                 )
 
                                                 Text(
-                                                    text = "• Crosswind: HDG ${String.format("%03d", crosswindHdgInt)}° • ${String.format("%.1f", patternSize.downwindDistanceNm * sizeScale)} NM",
+                                                    text = stringResource(R.string.map_nav_pattern_leg_crosswind, crosswindHdgInt, (patternSize.downwindDistanceNm * sizeScale).toFloat()),
                                                     style = MaterialTheme.typography.bodySmall,
                                                     fontFamily = FontFamily.Monospace,
                                                     fontSize = 11.sp,
@@ -902,7 +895,7 @@ fun MapNavigationDisplay(
 
                                                 val downwindLengthNm = (selectedRwy?.lengthM?.toDouble() ?: 2000.0) / 1852.0 + patternFinalDistanceNm + (0.5 * sizeScale)
                                                 Text(
-                                                    text = "• Downwind: HDG ${String.format("%03d", downwindHdgInt)}° • ${String.format("%.1f", downwindLengthNm)} NM",
+                                                    text = stringResource(R.string.map_nav_pattern_leg_downwind, downwindHdgInt, downwindLengthNm.toFloat()),
                                                     style = MaterialTheme.typography.bodySmall,
                                                     fontFamily = FontFamily.Monospace,
                                                     fontSize = 11.sp,
@@ -911,7 +904,7 @@ fun MapNavigationDisplay(
 
                                                 val baseExtensionNm = (0.3 + (patternFinalDistanceNm * 0.2)) * sizeScale
                                                 Text(
-                                                    text = "• Base: HDG ${String.format("%03d", baseLegHdgInt)}° • ${String.format("%.1f", patternSize.downwindDistanceNm * sizeScale)} NM (turn at ${String.format("%.1f", baseExtensionNm)} NM)",
+                                                    text = stringResource(R.string.map_nav_pattern_leg_base, baseLegHdgInt, (patternSize.downwindDistanceNm * sizeScale).toFloat(), baseExtensionNm.toFloat()),
                                                     style = MaterialTheme.typography.bodySmall,
                                                     fontFamily = FontFamily.Monospace,
                                                     fontSize = 11.sp,
@@ -919,7 +912,7 @@ fun MapNavigationDisplay(
                                                 )
 
                                                 Text(
-                                                    text = "• Final: HDG ${String.format("%03d", finalHdgInt)}° • ${String.format("%.1f", patternFinalDistanceNm)} NM",
+                                                    text = stringResource(R.string.map_nav_pattern_leg_final, finalHdgInt, patternFinalDistanceNm.toFloat()),
                                                     style = MaterialTheme.typography.bodySmall,
                                                     fontFamily = FontFamily.Monospace,
                                                     fontSize = 11.sp,
@@ -942,7 +935,7 @@ fun MapNavigationDisplay(
                                                                 value = patternSize.displayName,
                                                                 onValueChange = {},
                                                                 readOnly = true,
-                                                                label = { Text("Pattern Size") },
+                                                                label = { Text(stringResource(R.string.map_nav_pattern_size_label)) },
                                                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = sizeExpanded) },
                                                                 modifier = Modifier.menuAnchor()
                                                             )
@@ -972,7 +965,7 @@ fun MapNavigationDisplay(
                                                                 },
                                                                 colors = if (patternDirection == PatternDirection.LEFT_HAND) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary) else ButtonDefaults.buttonColors()
                                                             ) {
-                                                                Text("Left")
+                                                                Text(stringResource(R.string.map_nav_pattern_dir_left))
                                                             }
                                                             Button(
                                                                 onClick = {
@@ -981,7 +974,7 @@ fun MapNavigationDisplay(
                                                                 },
                                                                 colors = if (patternDirection == PatternDirection.RIGHT_HAND) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary) else ButtonDefaults.buttonColors()
                                                             ) {
-                                                                Text("Right")
+                                                                Text(stringResource(R.string.map_nav_pattern_dir_right))
                                                             }
                                                         }
                                                     }
@@ -1001,13 +994,13 @@ fun MapNavigationDisplay(
                                                                     saveNavigationState()
                                                                 }
                                                             },
-                                                            label = { Text("Final dist (NM)") },
+                                                            label = { Text(stringResource(R.string.map_nav_final_dist_nm, "")) },
                                                             singleLine = true,
                                                             modifier = Modifier.weight(1f)
                                                         )
 
                                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                                            Text(text = "Show pattern")
+                                                            Text(text = stringResource(R.string.map_nav_show_pattern))
                                                             Spacer(modifier = Modifier.width(6.dp))
                                                             Switch(checked = showTrafficPattern, onCheckedChange = {
                                                                 onShowTrafficPatternChange(it)
@@ -1040,13 +1033,13 @@ fun MapNavigationDisplay(
                                                         modifier = Modifier.clickable { showAltitudeEditDialog = true }
                                                     ) {
                                                         Text(
-                                                            text = "Pattern Altitude: ${patternAltMsl} ft MSL ✎",
+                                                            text = stringResource(R.string.map_nav_pattern_alt_msl, patternAltMsl),
                                                             style = MaterialTheme.typography.labelSmall,
                                                             fontWeight = FontWeight.Bold,
                                                             color = MaterialTheme.colorScheme.primary
                                                         )
                                                         Text(
-                                                            text = "(${patternAltAgl} ft AGL + ${runwayElevationFt} ft field elev)${if (customPatternAltitudeAglFt != null) " [Custom]" else ""}",
+                                                            text = stringResource(R.string.map_nav_pattern_alt_agl, patternAltAgl, runwayElevationFt, if (customPatternAltitudeAglFt != null) stringResource(R.string.map_nav_pattern_alt_custom_suffix) else ""),
                                                             style = MaterialTheme.typography.labelSmall,
                                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                                         )
@@ -1089,14 +1082,14 @@ fun MapNavigationDisplay(
                                                                     // Below pattern -> show UP arrow
                                                                     Icon(
                                                                         imageVector = Icons.Default.KeyboardArrowUp,
-                                                                        contentDescription = "Need to climb",
+                                                                        contentDescription = stringResource(R.string.map_nav_alt_climb),
                                                                         tint = col
                                                                     )
                                                                 } else {
                                                                     // Above pattern -> show DOWN arrow
                                                                     Icon(
                                                                         imageVector = Icons.Default.KeyboardArrowDown,
-                                                                        contentDescription = "Need to descend",
+                                                                        contentDescription = stringResource(R.string.map_nav_alt_descend),
                                                                         tint = col
                                                                     )
                                                                 }
@@ -1113,7 +1106,7 @@ fun MapNavigationDisplay(
                                                     Spacer(modifier = Modifier.width(8.dp))
 
                                                     Text(
-                                                        text = "Current: $currentAltDisplay",
+                                                        text = stringResource(R.string.map_nav_current_alt_label, currentAltDisplay),
                                                         style = MaterialTheme.typography.labelSmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                                     )
@@ -1141,7 +1134,7 @@ fun MapNavigationDisplay(
                                 .padding(horizontal = 12.dp, vertical = 8.dp)
                         ) {
                             Text(
-                                text = "Transparency",
+                                text = stringResource(R.string.map_nav_transparency),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
@@ -1180,7 +1173,7 @@ fun MapNavigationDisplay(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.DragHandle,
-                                contentDescription = "Drag to resize",
+                                contentDescription = stringResource(R.string.map_nav_resize_handle),
                                 tint = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.6f)
                             )
 
@@ -1196,7 +1189,7 @@ fun MapNavigationDisplay(
                             ) {
                                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                     Text(
-                                        text = "${'$'}opacityPercent%",
+                                        text = stringResource(R.string.map_nav_opacity_percent, opacityPercent),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onErrorContainer,
                                         modifier = Modifier.padding(2.dp)
@@ -1244,27 +1237,26 @@ fun PatternAltitudeEditDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Edit Pattern Altitude (AGL)") },
+        title = { Text(stringResource(R.string.map_nav_edit_pattern_alt_title)) },
         text = {
             Column {
                 Text(
-                    text = "Enter pattern altitude above ground level (AGL) in feet:",
+                    text = stringResource(R.string.map_nav_edit_pattern_alt_label),
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = altitudeText,
-                    onValueChange = { 
-                        altitudeText = it.filter { ch -> ch.isDigit() }
-                        isValid = altitudeText.toIntOrNull()?.let { alt -> alt in 500..5000 } ?: false
-                    },
-                    label = { Text("Altitude (ft AGL)") },
-                    isError = !isValid,
+                                OutlinedTextField(
+                                    value = altitudeText,
+                                    onValueChange = {
+                                        altitudeText = it.filter { ch -> ch.isDigit() }
+                                        isValid = altitudeText.toIntOrNull()?.let { alt -> alt in 500..5000 } ?: false
+                                    },
+                                    label = { Text(stringResource(R.string.map_nav_edit_pattern_alt_hint)) },                    isError = !isValid,
                     supportingText = {
                         if (!isValid) {
-                            Text("Enter a value between 500 and 5000 ft", color = MaterialTheme.colorScheme.error)
+                            Text(stringResource(R.string.map_nav_edit_pattern_alt_error), color = MaterialTheme.colorScheme.error)
                         } else {
-                            Text("Typical pattern altitudes: 1000-2000 ft AGL")
+                            Text(stringResource(R.string.map_nav_edit_pattern_alt_info))
                         }
                     },
                     singleLine = true
@@ -1279,7 +1271,7 @@ fun PatternAltitudeEditDialog(
                         onDismiss()
                     }
                 ) {
-                    Text("Reset to Default")
+                    Text(stringResource(R.string.map_nav_reset_to_default))
                 }
                 TextButton(
                     onClick = {
@@ -1292,13 +1284,13 @@ fun PatternAltitudeEditDialog(
                     },
                     enabled = isValid
                 ) {
-                    Text("Save")
+                    Text(stringResource(R.string.action_save))
                 }
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.action_cancel))
             }
         }
     )
