@@ -61,6 +61,12 @@ class MapViewerState(
     var mgrsGridEnabled by mutableStateOf(prefsManager.isMapOverlayMgrsGridEnabled())
     var flightInstrumentsEnabled by mutableStateOf(prefsManager.isMapOverlayFlightInstrumentsEnabled())
     
+    // Flight path tracking state
+    var flightPathEnabled by mutableStateOf(false)
+    var flightPathPointCount by mutableStateOf(0)
+    var flightPathIntervalSeconds by mutableStateOf(2)
+    var flightPathPolyline by mutableStateOf<Polyline?>(null)
+    
     // Overlay instances
     var compassOverlay by mutableStateOf<Overlay?>(null)
     var headingSpeedLineOverlay by mutableStateOf<Overlay?>(null)
