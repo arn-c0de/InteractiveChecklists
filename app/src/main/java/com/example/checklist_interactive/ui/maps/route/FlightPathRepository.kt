@@ -111,14 +111,21 @@ class FlightPathRepository(
      * @param flightData Current flight data from DataPad
      */
     suspend fun processFlightData(flightData: FlightData?) {
-        if (!_isRecordingEnabled.value) return
-        if (flightData == null) return
+        if (!_isRecordingEnabled.value) {
+            // Log.v(TAG, "Recording disabled, skipping")
+            return
+        }
+        if (flightData == null) {
+            Log.v(TAG, "No flight data available")
+            return
+        }
         
         // Validate position data
         val lat = flightData.latitude
         val lon = flightData.longitude
         if (lat == 0.0 && lon == 0.0) {
             // Invalid position (aircraft not spawned or GPS not available)
+            Log.v(TAG, "Invalid position (0,0), skipping")
             return
         }
         
@@ -129,13 +136,14 @@ class FlightPathRepository(
         val intervalSeconds = prefsManager.getFlightPathIntervalSeconds()
         val minIntervalMs = intervalSeconds * 1000L
         
-        // Check if minimum time interval has elapsed
-        if (timeSinceLastRecord < minIntervalMs) {
-            return  // Too soon, skip this sample
-        }
-        
         // Calculate distance moved since last record (if we have a previous position)
         val shouldRecord = if (lastRecordedLat != null && lastRecordedLon != null) {
+            // Check if minimum time interval has elapsed (only after first point)
+            if (timeSinceLastRecord < minIntervalMs) {
+                Log.v(TAG, "⏱️ Too soon: ${timeSinceLastRecord}ms < ${minIntervalMs}ms (interval: ${intervalSeconds}s)")
+                return  // Too soon, skip this sample
+            }
+            
             val distanceMoved = calculateDistance(
                 lastRecordedLat!!,
                 lastRecordedLon!!,
@@ -149,10 +157,16 @@ class FlightPathRepository(
                 Double.MAX_VALUE  // First point, always record
             }
             
-            // Record if moved significantly or altitude changed significantly
-            distanceMoved > MIN_DISTANCE_METERS || altitudeChange > MIN_ALTITUDE_CHANGE_METERS
+            val shouldRec = distanceMoved > MIN_DISTANCE_METERS || altitudeChange > MIN_ALTITUDE_CHANGE_METERS
+            
+            if (!shouldRec) {
+                Log.d(TAG, "📍 Movement too small: dist=${distanceMoved.toInt()}m (min ${MIN_DISTANCE_METERS.toInt()}m), alt_change=${altitudeChange.toInt()}m (min ${MIN_ALTITUDE_CHANGE_METERS.toInt()}m)")
+            }
+            
+            shouldRec
         } else {
             // First point, always record
+            Log.d(TAG, "📍 First point - will record")
             true
         }
         
@@ -180,7 +194,7 @@ class FlightPathRepository(
                 // Update count
                 _pointCount.value = flightPathDao.getPointCount()
                 
-                Log.d(TAG, "Recorded position: lat=$lat, lon=$lon, alt=${flightData.altitude}m, pts=${_pointCount.value}")
+                Log.i(TAG, "✅ RECORDED POINT #${_pointCount.value}: lat=${String.format("%.6f", lat)}, lon=${String.format("%.6f", lon)}, alt=${flightData.altitude.toInt()}m, hdg=${Math.toDegrees(flightData.heading).toInt()}°")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to record flight path point: ${e.message}", e)
             }
@@ -192,15 +206,35 @@ class FlightPathRepository(
      */
     suspend fun clearPath() {
         try {
+            // Count points before deletion for logging
+            val countBefore = flightPathDao.getPointCount()
+            Log.d(TAG, "Attempting to clear $countBefore flight path points...")
+            
+            // Delete all points from database
             flightPathDao.clearAllPoints()
+            
+            // Verify deletion
+            val countAfter = flightPathDao.getPointCount()
+            Log.d(TAG, "Points after clearAllPoints: $countAfter")
+            
+            // Reset internal tracking state
             lastRecordedLat = null
             lastRecordedLon = null
             lastRecordedAlt = null
             lastRecordedTime = 0L
             _pointCount.value = 0
-            Log.d(TAG, "Flight path cleared")
+            
+            Log.i(TAG, "✅ Flight path cleared successfully: deleted $countBefore points, remaining: $countAfter")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to clear flight path: ${e.message}", e)
+            Log.e(TAG, "❌ Failed to clear flight path: ${e.message}", e)
+            // Try to get accurate count even after error
+            try {
+                val actualCount = flightPathDao.getPointCount()
+                _pointCount.value = actualCount
+                Log.e(TAG, "Actual point count after failed clear: $actualCount")
+            } catch (countError: Exception) {
+                Log.e(TAG, "Could not get point count: ${countError.message}")
+            }
         }
     }
     

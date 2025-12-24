@@ -5,6 +5,7 @@ import androidx.room.PrimaryKey
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -80,7 +81,9 @@ interface FlightPathDao {
     
     /**
      * Clear all flight path points (reset path)
+     * Uses @Transaction to ensure atomic deletion
      */
+    @Transaction
     @Query("DELETE FROM flight_path_points")
     suspend fun clearAllPoints()
     
