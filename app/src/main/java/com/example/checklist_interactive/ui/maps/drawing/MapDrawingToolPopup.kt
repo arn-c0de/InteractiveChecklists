@@ -21,6 +21,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.example.checklist_interactive.R
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 
@@ -74,13 +76,13 @@ fun MapDrawingToolPopup(
                 ) {
                     Column {
                         Text(
-                            text = "Drawing Tools",
+                            text = stringResource(R.string.map_drawing_tools_title),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                         if (state.isDrawingMode) {
                             Text(
-                                text = "✓ Drawing active",
+                                text = stringResource(R.string.map_drawing_active),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Medium
@@ -93,7 +95,7 @@ fun MapDrawingToolPopup(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
+                            contentDescription = stringResource(R.string.map_drawing_close_cd),
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -103,7 +105,7 @@ fun MapDrawingToolPopup(
 
                 // Brush Type Selection
                 Text(
-                    text = "Brush Type",
+                    text = stringResource(R.string.map_drawing_brush_type),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -114,7 +116,7 @@ fun MapDrawingToolPopup(
                     // Pen
                     BrushTypeButton(
                         icon = Icons.Default.Create,
-                        label = "Pen",
+                        label = stringResource(R.string.map_drawing_brush_pen),
                         isSelected = state.brushType == MapBrushType.Pen && !state.isEraseMode,
                         onClick = {
                             onStateChange(state.copy(
@@ -128,7 +130,7 @@ fun MapDrawingToolPopup(
                     // Marker
                     BrushTypeButton(
                         icon = Icons.Default.Edit,
-                        label = "Marker",
+                        label = stringResource(R.string.map_drawing_brush_marker),
                         isSelected = state.brushType == MapBrushType.Marker && !state.isEraseMode,
                         onClick = {
                             onStateChange(state.copy(
@@ -147,7 +149,7 @@ fun MapDrawingToolPopup(
                 ) {
                     BrushTypeButton(
                         icon = Icons.Default.Delete,
-                        label = "Eraser",
+                        label = stringResource(R.string.map_drawing_brush_eraser),
                         isSelected = state.isEraseMode,
                         onClick = {
                             onStateChange(state.copy(isEraseMode = !state.isEraseMode))
@@ -162,7 +164,7 @@ fun MapDrawingToolPopup(
                 // Color Palette
                 if (!state.isEraseMode) {
                     Text(
-                        text = "Color",
+                        text = stringResource(R.string.map_drawing_color),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -216,7 +218,7 @@ fun MapDrawingToolPopup(
                 // Stroke Width / Eraser Size
                 if (state.isEraseMode) {
                     Text(
-                        text = "Eraser Size",
+                        text = stringResource(R.string.map_drawing_eraser_size),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -239,7 +241,7 @@ fun MapDrawingToolPopup(
                     }
                 } else {
                     Text(
-                        text = "Brush Size",
+                        text = stringResource(R.string.map_drawing_brush_size),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -276,11 +278,11 @@ fun MapDrawingToolPopup(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Clear,
-                            contentDescription = "Clear All",
+                            contentDescription = stringResource(R.string.map_drawing_clear_all_cd),
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Clear", fontSize = 12.sp)
+                        Text(stringResource(R.string.map_drawing_clear), fontSize = 12.sp)
                     }
                     
                     // Save
@@ -290,11 +292,11 @@ fun MapDrawingToolPopup(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Done,
-                            contentDescription = "Save",
+                            contentDescription = stringResource(R.string.map_drawing_save_cd),
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Save", fontSize = 12.sp)
+                        Text(stringResource(R.string.map_drawing_save), fontSize = 12.sp)
                     }
                 }
             }
@@ -382,7 +384,7 @@ private fun ColorButton(
         if (isSelected) {
             Icon(
                 imageVector = Icons.Default.Check,
-                contentDescription = "Selected",
+                contentDescription = stringResource(R.string.map_drawing_color_selected_cd),
                 tint = if (color.luminance() > 0.5f) Color.Black else Color.White,
                 modifier = Modifier.size(20.dp)
             )

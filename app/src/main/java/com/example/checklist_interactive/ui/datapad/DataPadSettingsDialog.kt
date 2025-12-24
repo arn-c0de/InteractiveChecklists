@@ -202,7 +202,7 @@ fun DataPadSettingsDialog(
                         value = publicKey,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Public Key (Base64)") },
+                        label = { Text(stringResource(R.string.datapad_public_key_label)) },
                         singleLine = false,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -216,15 +216,15 @@ fun DataPadSettingsDialog(
                             }) {
                                 Icon(
                                     imageVector = Icons.Default.ContentCopy,
-                                    contentDescription = "Copy public key"
+                                    contentDescription = stringResource(R.string.datapad_cd_copy_public_key)
                                 )
                             }
                         },
                         supportingText = {
                             if (copiedPublicKey) {
-                                Text("Public key copied to clipboard ✅")
+                                Text(stringResource(R.string.datapad_public_key_copied_feedback))
                             } else {
-                                Text("Copy this Base64 public key into the server\'s authorized_devices.json entry")
+                                Text(stringResource(R.string.datapad_public_key_copy_hint))
                             }
                         }
                     )
