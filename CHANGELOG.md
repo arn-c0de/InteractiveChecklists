@@ -1,23 +1,14 @@
 # Changelog
 
+
 All relevant changes are summarized here by version.
 ## [1.0.16] - 2025-12-23
 
-### Added
-- Spanish language support (strings and Settings language selector).
-- Map features: two-finger rotation gesture with toggle and persisted preference, rotation-aware drawing (anchor strokes during rotation/pan), radial drawing tool menu and always-visible overlay, marker radial menu, resizable navigation popup with opacity badge and fixed header.
-- Flight instruments: added RPM, Wind, and Countermeasures instruments; compact instruments layout and initial Map flight instruments (phase 1).
-- DataPad / telemetry: packet interarrival tracking, periodic heartbeat UI (30s heartbeat), position interpolation and reduced rendering throttle.
-
-### Changed
-- Map and UI refactors: extracted MapViewer components (overlays, radial menu, navigation display), improved map rendering performance, and persisted navigation/route state and navigation-details expansion state.
-- Refactored marker/route management and added MarkerManager search support.
-
-### Fixed
-- Radial menu positioning and long-press behavior; navigation popup positioning and persisted state; runway selection and pattern heading/label calculations; map route persistence; and various small stability fixes.
-
-### Docs & Tests
-- Added Spanish translations and contributor note; added pattern tests and updated contributing docs.
+### Summary
+- Maps: Map rotation (two-finger gesture), overlay improvements, radial menu optimizations, improved drawing and navigation UI, flight path tracking with storage and overlay, performance and flicker fixes.
+- Internationalization: Spanish translation and string extraction for DataPad and Map.
+- Bugfixes: Various fixes for map interactions, radial menu, navigation, socket timeouts, database transactions, asynchronous trimming of export files.
+- Miscellaneous: Contributor added, changelog updated, documentation revised.
 
 ## [1.0.15] - 2025-12-19
 
