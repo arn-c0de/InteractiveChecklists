@@ -1,5 +1,11 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- APP METADATA -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- COMMON ACTIONS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
     <string name="action_save">Guardar</string>
     <string name="action_cancel">Cancelar</string>
@@ -22,12 +28,20 @@
     <string name="action_expand">Expandir</string>
     <string name="action_collapse">Colapsar</string>
 
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- NAVIGATION & UI ELEMENTS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
     <string name="nav_settings">Configuración</string>
     <string name="nav_my_files">Mis Archivos</string>
     <string name="nav_file_list">Lista de archivos</string>
     <string name="nav_expand">Expandir</string>
     <string name="nav_collapse">Colapsar</string>
     <string name="nav_up">Arriba</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- FILE OPERATIONS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
     <string name="file_import">Importar archivo</string>
     <string name="file_add">Añadir archivo</string>
@@ -42,6 +56,9 @@
     <string name="file_open_folders">Abrir carpetas</string>
     <string name="file_unsupported_format">Formato no soportado: .%1$s\nSoportado: .md, .markdown</string>
 
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- TABS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="tab_new">Nueva pestaña</string>
     <string name="tab_close">Cerrar pestaña</string>
     <string name="tab_previous">Pestaña anterior</string>
@@ -55,6 +72,10 @@
     <string name="tab_page_number">Página %1$d</string>
     <string name="tab_active">Activa</string>
     <string name="aviation_map_tab_title">Mapa Aeronáutico</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- TAGS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
     <string name="tag_edit">Editar etiquetas</string>
     <string name="tag_move">Mover</string>
@@ -77,12 +98,24 @@
     <string name="tag_postflight">Post-vuelo</string>
     <string name="tag_more_count">+%1$d más</string>
 
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- COMMON -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    
     <string name="common_ellipsis">...</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- CHECKLIST & MARKDOWN -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
     <string name="checklist_title">Lista de verificación</string>
     <string name="checklist_error_loading">Error al cargar: %1$s</string>
     <string name="checklist_error_unknown">Error desconocido</string>
 
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- PDF VIEWER -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    
     <string name="pdf_error_loading">Error al cargar PDF: %1$s</string>
     <string name="pdf_use_unified_viewer">Por favor use UnifiedViewerScreen para archivos PDF</string>
     <string name="pdf_drawing">Dibujo</string>
@@ -145,6 +178,10 @@
     <string name="pdf_show_toolbar">Mostrar barra</string>
     <string name="pdf_page_progress">Página %1$d/%2$d</string>
 
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- BROWSE & NAVIGATION -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    
     <string name="browse_path_label">Ruta:</string>
     <string name="browse_path_separator">/</string>
     <string name="browse_default_location">Activos</string>
@@ -173,6 +210,9 @@
     <string name="cd_file_list">Lista de archivos</string>
     <string name="cd_datapad">DataPad</string>
 
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- QUICK ACCESS & NOTES -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="quick_access_title">Acceso rápido</string>
     <string name="quick_notes_title">Notas Rápidas</string>
     <string name="quick_notes_search_placeholder">Buscar notas…</string>
@@ -213,6 +253,9 @@
     <string name="greeting_hello">¡Hola %1$s!</string>
     <string name="quick_notes_new_button">Nuevo</string>
 
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- FORMATS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="format_time_hh_mm_ss">HH:mm:ss</string>
     <string name="quick_notes_com_prefix">COM:</string>
     <string name="quick_notes_coord_template">N       E      </string>
@@ -241,6 +284,9 @@
     <string name="quick_notes_default_title">Mis Notas</string>
     <string name="quick_notes_new_note_title">Nueva Nota</string>
 
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- FLIGHT STATUS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="flight_status_idle">Inactivo</string>
     <string name="flight_status_startup">Arranque</string>
     <string name="flight_status_taxi">Rodaje</string>
@@ -250,6 +296,9 @@
     <string name="flight_status_landing">Aterrizaje</string>
     <string name="flight_status_shutdown">Apagado</string>
 
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- MAPS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="map_center_on_aircraft">Centrar en aeronave</string>
     <string name="map_layers">Capas del mapa</string>
     <string name="map_layers_dialog_title">Capas del Mapa</string>
@@ -275,6 +324,7 @@
     <string name="msg_map_cache_cleared">Caché del mapa borrada</string>
     <string name="msg_map_cache_clear_failed">Error al borrar caché: %1$s</string>
 
+    <!-- MAP DB WIPE/REIMPORT -->
     <string name="settings_wipe_map_db_title">Borrar y Reimportar BD Mapa</string>
     <string name="settings_wipe_map_db_explain">Borrar la base de datos interna y reimportar map_data.db desde los activos. Úsalo para actualizar marcadores y detalles del mapa.</string>
     <string name="settings_wipe_map_db_button">Borrar y Reimportar map_data.db</string>
@@ -286,6 +336,9 @@
     <string name="map_aviation_charts_note">Nota: Las cartas aeronáuticas requieren configuración adicional. Ver docs/technical/AVIATION_MAPS.md</string>
     <string name="map_note_aviation_charts">Nota: Las cartas aeronáuticas requieren configuración adicional. Ver docs/technical/AVIATION_MAPS.md</string>
     <string name="map_aviation_map">Mapa Aeronáutico</string>
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- Map Overlays -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="map_overlays">Superposiciones</string>
     <string name="map_overlays_dialog_title">Superposiciones del mapa</string>
     <string name="map_compass">Brújula</string>
@@ -301,6 +354,9 @@
     <string name="settings_asset_db_version">Versión BD empaquetada: %1$d</string>
 
     <string name="map_objects_transparency_label">Transparencia: %1$d%%</string>
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- Map Marker Management -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="map_objects_title">Objetos del Mapa</string>
     <string name="map_group_airports">✈ Aeropuertos</string>
     <string name="map_group_waypoints">📍 Waypoints</string>
@@ -431,6 +487,7 @@
 
     <string name="datapad_settings_description">Habilita o deshabilita DataPad. Cuando está deshabilitado, la app no escuchará telemetría UDP y los controles DataPad se ocultarán.</string>
 
+    <!-- ECDH / Device settings -->
     <string name="datapad_ecdh_title">Modo Handshake ECDH</string>
     <string name="datapad_ecdh_description_secure">La encriptación segura basada en sesión ahora siempre está activa.</string>
     <string name="datapad_device_name_label">Nombre del Dispositivo</string>
@@ -552,6 +609,9 @@
     <string name="datapad_field_unit_id">ID Unidad</string>
     <string name="datapad_field_streamer_version">Versión Streamer</string>
 
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- SETTINGS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="settings_title">Configuración</string>
     <string name="settings_dark_mode">Modo oscuro</string>
     <string name="settings_toggle_dark_mode">Alternar modo oscuro</string>
@@ -630,14 +690,23 @@
         <item quantity="other">%1$d archivos borrados e importados</item>
     </plurals>
 
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- STATES & STATUS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="status_loading">Cargando…</string>
 
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- LANGUAGE -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="settings_language_label">Idioma</string>
     <string name="language_english">Inglés</string>
     <string name="language_german">Alemán</string>
     <string name="language_spanish">Español</string>
     <string name="settings_language_restart_message">Idioma guardado. Por favor reinicia la app para aplicar cambios.</string>
 
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- CONTENT DESCRIPTIONS (Accessibility) -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="cd_marked">Marcado</string>
     <string name="cd_shortcut">Acceso directo</string>
     <string name="cd_note">Nota</string>
@@ -655,6 +724,9 @@
     <string name="cd_lock_screen">Bloquear pantalla</string>
     <string name="cd_unlock_screen">Desbloquear pantalla</string>
 
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- UI DIALOGS & MESSAGES -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="dialog_import">Importar</string>
     <string name="dialog_file">Archivo</string>
     <string name="dialog_folder">Carpeta</string>
@@ -675,6 +747,10 @@
     <string name="state_off">OFF</string>
     <string name="pdf_page_number">Página PDF %1$d</string>
 
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- DATAPAD -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    
     <string name="datapad_reception_on">Recepción: ON</string>
     <string name="datapad_reception_off">Recepción: OFF</string>
     <string name="datapad_connected">Conectado</string>
@@ -724,6 +800,9 @@
     <string name="datapad_time_format_hms">%02d:%02d:%02d</string>
     <string name="datapad_last_heartbeat_with_bullet">• Last heartbeat: %1$s</string>
 
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- DATAPAD SETTINGS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="datapad_settings_title">Ajustes DataPad</string>
     <string name="datapad_settings_udp_port">Puerto UDP</string>
     <string name="datapad_settings_udp_port_placeholder">5010</string>
@@ -738,6 +817,9 @@
     <string name="datapad_public_key_copied_feedback">Public key copied to clipboard ✅</string>
     <string name="datapad_public_key_copy_hint">Copy this Base64 public key into the server\'s authorized_devices.json entry</string>
 
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- FILES & FOLDERS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="files_in_folder">Archivos en: %1$s</string>
     <string name="select_another_folder">Seleccionar otra carpeta</string>
     <string name="select_folder">Seleccionar carpeta</string>
@@ -751,6 +833,9 @@
     <string name="pdf_error_unsupported_pixel_format">Formato de píxel no soportado para pág %1$d</string>
     <string name="viewer_unsupported_format_md_pdf">Formato no soportado: .%1$s\nSoportado: .md, .markdown, .pdf</string>
 
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- MARKDOWN VIEWER -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="markdown_label_h1">Encabezado 1</string>
     <string name="markdown_label_custom_block">Bloque Personalizado</string>
     <string name="markdown_label_blockquote">Cita</string>
@@ -775,6 +860,9 @@
     <string name="markdown_expand">Expandir</string>
     <string name="cd_menu">Menú</string>
 
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- INTERNAL FILES -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="no_files_found">No se encontraron archivos</string>
     <string name="no_subfolders_found">No se encontraron subcarpetas</string>
     <string name="root">Raíz</string>
@@ -788,6 +876,9 @@
     <string name="cd_grid_view_label">Vista cuadrícula</string>
     <string name="cd_search_files_label">Buscar archivos</string>
 
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- LEGACY COMPATIBILITY (deprecated - use semantic names above) -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="title_my_files">@string/nav_my_files</string>
     <string name="import_file">@string/file_import</string>
     <string name="refresh">@string/action_refresh</string>
@@ -826,6 +917,9 @@
     <string name="loading">@string/status_loading</string>
     <string name="use_unified_viewer_for_pdf">@string/pdf_use_unified_viewer</string>
 
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- DATABASE UPDATE -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="db_update_title">Actualización de BD Disponible</string>
     <string name="db_update_message">Nueva versión de la base de datos de aeropuertos/ubicaciones disponible.\n\nVersión actual: %1$d\nNueva versión: %2$d</string>
     <string name="db_update_options">Elige cómo actualizar:</string>
@@ -836,11 +930,16 @@
     <string name="db_update_btn_clean">Importación Limpia</string>
     <string name="db_update_btn_skip">Omitir</string>
 
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- MILITARY SYMBOL PICKER -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="military_symbols_title">Símbolos Militares</string>
     <string name="military_symbols_close">Cerrar</string>
+    <!-- Symbol Affiliations -->
     <string name="military_symbols_affiliation_label">Afiliación</string>
     <string name="military_symbols_category_label">Categoría</string>
 
+    <!-- Symbol Categories -->
     <string name="military_symbols_category_ground_units">Unidades Terrestres</string>
     <string name="military_symbols_category_equipment">Equipamiento</string>
     <string name="military_symbols_category_installations">Instalaciones</string>
@@ -856,6 +955,9 @@
     <string name="military_symbols_affiliation_neutral">Neutral</string>
     <string name="military_symbols_affiliation_unknown">Desconocido</string>
 
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- ROUTE CREATION -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="route_new_name_template">Nueva Ruta %d</string>
     <string name="route_autosaved_player_position_description">Posición jugador auto-guardada</string>
     <string name="route_description_waypoints">Ruta con %d waypoints</string>
@@ -898,6 +1000,9 @@
     <string name="action_move_down">Mover abajo</string>
 
     
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- MapFlightInstruments -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="map_flight_instrument_no_data">SIN DATOS</string>
     <string name="map_flight_instrument_attitude">ACTITUD</string>
     <string name="map_flight_instrument_mach_format">M%.2f</string>
@@ -922,6 +1027,9 @@
     <string name="map_flight_instrument_cardinal_w">O</string>
 
     
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- MapNavigationDisplay -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="map_nav_route_to">RUTA A: %1$s</string>
     <string name="map_nav_dist_nm">%1$.1f NM</string>
     <string name="map_nav_hdg">RUMBO %1$03.0f°</string>
@@ -978,11 +1086,17 @@
     <string name="map_nav_approach_target_name">%1$s RWY %2$02d</string>
 
     
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- FlightMiniStatusBar -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="mini_status_bar_battery_level">Nivel de batería %1$d por ciento</string>
     <string name="mini_status_bar_position_ok">Posición OK</string>
     <string name="mini_status_bar_interarrival_stats">%1$d/%2$d/%3$dms</string>
 
     
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- Map Drawing Tools -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="map_drawing_tools_title">Drawing Tools</string>
     <string name="map_drawing_active">✓ Drawing active</string>
     <string name="map_drawing_close_cd">Close</string>
@@ -1035,6 +1149,9 @@
     <string name="map_marker_hdg_na">n/a</string>
 
     
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- Map Radial Menu -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="map_radial_menu_info">Info</string>
     <string name="map_radial_menu_edit">Edit</string>
     <string name="map_radial_menu_navigate">Navigate</string>
@@ -1049,6 +1166,9 @@
     <string name="map_radial_menu_eraser">Eraser</string>
 
     
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- FAB Content Descriptions -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="fab_cd_center_on_position">Center on position</string>
     <string name="fab_cd_add_military_symbol">Add Military Symbol</string>
     <string name="fab_cd_markers_routes">Markers &amp; Routes</string>

@@ -1,6 +1,11 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- APP METADATA -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- COMMON ACTIONS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     
     
     <string name="action_save">Speichern</string>
@@ -24,7 +29,9 @@
     <string name="action_collapse">Einklappen</string>
 
     
-    
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- NAVIGATION & UI ELEMENTS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     
     <string name="nav_settings">Einstellungen</string>
     <string name="nav_my_files">Meine Dateien</string>
@@ -34,7 +41,9 @@
     <string name="nav_up">Hoch</string>
 
     
-    
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- FILE OPERATIONS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     
     <string name="file_import">Datei importieren</string>
     <string name="file_add">Datei hinzufügen</string>
@@ -49,7 +58,9 @@
     <string name="file_unsupported_format">Nicht unterstütztes Dateiformat: .%1$s\nUnterstützt: .md, .markdown</string>
 
     
-    
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- TABS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     
     <string name="tab_new">Neuer Tab</string>
     <string name="tab_close">Tab schließen</string>
@@ -65,7 +76,9 @@
     <string name="tab_active">Aktiv</string>
 
     
-    
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- TAGS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     
     <string name="tag_edit">Tags bearbeiten</string>
     <string name="tag_move">Verschieben</string>
@@ -83,12 +96,16 @@
     
     
     
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- CHECKLIST & MARKDOWN -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="checklist_title">Checkliste</string>
     <string name="checklist_error_loading">Fehler beim Laden: %1$s</string>
     <string name="checklist_error_unknown">Unbekannter Fehler</string>
 
-    
-    
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- PDF VIEWER -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     
     <string name="pdf_error_loading">Fehler beim Laden der PDF: %1$s</string>
     <string name="pdf_use_unified_viewer">Bitte verwenden Sie UnifiedViewerScreen für PDF-Dateien</string>
@@ -127,6 +144,9 @@
     
     
     
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- BROWSE & NAVIGATION -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="browse_path_label">Pfad:</string>
     <string name="cd_folder">Ordner</string>
     <string name="cd_file">Datei</string>
@@ -147,6 +167,10 @@
     <string name="cd_link_to_quick_note">Zu Schnellnotiz verlinken</string>
     <string name="shortcuts_title">Verknüpfungen</string>
     <string name="cd_file_list">Dateiliste</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- QUICK ACCESS & NOTES -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="quick_access_title">Schnellzugriff</string>
     <string name="quick_notes_title">Schnellnotizen</string>
     <string name="quick_notes_search_placeholder">Notizen durchsuchen…</string>
@@ -172,6 +196,9 @@
     <string name="quick_notes_untitled">Ohne Titel</string>
     <string name="quick_notes_delete_confirm">Erneut drücken zum Löschen</string>
     <string name="quick_notes_new_button">Neu</string>
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- COMMON -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="common_empty">(leer)</string>
     <string name="greeting_hello">Hallo %1$s!</string>
     <string name="quick_notes_flight_template">Alt: FL    / Spd:     / Hdg:    </string>
@@ -198,6 +225,9 @@
     
     
     
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- FLIGHT STATUS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="flight_status_idle">Leerlauf</string>
     <string name="flight_status_startup">Anlassen</string>
     <string name="flight_status_taxi">Rollen</string>
@@ -209,6 +239,9 @@
     
     
     
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- MAPS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="map_center_on_aircraft">Auf Flugzeug zentrieren</string>
     <string name="map_layers">Kartenebenen</string>
     <string name="map_layers_dialog_title">Kartenebenen</string>
@@ -237,6 +270,9 @@
     <string name="map_select_layer">Wählen Sie eine Kartenebene:</string>
     <string name="map_note_aviation_charts">Hinweis: Luftfahrt-Karten erfordern zusätzliche Konfiguration. Siehe docs/technical/AVIATION_MAPS.md</string>
     <string name="map_aviation_map">Luftfahrtkarte</string>
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- Map Overlays -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="map_overlays">Karten-Overlays</string>
     <string name="map_overlays_dialog_title">Karten-Overlays</string>
     <string name="map_compass">Kompass</string>
@@ -248,6 +284,9 @@
     <string name="marker_snippet_fmt">Alt: %1$dft | Spd: %2$dkt | Hdg: %3$d°</string>
     <string name="marker_pilot_fmt">Pilot: %1$s</string>
 
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- Map Marker Management -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="map_objects_title">Kartenobjekte</string>
     <string name="map_objects_transparency_label">Transparenz: %1$d%%</string>
     <string name="map_group_airports">✈ Flughäfen</string>
@@ -378,7 +417,7 @@
 • Bind-IP leer lassen, um auf allen Schnittstellen zu lauschen
 • Standardport: 5010</string>
 
-    
+    <!-- ECDH / Device settings -->
     <string name="datapad_ecdh_title">ECDH-Handshakemodus</string>
     <string name="datapad_ecdh_description_secure">Sichere, sitzungsbasierte Verschlüsselung (empfohlen)</string>
     <string name="datapad_device_name_label">Gerätename</string>
@@ -487,6 +526,9 @@
     
     
     
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- SETTINGS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="settings_title">Einstellungen</string>
     <string name="settings_dark_mode">Dunkles Design</string>
     <string name="settings_toggle_dark_mode">Dunkles Design umschalten</string>
@@ -523,6 +565,9 @@
     <string name="msg_tags_imported">Tags erfolgreich importiert</string>
     <string name="total_unique_tags">Gesamt eindeutige Tags: %1$d</string>
     <string name="files_with_tags">Dateien mit Tags: %1$d</string>
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- MARKDOWN VIEWER -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="markdown_title">Markdown-Einstellungen</string>
     
     
@@ -586,17 +631,26 @@
     <string name="error_encoding_contributors">Fehler beim Kodieren der Mitwirkenden: %1$s</string>
 
     <string name="text_empty">(leer)</string>
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- STATES & STATUS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="status_loading">Lädt…</string>
 
     
     
     
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- LANGUAGE -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="settings_language_label">Sprache</string>
     <string name="settings_language_restart_message">Sprache gespeichert. Bitte starten Sie die App neu, damit die Änderung wirksam wird.</string>
 
     
     
     
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- CONTENT DESCRIPTIONS (Accessibility) -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="cd_marked">Markiert</string>
     <string name="cd_shortcut">Verknüpfung</string>
     <string name="cd_note">Notiz</string>
@@ -617,6 +671,9 @@
     
     
     
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- UI DIALOGS & MESSAGES -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="dialog_import">Importieren</string>
     <string name="dialog_file">Datei</string>
     <string name="dialog_folder">Ordner</string>
@@ -688,7 +745,10 @@
             
             
             
-            <string name="datapad_settings_udp_port">UDP-Port</string>        <string name="datapad_settings_port_range">Portbereich: 1024-65535</string>
+        <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- DATAPAD SETTINGS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+        <string name="datapad_settings_udp_port">UDP-Port</string>        <string name="datapad_settings_port_range">Portbereich: 1024-65535</string>
     <string name="datapad_settings_bind_ip">Bind IP-Adresse</string>
     <string name="datapad_settings_bind_ip_placeholder">0.0.0.0 (alle Schnittstellen)</string>
     <string name="datapad_settings_bind_ip_hint">Leer = auf allen Schnittstellen hören</string>
@@ -705,7 +765,9 @@
 
     
     
-    
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- FILES & FOLDERS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="files_in_folder">Dateien in: %1$s</string>
     <string name="select_another_folder">Anderen Ordner auswählen</string>
     <string name="select_folder">Ordner auswählen</string>
@@ -745,13 +807,16 @@
     
     
     
-    
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- MILITARY SYMBOL PICKER -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="military_symbols_title">Militärische Symbole</string>
     <string name="military_symbols_close">Schließen</string>
+    <!-- Symbol Affiliations -->
     <string name="military_symbols_affiliation_label">Zugehörigkeit</string>
     <string name="military_symbols_category_label">Kategorie</string>
 
-    
+    <!-- Symbol Categories -->
     <string name="military_symbols_category_ground_units">Bodeneinheiten</string>
     <string name="military_symbols_category_equipment">Ausrüstung</string>
     <string name="military_symbols_category_installations">Installationen</string>
@@ -768,7 +833,9 @@
     <string name="military_symbols_affiliation_neutral">Neutral</string>
     <string name="military_symbols_affiliation_unknown">Unbekannt</string>
 
-    
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- ROUTE CREATION -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="route_new_name_template">Neue Route %d</string>
     <string name="route_autosaved_player_position_description">Automatisch gespeicherte Spielerposition</string>
     <string name="route_description_waypoints">Route mit %d Wegpunkten</string>
@@ -810,7 +877,9 @@
     <string name="action_move_up">Nach oben verschieben</string>
     <string name="action_move_down">Nach unten verschieben</string>
 
-    
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- MapFlightInstruments -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="map_flight_instrument_no_data">KEINE DATEN</string>
     <string name="map_flight_instrument_attitude">LAGE</string>
     <string name="map_flight_instrument_mach_format">M%.2f</string>
@@ -834,7 +903,9 @@
     <string name="map_flight_instrument_cardinal_s">S</string>
     <string name="map_flight_instrument_cardinal_w">W</string>
 
-    
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- MapNavigationDisplay -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="map_nav_route_to">ROUTE ZU: %1$s</string>
     <string name="map_nav_dist_nm">%1$.1f NM</string>
     <string name="map_nav_hdg">KURS %1$03.0f°</string>
@@ -891,11 +962,17 @@
     <string name="map_nav_approach_target_name">%1$s RWY %2$02d</string>
 
     
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- FlightMiniStatusBar -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="mini_status_bar_battery_level">Akkustand %1$d Prozent</string>
     <string name="mini_status_bar_position_ok">Position OK</string>
     <string name="mini_status_bar_interarrival_stats">%1$d/%2$d/%3$dms</string>
 
     
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- Map Drawing Tools -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="map_drawing_tools_title">Drawing Tools</string>
     <string name="map_drawing_active">✓ Drawing active</string>
     <string name="map_drawing_close_cd">Close</string>
@@ -948,6 +1025,9 @@
     <string name="map_marker_hdg_na">n/a</string>
 
     
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- Map Radial Menu -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="map_radial_menu_info">Info</string>
     <string name="map_radial_menu_edit">Edit</string>
     <string name="map_radial_menu_navigate">Navigate</string>
@@ -962,6 +1042,9 @@
     <string name="map_radial_menu_eraser">Eraser</string>
 
     
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- FAB Content Descriptions -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="fab_cd_center_on_position">Center on position</string>
     <string name="fab_cd_add_military_symbol">Add Military Symbol</string>
     <string name="fab_cd_markers_routes">Markers &amp; Routes</string>
@@ -1032,6 +1115,10 @@
     <string name="quick_notes_mode_normal_chip">Normal</string>
     <string name="quick_notes_mode_markdown_chip">Markdown</string>
     <string name="common_placeholder_dash">-</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- FORMATS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="format_time_hh_mm_ss">HH:mm:ss</string>
     <string name="quick_notes_com_prefix">COM:</string>
     <string name="quick_notes_coord_template">N       E      </string>
@@ -1048,6 +1135,8 @@
     <string name="map_auto_centering_active">🎯 Auto-centering (tap to disable)</string>
     <string name="map_auto_centering_off">Auto-center OFF (tap to enable)</string>
     <string name="map_tip_lock_screen">tip: tap lock to look around the map</string>
+
+    <!-- MAP DB WIPE/REIMPORT -->
     <string name="settings_wipe_map_db_title">Wipe &amp; Reimport Map DB</string>
     <string name="settings_wipe_map_db_explain">Delete the internal map database and re-import the packaged map_data.db from app assets. Use this to refresh markers and map details.</string>
     <string name="settings_wipe_map_db_button">Wipe &amp; Reimport map_data.db</string>
@@ -1055,6 +1144,9 @@
     <string name="settings_wipe_map_db_confirm_message">This will delete the internal map database and re-import the packaged database. The app will restart to reload map data. Continue?</string>
     <string name="msg_map_db_reimported">Map database reimported — restarting…</string>
     <string name="map_aviation_charts_note">Note: Aviation sectional charts require additional configuration. See docs/technical/AVIATION_MAPS.md</string>
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- DATAPAD -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="datapad_title">DataPad</string>
     <string name="datapad_command_example">python forward_parsed_udp.py --host %1$s --port %2$d</string>
     <string name="datapad_settings_description">Enable or disable DataPad. When disabled the app will not listen for UDP telemetry and DataPad UI controls will be hidden.</string>
@@ -1101,6 +1193,9 @@
     
     
     
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- INTERNAL FILES -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="no_files_found">No files found</string>
     <string name="no_subfolders_found">No subfolders found</string>
     <string name="root">Root</string>
@@ -1117,6 +1212,9 @@
     
     
     
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- LEGACY COMPATIBILITY (deprecated - use semantic names above) -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="title_my_files">@string/nav_my_files</string>
     <string name="import_file">@string/file_import</string>
     <string name="refresh">@string/action_refresh</string>
@@ -1158,6 +1256,9 @@
     
     
     
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- DATABASE UPDATE -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="db_update_title">Database Update Available</string>
     <string name="db_update_message">A new version of the airport/location database is available.\n\nCurrent version: %1$d\nNew version: %2$d</string>
     <string name="db_update_options">Choose how to update:</string>
