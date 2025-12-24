@@ -420,8 +420,11 @@ private fun ConnectionStatusCard(
 ) {
     // Keep the time-since-update localized to this composable so only it recomposes
     val context = androidx.compose.ui.platform.LocalContext.current
-    var timeSinceUpdate by remember { mutableStateOf("--") }
+    var timeSinceUpdate by remember { mutableStateOf("") }
+    val naValue = stringResource(R.string.datapad_na_value)
+
     LaunchedEffect(lastUpdateTime) {
+        timeSinceUpdate = naValue
         // Single-running ticker while visible; updates only local text state
         while (true) {
             val lastUpdate = lastUpdateTime
@@ -433,7 +436,7 @@ private fun ConnectionStatusCard(
                     else -> context.getString(com.example.checklist_interactive.R.string.datapad_time_hours_ago, seconds / 3600)
                 }
             } else {
-                "--"
+                naValue
             }
             kotlinx.coroutines.delay(1000)
         }
@@ -444,9 +447,10 @@ private fun ConnectionStatusCard(
     val lastHeartbeat by manager.lastHeartbeatTime.collectAsState()
     val connHealth by manager.connectionHealth.collectAsState()
 
-    var lastHeartbeatText by remember { mutableStateOf("--") }
+    var lastHeartbeatText by remember { mutableStateOf("") }
     var heartbeatColor by remember { mutableStateOf(Color.White.copy(alpha = 0.9f)) }
     LaunchedEffect(lastHeartbeat) {
+        lastHeartbeatText = naValue
         while (true) {
             val hb = lastHeartbeat
             lastHeartbeatText = if (hb != null) {
@@ -459,7 +463,7 @@ private fun ConnectionStatusCard(
                 }
             } else {
                 heartbeatColor = Color.White.copy(alpha = 0.9f)
-                "--"
+                naValue
             }
             kotlinx.coroutines.delay(1000)
         }
@@ -519,7 +523,7 @@ private fun ConnectionStatusCard(
                     if (lastHeartbeat != null && !isConnected) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "• ${context.getString(com.example.checklist_interactive.R.string.datapad_last_heartbeat, lastHeartbeatText)}",
+                            text = context.getString(R.string.datapad_last_heartbeat_with_bullet, lastHeartbeatText),
                             color = heartbeatColor,
                             fontSize = 11.sp
                         )
@@ -557,10 +561,15 @@ private fun ConnectionStatusCard(
             val maxInterarrival by manager.maxInterarrivalMs.collectAsState()
             val avgInterarrival by manager.avgInterarrivalMs.collectAsState()
             
-            if (isConnected && minInterarrival != null && maxInterarrival != null && avgInterarrival != null) {
+            // Snapshot delegated values into local vals so Kotlin can smart-cast after null-check
+            val minInterarrivalVal = minInterarrival
+            val maxInterarrivalVal = maxInterarrival
+            val avgInterarrivalVal = avgInterarrival
+            
+            if (isConnected && minInterarrivalVal != null && maxInterarrivalVal != null && avgInterarrivalVal != null) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Packet timing: ${minInterarrival}ms / ${avgInterarrival}ms / ${maxInterarrival}ms (min/avg/max)",
+                    text = stringResource(R.string.datapad_packet_timing, minInterarrivalVal, avgInterarrivalVal, maxInterarrivalVal),
                     color = Color.White.copy(alpha = 0.7f),
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Light
@@ -625,6 +634,7 @@ private fun NoDataCard() {
 
 @Composable
 private fun FlightDataDisplay(data: FlightData?) {
+    val context = LocalContext.current
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -640,26 +650,25 @@ private fun FlightDataDisplay(data: FlightData?) {
         // Environment + Position side-by-side
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(modifier = Modifier.weight(1f)) {
-                DataSection(title = stringResource(R.string.datapad_environment)) {
-                    data?.environment?.let { env ->
-                        DataRow(stringResource(R.string.datapad_temperature), env.temperature?.let { String.format("%.1f", it) + "°C (${String.format("%.1f", celsiusToFahrenheit(it))}°F)" } ?: stringResource(R.string.datapad_not_available))
-                        DataRow(stringResource(R.string.datapad_pressure), env.pressure?.let { String.format("%.1f", it) + " hPa (${String.format("%.2f", hpaToInHg(it))} inHg)" } ?: stringResource(R.string.datapad_not_available))
-                        DataRow(stringResource(R.string.datapad_wind_speed), env.windSpeed?.let { String.format("%.1f", it) + " m/s (${String.format("%.1f", mpsToKts(it))} kt)" } ?: stringResource(R.string.datapad_not_available))
-                        DataRow(stringResource(R.string.datapad_wind_direction), env.windDirection?.let { String.format("%.1f", it) + "°" } ?: stringResource(R.string.datapad_not_available))
-                        env.visibility?.let { vis ->
-                            DataRow(stringResource(R.string.datapad_visibility), String.format("%.0f", vis) + " m (${String.format("%.1f", metersToNm(vis))} nm)")
-                        }
-                        env.clouds?.let { clouds ->
-                            DataRow(stringResource(R.string.datapad_clouds), clouds)
-                        }
-                    } ?: run {
-                        DataRow(stringResource(R.string.datapad_temperature), stringResource(R.string.datapad_not_available))
-                        DataRow(stringResource(R.string.datapad_pressure), stringResource(R.string.datapad_not_available))
-                        DataRow(stringResource(R.string.datapad_wind_speed), stringResource(R.string.datapad_not_available))
-                        DataRow(stringResource(R.string.datapad_wind_direction), stringResource(R.string.datapad_not_available))
-                    }
-                }
-            }
+                            DataSection(title = stringResource(R.string.datapad_environment)) {
+                                data?.environment?.let { env ->
+                                    DataRow(stringResource(R.string.datapad_temperature), env.temperature?.let { stringResource(R.string.datapad_temperature_c_f, it, celsiusToFahrenheit(it)) } ?: stringResource(R.string.datapad_not_available))
+                                    DataRow(stringResource(R.string.datapad_pressure), env.pressure?.let { stringResource(R.string.datapad_pressure_hpa_inhg, it, hpaToInHg(it)) } ?: stringResource(R.string.datapad_not_available))
+                                    DataRow(stringResource(R.string.datapad_wind_speed), env.windSpeed?.let { stringResource(R.string.datapad_wind_speed_ms_kts, it, mpsToKts(it)) } ?: stringResource(R.string.datapad_not_available))
+                                    DataRow(stringResource(R.string.datapad_wind_direction), env.windDirection?.let { stringResource(R.string.datapad_direction_deg, it) } ?: stringResource(R.string.datapad_not_available))
+                                    env.visibility?.let { vis ->
+                                        DataRow(stringResource(R.string.datapad_visibility), stringResource(R.string.datapad_visibility_m_nm, vis, metersToNm(vis)))
+                                    }
+                                    env.clouds?.let { clouds ->
+                                        DataRow(stringResource(R.string.datapad_clouds), clouds)
+                                    }
+                                } ?: run {
+                                    DataRow(stringResource(R.string.datapad_temperature), stringResource(R.string.datapad_not_available))
+                                    DataRow(stringResource(R.string.datapad_pressure), stringResource(R.string.datapad_not_available))
+                                    DataRow(stringResource(R.string.datapad_wind_speed), stringResource(R.string.datapad_not_available))
+                                    DataRow(stringResource(R.string.datapad_wind_direction), stringResource(R.string.datapad_not_available))
+                                }
+                            }            }
 
             Column(modifier = Modifier.weight(1f)) {
                 DataSection(title = stringResource(R.string.datapad_section_position)) {
@@ -681,11 +690,11 @@ private fun FlightDataDisplay(data: FlightData?) {
         // AoA & G-Load
         data?.angleOfAttack?.let { aoa ->
             DataSection(title = stringResource(R.string.datapad_section_flight_performance)) {
-                DataRow(stringResource(R.string.datapad_field_angle_of_attack), String.format("%.2f°", aoa))
+                DataRow(stringResource(R.string.datapad_field_angle_of_attack), stringResource(R.string.datapad_aoa_deg, aoa))
                 data.gLoad?.let { g ->
-                    DataRow(stringResource(R.string.datapad_field_g_load_x), String.format("%.2f G", g.x))
-                    DataRow(stringResource(R.string.datapad_field_g_load_y), String.format("%.2f G", g.y))
-                    DataRow(stringResource(R.string.datapad_field_g_load_z), String.format("%.2f G", g.z))
+                    DataRow(stringResource(R.string.datapad_field_g_load_x), stringResource(R.string.datapad_g_load_unit, g.x))
+                    DataRow(stringResource(R.string.datapad_field_g_load_y), stringResource(R.string.datapad_g_load_unit, g.y))
+                    DataRow(stringResource(R.string.datapad_field_g_load_z), stringResource(R.string.datapad_g_load_unit, g.z))
                 }
             }
         }
@@ -694,14 +703,14 @@ private fun FlightDataDisplay(data: FlightData?) {
         data?.engines?.let { eng ->
             DataSection(title = stringResource(R.string.datapad_section_engine)) {
                 eng.rpm?.let { rpm ->
-                    rpm.left?.let { DataRow(stringResource(R.string.datapad_field_rpm_left), String.format("%.1f%%", it)) }
-                    rpm.right?.let { DataRow(stringResource(R.string.datapad_field_rpm_right), String.format("%.1f%%", it)) }
+                    rpm.left?.let { DataRow(stringResource(R.string.datapad_field_rpm_left), stringResource(R.string.datapad_percent_format, it)) }
+                    rpm.right?.let { DataRow(stringResource(R.string.datapad_field_rpm_right), stringResource(R.string.datapad_percent_format, it)) }
                 }
                 eng.egt?.let { egt ->
-                    egt.left?.let { DataRow(stringResource(R.string.datapad_field_egt_left), String.format("%.0f°C", it)) }
-                    egt.right?.let { DataRow(stringResource(R.string.datapad_field_egt_right), String.format("%.0f°C", it)) }
+                    egt.left?.let { DataRow(stringResource(R.string.datapad_field_egt_left), stringResource(R.string.datapad_temp_c_format, it)) }
+                    egt.right?.let { DataRow(stringResource(R.string.datapad_field_egt_right), stringResource(R.string.datapad_temp_c_format, it)) }
                 }
-                eng.throttle?.let { DataRow(stringResource(R.string.datapad_field_throttle), String.format("%.1f%%", it * 100)) }
+                eng.throttle?.let { DataRow(stringResource(R.string.datapad_field_throttle), stringResource(R.string.datapad_percent_format, it * 100)) }
                 StatusRow(stringResource(R.string.datapad_field_afterburner), eng.afterburner)
             }
         }
@@ -709,9 +718,9 @@ private fun FlightDataDisplay(data: FlightData?) {
         // Aircraft Mass
         data?.aircraftMass?.let { mass ->
             DataSection(title = stringResource(R.string.datapad_section_aircraft_mass)) {
-                mass.total?.let { DataRow(stringResource(R.string.datapad_field_total_mass), String.format("%.0f kg", it)) }
-                mass.empty?.let { DataRow(stringResource(R.string.datapad_field_empty_mass), String.format("%.0f kg", it)) }
-                mass.payload?.let { DataRow(stringResource(R.string.datapad_field_payload), String.format("%.0f kg", it)) }
+                mass.total?.let { DataRow(stringResource(R.string.datapad_field_total_mass), stringResource(R.string.datapad_mass_kg_format, it)) }
+                mass.empty?.let { DataRow(stringResource(R.string.datapad_field_empty_mass), stringResource(R.string.datapad_mass_kg_format, it)) }
+                mass.payload?.let { DataRow(stringResource(R.string.datapad_field_payload), stringResource(R.string.datapad_mass_kg_format, it)) }
             }
         }
 
@@ -736,8 +745,8 @@ private fun FlightDataDisplay(data: FlightData?) {
                     gear.right?.let { DataRow(stringResource(R.string.datapad_field_right_gear), if (it > 0.9) stringResource(R.string.datapad_gear_down) else if (it < 0.1) stringResource(R.string.datapad_gear_up) else stringResource(R.string.datapad_gear_transit)) }
                 }
                 StatusRow(stringResource(R.string.datapad_field_weight_on_wheels), data.weightOnWheels)
-                mech.flaps?.let { DataRow(stringResource(R.string.datapad_field_flaps), String.format("%.0f%%", it * 100)) }
-                mech.speedbrake?.let { DataRow(stringResource(R.string.datapad_field_speedbrake), String.format("%.0f%%", it * 100)) }
+                mech.flaps?.let { DataRow(stringResource(R.string.datapad_field_flaps), stringResource(R.string.datapad_percent_format_int, it * 100)) }
+                mech.speedbrake?.let { DataRow(stringResource(R.string.datapad_field_speedbrake), stringResource(R.string.datapad_percent_format_int, it * 100)) }
                 mech.canopy?.let { DataRow(stringResource(R.string.datapad_field_canopy), if (it > 0.9) stringResource(R.string.datapad_canopy_open) else if (it < 0.1) stringResource(R.string.datapad_canopy_closed) else stringResource(R.string.datapad_canopy_moving)) }
                 mech.hook?.let { DataRow(stringResource(R.string.datapad_field_hook), if (it > 0.5) stringResource(R.string.datapad_hook_down) else stringResource(R.string.datapad_hook_up)) }
             }
@@ -770,7 +779,7 @@ private fun FlightDataDisplay(data: FlightData?) {
                 val hours = (mt / 3600).toInt()
                 val minutes = ((mt % 3600) / 60).toInt()
                 val seconds = (mt % 60).toInt()
-                DataRow(stringResource(R.string.datapad_field_time), String.format("%02d:%02d:%02d", hours, minutes, seconds))
+                DataRow(stringResource(R.string.datapad_field_time), stringResource(R.string.datapad_time_format_hms, hours, minutes, seconds))
             }
         }
 
@@ -781,7 +790,7 @@ private fun FlightDataDisplay(data: FlightData?) {
                     units.take(10).forEach { unit ->
                         DataRow(
                             unit.name,
-                            "${unit.type} • ${unit.distance?.let { String.format("%.0f m", it) } ?: "?"}"
+                            stringResource(R.string.datapad_unit_details_format, unit.type, unit.distance?.let { stringResource(R.string.datapad_distance_m_format_int, it) } ?: stringResource(R.string.datapad_na_symbol))
                         )
                     }
                 }
@@ -792,17 +801,17 @@ private fun FlightDataDisplay(data: FlightData?) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(modifier = Modifier.weight(1f)) {
                 DataSection(title = stringResource(R.string.datapad_section_flight_params)) {
-                    DataRow(stringResource(R.string.datapad_field_altitude), data?.altitude?.let { "${String.format("%.1f", it)} m" } ?: stringResource(R.string.datapad_not_available))
-                    DataRow(stringResource(R.string.datapad_field_heading), data?.heading?.let { "${String.format("%.1f", Math.toDegrees(it))}°" } ?: stringResource(R.string.datapad_not_available))
-                    DataRow(stringResource(R.string.datapad_field_pitch), data?.pitch?.let { "${String.format("%.2f", Math.toDegrees(it))}°" } ?: stringResource(R.string.datapad_not_available))
-                    DataRow(stringResource(R.string.datapad_field_bank), data?.bank?.let { "${String.format("%.2f", Math.toDegrees(it))}°" } ?: stringResource(R.string.datapad_not_available))
+                    DataRow(stringResource(R.string.datapad_field_altitude), data?.altitude?.let { stringResource(R.string.datapad_altitude_m_format, it) } ?: stringResource(R.string.datapad_not_available))
+                    DataRow(stringResource(R.string.datapad_field_heading), data?.heading?.let { stringResource(R.string.datapad_heading_deg_format, Math.toDegrees(it)) } ?: stringResource(R.string.datapad_not_available))
+                    DataRow(stringResource(R.string.datapad_field_pitch), data?.pitch?.let { stringResource(R.string.datapad_angle_deg_format, Math.toDegrees(it)) } ?: stringResource(R.string.datapad_not_available))
+                    DataRow(stringResource(R.string.datapad_field_bank), data?.bank?.let { stringResource(R.string.datapad_angle_deg_format, Math.toDegrees(it)) } ?: stringResource(R.string.datapad_not_available))
                 }
             }
             Column(modifier = Modifier.weight(1f)) {
                 DataSection(title = stringResource(R.string.datapad_section_performance)) {
-                    DataRow(stringResource(R.string.datapad_field_indicated_airspeed), data?.indicatedAirspeed?.let { formatSpeedWithKnots(it) } ?: stringResource(R.string.datapad_not_available))
-                    DataRow(stringResource(R.string.datapad_field_true_airspeed), data?.trueAirspeed?.let { formatSpeedWithKnots(it) } ?: stringResource(R.string.datapad_not_available))
-                    DataRow(stringResource(R.string.datapad_field_vertical_speed), data?.verticalSpeed?.let { "${String.format("%.2f", it)} m/s (${String.format("%.0f", mpsToFpm(it))} ft/min)" } ?: stringResource(R.string.datapad_not_available))
+                    DataRow(stringResource(R.string.datapad_field_indicated_airspeed), data?.indicatedAirspeed?.let { formatSpeedWithKnots(context, it) } ?: stringResource(R.string.datapad_not_available))
+                    DataRow(stringResource(R.string.datapad_field_true_airspeed), data?.trueAirspeed?.let { formatSpeedWithKnots(context, it) } ?: stringResource(R.string.datapad_not_available))
+                    DataRow(stringResource(R.string.datapad_field_vertical_speed), data?.verticalSpeed?.let { stringResource(R.string.datapad_vs_ms_fpm, it, mpsToFpm(it)) } ?: stringResource(R.string.datapad_not_available))
                     DataRow(stringResource(R.string.datapad_field_mach), data?.mach?.let { String.format("%.3f", it) } ?: stringResource(R.string.datapad_not_available))
                 }
             }
@@ -850,11 +859,11 @@ private fun FlightDataDisplay(data: FlightData?) {
         data?.radar?.let { radar ->
             DataSection(title = stringResource(R.string.datapad_section_radar), initialExpanded = false) {
                 radar.mode?.let { DataRow(stringResource(R.string.datapad_field_mode), it) }
-                radar.range?.let { DataRow(stringResource(R.string.datapad_field_range), String.format("%.0f m", it)) }
+                radar.range?.let { DataRow(stringResource(R.string.datapad_field_range), stringResource(R.string.datapad_range_m_format, it)) }
                 StatusRow(stringResource(R.string.datapad_field_locked), radar.locked)
                 DataRow(stringResource(R.string.datapad_field_track_count), radar.trackCount.toString())
-                radar.azimuth?.let { DataRow(stringResource(R.string.datapad_field_azimuth), String.format("%.1f°", it)) }
-                radar.elevation?.let { DataRow(stringResource(R.string.datapad_field_elevation), String.format("%.1f°", it)) }
+                radar.azimuth?.let { DataRow(stringResource(R.string.datapad_field_azimuth), stringResource(R.string.datapad_azimuth_deg_format, it)) }
+                radar.elevation?.let { DataRow(stringResource(R.string.datapad_field_elevation), stringResource(R.string.datapad_azimuth_deg_format, it)) }
                 radar.scan?.let { DataRow(stringResource(R.string.datapad_field_scan), it) }
                 radar.tracks?.let { tracks ->
                     if (tracks.isNotEmpty()) {
@@ -868,8 +877,8 @@ private fun FlightDataDisplay(data: FlightData?) {
                             DataRow(
                                 stringResource(R.string.datapad_track_label, track.id),
                                 stringResource(R.string.datapad_track_detail,
-                                    track.range?.let { String.format("%.0f m", it) } ?: "?",
-                                    track.azimuth?.let { String.format("%.0f°", it) } ?: "?"
+                                    track.range?.let { stringResource(R.string.datapad_range_m_format, it) } ?: stringResource(R.string.datapad_na_symbol),
+                                    track.azimuth?.let { stringResource(R.string.datapad_azimuth_deg_format, it) } ?: stringResource(R.string.datapad_na_symbol)
                                 )
                             )
                         }
@@ -885,7 +894,12 @@ private fun FlightDataDisplay(data: FlightData?) {
                     rwr.contacts?.forEach { contact ->
                         DataRow(
                             contact.type,
-                            "${stringResource(R.string.datapad_rwr_azimuth_prefix)} ${contact.azimuth?.let { String.format("%.0f°", it) } ?: "?"} • ${stringResource(R.string.datapad_rwr_priority_prefix)} ${contact.priority}"
+                            stringResource(R.string.datapad_rwr_contact_format,
+                                stringResource(R.string.datapad_rwr_azimuth_prefix),
+                                contact.azimuth?.let { stringResource(R.string.datapad_azimuth_deg_format, it) } ?: stringResource(R.string.datapad_na_symbol),
+                                stringResource(R.string.datapad_rwr_priority_prefix),
+                                contact.priority
+                            )
                         )
                     }
                 }
@@ -1027,5 +1041,6 @@ private fun hpaToInHg(hpa: Double): Double = hpa * 0.02953
 
 private fun metersToNm(meters: Double): Double = meters * 0.000539957
 
-private fun formatSpeedWithKnots(value: Double): String =
-    "${String.format("%.1f", value)} m/s (${String.format("%.1f", mpsToKts(value))} kt)"
+private fun formatSpeedWithKnots(context: Context, value: Double): String {
+    return context.getString(R.string.datapad_speed_ms_kts, value, mpsToKts(value))
+}
