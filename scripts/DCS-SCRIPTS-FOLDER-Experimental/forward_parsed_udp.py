@@ -794,6 +794,8 @@ def get_last_line(path: str) -> str | None:
     
     This avoids reading the entire file, which is important for large JSONL files.
     Returns None if file is empty or only contains incomplete lines.
+    
+    Note: Opens file fresh each time to avoid stale cache issues.
     """
     try:
         with open(path, 'rb') as f:

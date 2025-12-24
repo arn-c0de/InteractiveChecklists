@@ -8,13 +8,16 @@ pcall(function()
 	local COMMAND_PATH = writeDir .. [[Scripts\forwarder_command.json]]
 	local DEBUG_DUMP_TABLES = true -- set to false to disable table debug dumps
 	local dumped_tables = {}
-	local UPDATE_INTERVAL = 0.3 -- seconds (5 Hz update rate)
+	local UPDATE_INTERVAL = 0.05 -- seconds (5 Hz update rate)
 	local lastWrite = 0
 	local lastCommandCheck = 0
 	local COMMAND_CHECK_INTERVAL = 2.0 -- check for command file every 2 seconds
-	local STREAMER_VERSION = "1.0.4"
+	local STREAMER_VERSION = "1.0.5"
 	-- Maximum number of JSON lines to keep in the output file. Set to 0 to disable trimming.
-	local MAX_JSON_LINES = 10000
+	local MAX_JSON_LINES = 500  -- Keep only last 500 lines (25 seconds @ 20 Hz)
+	-- Trim interval: Only trim file periodically, NOT on every write (performance!)
+	local TRIM_INTERVAL = 30.0  -- Trim file every 30 seconds (not on every write!)
+	local lastTrim = 0
 	-- If true, clear the JSON/log/debug files once when the export starts
 	local CLEAR_ON_START = true
 
@@ -571,31 +574,57 @@ pcall(function()
 			local f = io.open(JSON_PATH, 'a')
 			if not f then return end
 			f:write(json .. '\n')
+			f:flush()  -- Force immediate flush to disk
 			f:close()
 		end)
+		-- NOTE: File trimming moved to separate function, called periodically (not on every write!)
+	end
 
+	local function trim_json_file()
 		-- Trim the JSONL file to keep only the last MAX_JSON_LINES entries (if enabled).
-		if MAX_JSON_LINES and MAX_JSON_LINES > 0 then
-			pcall(function()
-				-- Read and keep only the last MAX_JSON_LINES lines to bound memory usage
-				local tmp = {}
-				local ok, r = pcall(io.open, JSON_PATH, 'r')
-				if not ok or not r then return end
-				for line in r:lines() do
+		-- IMPORTANT: This is called PERIODICALLY (every TRIM_INTERVAL seconds), NOT on every write!
+		-- This prevents blocking the write path with expensive file I/O.
+		if not MAX_JSON_LINES or MAX_JSON_LINES <= 0 then return end
+		
+		pcall(function()
+			-- Read and keep only the last MAX_JSON_LINES lines to bound memory usage
+			local tmp = {}
+			local count = 0
+			local ok, r = pcall(io.open, JSON_PATH, 'r')
+			if not ok or not r then return end
+			
+			-- Fast path: count lines first to avoid unnecessary memory usage
+			for _ in r:lines() do
+				count = count + 1
+			end
+			r:close()
+			
+			-- Only trim if file exceeds threshold (no work needed if file is small)
+			if count <= MAX_JSON_LINES then return end
+			
+			-- Reopen and keep only last MAX_JSON_LINES entries
+			local skip = count - MAX_JSON_LINES
+			local ok2, r2 = pcall(io.open, JSON_PATH, 'r')
+			if not ok2 or not r2 then return end
+			
+			local lineNum = 0
+			for line in r2:lines() do
+				lineNum = lineNum + 1
+				if lineNum > skip then
 					table.insert(tmp, line)
-					if #tmp > MAX_JSON_LINES then
-						table.remove(tmp, 1)
-					end
 				end
-				r:close()
-				local ok2, w = pcall(io.open, JSON_PATH, 'w')
-				if not ok2 or not w then return end
-				for _, l in ipairs(tmp) do
-					w:write(l .. '\n')
-				end
-				w:close()
-			end)
-		end
+			end
+			r2:close()
+			
+			-- Write trimmed data back
+			local ok3, w = pcall(io.open, JSON_PATH, 'w')
+			if not ok3 or not w then return end
+			for _, l in ipairs(tmp) do
+				w:write(l .. '\n')
+			end
+			w:flush()
+			w:close()
+		end)
 	end
 
 	local function serialize_table(obj, depth, maxDepth, seen)
@@ -634,17 +663,18 @@ pcall(function()
 
 	function LuaExportStart()
 		lastWrite = 0
-	-- clear files once at start if requested
-	if CLEAR_ON_START then
-		pcall(function()
-			local f = io.open(JSON_PATH, 'w')
-			if f then f:write('') f:close() end
-			local lf = io.open(LOG_PATH, 'w')
-			if lf then lf:write('') lf:close() end
-			local df = io.open(DEBUG_LOG_PATH, 'w')
-			if df then df:write('') df:close() end
-		end)
-	end
+		lastTrim = 0  -- Initialize trim timer
+		-- clear files once at start if requested
+		if CLEAR_ON_START then
+			pcall(function()
+				local f = io.open(JSON_PATH, 'w')
+				if f then f:write('') f:close() end
+				local lf = io.open(LOG_PATH, 'w')
+				if lf then lf:write('') lf:close() end
+				local df = io.open(DEBUG_LOG_PATH, 'w')
+				if df then df:write('') df:close() end
+			end)
+		end
 		if DEBUG_DUMP_TABLES then
 			debug_dump_once(telemetry)
 		end
@@ -658,6 +688,12 @@ pcall(function()
 		if now - lastCommandCheck >= COMMAND_CHECK_INTERVAL then
 			check_live_commands()
 			lastCommandCheck = now
+		end
+
+		-- Periodic file trimming (separate from write path for performance)
+		if now - lastTrim >= TRIM_INTERVAL then
+			trim_json_file()
+			lastTrim = now
 		end
 
 		if now - lastWrite >= UPDATE_INTERVAL then
