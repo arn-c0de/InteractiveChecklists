@@ -687,17 +687,40 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                     time.sleep(interval)
                     continue
 
+                # FILE TRUNCATED/TRIMMED: position > file size means file was rewritten (trim operation)
+                # Solution: Skip buffered lines and wait for file to GROW with new data
                 if cur_pos > size:
                     try:
                         f.close()
                     except Exception:
                         pass
-                    f = open_for_tail(True)
+                    logger.info(f"🔄 File trimmed detected (pos={cur_pos} > size={size}), skipping to new data...")
+                    
+                    # After trim, file contains last N buffered lines (already processed)
+                    # Wait for file to GROW beyond trimmed size = new data appended
+                    trimmed_size = os.path.getsize(path)
+                    f = open(path, 'r', encoding='utf-8', errors='replace')
+                    f.seek(0, os.SEEK_END)
+                    
+                    # Poll for file growth (new data written)
+                    for _ in range(20):  # Max 2 second wait
+                        time.sleep(interval)
+                        new_size = os.path.getsize(path)
+                        if new_size > trimmed_size:
+                            # File grew! Seek to where new data starts, then skip to next complete line
+                            f.seek(trimmed_size, os.SEEK_SET)
+                            # Discard partial/incomplete line at seek position
+                            f.readline()
+                            logger.info(f"✅ Skipped buffered data, reading fresh lines from byte {f.tell()}")
+                            break
+                    else:
+                        logger.warning(f"⚠️ Timeout waiting for file growth after trim")
+                    
                     if once:
                         break
-                    time.sleep(interval)
                     continue
 
+                # Reopen and seek to END - skip the buffered old lines
                 if not _is_same_file(f, path):
                     try:
                         f.close()
