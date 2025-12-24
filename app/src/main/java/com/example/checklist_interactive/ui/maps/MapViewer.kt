@@ -73,6 +73,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import androidx.compose.foundation.isSystemInDarkTheme
 
@@ -137,6 +138,11 @@ fun MapViewer(
     val prefsManager = remember { com.example.checklist_interactive.data.prefs.PreferencesManager(context) }
     val savedCenter = remember { prefsManager.getMapCenter() }
     val savedZoom = remember { prefsManager.getMapZoom() }
+    
+    // Initialize flight path interval from preferences
+    LaunchedEffect(Unit) {
+        mapState.flightPathIntervalSeconds = prefsManager.getFlightPathIntervalSeconds()
+    }
 
     // Pending move marker id (driven by MapActionBus)
     val pendingMoveMarkerIdFlow = MapActionBus.pendingMoveMarkerId
@@ -176,6 +182,11 @@ fun MapViewer(
     val routeRepository = remember(mapState.tacticalDb) { 
         mapState.tacticalDb?.let { 
             com.example.checklist_interactive.data.tactical.RouteRepositoryImpl(it.routeDao(), it.locationDao()) 
+        }
+    }
+    val flightPathRepository = remember(mapState.tacticalDb) {
+        mapState.tacticalDb?.let {
+            com.example.checklist_interactive.ui.maps.route.FlightPathRepository(context, it.flightPathDao())
         }
     }
     val markerRouteViewModel = remember(mapState.tacticalDb) { if (locationRepository != null && routeRepository != null) MarkerRouteViewModel(locationRepository, routeRepository) else null }
@@ -273,6 +284,30 @@ fun MapViewer(
         }
     }
 
+    // Flight path recording: Monitor repository state and update UI
+    LaunchedEffect(flightPathRepository) {
+        flightPathRepository?.let { repo ->
+            // Observe recording state
+            repo.isRecordingEnabled.collect { enabled ->
+                mapState.flightPathEnabled = enabled
+                android.util.Log.d("MapViewer", "Flight path recording: $enabled")
+            }
+        }
+    }
+    
+    // Flight path: Monitor point count
+    LaunchedEffect(flightPathRepository) {
+        flightPathRepository?.pointCount?.collect { count ->
+            mapState.flightPathPointCount = count
+        }
+    }
+    
+    // Flight path: Process incoming flight data for recording
+    LaunchedEffect(flightPathRepository, flightData) {
+        flightPathRepository?.processFlightData(flightData)
+    }
+
+
     // Save navigation state when it changes (but only after initial restoration completes)
     LaunchedEffect(
         mapState.activeNavigationTarget?.id,
@@ -359,6 +394,82 @@ fun MapViewer(
         
         mv.invalidate()
     }
+
+    // Flight path rendering: Draw the recorded path as a polyline on the map
+    LaunchedEffect(mapState.flightPathEnabled, flightPathRepository, mapState.mapView) {
+        val mv = mapState.mapView ?: return@LaunchedEffect
+        
+        // Remove existing flight path overlay
+        mapState.flightPathPolyline?.let { mv.overlays.remove(it) }
+        mapState.flightPathPolyline = null
+        
+        if (mapState.flightPathEnabled && flightPathRepository != null) {
+            // Load path points and create polyline
+            scope.launch(Dispatchers.IO) {
+                try {
+                    val points = flightPathRepository.getPathAsGeoPoints()
+                    withContext(Dispatchers.Main) {
+                        if (points.size >= 2) {
+                            val polyline = org.osmdroid.views.overlay.Polyline(mv).apply {
+                                outlinePaint.color = android.graphics.Color.parseColor("#FF6B00") // Orange color
+                                outlinePaint.strokeWidth = 6f
+                                outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                                outlinePaint.alpha = 200 // Slightly transparent
+                                setPoints(points)
+                                id = "flight_path_polyline"
+                            }
+                            // Add polyline below markers but above base layers
+                            mv.overlays.add(0, polyline)
+                            mapState.flightPathPolyline = polyline
+                            mv.invalidate()
+                            android.util.Log.d("MapViewer", "Flight path rendered with ${points.size} points")
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("MapViewer", "Failed to render flight path: ${e.message}", e)
+                }
+            }
+        } else {
+            mv.invalidate()
+        }
+    }
+
+    // Flight path: Update polyline when new points are added (reactive updates)
+    LaunchedEffect(mapState.flightPathPointCount, mapState.flightPathEnabled) {
+        if (mapState.flightPathEnabled && mapState.flightPathPointCount > 0 && flightPathRepository != null) {
+            val mv = mapState.mapView ?: return@LaunchedEffect
+            
+            scope.launch(Dispatchers.IO) {
+                try {
+                    val points = flightPathRepository.getPathAsGeoPoints()
+                    withContext(Dispatchers.Main) {
+                        if (points.size >= 2) {
+                            // Update existing polyline or create new one
+                            val polyline = mapState.flightPathPolyline
+                            if (polyline != null) {
+                                polyline.setPoints(points)
+                            } else {
+                                val newPolyline = org.osmdroid.views.overlay.Polyline(mv).apply {
+                                    outlinePaint.color = android.graphics.Color.parseColor("#FF6B00")
+                                    outlinePaint.strokeWidth = 6f
+                                    outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                                    outlinePaint.alpha = 200
+                                    setPoints(points)
+                                    id = "flight_path_polyline"
+                                }
+                                mv.overlays.add(0, newPolyline)
+                                mapState.flightPathPolyline = newPolyline
+                            }
+                            mv.invalidate()
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("MapViewer", "Failed to update flight path: ${e.message}", e)
+                }
+            }
+        }
+    }
+
 
     // Track last programmatic map movement to avoid treating it as a user scroll
     val lastProgrammaticMove = remember { mutableStateOf(0L) }
@@ -2127,6 +2238,9 @@ fun MapViewer(
             rangeRingsMaxNm = mapState.rangeRingsMaxNm,
             mgrsGridEnabled = mapState.mgrsGridEnabled,
             flightInstrumentsEnabled = mapState.flightInstrumentsEnabled,
+            flightPathEnabled = mapState.flightPathEnabled,
+            flightPathPointCount = mapState.flightPathPointCount,
+            flightPathIntervalSeconds = mapState.flightPathIntervalSeconds,
             onDismiss = { mapState.showOverlayDialog = false },
             onToggleCompass = { enabled ->
                 mapState.compassEnabled = enabled
@@ -2199,6 +2313,20 @@ fun MapViewer(
             onToggleFlightInstruments = { enabled ->
                 mapState.flightInstrumentsEnabled = enabled
                 prefsManager.setMapOverlayFlightInstrumentsEnabled(enabled)
+            },
+            onToggleFlightPath = { enabled ->
+                scope.launch {
+                    flightPathRepository?.setRecordingEnabled(enabled)
+                }
+            },
+            onClearFlightPath = {
+                scope.launch {
+                    flightPathRepository?.clearPath()
+                }
+            },
+            onChangeFlightPathInterval = { seconds ->
+                mapState.flightPathIntervalSeconds = seconds
+                prefsManager.setFlightPathIntervalSeconds(seconds)
             }
         )
     }

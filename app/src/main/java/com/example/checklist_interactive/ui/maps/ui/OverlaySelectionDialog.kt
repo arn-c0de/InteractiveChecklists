@@ -16,6 +16,7 @@ import com.example.checklist_interactive.R
  * - Compass overlay
  * - Range rings with distance configuration
  * - MGRS grid overlay
+ * - Flight path tracking and recording
  */
 @Composable
 fun OverlaySelectionDialog(
@@ -24,12 +25,18 @@ fun OverlaySelectionDialog(
     rangeRingsMaxNm: Int,
     mgrsGridEnabled: Boolean,
     flightInstrumentsEnabled: Boolean,
+    flightPathEnabled: Boolean,
+    flightPathPointCount: Int,
+    flightPathIntervalSeconds: Int,
     onDismiss: () -> Unit,
     onToggleCompass: (Boolean) -> Unit,
     onToggleRangeRings: (Boolean) -> Unit,
     onChangeRangeRingsMaxNm: (Int) -> Unit,
     onToggleMgrsGrid: (Boolean) -> Unit,
-    onToggleFlightInstruments: (Boolean) -> Unit
+    onToggleFlightInstruments: (Boolean) -> Unit,
+    onToggleFlightPath: (Boolean) -> Unit,
+    onClearFlightPath: () -> Unit,
+    onChangeFlightPathInterval: (Int) -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -81,6 +88,69 @@ fun OverlaySelectionDialog(
                         Text(stringResource(R.string.map_overlay_flight_instruments_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(checked = flightInstrumentsEnabled, onCheckedChange = onToggleFlightInstruments)
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                // Flight Path Section
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.map_overlay_flight_path), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.map_overlay_flight_path_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (flightPathEnabled && flightPathPointCount > 0) {
+                            Text(
+                                stringResource(R.string.map_overlay_flight_path_points, flightPathPointCount),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    Switch(checked = flightPathEnabled, onCheckedChange = onToggleFlightPath)
+                }
+
+                // Recording interval slider (shown when path recording is enabled)
+                if (flightPathEnabled) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            stringResource(R.string.map_overlay_flight_path_interval_desc, flightPathIntervalSeconds),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text("1s", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(28.dp))
+                            Slider(
+                                value = flightPathIntervalSeconds.toFloat(),
+                                onValueChange = { onChangeFlightPathInterval(it.toInt()) },
+                                valueRange = 1f..60f,
+                                steps = 58,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text("60s", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(32.dp))
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            listOf(1, 2, 5, 10, 30, 60).forEach { seconds ->
+                                TextButton(
+                                    onClick = { onChangeFlightPathInterval(seconds) },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("${seconds}s", style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Clear Path Button (shown when path exists)
+                if (flightPathPointCount > 0) {
+                    OutlinedButton(
+                        onClick = onClearFlightPath,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.map_overlay_flight_path_clear))
+                    }
                 }
             }
         },
