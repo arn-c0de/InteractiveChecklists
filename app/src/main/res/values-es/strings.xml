@@ -1,3 +1,4 @@
+<?xml version='1.0' encoding='utf-8'?>
 <resources>
 
     <string name="action_save">Guardar</string>
@@ -896,7 +897,7 @@
     <string name="action_move_up">Mover arriba</string>
     <string name="action_move_down">Mover abajo</string>
 
-    <!-- MapFlightInstruments -->
+    
     <string name="map_flight_instrument_no_data">SIN DATOS</string>
     <string name="map_flight_instrument_attitude">ACTITUD</string>
     <string name="map_flight_instrument_mach_format">M%.2f</string>
@@ -920,7 +921,7 @@
     <string name="map_flight_instrument_cardinal_s">S</string>
     <string name="map_flight_instrument_cardinal_w">O</string>
 
-    <!-- MapNavigationDisplay -->
+    
     <string name="map_nav_route_to">RUTA A: %1$s</string>
     <string name="map_nav_dist_nm">%1$.1f NM</string>
     <string name="map_nav_hdg">RUMBO %1$03.0f°</string>
@@ -976,12 +977,12 @@
     <string name="map_nav_reset_to_default">Restaurar a Predeterminado</string>
     <string name="map_nav_approach_target_name">%1$s RWY %2$02d</string>
 
-    <!-- FlightMiniStatusBar -->
+    
     <string name="mini_status_bar_battery_level">Nivel de batería %1$d por ciento</string>
     <string name="mini_status_bar_position_ok">Posición OK</string>
     <string name="mini_status_bar_interarrival_stats">%1$d/%2$d/%3$dms</string>
 
-    <!-- Map Drawing Tools -->
+    
     <string name="map_drawing_tools_title">Drawing Tools</string>
     <string name="map_drawing_active">✓ Drawing active</string>
     <string name="map_drawing_close_cd">Close</string>
@@ -998,13 +999,13 @@
     <string name="map_drawing_save">Save</string>
     <string name="map_drawing_color_selected_cd">Selected</string>
 
-    <!-- Map Overlays -->
+    
     <string name="map_overlay_mgrs_grid">MGRS Grid</string>
     <string name="map_overlay_mgrs_grid_desc">Military Grid Reference System overlay</string>
     <string name="map_overlay_flight_instruments">Flight Instruments</string>
     <string name="map_overlay_flight_instruments_desc">Live attitude and turn indicators (drag to reposition)</string>
 
-    <!-- Map Marker Management -->
+    
     <string name="map_search_markers_placeholder">Search markers</string>
     <string name="map_frequency_placeholder">118.50</string>
     <string name="map_marker_manage">Manage</string>
@@ -1033,7 +1034,7 @@
     <string name="map_marker_verified_no">no</string>
     <string name="map_marker_hdg_na">n/a</string>
 
-    <!-- Map Radial Menu -->
+    
     <string name="map_radial_menu_info">Info</string>
     <string name="map_radial_menu_edit">Edit</string>
     <string name="map_radial_menu_navigate">Navigate</string>
@@ -1047,7 +1048,7 @@
     <string name="map_radial_menu_color">Color</string>
     <string name="map_radial_menu_eraser">Eraser</string>
 
-    <!-- FAB Content Descriptions -->
+    
     <string name="fab_cd_center_on_position">Center on position</string>
     <string name="fab_cd_add_military_symbol">Add Military Symbol</string>
     <string name="fab_cd_markers_routes">Markers &amp; Routes</string>
@@ -1062,4 +1063,9 @@
     <string name="fab_positions_reset">FAB positions reset</string>
     <string name="map_drawing_saved">Drawings saved</string>
     <string name="map_db_not_ready_retry">Map database not ready — please tap again to retry.</string>
-</resources>
+<string name="app_name">Checklist-Interactive</string>
+
+    
+    
+    
+    </resources>
