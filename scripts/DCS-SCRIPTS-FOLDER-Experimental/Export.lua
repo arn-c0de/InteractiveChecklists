@@ -8,7 +8,7 @@ pcall(function()
 	local COMMAND_PATH = writeDir .. [[Scripts\forwarder_command.json]]
 	local DEBUG_DUMP_TABLES = true -- set to false to disable table debug dumps
 	local dumped_tables = {}
-	local UPDATE_INTERVAL = 0.1 -- seconds (10 Hz update rate)
+	local UPDATE_INTERVAL = 0.01 -- seconds (10 Hz update rate)
 	local lastWrite = 0
 	local lastCommandCheck = 0
 	local COMMAND_CHECK_INTERVAL = 2.0 -- check for command file every 2 seconds

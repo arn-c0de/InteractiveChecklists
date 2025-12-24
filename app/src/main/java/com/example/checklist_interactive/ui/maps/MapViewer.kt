@@ -289,7 +289,7 @@ fun MapViewer(
         flightPathRepository?.let { repo ->
             // Observe recording state
             repo.isRecordingEnabled.collect { enabled ->
-                mapState.flightPathEnabled = enabled
+                mapState.flightPathRecording = enabled
                 android.util.Log.d("MapViewer", "Flight path recording: $enabled")
             }
         }
@@ -460,11 +460,30 @@ fun MapViewer(
                                 mv.overlays.add(0, newPolyline)
                                 mapState.flightPathPolyline = newPolyline
                             }
+                            
+                            // Add/update start point marker
+                            if (mapState.flightPathStartMarker == null) {
+                                val startMarker = Marker(mv).apply {
+                                    position = points.first()
+                                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                    title = context.getString(R.string.map_flight_path_start)
+                                    snippet = "Start Point"
+                                    // Use generated plane bitmap drawable (green) so we don't rely on an external resource
+                                    icon = createPlaneDrawable(context, 20f, android.graphics.Color.parseColor("#4CAF50"))
+                                }
+                                mv.overlays.add(startMarker)
+                                mapState.flightPathStartMarker = startMarker
+                            } else {
+                                mapState.flightPathStartMarker?.position = points.first()
+                            }
+                            
                             mv.invalidate()
                         } else {
                             // Points exist in DB but < 2 - remove polyline
                             mapState.flightPathPolyline?.let { mv.overlays.remove(it) }
                             mapState.flightPathPolyline = null
+                            mapState.flightPathStartMarker?.let { mv.overlays.remove(it) }
+                            mapState.flightPathStartMarker = null
                             mv.invalidate()
                         }
                     }
@@ -476,6 +495,8 @@ fun MapViewer(
             // Path disabled or no points - remove polyline from map
             mapState.flightPathPolyline?.let { mv.overlays.remove(it) }
             mapState.flightPathPolyline = null
+            mapState.flightPathStartMarker?.let { mv.overlays.remove(it) }
+            mapState.flightPathStartMarker = null
             mv.invalidate()
             android.util.Log.d("MapViewer", "Flight path polyline removed (disabled or cleared)")
         }
@@ -1233,29 +1254,38 @@ fun MapViewer(
                                                     val rawY = ev.rawY.toInt()
                                                     var nearestMarker: org.osmdroid.views.overlay.Marker? = null
                                                     var bestDist2 = Int.MAX_VALUE
-                                                    val radiusPx = (with(density) { 40.dp.toPx() }).toInt()
+                                                    val radiusPx = (with(density) { 30.dp.toPx() }).toInt() // Reduced from 40dp to 30dp
+                                                    
+                                                    Log.d(TAG, "Long-press detection: touch=($touchX,$touchY) radiusPx=$radiusPx overlays=${overlays.size}")
+                                                    Log.d(TAG, "Excluded markers: posMarker=${mapState.positionMarker} startMarker=${mapState.flightPathStartMarker}")
 
                                                     for (o in overlays) {
-                                                        if (o is org.osmdroid.views.overlay.Marker && o != mapState.positionMarker) {
+                                                        // Exclude position marker and flight path start marker from long-press detection
+                                                        if (o is org.osmdroid.views.overlay.Marker) {
+                                                            val isExcluded = (o == mapState.positionMarker || o == mapState.flightPathStartMarker)
                                                             val p = android.graphics.Point()
                                                             projection.toPixels(o.position, p)
                                                             val dx = p.x - touchX
                                                             val dy = p.y - touchY
                                                             val dist2 = dx * dx + dy * dy
-                                                            Log.d(TAG, "marker candidate at screen=(${p.x},${p.y}) dx=$dx dy=$dy dist2=$dist2")
-                                                            if (dist2 < bestDist2 && dist2 <= radiusPx * radiusPx) {
+                                                            val distPx = kotlin.math.sqrt(dist2.toDouble()).toInt()
+                                                            Log.d(TAG, "  marker '${o.title}' at screen=(${p.x},${p.y}) distPx=$distPx excluded=$isExcluded")
+                                                            
+                                                            if (!isExcluded && dist2 < bestDist2 && dist2 <= radiusPx * radiusPx) {
                                                                 bestDist2 = dist2
                                                                 nearestMarker = o
+                                                                Log.d(TAG, "    -> NEW NEAREST (distPx=$distPx)")
                                                             }
                                                         }
                                                     }
+                                                    
+                                                    Log.d(TAG, "Long-press result: nearestMarker=${nearestMarker?.title} bestDistPx=${kotlin.math.sqrt(bestDist2.toDouble()).toInt()}")
 
-                                                    if (nearestMarker != null) {
-                                                        // Marker found - show marker radial menu
-                                                        val nm = nearestMarker
-                                                        // Prefer mapping lookup; fall back to relatedObject
-                                                        val loc = markerToLocation[nm] ?: try { nm.relatedObject as? com.example.checklist_interactive.data.tactical.LocationEntity } catch (_: Throwable) { null }
-                                                        
+                                                    val nm = nearestMarker
+                                                    val loc = if (nm != null) markerToLocation[nm] ?: try { nm.relatedObject as? com.example.checklist_interactive.data.tactical.LocationEntity } catch (_: Throwable) { null } else null
+
+                                                    if (nm != null && loc != null) {
+                                                        // Marker found and is a real LocationEntity - show marker radial menu
                                                         // Use raw screen coords for popup placement (more reliable across window insets)
                                                         val screenX = rawX
                                                         val screenY = rawY
@@ -1313,17 +1343,10 @@ fun MapViewer(
                                                             Log.d(TAG, "Long-press found nearest marker but could not resolve LocationEntity")
                                                         }
                                                     } else {
-                                                        // No marker found - show drawing radial menu
-                                                        Log.d(TAG, "Long-press without marker - showing drawing menu")
-                                                        // Use raw screen coordinates for popup placement
+                                                        // No real marker found - show drawing radial menu
+                                                        Log.d(TAG, "Long-press: no LocationEntity, showing drawing radial menu")
                                                         val windowX = rawX
                                                         val windowY = rawY
-                                                        val mapLoc = IntArray(2)
-                                                        this@apply.getLocationInWindow(mapLoc)
-                                                        val screenLoc = IntArray(2)
-                                                        this@apply.getLocationOnScreen(screenLoc)
-                                                        Log.d(TAG, "Coord conversion (no marker): rawScreen=($rawX,$rawY) mapInWindow=(${mapLoc[0]},${mapLoc[1]}) mapOnScreen=(${screenLoc[0]},${screenLoc[1]}) -> window=($windowX,$windowY)")
-                                                        
                                                         scope.launch {
                                                             mapState.radialMenuMarker = null
                                                             mapState.radialMenuX = windowX
@@ -2250,6 +2273,7 @@ fun MapViewer(
             mgrsGridEnabled = mapState.mgrsGridEnabled,
             flightInstrumentsEnabled = mapState.flightInstrumentsEnabled,
             flightPathEnabled = mapState.flightPathEnabled,
+            flightPathRecording = mapState.flightPathRecording,
             flightPathPointCount = mapState.flightPathPointCount,
             flightPathIntervalSeconds = mapState.flightPathIntervalSeconds,
             onDismiss = { mapState.showOverlayDialog = false },
@@ -2326,16 +2350,29 @@ fun MapViewer(
                 prefsManager.setMapOverlayFlightInstrumentsEnabled(enabled)
             },
             onToggleFlightPath = { enabled ->
+                mapState.flightPathEnabled = enabled
+                prefsManager.setFlightPathEnabled(enabled)
+            },
+            onStartTracking = {
                 scope.launch {
-                    flightPathRepository?.setRecordingEnabled(enabled)
+                    flightPathRepository?.setRecordingEnabled(true)
+                }
+            },
+            onPauseTracking = {
+                scope.launch {
+                    flightPathRepository?.setRecordingEnabled(false)
                 }
             },
             onClearFlightPath = {
-                // Immediately remove polyline from map (don't wait for coroutine)
+                // Immediately remove polyline and start marker from map
                 mapState.flightPathPolyline?.let { polyline ->
                     mapState.mapView?.overlays?.remove(polyline)
                 }
                 mapState.flightPathPolyline = null
+                mapState.flightPathStartMarker?.let { marker ->
+                    mapState.mapView?.overlays?.remove(marker)
+                }
+                mapState.flightPathStartMarker = null
                 mapState.flightPathPointCount = 0
                 mapState.mapView?.invalidate()
                 
