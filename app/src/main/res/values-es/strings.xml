@@ -696,6 +696,33 @@
     <string name="datapad_clouds">Nubes</string>
     <string name="datapad_not_available">No disponible</string>
 
+    <string name="datapad_packet_timing">Packet timing: %1$dms / %2$dms / %3$dms (min/avg/max)</string>
+    <string name="datapad_temperature_c_f">%.1f°C (%.1f°F)</string>
+    <string name="datapad_pressure_hpa_inhg">%.1f hPa (%.2f inHg)</string>
+    <string name="datapad_wind_speed_ms_kts">%.1f m/s (%.1f kt)</string>
+    <string name="datapad_direction_deg">%.1f°</string>
+    <string name="datapad_visibility_m_nm">%.0f m (%.1f nm)</string>
+    <string name="datapad_aoa_deg">%.2f°</string>
+    <string name="datapad_g_load_unit">%.2f G</string>
+    <string name="datapad_percent_format">%.1f%%</string>
+    <string name="datapad_temp_c_format">%.0f°C</string>
+    <string name="datapad_mass_kg_format">%.0f kg</string>
+    <string name="datapad_percent_format_int">%.0f%%</string>
+    <string name="datapad_altitude_m_format">%.1f m</string>
+    <string name="datapad_heading_deg_format">%.1f°</string>
+    <string name="datapad_angle_deg_format">%.2f°</string>
+    <string name="datapad_vs_ms_fpm">%.2f m/s (%.0f ft/min)</string>
+    <string name="datapad_unit_details_format">%1$s • %2$s</string>
+    <string name="datapad_distance_m_format_int">%.0f m</string>
+    <string name="datapad_na_symbol">?</string>
+    <string name="datapad_rwr_contact_format">%1$s %2$s • %3$s %4$s</string>
+    <string name="datapad_azimuth_deg_format">%.0f°</string>
+    <string name="datapad_speed_ms_kts">%.1f m/s (%.1f kt)</string>
+    <string name="datapad_range_m_format">%.0f m</string>
+    <string name="datapad_na_value">--</string>
+    <string name="datapad_time_format_hms">%02d:%02d:%02d</string>
+    <string name="datapad_last_heartbeat_with_bullet">• Last heartbeat: %1$s</string>
+
     <string name="datapad_settings_title">Ajustes DataPad</string>
     <string name="datapad_settings_udp_port">Puerto UDP</string>
     <string name="datapad_settings_udp_port_placeholder">5010</string>
@@ -704,6 +731,11 @@
     <string name="datapad_settings_bind_ip_placeholder">0.0.0.0 (todas interfaces)</string>
     <string name="datapad_settings_bind_ip_hint">Vacío = escuchar en todas</string>
     <string name="datapad_settings_save_restart">Guardar y Reiniciar</string>
+
+    <string name="datapad_public_key_label">Public Key (Base64)</string>
+    <string name="datapad_cd_copy_public_key">Copy public key</string>
+    <string name="datapad_public_key_copied_feedback">Public key copied to clipboard ✅</string>
+    <string name="datapad_public_key_copy_hint">Copy this Base64 public key into the server\'s authorized_devices.json entry</string>
 
     <string name="files_in_folder">Archivos en: %1$s</string>
     <string name="select_another_folder">Seleccionar otra carpeta</string>
@@ -948,4 +980,21 @@
     <string name="mini_status_bar_battery_level">Nivel de batería %1$d por ciento</string>
     <string name="mini_status_bar_position_ok">Posición OK</string>
     <string name="mini_status_bar_interarrival_stats">%1$d/%2$d/%3$dms</string>
+
+    <!-- Map Drawing Tools -->
+    <string name="map_drawing_tools_title">Drawing Tools</string>
+    <string name="map_drawing_active">✓ Drawing active</string>
+    <string name="map_drawing_close_cd">Close</string>
+    <string name="map_drawing_brush_type">Brush Type</string>
+    <string name="map_drawing_brush_pen">Pen</string>
+    <string name="map_drawing_brush_marker">Marker</string>
+    <string name="map_drawing_brush_eraser">Eraser</string>
+    <string name="map_drawing_color">Color</string>
+    <string name="map_drawing_eraser_size">Eraser Size</string>
+    <string name="map_drawing_brush_size">Brush Size</string>
+    <string name="map_drawing_clear_all_cd">Clear All</string>
+    <string name="map_drawing_clear">Clear</string>
+    <string name="map_drawing_save_cd">Save</string>
+    <string name="map_drawing_save">Save</string>
+    <string name="map_drawing_color_selected_cd">Selected</string>
 </resources>
