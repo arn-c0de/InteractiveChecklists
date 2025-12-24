@@ -1095,8 +1095,12 @@
     <string name="map_overlay_flight_path_desc">Record and display aircraft position history</string>
     <string name="map_overlay_flight_path_points">%d points recorded</string>
     <string name="map_overlay_flight_path_clear">Clear Path</string>
+    <string name="map_overlay_flight_path_start">Start Tracking</string>
+    <string name="map_overlay_flight_path_pause">Pause Tracking</string>
     <string name="map_overlay_flight_path_interval">Recording interval</string>
     <string name="map_overlay_flight_path_interval_desc">Record position every %d seconds</string>
+    <string name="map_flight_path_start">Start Point</string>
+    <string name="map_flight_path_cleared">Flight path cleared</string>
 
     <!-- Map Marker Management -->
     <string name="map_search_markers_placeholder">Search markers</string>

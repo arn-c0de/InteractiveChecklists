@@ -62,10 +62,12 @@ class MapViewerState(
     var flightInstrumentsEnabled by mutableStateOf(prefsManager.isMapOverlayFlightInstrumentsEnabled())
     
     // Flight path tracking state
-    var flightPathEnabled by mutableStateOf(false)
+    var flightPathEnabled by mutableStateOf(prefsManager.isFlightPathEnabled())
+    var flightPathRecording by mutableStateOf(false)
     var flightPathPointCount by mutableStateOf(0)
-    var flightPathIntervalSeconds by mutableStateOf(2)
+    var flightPathIntervalSeconds by mutableStateOf(prefsManager.getFlightPathIntervalSeconds())
     var flightPathPolyline by mutableStateOf<Polyline?>(null)
+    var flightPathStartMarker by mutableStateOf<Marker?>(null)
     
     // Overlay instances
     var compassOverlay by mutableStateOf<Overlay?>(null)

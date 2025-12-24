@@ -26,6 +26,7 @@ fun OverlaySelectionDialog(
     mgrsGridEnabled: Boolean,
     flightInstrumentsEnabled: Boolean,
     flightPathEnabled: Boolean,
+    flightPathRecording: Boolean,
     flightPathPointCount: Int,
     flightPathIntervalSeconds: Int,
     onDismiss: () -> Unit,
@@ -35,6 +36,8 @@ fun OverlaySelectionDialog(
     onToggleMgrsGrid: (Boolean) -> Unit,
     onToggleFlightInstruments: (Boolean) -> Unit,
     onToggleFlightPath: (Boolean) -> Unit,
+    onStartTracking: () -> Unit,
+    onPauseTracking: () -> Unit,
     onClearFlightPath: () -> Unit,
     onChangeFlightPathInterval: (Int) -> Unit
 ) {
@@ -139,6 +142,29 @@ fun OverlaySelectionDialog(
                                     Text("${seconds}s", style = MaterialTheme.typography.labelSmall)
                                 }
                             }
+                        }
+                    }
+                }
+
+                // Start/Pause Tracking Buttons
+                if (flightPathEnabled) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = onStartTracking,
+                            enabled = !flightPathRecording,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(stringResource(R.string.map_overlay_flight_path_start))
+                        }
+                        OutlinedButton(
+                            onClick = onPauseTracking,
+                            enabled = flightPathRecording,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(stringResource(R.string.map_overlay_flight_path_pause))
                         }
                     }
                 }
