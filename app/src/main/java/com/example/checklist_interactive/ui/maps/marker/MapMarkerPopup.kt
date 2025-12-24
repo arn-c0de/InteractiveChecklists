@@ -28,6 +28,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import com.example.checklist_interactive.R
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
@@ -274,14 +276,14 @@ fun MapMarkerPopup(
                         }
 
                         IconButton(onClick = onClose) {
-                            Icon(Icons.Default.Close, contentDescription = "Close")
+                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_close))
                         }
                     }
                 }
 
                 AnimatedVisibility(visible = showOpacitySlider, enter = fadeIn(), exit = fadeOut()) {
                     Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 8.dp)) {
-                        Text(text = "Transparency: ${(sheetOpacity * 100).toInt()}%", style = MaterialTheme.typography.labelSmall)
+                        Text(text = stringResource(R.string.map_nav_transparency) + ": ${(sheetOpacity * 100).toInt()}%", style = MaterialTheme.typography.labelSmall)
                         Slider(
                             value = sheetOpacity,
                             onValueChange = { sheetOpacity = it },
@@ -293,31 +295,50 @@ fun MapMarkerPopup(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
+                // Extract string resources before remember block
+                val strMarkerType = stringResource(R.string.map_marker_type)
+                val strIcao = stringResource(R.string.map_marker_icao)
+                val strIata = stringResource(R.string.map_marker_iata)
+                val strCountry = stringResource(R.string.map_marker_country)
+                val strRegion = stringResource(R.string.map_marker_region)
+                val strTimezone = stringResource(R.string.map_marker_timezone)
+                val strElevation = stringResource(R.string.map_marker_elevation)
+                val strUnit = stringResource(R.string.map_marker_unit)
+                val strThreat = stringResource(R.string.map_marker_threat)
+                val strStrength = stringResource(R.string.map_marker_strength)
+                val strSource = stringResource(R.string.map_marker_source)
+                val strVerified = stringResource(R.string.map_marker_verified)
+                val strVerifiedYes = stringResource(R.string.map_marker_verified_yes)
+                val strVerifiedNo = stringResource(R.string.map_marker_verified_no)
+                val strVerifiedAt = stringResource(R.string.map_marker_verified_at)
+                val strTags = stringResource(R.string.map_marker_tags)
+                val strRunways = stringResource(R.string.map_marker_runways)
+
                 // Info grid (two columns) — expanded to include tactical/admin metadata, source and tags
-                val infoItems = remember(location, runways) {
+                val infoItems = remember(location, runways, strMarkerType, strIcao, strIata, strCountry, strRegion, strTimezone, strElevation, strUnit, strThreat, strStrength, strSource, strVerified, strVerifiedYes, strVerifiedNo, strVerifiedAt, strTags, strRunways) {
                     mutableListOf<Pair<String, String>>().apply {
                         // Basic identifiers
-                        location.markerType?.takeIf { it.isNotEmpty() }?.let { add("Type" to it.replace('_', ' ')) }
-                        location.icao?.takeIf { it.isNotEmpty() }?.let { add("ICAO" to it) }
-                        location.iata?.takeIf { it.isNotEmpty() }?.let { add("IATA" to it) }
+                        location.markerType?.takeIf { it.isNotEmpty() }?.let { add(strMarkerType to it.replace('_', ' ')) }
+                        location.icao?.takeIf { it.isNotEmpty() }?.let { add(strIcao to it) }
+                        location.iata?.takeIf { it.isNotEmpty() }?.let { add(strIata to it) }
 
                         // Geography / admin
-                        location.country?.takeIf { it.isNotEmpty() }?.let { add("Country" to it) }
-                        location.region?.takeIf { it.isNotEmpty() }?.let { add("Region" to it) }
-                        location.timezone?.takeIf { it.isNotEmpty() }?.let { add("Timezone" to it) }
+                        location.country?.takeIf { it.isNotEmpty() }?.let { add(strCountry to it) }
+                        location.region?.takeIf { it.isNotEmpty() }?.let { add(strRegion to it) }
+                        location.timezone?.takeIf { it.isNotEmpty() }?.let { add(strTimezone to it) }
 
                         // Elevation
-                        location.elevationM?.let { add("Elevation" to "${it} m") }
+                        location.elevationM?.let { add(strElevation to context.getString(R.string.map_marker_elevation_m, String.format(java.util.Locale.getDefault(), "%.0f", it))) }
 
                         // Tactical / unit fields (if present)
-                        location.unitType?.takeIf { it.isNotEmpty() }?.let { add("Unit" to it) }
-                        location.threatLevel?.let { add("Threat" to it.toString()) }
-                        location.strength?.let { add("Strength" to it.toString()) }
+                        location.unitType?.takeIf { it.isNotEmpty() }?.let { add(strUnit to it) }
+                        location.threatLevel?.let { add(strThreat to it.toString()) }
+                        location.strength?.let { add(strStrength to it.toString()) }
 
                         // Source and verification
-                        location.source?.takeIf { it.isNotEmpty() }?.let { add("Source" to it) }
-                        location.verified?.let { add("Verified" to if (it == 1) "yes" else "no") }
-                        location.lastVerifiedAt?.takeIf { it.isNotEmpty() }?.let { add("Verified at" to it) }
+                        location.source?.takeIf { it.isNotEmpty() }?.let { add(strSource to it) }
+                        location.verified?.let { add(strVerified to if (it == 1) strVerifiedYes else strVerifiedNo) }
+                        location.lastVerifiedAt?.takeIf { it.isNotEmpty() }?.let { add(strVerifiedAt to it) }
 
                         // Tags (try JSON array, fallback to comma-separated string)
                         location.tags?.takeIf { it.isNotEmpty() }?.let { rawTags ->
@@ -327,11 +348,11 @@ fun MapMarkerPopup(
                             } catch (_: Exception) {
                                 rawTags.split(',').map { it.trim() }.filter { it.isNotEmpty() }
                             }
-                            if (parsed.isNotEmpty()) add("Tags" to parsed.joinToString(", "))
+                            if (parsed.isNotEmpty()) add(strTags to parsed.joinToString(", "))
                         }
 
                         // Runways count if provided by the caller
-                        if (runways.isNotEmpty()) add("Runways" to runways.size.toString())
+                        if (runways.isNotEmpty()) add(strRunways to runways.size.toString())
                     }
                 }
 
@@ -374,7 +395,7 @@ fun MapMarkerPopup(
 
                 if (freqs.isNotEmpty() || (!location.frequencies.isNullOrEmpty())) {
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text(text = "Frequencies", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(text = stringResource(R.string.map_marker_frequencies), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(6.dp))
 
                     if (freqs.isNotEmpty()) {
@@ -395,7 +416,7 @@ fun MapMarkerPopup(
                 // Runways - compact cards list
                 if (runways.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text(text = "Runways", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(text = stringResource(R.string.map_marker_runways), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -409,22 +430,22 @@ fun MapMarkerPopup(
                                 Column(modifier = Modifier.padding(12.dp)) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text(text = rw.name, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                                        val length = rw.lengthM?.toString() ?: rw.lengthFt?.toString() ?: "?"
-                                        Text(text = "${length} m", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        val length = rw.lengthM?.toString() ?: rw.lengthFt?.toString() ?: stringResource(R.string.datapad_na_symbol)
+                                        Text(text = stringResource(R.string.map_marker_elevation_m, length), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
 
                                     Spacer(modifier = Modifier.height(6.dp))
 
                                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                        Text(text = rw.surface ?: "unknown", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Text(text = "HDG: ${rw.headingDeg?.let { String.format("%.0f°", it) } ?: "n/a"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(text = rw.surface ?: stringResource(R.string.datapad_not_available), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(text = stringResource(R.string.map_marker_hdg_format, rw.headingDeg?.let { String.format("%.0f°", it) } ?: stringResource(R.string.map_marker_hdg_na)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                                         if (!rw.ilsFrequency.isNullOrEmpty()) {
-                                            AssistChip(onClick = { /*noop*/ }, label = { Text(text = "ILS ${rw.ilsFrequency}") })
+                                            AssistChip(onClick = { /*noop*/ }, label = { Text(text = stringResource(R.string.map_marker_ils_format, rw.ilsFrequency)) })
                                         }
 
                                         if (rw.hasLighting == 1) {
-                                            AssistChip(onClick = { /*noop*/ }, label = { Text(text = "Lighting") })
+                                            AssistChip(onClick = { /*noop*/ }, label = { Text(text = stringResource(R.string.map_marker_lighting)) })
                                         }
                                     }
 
@@ -442,11 +463,11 @@ fun MapMarkerPopup(
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = onManage, modifier = Modifier.weight(1f)) {
-                        Text("Manage")
+                        Text(stringResource(R.string.map_marker_manage))
                     }
 
                     Button(onClick = onClose, modifier = Modifier.weight(1f)) {
-                        Text("Close")
+                        Text(stringResource(R.string.action_close))
                     }
                 }
             }

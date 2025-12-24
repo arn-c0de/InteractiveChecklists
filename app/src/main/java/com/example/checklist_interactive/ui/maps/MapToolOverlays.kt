@@ -131,7 +131,7 @@ class CompassOverlay : Overlay() {
             canvas?.drawLine(innerX, innerY, outerX, outerY, majorTickPaint)
 
             if (a % 90 == 0) {
-                val label = "$a°"
+                val label = String.format(mapView.context.getString(com.example.checklist_interactive.R.string.map_label_degrees), a)
                 val lx = centerPt.x + (dx * 0.8f)
                 val ly = centerPt.y + (dy * 0.8f)
                 canvas?.drawText(label, lx, ly, labelSize)
@@ -150,7 +150,7 @@ class CompassOverlay : Overlay() {
         canvas?.drawCircle(centerPt.x + dxH, centerPt.y + dyH, 8f, outlinePaint)
         
         // Label with heading near the marker
-        val label = "HDG ${headingNorm}°"
+        val label = String.format(mapView.context.getString(com.example.checklist_interactive.R.string.map_label_hdg_degrees), headingNorm)
         val labelX = centerPt.x + (dxH * 1.25f)
         val labelY = centerPt.y + (dyH * 1.25f)
         // Draw shadow for readability
@@ -331,7 +331,7 @@ class RangeRingsOverlay : Overlay() {
             canvas?.drawCircle(centerPt.x.toFloat(), centerPt.y.toFloat(), radiusPx, paint)
             // label at rightmost point
             val nm = (meters / 1852.0).toInt()
-            val label = "%d NM".format(nm)
+            val label = String.format(mapView.context.getString(com.example.checklist_interactive.R.string.map_label_nm), nm)
             canvas?.drawText(label, centerPt.x + radiusPx + 6f, centerPt.y.toFloat() - 6f - (idx * 18), textPaint)
             if (idx == distances.lastIndex) outerRadiusPx = radiusPx
         }
@@ -360,7 +360,7 @@ class RangeRingsOverlay : Overlay() {
                 canvas?.drawLine(innerX, innerY, centerPt.x + dx, centerPt.y + dy, tickPaint)
                 
                 if (a % 60 == 0 && a !in cardinals) {
-                    val label = "${a}°"
+                    val label = String.format(mapView.context.getString(com.example.checklist_interactive.R.string.map_label_degrees), a)
                     canvas?.drawText(label, centerPt.x + (dx * 1.12f), centerPt.y + (dy * 1.12f), smallText)
                 }
             }
@@ -387,7 +387,7 @@ class RangeRingsOverlay : Overlay() {
 
             val hx = centerPt.x + (Math.sin(hRad) * headingRadius).toFloat()
             val hy = centerPt.y + (-Math.cos(hRad) * headingRadius).toFloat()
-            val headingLabel = "${headingNorm}°"
+            val headingLabel = String.format(mapView.context.getString(com.example.checklist_interactive.R.string.map_label_degrees), headingNorm)
             // Draw a highlighted radial for heading (slightly transparent)
             canvas?.drawLine(centerPt.x.toFloat(), centerPt.y.toFloat(), hx, hy, headingLinePaint)
 

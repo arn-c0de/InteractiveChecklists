@@ -69,16 +69,16 @@ fun OverlaySelectionDialog(
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Column {
-                        Text("MGRS Grid", style = MaterialTheme.typography.bodyMedium)
-                        Text("Military Grid Reference System overlay", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.map_overlay_mgrs_grid), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.map_overlay_mgrs_grid_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(checked = mgrsGridEnabled, onCheckedChange = onToggleMgrsGrid)
                 }
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Column {
-                        Text("Flight Instruments", style = MaterialTheme.typography.bodyMedium)
-                        Text("Live attitude and turn indicators (drag to reposition)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.map_overlay_flight_instruments), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.map_overlay_flight_instruments_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(checked = flightInstrumentsEnabled, onCheckedChange = onToggleFlightInstruments)
                 }

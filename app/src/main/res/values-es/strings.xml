@@ -997,4 +997,69 @@
     <string name="map_drawing_save_cd">Save</string>
     <string name="map_drawing_save">Save</string>
     <string name="map_drawing_color_selected_cd">Selected</string>
+
+    <!-- Map Overlays -->
+    <string name="map_overlay_mgrs_grid">MGRS Grid</string>
+    <string name="map_overlay_mgrs_grid_desc">Military Grid Reference System overlay</string>
+    <string name="map_overlay_flight_instruments">Flight Instruments</string>
+    <string name="map_overlay_flight_instruments_desc">Live attitude and turn indicators (drag to reposition)</string>
+
+    <!-- Map Marker Management -->
+    <string name="map_search_markers_placeholder">Search markers</string>
+    <string name="map_frequency_placeholder">118.50</string>
+    <string name="map_marker_manage">Manage</string>
+
+    <string name="map_marker_type">Type</string>
+    <string name="map_marker_icao">ICAO</string>
+    <string name="map_marker_iata">IATA</string>
+    <string name="map_marker_country">Country</string>
+    <string name="map_marker_region">Region</string>
+    <string name="map_marker_timezone">Timezone</string>
+    <string name="map_marker_elevation">Elevation</string>
+    <string name="map_marker_unit">Unit</string>
+    <string name="map_marker_threat">Threat</string>
+    <string name="map_marker_strength">Strength</string>
+    <string name="map_marker_source">Source</string>
+    <string name="map_marker_verified">Verified</string>
+    <string name="map_marker_verified_at">Verified at</string>
+    <string name="map_marker_tags">Tags</string>
+    <string name="map_marker_runways">Runways</string>
+    <string name="map_marker_frequencies">Frequencies</string>
+    <string name="map_marker_elevation_m">%s m</string>
+    <string name="map_marker_hdg_format">HDG: %s</string>
+    <string name="map_marker_ils_format">ILS %s</string>
+    <string name="map_marker_lighting">Lighting</string>
+    <string name="map_marker_verified_yes">yes</string>
+    <string name="map_marker_verified_no">no</string>
+    <string name="map_marker_hdg_na">n/a</string>
+
+    <!-- Map Radial Menu -->
+    <string name="map_radial_menu_info">Info</string>
+    <string name="map_radial_menu_edit">Edit</string>
+    <string name="map_radial_menu_navigate">Navigate</string>
+    <string name="map_radial_menu_delete">Delete</string>
+    <string name="map_label_degrees">%s°</string>
+    <string name="map_label_hdg_degrees">HDG %s°</string>
+    <string name="map_label_nm">%d NM</string>
+    <string name="map_radial_menu_scale">scale</string>
+    <string name="map_radial_menu_alpha">alpha</string>
+    <string name="map_radial_menu_brush">Brush</string>
+    <string name="map_radial_menu_color">Color</string>
+    <string name="map_radial_menu_eraser">Eraser</string>
+
+    <!-- FAB Content Descriptions -->
+    <string name="fab_cd_center_on_position">Center on position</string>
+    <string name="fab_cd_add_military_symbol">Add Military Symbol</string>
+    <string name="fab_cd_markers_routes">Markers &amp; Routes</string>
+    <string name="fab_cd_toggle_map_rotation">Toggle map rotation</string>
+    <string name="fab_cd_toggle_rotation_gesture">Toggle 2-finger rotation gesture</string>
+    <string name="fab_cd_quick_tab_switch">Quick tab switch</string>
+    <string name="fab_cd_open_menu">Open menu</string>
+    <string name="fab_cd_reset_zoom">Reset Zoom</string>
+    <string name="fab_cd_file_list">File List</string>
+    <string name="fab_cd_menu">Menu</string>
+
+    <string name="fab_positions_reset">FAB positions reset</string>
+    <string name="map_drawing_saved">Drawings saved</string>
+    <string name="map_db_not_ready_retry">Map database not ready — please tap again to retry.</string>
 </resources>

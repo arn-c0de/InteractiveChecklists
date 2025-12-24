@@ -420,7 +420,7 @@ fun MarkerRouteManagementSheet(
                                     }
                                 }
                             },
-                            placeholder = { Text("Search markers") },
+                            placeholder = { Text(stringResource(R.string.map_search_markers_placeholder)) },
                             singleLine = true
                         )
 
@@ -1263,7 +1263,7 @@ fun LocationEditDialog(
                                                             editRunways[idx] = rw.copy(ilsFrequency = filtered)
                                                         },
                                                         label = { Text(stringResource(R.string.map_runway_ils_mhz_label)) },
-                                                        placeholder = { Text("118.50") },
+                                                        placeholder = { Text(stringResource(R.string.map_frequency_placeholder)) },
                                                         modifier = Modifier.fillMaxWidth(),
                                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                                                     )
@@ -1642,12 +1642,12 @@ fun RouteEditDialog(
                 },
                 enabled = name.isNotBlank()
             ) {
-                Text("Save")
+                Text(stringResource(R.string.action_save))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.action_cancel))
             }
         }
     )
