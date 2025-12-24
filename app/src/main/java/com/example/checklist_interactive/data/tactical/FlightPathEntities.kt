@@ -11,7 +11,10 @@ import kotlinx.coroutines.flow.Flow
  * Entity representing a single point in the aircraft's flight path history
  * Used to render the flight path as a polyline on the map
  */
-@Entity(tableName = "flight_path_points")
+@Entity(
+    tableName = "flight_path_points",
+    indices = [androidx.room.Index(value = ["timestamp"])]
+)
 data class FlightPathPoint(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
