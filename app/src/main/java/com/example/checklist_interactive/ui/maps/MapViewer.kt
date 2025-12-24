@@ -436,9 +436,9 @@ fun MapViewer(
 
     // Flight path: Update polyline when new points are added (reactive updates)
     LaunchedEffect(mapState.flightPathPointCount, mapState.flightPathEnabled) {
+        val mv = mapState.mapView ?: return@LaunchedEffect
+        
         if (mapState.flightPathEnabled && mapState.flightPathPointCount > 0 && flightPathRepository != null) {
-            val mv = mapState.mapView ?: return@LaunchedEffect
-            
             scope.launch(Dispatchers.IO) {
                 try {
                     val points = flightPathRepository.getPathAsGeoPoints()
@@ -461,12 +461,23 @@ fun MapViewer(
                                 mapState.flightPathPolyline = newPolyline
                             }
                             mv.invalidate()
+                        } else {
+                            // Points exist in DB but < 2 - remove polyline
+                            mapState.flightPathPolyline?.let { mv.overlays.remove(it) }
+                            mapState.flightPathPolyline = null
+                            mv.invalidate()
                         }
                     }
                 } catch (e: Exception) {
                     android.util.Log.e("MapViewer", "Failed to update flight path: ${e.message}", e)
                 }
             }
+        } else {
+            // Path disabled or no points - remove polyline from map
+            mapState.flightPathPolyline?.let { mv.overlays.remove(it) }
+            mapState.flightPathPolyline = null
+            mv.invalidate()
+            android.util.Log.d("MapViewer", "Flight path polyline removed (disabled or cleared)")
         }
     }
 
@@ -2320,8 +2331,18 @@ fun MapViewer(
                 }
             },
             onClearFlightPath = {
+                // Immediately remove polyline from map (don't wait for coroutine)
+                mapState.flightPathPolyline?.let { polyline ->
+                    mapState.mapView?.overlays?.remove(polyline)
+                }
+                mapState.flightPathPolyline = null
+                mapState.flightPathPointCount = 0
+                mapState.mapView?.invalidate()
+                
+                // Clear database in background
                 scope.launch {
                     flightPathRepository?.clearPath()
+                    android.util.Log.d("MapViewer", "Flight path cleared - UI and DB reset")
                 }
             },
             onChangeFlightPathInterval = { seconds ->
