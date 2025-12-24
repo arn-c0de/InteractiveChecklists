@@ -8,15 +8,15 @@ pcall(function()
 	local COMMAND_PATH = writeDir .. [[Scripts\forwarder_command.json]]
 	local DEBUG_DUMP_TABLES = true -- set to false to disable table debug dumps
 	local dumped_tables = {}
-	local UPDATE_INTERVAL = 0.05 -- seconds (5 Hz update rate)
+	local UPDATE_INTERVAL = 0.05 -- seconds (10 Hz update rate)
 	local lastWrite = 0
 	local lastCommandCheck = 0
 	local COMMAND_CHECK_INTERVAL = 2.0 -- check for command file every 2 seconds
 	local STREAMER_VERSION = "1.0.5"
 	-- Maximum number of JSON lines to keep in the output file. Set to 0 to disable trimming.
-	local MAX_JSON_LINES = 500  -- Keep only last 500 lines (25 seconds @ 20 Hz)
+	local MAX_JSON_LINES = 100  -- Keep only last 100 lines (10 seconds @ 10 Hz) - reduced for faster cleanup
 	-- Trim interval: Only trim file periodically, NOT on every write (performance!)
-	local TRIM_INTERVAL = 30.0  -- Trim file every 30 seconds (not on every write!)
+	local TRIM_INTERVAL = 5.0  -- Trim file every 5 seconds (aggressive cleanup to prevent old data)
 	local lastTrim = 0
 	-- If true, clear the JSON/log/debug files once when the export starts
 	local CLEAR_ON_START = true
