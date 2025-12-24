@@ -148,6 +148,11 @@ fun MapViewer(
     // Create a coroutine scope for state updates from listeners
     val scope = rememberCoroutineScope()
 
+    // Extract string resources for use in non-composable contexts (lambdas)
+    val msgDbNotReady = stringResource(R.string.map_db_not_ready_retry)
+    val msgFabPositionsReset = stringResource(R.string.fab_positions_reset)
+    val msgDrawingSaved = stringResource(R.string.map_drawing_saved)
+
     // Density for dp<->px conversions needed by effects below
     val density = androidx.compose.ui.platform.LocalDensity.current
     
@@ -1033,7 +1038,7 @@ fun MapViewer(
                                                 Log.e(TAG, "TacticalDatabase is null, cannot save marker")
                                                 // Notify user that DB is not ready and leave the placement pending so they can try again
                                                 try {
-                                                    android.widget.Toast.makeText(context, "Kartendatenbank noch nicht bereit — bitte erneut tippen.", android.widget.Toast.LENGTH_SHORT).show()
+                                                    android.widget.Toast.makeText(context, msgDbNotReady, android.widget.Toast.LENGTH_SHORT).show()
                                                 } catch (_: Throwable) {
                                                     // ignore if Toast can't be shown (tests / preview)
                                                 }
@@ -1259,7 +1264,6 @@ fun MapViewer(
                     }
 
                     // Listen for user map interactions to persist center/zoom and disable auto-center when user moves map
-                    try {
                         val mapListener = object : org.osmdroid.events.MapListener {
                             override fun onScroll(event: org.osmdroid.events.ScrollEvent?): Boolean {
                                 val center = this@apply.mapCenter
@@ -1290,9 +1294,6 @@ fun MapViewer(
                             }
                         }
                         addMapListener(mapListener)
-                    } catch (e: Exception) {
-                        // osmdroid map listener not available - ignore
-                    }
                 }
             },
             modifier = Modifier
@@ -1580,7 +1581,7 @@ fun MapViewer(
                     // force re-read of saved positions for the DraggableFabs
                     try { fabLayoutResetTrigger = fabLayoutResetTrigger + 1 } catch (_: Throwable) {}
                     // quick feedback
-                    android.widget.Toast.makeText(context, "FAB-Positionen zurückgesetzt", android.widget.Toast.LENGTH_SHORT).show()
+                    android.widget.Toast.makeText(context, msgFabPositionsReset, android.widget.Toast.LENGTH_SHORT).show()
                 },
 
                 onDataPadOpen = { if (datapadEnabled) mapState.showDataPad = true },
@@ -1792,7 +1793,7 @@ fun MapViewer(
                     Text(text = "Move marker: ${mapState.pendingMoveTargetName ?: pendingMoveMarkerId}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
                     Spacer(modifier = Modifier.width(12.dp))
                     TextButton(onClick = { MapActionBus.clear() }) {
-                        Text("Cancel")
+                        Text(stringResource(R.string.action_cancel))
                     }
                 }
             }
@@ -1911,7 +1912,7 @@ fun MapViewer(
                 },
                 onSave = {
                     saveDrawings()
-                    android.widget.Toast.makeText(context, "Drawings saved", android.widget.Toast.LENGTH_SHORT).show()
+                    android.widget.Toast.makeText(context, msgDrawingSaved, android.widget.Toast.LENGTH_SHORT).show()
                 }
             )
         }

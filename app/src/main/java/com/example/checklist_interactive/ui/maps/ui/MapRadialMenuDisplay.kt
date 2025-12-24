@@ -8,6 +8,8 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import com.example.checklist_interactive.R
 import com.example.checklist_interactive.data.tactical.LocationRepository
 import com.example.checklist_interactive.ui.maps.MapViewerState
 import com.example.checklist_interactive.ui.maps.components.RadialMenu
@@ -87,6 +89,7 @@ fun MapRadialMenuDisplay(
 /**
  * Builds the list of radial menu items for marker interactions.
  */
+@Composable
 private fun buildMarkerMenuItems(
     mapState: MapViewerState,
     locationRepository: LocationRepository?,
@@ -96,7 +99,7 @@ private fun buildMarkerMenuItems(
         // Info button
         add(RadialMenuItem(
             icon = Icons.Default.Info,
-            label = "Info",
+            label = stringResource(R.string.map_radial_menu_info),
             onClick = {
                 mapState.selectedLocation = mapState.radialMenuMarker
                 mapState.showMarkerRouteManagement = true
@@ -106,7 +109,7 @@ private fun buildMarkerMenuItems(
         // Edit button
         add(RadialMenuItem(
             icon = Icons.Default.Edit,
-            label = "Edit",
+            label = stringResource(R.string.map_radial_menu_edit),
             onClick = {
                 mapState.selectedLocation = mapState.radialMenuMarker
                 mapState.showMarkerRouteManagement = true
@@ -116,7 +119,7 @@ private fun buildMarkerMenuItems(
         // Navigate button
         add(RadialMenuItem(
             icon = Icons.Default.Navigation,
-            label = "Navigate",
+            label = stringResource(R.string.map_radial_menu_navigate),
             onClick = {
                 mapState.radialMenuMarker?.let { marker ->
                     mapState.activeNavigationTarget = marker
@@ -128,7 +131,7 @@ private fun buildMarkerMenuItems(
         if (mapState.radialMenuMarker?.isStatic != 1) {
             add(RadialMenuItem(
                 icon = Icons.Default.Delete,
-                label = "Delete",
+                label = stringResource(R.string.map_radial_menu_delete),
                 onClick = {
                     mapState.radialMenuMarker?.let { marker ->
                         scope.launch {

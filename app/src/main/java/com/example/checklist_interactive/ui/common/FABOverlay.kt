@@ -12,7 +12,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.example.checklist_interactive.R
 import com.example.checklist_interactive.data.prefs.PreferencesManager
 
 /**
@@ -93,6 +95,7 @@ fun FABOverlay(
  * Standard FAB configurations for Map Viewer
  */
 object MapViewerFABs {
+    @Composable
     fun create(
         onCenterOnPosition: () -> Unit,
         onLayerSelection: () -> Unit,
@@ -124,7 +127,7 @@ object MapViewerFABs {
         FABConfig(
             id = "map_center",
             icon = Icons.Default.MyLocation,
-            contentDescription = "Center on position",
+            contentDescription = stringResource(R.string.fab_cd_center_on_position),
             onClick = onCenterOnPosition,
             containerColor = if (isConnected) containerColorConnected else containerColorDisconnected,
             defaultX = 0.95f,
@@ -134,7 +137,7 @@ object MapViewerFABs {
         FABConfig(
             id = "map_layers",
             icon = Icons.Default.Layers,
-            contentDescription = "Map layers",
+            contentDescription = stringResource(R.string.map_layers),
             onClick = onLayerSelection,
             containerColor = containerColorSecondary,
             defaultX = 0.95f,
@@ -144,7 +147,7 @@ object MapViewerFABs {
         FABConfig(
             id = "map_overlays",
             icon = Icons.Default.Flight,
-            contentDescription = "Map overlays",
+            contentDescription = stringResource(R.string.map_overlays),
             onClick = onOverlaySelection,
             containerColor = containerColorSecondary,
             defaultX = 0.95f,
@@ -154,7 +157,7 @@ object MapViewerFABs {
         FABConfig(
             id = "map_add_symbol",
             icon = Icons.Default.Add,
-            contentDescription = "Add Military Symbol",
+            contentDescription = stringResource(R.string.fab_cd_add_military_symbol),
             onClick = onAddMilitarySymbol,
             containerColor = if (pendingSymbolPlacement != null) containerColorPrimary 
                          else if (repositoriesReady) containerColorTertiary 
@@ -167,7 +170,7 @@ object MapViewerFABs {
         FABConfig(
             id = "map_marker_route",
             icon = Icons.Default.List,
-            contentDescription = "Markers & Routes",
+            contentDescription = stringResource(R.string.fab_cd_markers_routes),
             onClick = onMarkerRouteManagement,
             containerColor = if (repositoriesReady) containerColorTertiary else containerColorSurface,
             enabled = repositoriesReady,
@@ -178,7 +181,7 @@ object MapViewerFABs {
         FABConfig(
             id = "map_screen_lock",
             icon = if (isScreenLocked) Icons.Default.Lock else Icons.Default.LockOpen,
-            contentDescription = if (isScreenLocked) "Unlock screen" else "Lock screen",
+            contentDescription = if (isScreenLocked) stringResource(R.string.cd_unlock_screen) else stringResource(R.string.cd_lock_screen),
             onClick = onLockScreen,
             containerColor = if (isScreenLocked) containerColorPrimary else containerColorSurface,
             defaultX = 0.95f,
@@ -188,7 +191,7 @@ object MapViewerFABs {
         FABConfig(
             id = "map_rotate",
             icon = if (mapRotationMode == 1) Icons.Default.Flight else Icons.Default.Explore,
-            contentDescription = "Toggle map rotation",
+            contentDescription = stringResource(R.string.fab_cd_toggle_map_rotation),
             onClick = onToggleMapRotation,
             containerColor = if (mapRotationMode == 1) containerColorPrimary else containerColorSurface,
             defaultX = 0.95f,
@@ -198,7 +201,7 @@ object MapViewerFABs {
         FABConfig(
             id = "map_rotation_gesture",
             icon = Icons.Default.RotateRight,
-            contentDescription = "Toggle 2-finger rotation gesture",
+            contentDescription = stringResource(R.string.fab_cd_toggle_rotation_gesture),
             onClick = onToggleRotationGesture,
             containerColor = if (rotationGestureEnabled) containerColorPrimary else containerColorSurface,
             defaultX = 0.95f,
@@ -208,7 +211,7 @@ object MapViewerFABs {
         FABConfig(
             id = "map_drawing",
             icon = Icons.Default.Edit,
-            contentDescription = "Drawing Tools",
+            contentDescription = stringResource(R.string.map_drawing_tools_title),
             onClick = onDrawingTools,
             containerColor = if (isDrawingMode) containerColorPrimary else containerColorTertiary,
             defaultX = 0.95f,
@@ -218,7 +221,7 @@ object MapViewerFABs {
         FABConfig(
             id = "datapad",
             icon = Icons.Default.Flight,
-            contentDescription = "DataPad",
+            contentDescription = stringResource(R.string.datapad_title),
             onClick = onDataPadOpen,
             visible = datapadEnabled,
             containerColor = containerColorTertiary,
@@ -229,7 +232,7 @@ object MapViewerFABs {
         FABConfig(
             id = "quick_access",
             icon = Icons.AutoMirrored.Filled.NoteAdd,
-            contentDescription = "Quick Access",
+            contentDescription = stringResource(R.string.quick_access_title),
             onClick = onQuickAccessOpen,
             containerColor = containerColorPrimary,
             defaultX = 0.95f,
@@ -243,6 +246,7 @@ object MapViewerFABs {
  * Standard FAB configurations for Quick Tab Switcher
  */
 object QuickTabSwitcherFABs {
+    @Composable
     fun create(
         onQuickTabSwitch: () -> Unit,
         containerColor: Color
@@ -250,7 +254,7 @@ object QuickTabSwitcherFABs {
         FABConfig(
             id = "quick_tab_switch",
             icon = Icons.Default.History,
-            contentDescription = "Quick tab switch",
+            contentDescription = stringResource(R.string.fab_cd_quick_tab_switch),
             onClick = onQuickTabSwitch,
             containerColor = containerColor,
             defaultX = 0.9f,
@@ -263,6 +267,7 @@ object QuickTabSwitcherFABs {
  * Standard FAB configurations for Menu/Navigation
  */
 object MenuFABs {
+    @Composable
     fun create(
         onMenuOpen: () -> Unit,
         containerColor: Color
@@ -270,7 +275,7 @@ object MenuFABs {
         FABConfig(
             id = "menu",
             icon = Icons.Default.Menu,
-            contentDescription = "Open menu",
+            contentDescription = stringResource(R.string.fab_cd_open_menu),
             onClick = onMenuOpen,
             containerColor = containerColor,
             defaultX = 0.05f,
@@ -283,6 +288,7 @@ object MenuFABs {
  * Standard FAB configurations for Quick Access/Notes
  */
 object QuickAccessFABs {
+    @Composable
     fun create(
         onQuickAccessOpen: () -> Unit,
         containerColor: Color
@@ -290,7 +296,7 @@ object QuickAccessFABs {
         FABConfig(
             id = "quick_access",
             icon = Icons.Default.Note,
-            contentDescription = "Quick access",
+            contentDescription = stringResource(R.string.quick_access_title),
             onClick = onQuickAccessOpen,
             containerColor = containerColor,
             defaultX = 0.9f,
@@ -303,6 +309,7 @@ object QuickAccessFABs {
  * Standard FAB configurations for DataPad
  */
 object DataPadFABs {
+    @Composable
     fun create(
         onDataPadOpen: () -> Unit,
         containerColor: Color,
@@ -311,7 +318,7 @@ object DataPadFABs {
         FABConfig(
             id = "datapad",
             icon = Icons.Default.Tablet,
-            contentDescription = "DataPad",
+            contentDescription = stringResource(R.string.datapad_title),
             onClick = onDataPadOpen,
             containerColor = containerColor,
             visible = visible,
@@ -325,6 +332,7 @@ object DataPadFABs {
  * Standard FAB configurations for PDF Viewer
  */
 object PdfViewerFABs {
+    @Composable
     fun create(
         onZoomReset: () -> Unit,
         onMenuOpen: (() -> Unit)?,
@@ -340,7 +348,7 @@ object PdfViewerFABs {
             FABConfig(
                 id = "zoom_reset",
                 icon = Icons.Default.CenterFocusWeak,
-                contentDescription = "Reset Zoom",
+                contentDescription = stringResource(R.string.fab_cd_reset_zoom),
                 onClick = onZoomReset,
                 visible = zoomResetVisible,
                 defaultX = 0.95f,
@@ -354,7 +362,7 @@ object PdfViewerFABs {
                 FABConfig(
                     id = "menu",
                     icon = Icons.Default.Menu,
-                    contentDescription = "File List",
+                    contentDescription = stringResource(R.string.fab_cd_file_list),
                     onClick = onMenuOpen,
                     defaultX = 0.95f,
                     defaultY = 0.10f
@@ -367,7 +375,7 @@ object PdfViewerFABs {
             FABConfig(
                 id = "datapad",
                 icon = Icons.Default.Flight,
-                contentDescription = "DataPad",
+                contentDescription = stringResource(R.string.datapad_title),
                 onClick = onDataPadOpen,
                 visible = datapadEnabled,
                 containerColor = containerColorTertiary,
@@ -382,7 +390,7 @@ object PdfViewerFABs {
             FABConfig(
                 id = "quick_access",
                 icon = Icons.AutoMirrored.Filled.NoteAdd,
-                contentDescription = "Quick Access",
+                contentDescription = stringResource(R.string.quick_access_title),
                 onClick = onQuickAccessOpen,
                 containerColor = containerColorPrimary,
                 defaultX = 0.95f,
@@ -397,6 +405,7 @@ object PdfViewerFABs {
  * Standard FAB configurations for Markdown Viewer
  */
 object MarkdownViewerFABs {
+    @Composable
     fun create(
         onMenuOpen: (() -> Unit)?,
         onDataPadOpen: () -> Unit,
@@ -411,7 +420,7 @@ object MarkdownViewerFABs {
                 FABConfig(
                     id = "menu",
                     icon = Icons.Default.Menu,
-                    contentDescription = "Menu",
+                    contentDescription = stringResource(R.string.fab_cd_menu),
                     onClick = onMenuOpen,
                     defaultX = 0.95f,
                     defaultY = 0.05f
@@ -424,7 +433,7 @@ object MarkdownViewerFABs {
             FABConfig(
                 id = "datapad",
                 icon = Icons.Default.Flight,
-                contentDescription = "DataPad",
+                contentDescription = stringResource(R.string.datapad_title),
                 onClick = onDataPadOpen,
                 visible = datapadEnabled,
                 containerColor = containerColorTertiary,
@@ -439,7 +448,7 @@ object MarkdownViewerFABs {
             FABConfig(
                 id = "quick_access",
                 icon = Icons.AutoMirrored.Filled.NoteAdd,
-                contentDescription = "Quick Access",
+                contentDescription = stringResource(R.string.quick_access_title),
                 onClick = onQuickAccessOpen,
                 containerColor = containerColorPrimary,
                 defaultX = 0.95f,
@@ -454,6 +463,7 @@ object MarkdownViewerFABs {
  * Standard FAB configurations for Internal File Viewer
  */
 object InternalFileViewerFABs {
+    @Composable
     fun create(
         onMenuOpen: () -> Unit,
         onDataPadOpen: () -> Unit,
@@ -465,7 +475,7 @@ object InternalFileViewerFABs {
         FABConfig(
             id = "menu",
             icon = Icons.Default.Menu,
-            contentDescription = "File List",
+            contentDescription = stringResource(R.string.fab_cd_file_list),
             onClick = onMenuOpen,
             defaultX = 0.95f,
             defaultY = 0.05f
@@ -473,7 +483,7 @@ object InternalFileViewerFABs {
         FABConfig(
             id = "datapad",
             icon = Icons.Default.Flight,
-            contentDescription = "DataPad",
+            contentDescription = stringResource(R.string.datapad_title),
             onClick = onDataPadOpen,
             visible = datapadEnabled,
             containerColor = containerColorTertiary,
@@ -484,7 +494,7 @@ object InternalFileViewerFABs {
         FABConfig(
             id = "quick_access",
             icon = Icons.AutoMirrored.Filled.NoteAdd,
-            contentDescription = "Quick Access",
+            contentDescription = stringResource(R.string.quick_access_title),
             onClick = onQuickAccessOpen,
             containerColor = containerColorPrimary,
             defaultX = 0.95f,
@@ -497,6 +507,7 @@ object InternalFileViewerFABs {
  * Standard FAB configurations for Internal Files Screen (browser)
  */
 object InternalFilesScreenFABs {
+    @Composable
     fun create(
         onDataPadOpen: () -> Unit,
         onQuickAccessOpen: () -> Unit,
@@ -507,7 +518,7 @@ object InternalFilesScreenFABs {
         FABConfig(
             id = "datapad",
             icon = Icons.Default.Flight,
-            contentDescription = "DataPad",
+            contentDescription = stringResource(R.string.datapad_title),
             onClick = onDataPadOpen,
             visible = datapadEnabled,
             containerColor = containerColorTertiary,
@@ -518,7 +529,7 @@ object InternalFilesScreenFABs {
         FABConfig(
             id = "quick_access",
             icon = Icons.AutoMirrored.Filled.NoteAdd,
-            contentDescription = "Quick Access",
+            contentDescription = stringResource(R.string.quick_access_title),
             onClick = onQuickAccessOpen,
             containerColor = containerColorPrimary,
             defaultX = 0.95f,

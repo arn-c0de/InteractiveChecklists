@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
+import androidx.compose.ui.res.stringResource
+import com.example.checklist_interactive.R
 import com.example.checklist_interactive.ui.maps.drawing.MapBrushType
 import com.example.checklist_interactive.ui.maps.drawing.MapDrawingState
 import kotlin.math.cos
@@ -81,13 +83,13 @@ fun RadialMenu(
     val scale by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
         animationSpec = tween(durationMillis = 200),
-        label = "scale"
+        label = "radial_menu_scale"
     )
     
     val alpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
         animationSpec = tween(durationMillis = 200),
-        label = "alpha"
+        label = "radial_menu_alpha"
     )
     
     // Fullscreen popup to capture outside clicks
@@ -188,7 +190,7 @@ fun RadialMenu(
                         y = centerY - radius,
                         item = RadialMenuItem(
                             icon = Icons.Default.Brush,
-                            label = "Brush",
+                            label = stringResource(R.string.map_radial_menu_brush),
                             isActive = !state.isEraseMode && state.isDrawingMode,
                             onClick = {
                                 showBrushSubmenu = !showBrushSubmenu
@@ -206,7 +208,7 @@ fun RadialMenu(
                         y = centerY,
                         item = RadialMenuItem(
                             icon = Icons.Default.Palette,
-                            label = "Color",
+                            label = stringResource(R.string.map_radial_menu_color),
                             color = state.selectedColor,
                             onClick = {
                                 showColorSubmenu = !showColorSubmenu
@@ -224,7 +226,7 @@ fun RadialMenu(
                         y = centerY + radius,
                         item = RadialMenuItem(
                             icon = Icons.Default.AutoFixHigh,
-                            label = "Eraser",
+                            label = stringResource(R.string.map_radial_menu_eraser),
                             isActive = state.isEraseMode,
                             onClick = {
                                 onDrawingStateChange?.invoke(state.copy(isEraseMode = !state.isEraseMode))
@@ -256,7 +258,7 @@ fun RadialMenu(
                                 y = buttonY,
                                 item = RadialMenuItem(
                                     icon = icon,
-                                    label = brushType.name,
+                                    label = brushType.name, // This is an enum name, not a UI string. It will be replaced later.
                                     isActive = state.brushType == brushType,
                                     onClick = {
                                         onBrushSelected?.invoke(brushType)
@@ -295,7 +297,7 @@ fun RadialMenu(
                                 y = buttonY,
                                 item = RadialMenuItem(
                                     icon = Icons.Default.Circle,
-                                    label = "Color",
+                                    label = stringResource(R.string.map_radial_menu_color),
                                     color = color,
                                     isActive = state.selectedColor == color,
                                     onClick = {
