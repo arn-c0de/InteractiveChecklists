@@ -378,7 +378,7 @@
 • Bind-IP leer lassen, um auf allen Schnittstellen zu lauschen
 • Standardport: 5010</string>
 
-    <!-- ECDH / Geräteeinstellungen -->
+    
     <string name="datapad_ecdh_title">ECDH-Handshakemodus</string>
     <string name="datapad_ecdh_description_secure">Sichere, sitzungsbasierte Verschlüsselung (empfohlen)</string>
     <string name="datapad_device_name_label">Gerätename</string>
@@ -524,9 +524,9 @@
     <string name="total_unique_tags">Gesamt eindeutige Tags: %1$d</string>
     <string name="files_with_tags">Dateien mit Tags: %1$d</string>
     <string name="markdown_title">Markdown-Einstellungen</string>
-    <!-- ═══════════════════════════════════════════════════════════════════════ -->
-    <!-- MARKDOWN VIEWER -->
-    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    
+    
+    
     <string name="markdown_label_h1">Überschrift 1</string>
     <string name="markdown_label_custom_block">Benutzerdefinierter Block</string>
     <string name="markdown_label_blockquote">Zitatblock</string>
@@ -745,13 +745,13 @@
     
     
     
-    <!-- Military Symbol Picker -->
+    
     <string name="military_symbols_title">Militärische Symbole</string>
     <string name="military_symbols_close">Schließen</string>
     <string name="military_symbols_affiliation_label">Zugehörigkeit</string>
     <string name="military_symbols_category_label">Kategorie</string>
 
-    <!-- Symbol Categories -->
+    
     <string name="military_symbols_category_ground_units">Bodeneinheiten</string>
     <string name="military_symbols_category_equipment">Ausrüstung</string>
     <string name="military_symbols_category_installations">Installationen</string>
@@ -762,13 +762,13 @@
     <string name="military_symbols_category_ship">Schiffe</string>
     <string name="military_symbols_category_vehicle">Fahrzeuge</string>
 
-    <!-- Symbol Affiliations -->
+    
     <string name="military_symbols_affiliation_friendly">Freundlich</string>
     <string name="military_symbols_affiliation_hostile">Feindlich</string>
     <string name="military_symbols_affiliation_neutral">Neutral</string>
     <string name="military_symbols_affiliation_unknown">Unbekannt</string>
 
-    <!-- ROUTE CREATION -->
+    
     <string name="route_new_name_template">Neue Route %d</string>
     <string name="route_autosaved_player_position_description">Automatisch gespeicherte Spielerposition</string>
     <string name="route_description_waypoints">Route mit %d Wegpunkten</string>
@@ -810,7 +810,7 @@
     <string name="action_move_up">Nach oben verschieben</string>
     <string name="action_move_down">Nach unten verschieben</string>
 
-    <!-- MapFlightInstruments -->
+    
     <string name="map_flight_instrument_no_data">KEINE DATEN</string>
     <string name="map_flight_instrument_attitude">LAGE</string>
     <string name="map_flight_instrument_mach_format">M%.2f</string>
@@ -834,7 +834,7 @@
     <string name="map_flight_instrument_cardinal_s">S</string>
     <string name="map_flight_instrument_cardinal_w">W</string>
 
-    <!-- MapNavigationDisplay -->
+    
     <string name="map_nav_route_to">ROUTE ZU: %1$s</string>
     <string name="map_nav_dist_nm">%1$.1f NM</string>
     <string name="map_nav_hdg">KURS %1$03.0f°</string>
@@ -890,12 +890,12 @@
     <string name="map_nav_reset_to_default">Auf Standard zurücks.</string>
     <string name="map_nav_approach_target_name">%1$s RWY %2$02d</string>
 
-    <!-- FlightMiniStatusBar -->
+    
     <string name="mini_status_bar_battery_level">Akkustand %1$d Prozent</string>
     <string name="mini_status_bar_position_ok">Position OK</string>
     <string name="mini_status_bar_interarrival_stats">%1$d/%2$d/%3$dms</string>
 
-    <!-- Map Drawing Tools -->
+    
     <string name="map_drawing_tools_title">Drawing Tools</string>
     <string name="map_drawing_active">✓ Drawing active</string>
     <string name="map_drawing_close_cd">Close</string>
@@ -912,13 +912,13 @@
     <string name="map_drawing_save">Save</string>
     <string name="map_drawing_color_selected_cd">Selected</string>
 
-    <!-- Map Overlays -->
+    
     <string name="map_overlay_mgrs_grid">MGRS Grid</string>
     <string name="map_overlay_mgrs_grid_desc">Military Grid Reference System overlay</string>
     <string name="map_overlay_flight_instruments">Flight Instruments</string>
     <string name="map_overlay_flight_instruments_desc">Live attitude and turn indicators (drag to reposition)</string>
 
-    <!-- Map Marker Management -->
+    
     <string name="map_search_markers_placeholder">Search markers</string>
     <string name="map_frequency_placeholder">118.50</string>
     <string name="map_marker_manage">Manage</string>
@@ -947,7 +947,7 @@
     <string name="map_marker_verified_no">no</string>
     <string name="map_marker_hdg_na">n/a</string>
 
-    <!-- Map Radial Menu -->
+    
     <string name="map_radial_menu_info">Info</string>
     <string name="map_radial_menu_edit">Edit</string>
     <string name="map_radial_menu_navigate">Navigate</string>
@@ -961,7 +961,7 @@
     <string name="map_radial_menu_color">Color</string>
     <string name="map_radial_menu_eraser">Eraser</string>
 
-    <!-- FAB Content Descriptions -->
+    
     <string name="fab_cd_center_on_position">Center on position</string>
     <string name="fab_cd_add_military_symbol">Add Military Symbol</string>
     <string name="fab_cd_markers_routes">Markers &amp; Routes</string>
@@ -976,4 +976,197 @@
     <string name="fab_positions_reset">FAB positions reset</string>
     <string name="map_drawing_saved">Drawings saved</string>
     <string name="map_db_not_ready_retry">Map database not ready — please tap again to retry.</string>
-</resources>
+<string name="app_name">Checklist-Interactive</string>
+
+    
+    
+    
+    <string name="action_ok">OK</string>
+    <string name="open_internal_viewer">Open internal viewer</string>
+    <string name="aviation_map_tab_title">Aviation Map</string>
+
+    
+    
+    
+    <string name="tag_startup">Startup</string>
+    <string name="tag_start">Start</string>
+    <string name="tag_navigation">Navigation</string>
+    <string name="tag_landing">Landing</string>
+    <string name="tag_combat">Combat</string>
+    <string name="tag_takeoff">Takeoff</string>
+    <string name="tag_taxi">Taxi</string>
+    <string name="tag_preflight">Preflight</string>
+    <string name="tag_postflight">Postflight</string>
+    <string name="tag_more_count">+%1$d more</string>
+
+    
+    
+    
+    <string name="common_ellipsis">...</string>
+
+    
+    
+    
+    <string name="pdf_marker">Marker</string>
+    <string name="pdf_sharpen_label">Sharpen: %1$s%%</string>
+    <string name="pdf_link">Link</string>
+    <string name="pdf_apply_to_current_page">Apply to current page</string>
+    <string name="pdf_page_prefix">Page </string>
+    <string name="browse_path_separator">/</string>
+    <string name="browse_default_location">Assets</string>
+    <string name="cd_marker">Marker</string>
+    <string name="cd_link">Link</string>
+    <string name="cd_datapad">DataPad</string>
+
+    
+    
+    
+    <string name="quick_notes_com1_label">COM1</string>
+    <string name="quick_notes_com2_label">COM2</string>
+    <string name="quick_notes_fm">FM</string>
+    <string name="quick_notes_am">AM</string>
+    <string name="quick_notes_mode_normal">Normal</string>
+    <string name="quick_notes_mode_markdown">Markdown</string>
+    <string name="quick_notes_field_text">Text</string>
+    <string name="quick_notes_status_label">Status</string>
+    <string name="quick_notes_mode_normal_chip">Normal</string>
+    <string name="quick_notes_mode_markdown_chip">Markdown</string>
+    <string name="common_placeholder_dash">-</string>
+    <string name="format_time_hh_mm_ss">HH:mm:ss</string>
+    <string name="quick_notes_com_prefix">COM:</string>
+    <string name="quick_notes_coord_template">N       E      </string>
+    <string name="quick_notes_coord_format">N %1$s E %2$s</string>
+    <string name="quick_notes_alt_prefix">Alt: FL </string>
+    <string name="quick_notes_default_title">My Notes</string>
+    <string name="quick_notes_new_note_title">New Note</string>
+
+    
+    
+    
+    <string name="flight_status_navigation">Navigation</string>
+    <string name="map_openstreetmap">OpenStreetMap</string>
+    <string name="map_auto_centering_active">🎯 Auto-centering (tap to disable)</string>
+    <string name="map_auto_centering_off">Auto-center OFF (tap to enable)</string>
+    <string name="map_tip_lock_screen">tip: tap lock to look around the map</string>
+    <string name="settings_wipe_map_db_title">Wipe &amp; Reimport Map DB</string>
+    <string name="settings_wipe_map_db_explain">Delete the internal map database and re-import the packaged map_data.db from app assets. Use this to refresh markers and map details.</string>
+    <string name="settings_wipe_map_db_button">Wipe &amp; Reimport map_data.db</string>
+    <string name="settings_wipe_map_db_confirm_title">Reimport Map Database?</string>
+    <string name="settings_wipe_map_db_confirm_message">This will delete the internal map database and re-import the packaged database. The app will restart to reload map data. Continue?</string>
+    <string name="msg_map_db_reimported">Map database reimported — restarting…</string>
+    <string name="map_aviation_charts_note">Note: Aviation sectional charts require additional configuration. See docs/technical/AVIATION_MAPS.md</string>
+    <string name="datapad_title">DataPad</string>
+    <string name="datapad_command_example">python forward_parsed_udp.py --host %1$s --port %2$d</string>
+    <string name="datapad_settings_description">Enable or disable DataPad. When disabled the app will not listen for UDP telemetry and DataPad UI controls will be hidden.</string>
+
+    
+    <string name="datapad_settings_generate_key">Generate Key</string>
+    <string name="datapad_field_apu">APU</string>
+    <string name="datapad_field_generator">Generator</string>
+    <string name="datapad_field_mach">Mach</string>
+    <string name="datapad_section_radar">Radar</string>
+    <string name="datapad_field_elevation">Elevation</string>
+    <string name="datapad_field_scan">Scan</string>
+    <string name="datapad_station_label">Station %1$s</string>
+    <string name="datapad_track_detail">%1$s • %2$s</string>
+    <string name="datapad_section_position">Position</string>
+    <string name="datapad_time_seconds_ago">%1$ds ago</string>
+    <string name="datapad_time_minutes_ago">%1$dm ago</string>
+    <string name="datapad_time_hours_ago">%1$dh ago</string>
+    <string name="datapad_field_x">X</string>
+    <string name="datapad_field_y">Y</string>
+    <string name="datapad_field_z">Z</string>
+    <string name="clipboard_tags_json_label">Tags JSON</string>
+    <string name="clipboard_sources_json_label">Sources JSON</string>
+    <string name="clipboard_contributors_json_label">Contributors JSON</string>
+    <string name="settings_font_size">%1$d sp</string>
+    <string name="language_english">English</string>
+    <string name="language_german">German</string>
+    <string name="language_spanish">Español</string>
+    <string name="dialog_name">Name</string>
+    <string name="greeting_default_name">Android</string>
+    <string name="datapad_pilot">Pilot</string>
+    <string name="datapad_settings_title">DataPad Settings</string>
+    <string name="datapad_settings_udp_port_placeholder">5010</string>
+    <string name="viewer_unsupported_format_md_pdf">Unsupported file format: .%1$s\nSupported: .md, .markdown, .pdf</string>
+
+    
+    
+    
+    <string name="markdown_checkbox_count_format"> | %1$d/%2$d</string>
+    <string name="markdown_collapse">Collapse</string>
+    <string name="markdown_expand">Expand</string>
+    <string name="cd_menu">Menu</string>
+
+    
+    
+    
+    <string name="no_files_found">No files found</string>
+    <string name="no_subfolders_found">No subfolders found</string>
+    <string name="root">Root</string>
+    <string name="file_or_files">file</string>
+    <string name="files_multiple">files</string>
+    <string name="shortcuts_label">Shortcuts</string>
+    <string name="rename_label">Rename</string>
+    <string name="page_number_format">Page %1$d</string>
+    <string name="edit_tags_label">Edit tags</string>
+    <string name="cd_list_view_label">List view</string>
+    <string name="cd_grid_view_label">Grid view</string>
+    <string name="cd_search_files_label">Search files</string>
+
+    
+    
+    
+    <string name="title_my_files">@string/nav_my_files</string>
+    <string name="import_file">@string/file_import</string>
+    <string name="refresh">@string/action_refresh</string>
+    <string name="toggle_dark_mode">@string/settings_toggle_dark_mode</string>
+    <string name="no_files">@string/file_no_files</string>
+    <string name="add_file">@string/file_add</string>
+    <string name="delete_file">@string/file_delete</string>
+    <string name="delete_confirm">@string/file_delete_confirm</string>
+    <string name="delete">@string/action_delete</string>
+    <string name="cancel">@string/action_cancel</string>
+    <string name="category">@string/file_category</string>
+    <string name="file">@string/file_single</string>
+    <string name="files">@string/file_plural</string>
+    <string name="expand">@string/nav_expand</string>
+    <string name="collapse">@string/nav_collapse</string>
+    <string name="unsupported_file_format">@string/file_unsupported_format</string>
+    <string name="back">@string/action_back</string>
+    <string name="file_list">@string/nav_file_list</string>
+    <string name="settings">@string/nav_settings</string>
+    <string name="dark_mode">@string/settings_dark_mode</string>
+    <string name="ok">@string/action_ok</string>
+    <string name="error_loading_pdf">@string/pdf_error_loading</string>
+    <string name="drawing">@string/pdf_drawing</string>
+    <string name="eraser">@string/pdf_eraser</string>
+    <string name="view">@string/pdf_view</string>
+    <string name="width">@string/pdf_width</string>
+    <string name="save">@string/action_save</string>
+    <string name="undo">@string/action_undo</string>
+    <string name="highlight">@string/pdf_highlight</string>
+    <string name="checklist">@string/checklist_title</string>
+    <string name="open_folders">@string/file_open_folders</string>
+    <string name="up">@string/nav_up</string>
+    <string name="open">@string/action_open</string>
+    <string name="reset">@string/action_reset</string>
+    <string name="export">@string/action_export</string>
+    <string name="loading">@string/status_loading</string>
+    <string name="use_unified_viewer_for_pdf">@string/pdf_use_unified_viewer</string>
+
+    
+    
+    
+    <string name="db_update_title">Database Update Available</string>
+    <string name="db_update_message">A new version of the airport/location database is available.\n\nCurrent version: %1$d\nNew version: %2$d</string>
+    <string name="db_update_options">Choose how to update:</string>
+    <string name="db_update_option_merge">Merge: Import new locations while keeping your existing data</string>
+    <string name="db_update_option_clean">Clean Import: Wipe internal database and import all data from new version (recommended for major updates)</string>
+    <string name="db_update_option_skip">Skip: Don\'t import now (can be triggered manually later)</string>
+    <string name="db_update_btn_merge">Merge</string>
+    <string name="db_update_btn_clean">Clean Import</string>
+    <string name="db_update_btn_skip">Skip</string>
+
+    
+    </resources>
