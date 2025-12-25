@@ -13,6 +13,7 @@ interface LocationRepository {
     fun getLocationsByType(type: String): Flow<List<LocationEntity>>
     fun getLocationsByCoalition(coalition: String): Flow<List<LocationEntity>>
     fun searchLocations(query: String): Flow<List<LocationEntity>>
+    fun getAllMaps(): Flow<List<String>>
     suspend fun getLocationById(id: Int): LocationEntity?
     suspend fun saveLocation(location: LocationEntity): Long
     suspend fun updateLocation(location: LocationEntity)
@@ -115,6 +116,9 @@ class LocationRepositoryImpl(
     
     override fun searchLocations(query: String): Flow<List<LocationEntity>> =
         locationDao.searchLocations(query)
+    
+    override fun getAllMaps(): Flow<List<String>> =
+        locationDao.getAllMaps()
     
     override suspend fun getLocationById(id: Int): LocationEntity? =
         locationDao.getLocationById(id)
