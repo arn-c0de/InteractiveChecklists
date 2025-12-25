@@ -1,84 +1,84 @@
 # Entity Tracking Feature
 
-## Überblick
+## Overview
 
-Das System sendet jetzt **automatisch beide Dateien** (Aircraft Data + Entity Contacts) basierend auf dem Toggle-Status in der Android App.
+The system now **automatically sends both files** (Aircraft Data + Entity Contacts) based on the toggle status in the Android app.
 
-## Architektur
+## Architecture
 
 ### DCS (Export.lua)
-Schreibt parallel zwei separate Dateien:
-- `player_aircraft_parsed.jsonl` - Flugzeugdaten (~1KB/Update)
-- `entity-contacts-parsed.jsonl` - Taktische Einheiten (~30KB/Update)
+Writes two separate files in parallel:
+- `player_aircraft_parsed.jsonl` — aircraft data (~1KB/update)
+- `entity-contacts-parsed.jsonl` — tactical units (~30KB/update)
 
 ### Python Forwarder (forward_parsed_udp.py)
-**Ein einziger Befehl** reicht:
+**A single command** is enough:
 ```bash
 python forward_parsed_udp.py --interval 50 --host 192.168.178.132 --port 5010 --verbose --authorized-devices authorized_devices.json --bind-ip 192.168.178.100
 ```
 
-**Was passiert automatisch:**
-1. Script erkennt beide Dateien automatisch
-2. Beim Handshake empfängt es `entityTrackingEnabled` Status von der App
-3. **Wenn Toggle AUS:** Nur Aircraft-Daten werden gesendet
-4. **Wenn Toggle AN:** Beide Dateien werden parallel gesendet
+**What happens automatically:**
+1. The script detects both files automatically
+2. During the handshake it receives the `entityTrackingEnabled` status from the app
+3. **If toggle OFF:** only aircraft data is sent
+4. **If toggle ON:** both files are sent in parallel
 
 ### Android App
-- Toggle-Schalter in der Tactical Units Liste
-- Status wird beim Handshake an den Forwarder gesendet
-- Kann jederzeit ein/aus geschaltet werden (nächstes Handshake übernimmt neuen Status)
+- Toggle switch in the Tactical Units list
+- Status is sent to the forwarder during the handshake
+- Can be toggled on/off at any time (the next handshake applies the new status)
 
-## Datenfluss
+## Data Flow
 
 ```
 DCS Export.lua
-    ├─→ player_aircraft_parsed.jsonl (immer)
-    └─→ entity-contacts-parsed.jsonl (immer)
+    ├─→ player_aircraft_parsed.jsonl (always)
+    └─→ entity-contacts-parsed.jsonl (always)
 
-Python Forwarder (liest beide Dateien)
-    ├─→ Aircraft Data → ALLE verbundenen Geräte
-    └─→ Entity Contacts → NUR Geräte mit entityTrackingEnabled=true
+Python Forwarder (reads both files)
+    ├─→ Aircraft Data → ALL connected devices
+    └─→ Entity Contacts → ONLY devices with entityTrackingEnabled=true
 
 Android App
-    ├─→ Empfängt Aircraft Data (immer)
-    └─→ Empfängt Entity Contacts (nur wenn Toggle aktiv)
+    ├─→ Receives Aircraft Data (always)
+    └─→ Receives Entity Contacts (only when toggle is active)
 ```
 
-## Vorteile
+## Benefits
 
-✅ **Ein einziger Python-Befehl** - keine separaten Prozesse mehr
-✅ **Dynamisch steuerbar** - Toggle in der App reicht
-✅ **Effizient** - Entity-Daten werden nur gesendet wenn benötigt
-✅ **Keine Bandbreiten-Verschwendung** - Forwarder prüft vor dem Senden
-✅ **Automatische Erkennung** - Forwarder findet entity-contacts-Datei selbst
+✅ **One Python command** — no separate processes
+✅ **Dynamically controllable** — toggle in the app is enough
+✅ **Efficient** — entity data is only sent when needed
+✅ **No bandwidth waste** — forwarder checks sessions before sending
+✅ **Automatic detection** — forwarder finds `entity-contacts` file automatically
 
-## Technische Details
+## Technical Details
 
-### Handshake-Erweiterung
+### Handshake extension
 ```json
 {
   "type": "ClientHello",
   "deviceId": "...",
   "deviceName": "...",
   "publicKey": "...",
-  "entityTrackingEnabled": true  // NEU
+  "entityTrackingEnabled": true  // NEW
 }
 ```
 
 ### Session Management
-Jede Session speichert:
-- `session_id` - Eindeutige Session-ID
-- `device_id` - Geräte-ID
-- `session_key` - Verschlüsselungsschlüssel
-- **`entity_tracking_enabled`** - Toggle-Status vom Client
+Each session stores:
+- `session_id` — unique session ID
+- `device_id` — device ID
+- `session_key` — encryption key
+- **`entity_tracking_enabled`** — client's toggle status
 
-### Sende-Logik im Forwarder
+### Forwarder send logic
 ```python
-# Aircraft data: an ALLE Sessions
+# Aircraft data: sent to ALL sessions
 for device_id, session_id in device_sessions.items():
     send(aircraft_data, device_id)
 
-# Entity contacts: NUR wenn session.entity_tracking_enabled==true
+# Entity contacts: ONLY if session.entity_tracking_enabled==True
 for device_id, session_id in device_sessions.items():
     session = sessions[session_id]
     if session.entity_tracking_enabled:
@@ -87,7 +87,7 @@ for device_id, session_id in device_sessions.items():
 
 ## Logging
 
-Der Forwarder zeigt im Log:
+The forwarder logs messages like:
 ```
 🔑 Session created: abc123... (key derived from ECDH, with entity tracking)
 📡 Entity contacts file detected: ...\entity-contacts-parsed.jsonl
@@ -95,17 +95,17 @@ Der Forwarder zeigt im Log:
 📡 Entity contacts sent to 1 device(s)
 ```
 
-Oder wenn Toggle aus:
+Or when toggle is off:
 ```
 🔑 Session created: xyz789... (key derived from ECDH, aircraft data only)
 ```
 
 ## Migration
 
-**Bestehende Befehle funktionieren weiterhin!**
-- Wenn `entityTrackingEnabled` nicht im Handshake ist → default: `false`
-- Alte Apps ohne Toggle → bekommen keine Entity-Daten
-- Neue Apps mit Toggle aus → bekommen keine Entity-Daten
-- Neue Apps mit Toggle an → bekommen Entity-Daten
+**Existing commands continue to work!**
+- If `entityTrackingEnabled` is missing from the handshake → default: `false`
+- Old apps without the toggle → do not receive entity data
+- New apps with toggle off → do not receive entity data
+- New apps with toggle on → receive entity data
 
-Keine Breaking Changes! 🎉
+No breaking changes! 🎉

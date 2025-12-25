@@ -61,6 +61,7 @@ InteractiveChecklists is an Android application for viewing and interacting with
 - **QuickNotes:** Persistent notes powered by Room, with search, autosave, and markdown support.
 - **Data Persistence:** Stores user preferences, annotations, shortcuts, tags, and open tabs locally.
 - **DataPad (experimental):** Live flight telemetry display (UDP) for DCS World. Streams aircraft telemetry to the app for realtime status and popup details — see `docs/features/DATAPAD_FEATURE.md` for full details and setup instructions.
+- **Tactical Units Tracking (experimental):** Live tactical unit markers (aircraft, helicopter, ground, ship) on the map with real-time updates. Marker popups include **"Last seen"** timestamps and refresh snippets with speed/altitude. A **"Live Units Only"** filter (shows units seen in the last 10s) is synchronized between the list and the map. See `docs/features/TACTICAL_UNITS_TRACKING.md` and `scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md` for setup and details.
 - **Aviation Map (experimental):** OpenStreetMap-based map viewer with live aircraft position tracking from the DataPad stream. Adds a `MapViewer` tab showing aircraft position, heading, altitude and basic overlays — see `docs/features/AVIATION_MAP_FEATURE.md` for details and configuration.
 - **MapDatabaseTools (Python):** A collection of Python utilities for receiving, decrypting (AES-GCM), and visualizing DCS flight telemetry. Includes a PySide6 GUI with an embedded OpenStreetMap/Leaflet map for live aircraft tracking, a marker database, and helper scripts to manage map assets. See `scripts/MapDatabaseTools/README.md` for usage and configuration.
 
@@ -86,6 +87,8 @@ python forward_parsed_udp.py --repeat-last --interval 1 --host 192.168.178.101 -
 # Android: Settings → DataPad → Enable "ECDH Handshake Mode"
 # Add your device ID to authorized_devices.json on server
 ```
+
+DataPad also supports receiving **entity contacts** (tactical units) exported from DCS. Enable **Entity Tracking** in the app to receive tactical units and display them as live markers (requires running the forwarder with entity tracking enabled). For details and setup instructions, see `scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md` and `docs/features/TACTICAL_UNITS_TRACKING.md`.
 
 See `docs/technical/ECDH_USAGE_GUIDE.md` for complete setup instructions and `docs/features/DATAPAD_FEATURE.md` for full usage, configuration, and troubleshooting.
 

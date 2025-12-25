@@ -67,13 +67,28 @@ class TacticalUnitsViewModel(
     
     // --- Statistics ---
     
-    private val _stats = MutableStateFlow(UnitStatistics())
-    val stats: StateFlow<UnitStatistics> = _stats.asStateFlow()
-    
-    init {
-        // Load initial statistics
-        refreshStatistics()
-    }
+    // Statistics based on currently visible (filtered) units
+    val stats: StateFlow<UnitStatistics> = units.map { filteredUnits ->
+        val categoryDist = filteredUnits.groupingBy { it.category }.eachCount()
+        val coalitionDist = filteredUnits.groupingBy { it.coalition }.eachCount()
+        
+        UnitStatistics(
+            totalActive = filteredUnits.size,
+            aircraftCount = categoryDist["aircraft"] ?: 0,
+            helicopterCount = categoryDist["helicopter"] ?: 0,
+            groundCount = categoryDist["ground"] ?: 0,
+            shipCount = categoryDist["ship"] ?: 0,
+            structureCount = categoryDist["structure"] ?: 0,
+            weaponCount = categoryDist["weapon"] ?: 0,
+            neutralCount = coalitionDist[0] ?: 0,
+            redCount = coalitionDist[1] ?: 0,
+            blueCount = coalitionDist[2] ?: 0
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = UnitStatistics()
+    )
     
     // --- Actions ---
     
@@ -131,40 +146,17 @@ class TacticalUnitsViewModel(
         _uiState.update { it.copy(showFilterDialog = !it.showFilterDialog) }
     }
     
-    fun refreshStatistics() {
-        viewModelScope.launch {
-            val totalActive = repository.getActiveUnitCount()
-            val categoryDist = repository.getCategoryDistribution()
-            val coalitionDist = repository.getCoalitionDistribution()
-            
-            _stats.value = UnitStatistics(
-                totalActive = totalActive,
-                aircraftCount = categoryDist["aircraft"] ?: 0,
-                helicopterCount = categoryDist["helicopter"] ?: 0,
-                groundCount = categoryDist["ground"] ?: 0,
-                shipCount = categoryDist["ship"] ?: 0,
-                structureCount = categoryDist["structure"] ?: 0,
-                weaponCount = categoryDist["weapon"] ?: 0,
-                neutralCount = coalitionDist[0] ?: 0,
-                redCount = coalitionDist[1] ?: 0,
-                blueCount = coalitionDist[2] ?: 0
-            )
-        }
-    }
-    
     // --- Cleanup Actions ---
     
     fun deleteAllUnits() {
         viewModelScope.launch {
             repository.deleteAllUnits()
-            refreshStatistics()
         }
     }
     
     fun deleteOldInactiveUnits(daysOld: Int = 7) {
         viewModelScope.launch {
             repository.deleteOldInactiveUnits(daysOld)
-            refreshStatistics()
         }
     }
     
