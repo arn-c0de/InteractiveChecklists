@@ -722,38 +722,53 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                     continue
 
                 # FILE TRUNCATED/TRIMMED: position > file size means file was rewritten (trim operation)
-                # Solution: Skip buffered lines and wait for file to GROW with new data
+                # Solution: Close file to flush readline() buffer, then reopen and wait for growth
                 if cur_pos > size:
+                    # CRITICAL: Close ALL files to flush their internal readline() buffers
+                    # Without this, old buffered lines will be processed after trim!
                     try:
                         f.close()
                     except Exception:
                         pass
-                    logger.info(f"🔄 File trimmed detected (pos={cur_pos} > size={size}), skipping to new data...")
+                    if f_entity:
+                        try:
+                            f_entity.close()
+                        except Exception:
+                            pass
                     
-                    # IMPORTANT: Reset timestamp filter to avoid rejecting buffered data after trim
+                    logger.info(f"🔄 File trimmed detected (pos={cur_pos} > size={size}), flushed buffers")
+                    
+                    # IMPORTANT: Reset timestamp filter to accept fresh data after trim
                     _last_processed_timestamp = None
                     _last_timestamp_update_time = 0
                     logger.info("🔄 Reset timestamp filter after file trim")
                     
-                    # After trim, file contains last N buffered lines (already processed)
                     # Wait for file to GROW beyond trimmed size = new data appended
                     trimmed_size = os.path.getsize(path)
-                    f = open(path, 'r', encoding='utf-8', errors='replace')
-                    f.seek(0, os.SEEK_END)
                     
-                    # Poll for file growth (new data written)
-                    for _ in range(20):  # Max 2 second wait
+                    # Poll for file growth (new data written) WITHOUT opening yet
+                    growth_detected = False
+                    for _ in range(30):  # Max 3 second wait (increased from 2s)
                         time.sleep(interval)
                         new_size = os.path.getsize(path)
                         if new_size > trimmed_size:
-                            # File grew! Seek to where new data starts, then skip to next complete line
-                            f.seek(trimmed_size, os.SEEK_SET)
-                            # Discard partial/incomplete line at seek position
-                            f.readline()
-                            logger.info(f"✅ Skipped buffered data, reading fresh lines from byte {f.tell()}")
+                            growth_detected = True
+                            logger.info(f"✅ File grew from {trimmed_size} to {new_size} bytes, opening fresh")
                             break
-                    else:
+                    
+                    if not growth_detected:
                         logger.warning(f"⚠️ Timeout waiting for file growth after trim")
+                    
+                    # NOW open file fresh (no buffered old data!) and seek to where new data starts
+                    f = open(path, 'r', encoding='utf-8', errors='replace')
+                    f.seek(trimmed_size, os.SEEK_SET)
+                    # Discard any partial line at seek position
+                    f.readline()
+                    logger.info(f"📖 Reading from byte {f.tell()} with clean buffer")
+                    
+                    # Reopen entity file if needed
+                    if entity_contacts_path and os.path.exists(entity_contacts_path):
+                        f_entity = open_for_tail(entity_contacts_path, False)  # Seek to end
                     
                     if once:
                         break
@@ -808,21 +823,43 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                 _last_processed_timestamp = None
                 _last_timestamp_update_time = 0
 
+            # STRICT timestamp validation: reject corrupted/invalid timestamps
+            if cur_ts is not None:
+                # Validate format: must look like ISO-8601 with 'T' separator and reasonable hour (00-23)
+                if not isinstance(cur_ts, str) or 'T' not in cur_ts:
+                    logger.warning(f"⚠️ Invalid timestamp format: {repr(cur_ts)}")
+                    continue
+                
+                # Check for corrupted hour field (must be 2 digits 00-23, not "115" etc)
+                try:
+                    # Extract hour from "2025-12-25T15:41:05.990Z" -> should be "15"
+                    time_part = cur_ts.split('T')[1]  # "15:41:05.990Z"
+                    hour_str = time_part[:2]  # "15"
+                    if not hour_str.isdigit() or len(hour_str) != 2:
+                        logger.warning(f"⚠️ Corrupted timestamp hour in: {repr(cur_ts)}")
+                        continue
+                except Exception:
+                    logger.warning(f"⚠️ Malformed timestamp: {repr(cur_ts)}")
+                    continue
+            
+            # Check if timestamp is newer than last processed
             if not _timestamp_is_newer(cur_ts, _last_processed_timestamp):
-                logger.warning(f"⚠️ REJECTED OLD DATA: timestamp={cur_ts} (last={_last_processed_timestamp}) - preventing position reset!")
+                logger.warning(f"⚠️ REJECTED OLD: ts={cur_ts} (last={_last_processed_timestamp})")
                 continue
 
-            # Accept and record timestamp
+            # Accept and record clean timestamp
             if cur_ts is not None:
-                logger.info(f"✅ Accepted data with timestamp={cur_ts}")
-                _last_processed_timestamp = cur_ts
+                _last_processed_timestamp = str(cur_ts)  # Store as clean string
                 _last_timestamp_update_time = current_time
+                logger.debug(f"✅ ts={cur_ts}")
 
             # Increment player update counter
             player_update_counter += 1
 
             # Read entity data periodically (not every frame for performance!)
+            # OPTIMIZATION: Only read if file position is ready (non-blocking)
             should_read_entity = (player_update_counter % ENTITY_UPDATE_INTERVAL) == 0
+            entity_data_updated = False  # Track if we got fresh entity data
             if should_read_entity and f_entity is not None:
                 wants_entities = any(
                     session_mgr.sessions[session_id].entity_tracking_enabled
@@ -830,22 +867,28 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                     if session_id in session_mgr.sessions
                 )
                 if wants_entities:
-                    entity_line = f_entity.readline()
-                    if entity_line:
-                        entity_jsonpart = extract_json_from_line(entity_line)
-                        if entity_jsonpart:
-                            # Parse and cache entity data
-                            try:
-                                entity_parsed = safe_json_parse(entity_jsonpart, max_size=_MAX_DATA_MESSAGE_SIZE)
-                                if entity_parsed and 'nearbyUnits' in entity_parsed:
-                                    last_entity_data = entity_parsed['nearbyUnits']
-                                    logger.debug(f"📡 Cached {len(last_entity_data)} tactical units")
-                            except Exception as e:
-                                logger.debug(f"Failed to parse entity data: {e}")
+                    # NON-BLOCKING: Try to read entity line but don't wait/seek
+                    try:
+                        entity_line = f_entity.readline()
+                        if entity_line:
+                            entity_jsonpart = extract_json_from_line(entity_line)
+                            if entity_jsonpart:
+                                # Quick parse and cache (skip if too large to prevent blocking)
+                                if len(entity_jsonpart) < 100000:  # Skip if > 100KB
+                                    entity_parsed = safe_json_parse(entity_jsonpart, max_size=_MAX_DATA_MESSAGE_SIZE)
+                                    if entity_parsed and 'nearbyUnits' in entity_parsed:
+                                        last_entity_data = entity_parsed['nearbyUnits']
+                                        entity_data_updated = True  # Mark as fresh
+                                        logger.debug(f"📡 Cached {len(last_entity_data)} tactical units")
+                                else:
+                                    logger.debug(f"⚠️ Skipped large entity data ({len(entity_jsonpart)} bytes)")
+                    except Exception as e:
+                        logger.debug(f"Failed to read entity data: {e}")
 
-            # Merge cached tactical data with player data before sending
+            # Merge cached tactical data with player data ONLY when it was just updated
+            # This reduces JSON parsing/encoding overhead on non-entity frames
             final_json = jsonpart
-            if last_entity_data is not None:
+            if entity_data_updated and last_entity_data is not None:
                 try:
                     # Parse player data, add nearbyUnits, re-encode
                     player_data = safe_json_parse(jsonpart, max_size=_MAX_DATA_MESSAGE_SIZE)
