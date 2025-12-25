@@ -14,6 +14,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,6 +29,8 @@ import com.example.checklist_interactive.data.datapad.DataPadManager
 import com.example.checklist_interactive.ui.datapad.LocalDataPadManager
 import com.example.checklist_interactive.data.tactical.TacticalUnitEntity
 import com.example.checklist_interactive.data.tactical.TacticalUnitsRepository
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -64,199 +67,249 @@ fun TacticalUnitsListScreen(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showCleanupMenu by remember { mutableStateOf(false) }
     
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Tactical Units") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                actions = {
-                    // Filter button
-                    IconButton(onClick = { viewModel.toggleFilterDialog() }) {
-                        Badge(
-                            containerColor = if (uiState.selectedCategories.isNotEmpty() || uiState.selectedCoalitions.isNotEmpty()) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                Color.Transparent
-                            }
-                        ) {
-                            Icon(Icons.Default.FilterList, "Filter")
-                        }
-                    }
+    // Opacity control (persistent)
+    val prefs = context.getSharedPreferences("tactical_units_prefs", android.content.Context.MODE_PRIVATE)
+    val KEY_OPACITY = "tactical_units_opacity"
+    val savedOpacity = prefs.getFloat(KEY_OPACITY, 1.0f)
+    var dialogOpacity by rememberSaveable { mutableStateOf(savedOpacity.coerceIn(0.25f, 1.0f)) }
+    var showOpacitySlider by remember { mutableStateOf(false) }
 
-                    // Cleanup menu
-                    Box {
-                        IconButton(onClick = { showCleanupMenu = true }) {
-                            Icon(Icons.Default.MoreVert, "More")
+    // Persist opacity when changed
+    LaunchedEffect(dialogOpacity) {
+        prefs.edit().putFloat(KEY_OPACITY, dialogOpacity).apply()
+    }
+    
+    // Box overlay instead of Dialog so map remains visible and active in background
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.7f)
+                .fillMaxHeight(0.92f),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = dialogOpacity),
+            tonalElevation = 8.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                // Header with close button and opacity control
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Tactical Units",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Opacity control button
+                        IconButton(onClick = { showOpacitySlider = !showOpacitySlider }) {
+                            Icon(
+                                imageVector = if (showOpacitySlider) Icons.Default.Close else Icons.Default.Visibility,
+                                contentDescription = "Adjust opacity"
+                            )
                         }
-                        DropdownMenu(
-                            expanded = showCleanupMenu,
-                            onDismissRequest = { showCleanupMenu = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Delete old inactive (7d)") },
-                                onClick = {
-                                    viewModel.deleteOldInactiveUnits(7)
-                                    showCleanupMenu = false
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Delete old history (14d)") },
-                                onClick = {
-                                    viewModel.deleteOldHistory(14)
-                                    showCleanupMenu = false
-                                }
-                            )
-                            Divider()
-                            DropdownMenuItem(
-                                text = { Text("Delete all units", color = MaterialTheme.colorScheme.error) },
-                                onClick = {
-                                    showDeleteConfirm = true
-                                    showCleanupMenu = false
-                                }
+
+                        // More options menu
+                        Box {
+                            IconButton(onClick = { showCleanupMenu = true }) {
+                                Icon(Icons.Default.MoreVert, "Options")
+                            }
+                            DropdownMenu(
+                                expanded = showCleanupMenu,
+                                onDismissRequest = { showCleanupMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Delete Inactive Units") },
+                                    onClick = {
+                                        showCleanupMenu = false
+                                        viewModel.deleteInactiveUnits()
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.Delete, null) }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Delete Old Units (>1h)") },
+                                    onClick = {
+                                        showCleanupMenu = false
+                                        viewModel.deleteOldUnits(3600)
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.Delete, null) }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Delete All Units") },
+                                    onClick = {
+                                        showCleanupMenu = false
+                                        showDeleteConfirm = true
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.DeleteForever, null) }
+                                )
+                            }
+                        }
+                        
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.Default.Close, contentDescription = "Close")
+                        }
+                    }
+                }
+
+                // Opacity slider (animated visibility)
+                AnimatedVisibility(
+                    visible = showOpacitySlider,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp, bottom = 8.dp)
+                    ) {
+                        Text(
+                            text = "Opacity: ${(dialogOpacity * 100).toInt()}%",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Slider(
+                            value = dialogOpacity,
+                            onValueChange = { dialogOpacity = it },
+                            valueRange = 0.25f..1.0f,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Live filter toggle
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.FilterList,
+                            contentDescription = null,
+                            tint = if (uiState.showLiveOnly) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Live Only",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        IconButton(onClick = { viewModel.toggleFilterDialog() }) {
+                            Icon(Icons.Default.Tune, "Advanced Filters")
+                        }
+                    }
+                    Switch(
+                        checked = uiState.showLiveOnly,
+                        onCheckedChange = { viewModel.setShowLiveOnly(it) }
+                    )
+                }
+                
+                // Search bar
+                OutlinedTextField(
+                    value = uiState.searchQuery,
+                    onValueChange = { viewModel.setSearchQuery(it) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    placeholder = { Text("Search by name or group...") },
+                    leadingIcon = { Icon(Icons.Default.Search, null) },
+                    trailingIcon = {
+                        if (uiState.searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                                Icon(Icons.Default.Clear, "Clear")
+                            }
+                        }
+                    },
+                    singleLine = true
+                )
+                
+                // Statistics card with entity tracking toggle and map update interval
+                StatsCard(
+                    stats = stats,
+                    isEntityTrackingEnabled = isEntityTrackingEnabled,
+                    onToggleEntityTracking = { dataPadManager.toggleEntityTracking() },
+                    showTacticalUnitsOnMap = showTacticalUnitsOnMap,
+                    onToggleMapVisibility = { dataPadManager.toggleTacticalUnitsOnMap() },
+                    mapUpdateInterval = mapUpdateInterval,
+                    onMapUpdateIntervalChange = { dataPadManager.setTacticalUnitsMapUpdateInterval(it) }
+                )
+                
+                // Units list
+                if (units.isEmpty()) {
+                    EmptyState()
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(
+                            items = units,
+                            key = { it.id }
+                        ) { unit ->
+                            UnitCard(
+                                unit = unit,
+                                onClick = { onUnitClick?.invoke(unit) },
+                                onCenterOnMap = onCenterOnMap,
+                                getCoalitionName = { viewModel.getCoalitionName(it) },
+                                getCategoryDisplayName = { viewModel.getCategoryDisplayName(it) }
                             )
                         }
                     }
                 }
+            }
+        }
+
+        // Filter Dialog (inside the Box)
+        if (uiState.showFilterDialog) {
+            FilterDialog(
+                uiState = uiState,
+                onDismiss = { viewModel.toggleFilterDialog() },
+                onToggleCategory = { viewModel.toggleCategory(it) },
+                onToggleCoalition = { viewModel.toggleCoalition(it) },
+                onToggleActiveOnly = { viewModel.setShowActiveOnly(it) },
+                onClearFilters = { viewModel.clearFilters() }
             )
         }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            // Live filter toggle
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Radar,
-                        contentDescription = null,
-                        tint = if (uiState.showLiveOnly) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            text = "Live Units Only",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
+
+        // Delete confirmation dialog (inside the Box)
+        if (showDeleteConfirm) {
+            AlertDialog(
+                onDismissRequest = { showDeleteConfirm = false },
+                title = { Text("Delete All Units?") },
+                text = { Text("This will delete all tracked units and their history. This cannot be undone.") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            viewModel.deleteAllUnits()
+                            showDeleteConfirm = false
+                        },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
                         )
-                        Text(
-                            text = if (uiState.showLiveOnly) "Showing units seen in last 10s" else "Showing all units",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                Switch(
-                    checked = uiState.showLiveOnly,
-                    onCheckedChange = { viewModel.toggleLiveOnly() }
-                )
-            }
-            
-            // Search bar
-            OutlinedTextField(
-                value = uiState.searchQuery,
-                onValueChange = { viewModel.setSearchQuery(it) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                placeholder = { Text("Search by name or group...") },
-                leadingIcon = { Icon(Icons.Default.Search, null) },
-                trailingIcon = {
-                    if (uiState.searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.setSearchQuery("") }) {
-                            Icon(Icons.Default.Clear, "Clear")
-                        }
+                    ) {
+                        Text("Delete")
                     }
                 },
-                singleLine = true
-            )
-            
-            // Statistics card with entity tracking toggle and map update interval
-            StatsCard(
-                stats = stats,
-                isEntityTrackingEnabled = isEntityTrackingEnabled,
-                onToggleEntityTracking = { dataPadManager.toggleEntityTracking() },
-                showTacticalUnitsOnMap = showTacticalUnitsOnMap,
-                onToggleMapVisibility = { dataPadManager.toggleTacticalUnitsOnMap() },
-                mapUpdateInterval = mapUpdateInterval,
-                onMapUpdateIntervalChange = { dataPadManager.setTacticalUnitsMapUpdateInterval(it) }
-            )
-            
-            // Units list
-            if (units.isEmpty()) {
-                EmptyState()
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(
-                        items = units,
-                        key = { it.id }
-                    ) { unit ->
-                        UnitCard(
-                            unit = unit,
-                            onClick = { onUnitClick?.invoke(unit) },
-                            onCenterOnMap = onCenterOnMap,
-                            getCoalitionName = { viewModel.getCoalitionName(it) },
-                            getCategoryDisplayName = { viewModel.getCategoryDisplayName(it) }
-                        )
+                dismissButton = {
+                    TextButton(onClick = { showDeleteConfirm = false }) {
+                        Text("Cancel")
                     }
                 }
-            }
+            )
         }
-    }
-    
-    // Filter Dialog
-    if (uiState.showFilterDialog) {
-        FilterDialog(
-            uiState = uiState,
-            onDismiss = { viewModel.toggleFilterDialog() },
-            onToggleCategory = { viewModel.toggleCategory(it) },
-            onToggleCoalition = { viewModel.toggleCoalition(it) },
-            onToggleActiveOnly = { viewModel.setShowActiveOnly(it) },
-            onClearFilters = { viewModel.clearFilters() }
-        )
-    }
-    
-    // Delete confirmation dialog
-    if (showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete All Units?") },
-            text = { Text("This will delete all tracked units and their history. This cannot be undone.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.deleteAllUnits()
-                        showDeleteConfirm = false
-                    },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Text("Delete")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
     }
 }
 
@@ -273,7 +326,7 @@ private fun StatsCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(vertical = 8.dp)
     ) {
         Column(
             modifier = Modifier.padding(16.dp)
@@ -997,7 +1050,6 @@ private fun EmptyState() {
     }
 }
 
-// Extension function for Double formatting
 private fun Double.format(decimals: Int): String {
     return "%.${decimals}f".format(this)
 }

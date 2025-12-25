@@ -133,7 +133,14 @@ class TacticalUnitsRepository(private val context: Context) {
     }
     
     // --- Cleanup functions ---
-    
+
+    /**
+     * Delete all inactive units regardless of age
+     */
+    suspend fun deleteInactiveUnits() {
+        unitsDao.deleteAllInactiveUnits()
+    }
+
     /**
      * Delete inactive units older than specified days
      */
@@ -141,7 +148,15 @@ class TacticalUnitsRepository(private val context: Context) {
         val cutoffTime = Instant.now().minus(daysOld.toLong(), ChronoUnit.DAYS).toString()
         unitsDao.deleteInactiveUnitsOlderThan(cutoffTime)
     }
-    
+
+    /**
+     * Delete units (both active and inactive) older than specified seconds
+     */
+    suspend fun deleteOldUnits(seconds: Int) {
+        val cutoffTime = Instant.now().minusSeconds(seconds.toLong()).toString()
+        unitsDao.deleteUnitsOlderThan(cutoffTime)
+    }
+
     /**
      * Delete history entries older than specified days
      */
@@ -149,7 +164,7 @@ class TacticalUnitsRepository(private val context: Context) {
         val cutoffTime = Instant.now().minus(daysOld.toLong(), ChronoUnit.DAYS).toString()
         historyDao.deleteHistoryOlderThan(cutoffTime)
     }
-    
+
     /**
      * Delete all units (both active and inactive)
      */

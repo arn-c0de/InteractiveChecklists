@@ -5,6 +5,8 @@ All relevant changes are summarized here by version.
 ## [1.0.17] - 2025-12-25
 
 ### Summary
+- Full Tactical Units Streaming Implementation - TACTICAL_UNITS_TRACKING.md
+
 - Tactical Units: Added **"Live Units Only"** filter (shows units seen in the last 10s) and synchronized the filter between list and map; marker popups now include **"Last seen"** timestamps and refresh snippets with speed/altitude.
 - Map & DataPad: `MapViewer` now uses a timer-based update loop for precise redraw intervals; `DataPadManager` adds `tacticalUnitsShowLiveOnly` StateFlow and persistence, and improves the tactical units map update interval handling.
 - Fixes: Resolved compilation/import issues, fixed irregular marker update timing, ensured inactive units are removed promptly, and corrected coalition color mapping; improved logging for entity tracking.

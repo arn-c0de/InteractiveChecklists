@@ -147,19 +147,31 @@ class TacticalUnitsViewModel(
     }
     
     // --- Cleanup Actions ---
-    
+
+    fun deleteInactiveUnits() {
+        viewModelScope.launch {
+            repository.deleteInactiveUnits()
+        }
+    }
+
+    fun deleteOldUnits(seconds: Int) {
+        viewModelScope.launch {
+            repository.deleteOldUnits(seconds)
+        }
+    }
+
     fun deleteAllUnits() {
         viewModelScope.launch {
             repository.deleteAllUnits()
         }
     }
-    
+
     fun deleteOldInactiveUnits(daysOld: Int = 7) {
         viewModelScope.launch {
             repository.deleteOldInactiveUnits(daysOld)
         }
     }
-    
+
     fun deleteOldHistory(daysOld: Int = 14) {
         viewModelScope.launch {
             repository.deleteOldHistory(daysOld)
