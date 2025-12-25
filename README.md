@@ -128,7 +128,6 @@ Planned enhancements include additional telemetry (speed, vertical speed, fuel, 
 </p>
 
 <p align="center">
-**Demo 1:** Test recording — performance / tablet capture &nbsp;&nbsp; **Demo 2:** Test recording — workflow / resolution
 </p>
 
 > 📝 **NOTE**  
