@@ -284,6 +284,73 @@
     <string name="quick_notes_default_title">Mis Notas</string>
     <string name="quick_notes_new_note_title">Nueva Nota</string>
 
+    <!-- Tactical Units -->
+    <string name="tactical_title">Unidades Tácticas</string>
+    <string name="tactical_adjust_opacity">Ajustar opacidad</string>
+    <string name="tactical_delete_inactive">Eliminar unidades inactivas</string>
+    <string name="tactical_delete_old">Eliminar unidades antiguas (&gt;1h)</string>
+    <string name="tactical_delete_all">Eliminar todas las unidades</string>
+    <string name="tactical_delete_all_confirm_title">¿Eliminar todas las unidades?</string>
+    <string name="tactical_delete_all_confirm_message">Esto eliminará todas las unidades rastreadas y su historial. Esto no se puede deshacer.</string>
+    <string name="tactical_opacity_label">Opacidad: %1$d%%</string>
+    <string name="tactical_live_only">Solo en vivo</string>
+    <string name="tactical_search_placeholder">Buscar por nombre o grupo...</string>
+    <string name="tactical_advanced_filters">Filtros avanzados</string>
+    <string name="tactical_entity_tracking">Seguimiento de entidades</string>
+    <string name="tactical_receiving">Recibiendo unidades tácticas</string>
+    <string name="tactical_tracking_disabled">Seguimiento desactivado</string>
+    <string name="tactical_unit_visibility_on_map">Visibilidad de unidades en el mapa</string>
+    <string name="tactical_units_visible_on_map">Unidades visibles en el mapa</string>
+    <string name="tactical_units_hidden_on_map">Unidades ocultas en el mapa</string>
+    <string name="tactical_map_update_interval">Intervalo actualización mapa</string>
+    <string name="tactical_map_update_explain">Menor = movimiento más suave, mayor = mejor rendimiento</string>
+    <string name="tactical_active_units_label">Unidades activas: %1$d</string>
+    <string name="tactical_coalition_neutral">Neutral</string>
+    <string name="tactical_coalition_red">Rojo</string>
+    <string name="tactical_coalition_blue">Azul</string>
+    <string name="category_aircraft">Aeronave</string>
+    <string name="category_heli">Helicóptero</string>
+    <string name="category_ground">Tierra</string>
+    <string name="category_ship">Barco</string>
+    <string name="category_structure">Estructura</string>
+    <string name="category_weapon">Arma</string>
+    <string name="status_active">ACTIVO</string>
+    <string name="status_lost_contact">SIN CONTACTO</string>
+    <string name="empty_no_units_found">No se encontraron unidades</string>
+    <string name="empty_start_datapad_hint">Inicie DCS con DataPad habilitado para rastrear unidades</string>
+    <string name="filter_title">Filtrar unidades</string>
+    <string name="filter_show_active_only">Mostrar solo activas</string>
+    <string name="filter_categories_title">Categorías</string>
+    <string name="filter_coalitions_title">Coaliciones</string>
+    <string name="tactical_done">Listo</string>
+    <string name="unit_dist_label">Dist:</string>
+    <string name="unit_brg_label">Brg:</string>
+    <string name="unit_spd_label">Spd:</string>
+    <string name="unit_last_seen_label">Última vez:</string>
+    <string name="unit_group_label">Grupo:</string>
+    <string name="coords_title">Coordenadas</string>
+    <string name="lat_label">Latitud</string>
+    <string name="lon_label">Longitud</string>
+    <string name="alt_label">Altitud</string>
+    <string name="na_label">N/D</string>
+    <string name="navigation_title">Navegación</string>
+    <string name="heading_label">Rumbo</string>
+    <string name="speed_label">Velocidad</string>
+    <string name="distance_label">Distancia</string>
+    <string name="bearing_label">Orientación</string>
+    <string name="tracking_info_title">Información de seguimiento</string>
+    <string name="first_seen_label">Primera vez:</string>
+    <string name="last_seen_label">Última vez:</string>
+    <string name="dcs_id_label">ID DCS:</string>
+    <string name="pilot_info_title">Info del piloto</string>
+    <string name="pilot_label">Piloto:</string>
+    <string name="center_on_map">Centrar en el mapa</string>
+    <string name="tactical_options">Opciones</string>
+    <string name="tactical_time_seconds">hace %1$ds</string>
+    <string name="tactical_time_minutes">hace %1$dm</string>
+    <string name="tactical_time_hours">hace %1$dh</string>
+    <string name="tactical_time_unknown">Desconocido</string>
+
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <!-- FLIGHT STATUS -->
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
@@ -1127,6 +1194,7 @@
     <string name="map_marker_type">Type</string>
     <string name="map_marker_icao">ICAO</string>
     <string name="map_marker_iata">IATA</string>
+    <string name="map_marker_map">Mapa</string>
     <string name="map_marker_country">Country</string>
     <string name="map_marker_region">Region</string>
     <string name="map_marker_timezone">Timezone</string>
