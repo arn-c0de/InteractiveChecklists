@@ -232,38 +232,97 @@ fun MapNavigationDisplay(
                         val smallTolerance = patternAltitudeSmallToleranceFt
                         val warningTol = patternAltitudeWarningToleranceFt
 
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(
-                                text = stringResource(R.string.map_nav_pattern_alt, patternAltMslCompact),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer
-                            )
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            // Pattern altitude row (P:)
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    text = stringResource(R.string.map_nav_pattern_alt, patternAltMslCompact),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
 
-                            // compact indicator
-                            if (diffCompact != null) {
-                                val absDiff = kotlin.math.abs(diffCompact)
-                                when {
-                                    absDiff <= smallTolerance -> {
-                                        Text(text = "≈", color = androidx.compose.ui.graphics.Color(0xFF00C853))
+                                // compact indicator with black background
+                                Box(
+                                    modifier = Modifier
+                                        .background(
+                                            color = androidx.compose.ui.graphics.Color.Black,
+                                            shape = MaterialTheme.shapes.extraSmall
+                                        )
+                                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (diffCompact != null) {
+                                        val absDiff = kotlin.math.abs(diffCompact)
+                                        when {
+                                            absDiff <= smallTolerance -> {
+                                                Text(text = "≈", color = androidx.compose.ui.graphics.Color(0xFF00C853))
+                                            }
+                                            else -> {
+                                                val col = if (absDiff <= warningTol) androidx.compose.ui.graphics.Color(0xFFFFA000) else androidx.compose.ui.graphics.Color(0xFFD50000)
+                                                if (diffCompact < 0) {
+                                                    Icon(imageVector = Icons.Default.KeyboardArrowUp, contentDescription = stringResource(R.string.map_nav_alt_climb), tint = col)
+                                                } else {
+                                                    Icon(imageVector = Icons.Default.KeyboardArrowDown, contentDescription = stringResource(R.string.map_nav_alt_descend), tint = col)
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        Text(text = "?", color = MaterialTheme.colorScheme.onErrorContainer)
                                     }
-                                    else -> {
-                                        val col = if (absDiff <= warningTol) androidx.compose.ui.graphics.Color(0xFFFFA000) else androidx.compose.ui.graphics.Color(0xFFD50000)
-                                        if (diffCompact < 0) {
-                                            Icon(imageVector = Icons.Default.KeyboardArrowUp, contentDescription = stringResource(R.string.map_nav_alt_climb), tint = col)
+                                }
+
+                                Text(
+                                    text = "C:${currentAltCompactDisplay}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.9f)
+                                )
+                            }
+
+                            // Marker altitude row (M:) - only if marker has altitude
+                            activeNavigationTarget?.elevationM?.let { markerAltM ->
+                                val markerAltFt = markerAltM * 3.28084
+                                val markerPlayerDiff = if (currentAltCompact.isNaN()) null else currentAltCompact - markerAltFt
+                                val markerTolerance = 100.0
+
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(
+                                        text = "M:${markerAltFt.toInt()} ft",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+
+                                    // Marker altitude indicator with black background
+                                    Box(
+                                        modifier = Modifier
+                                            .background(
+                                                color = androidx.compose.ui.graphics.Color.Black,
+                                                shape = MaterialTheme.shapes.extraSmall
+                                            )
+                                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (markerPlayerDiff != null) {
+                                            val absDiff = kotlin.math.abs(markerPlayerDiff)
+                                            when {
+                                                absDiff <= markerTolerance -> {
+                                                    Text(text = "→", color = androidx.compose.ui.graphics.Color(0xFF00C853), fontWeight = FontWeight.Bold)
+                                                }
+                                                markerPlayerDiff < 0 -> {
+                                                    val col = if (absDiff <= 500.0) androidx.compose.ui.graphics.Color(0xFFFFA000) else androidx.compose.ui.graphics.Color(0xFFD50000)
+                                                    Icon(imageVector = Icons.Default.KeyboardArrowUp, contentDescription = "Climb to marker", tint = col, modifier = Modifier.size(16.dp))
+                                                }
+                                                else -> {
+                                                    val col = if (absDiff <= 500.0) androidx.compose.ui.graphics.Color(0xFFFFA000) else androidx.compose.ui.graphics.Color(0xFFD50000)
+                                                    Icon(imageVector = Icons.Default.KeyboardArrowDown, contentDescription = "Descend to marker", tint = col, modifier = Modifier.size(16.dp))
+                                                }
+                                            }
                                         } else {
-                                            Icon(imageVector = Icons.Default.KeyboardArrowDown, contentDescription = stringResource(R.string.map_nav_alt_descend), tint = col)
+                                            Text(text = "?", color = MaterialTheme.colorScheme.onErrorContainer)
                                         }
                                     }
                                 }
-                            } else {
-                                Text(text = "?", color = MaterialTheme.colorScheme.onErrorContainer)
                             }
-
-                            Text(
-                                text = "C:${currentAltCompactDisplay}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.9f)
-                            )
                         }
 
                         // Toggle expand/collapse button
