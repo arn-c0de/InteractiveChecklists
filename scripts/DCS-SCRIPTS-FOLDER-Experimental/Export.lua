@@ -9,7 +9,7 @@ pcall(function()
 	local COMMAND_PATH = writeDir .. [[Scripts\forwarder_command.json]]
 	local DEBUG_DUMP_TABLES = true -- set to false to disable table debug dumps
 	local dumped_tables = {}
-	local UPDATE_INTERVAL = 0.05 -- seconds (10 Hz update rate)
+	local UPDATE_INTERVAL = 0.01 -- seconds (10 Hz update rate)
 	local lastWrite = 0
 	local lastCommandCheck = 0
 	local COMMAND_CHECK_INTERVAL = 2.0 -- check for command file every 2 seconds
@@ -690,8 +690,8 @@ pcall(function()
 		data.aiOn = false
 		data.born = true
 
-		-- Include nearbyUnits directly in FlightData for consistent transmission
-		data.nearbyUnits = collect_nearby_units()
+		-- nearbyUnits removed from FlightData for performance - now in separate entity file
+		-- This allows fast player position updates without massive JSON payloads
 
 		return data
 	end
@@ -920,17 +920,23 @@ pcall(function()
 		end
 
 		if now - lastWrite >= UPDATE_INTERVAL then
-			-- Write aircraft telemetry (with nearbyUnits included)
+			-- Write aircraft telemetry (lean, no nearbyUnits for fast updates)
 			local telemetry = collect_telemetry()
 			write_json(telemetry)
+			-- Write entity contacts to SEPARATE file
+			local entityContacts = collect_entity_contacts()
+			write_entity_json(entityContacts)
 
 			lastWrite = now
 		end
 	end
 
 	function LuaExportStop()
-		-- Write final aircraft telemetry (with nearbyUnits included)
+		-- Write final aircraft telemetry
 		local telemetry = collect_telemetry()
 		write_json(telemetry)
+		-- Write final entity contacts
+		local entityContacts = collect_entity_contacts()
+		write_entity_json(entityContacts)
 	end
 end, nil)

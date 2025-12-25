@@ -233,6 +233,7 @@ def find_device_for_session(session_mgr: 'SessionManager', session_id: str) -> s
 # Timestamp filtering to prevent forwarding of old/cached data
 # Stores last processed timestamp as ISO-8601 string (or None)
 _last_processed_timestamp = None
+_last_timestamp_update_time = 0  # Track when timestamp was last updated for timeout
 
 def _parse_iso_timestamp(ts_str: str):
     try:
@@ -598,6 +599,14 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
         f_entity = open_for_tail(entity_contacts_path)
 
     try:
+        # Declare global variables at the start of the loop to avoid SyntaxError
+        global _last_processed_timestamp, _last_timestamp_update_time
+        
+        # Tactical data throttling: Send entity data only every N player updates for performance
+        player_update_counter = 0
+        ENTITY_UPDATE_INTERVAL = 10  # Send tactical data every 10 player updates (10:1 ratio)
+        last_entity_data = None  # Cache last entity data to attach to player updates
+        
         while True:
             # Check heartbeat FIRST (independent of data availability)
             current_time = time.time()
@@ -721,6 +730,11 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                         pass
                     logger.info(f"🔄 File trimmed detected (pos={cur_pos} > size={size}), skipping to new data...")
                     
+                    # IMPORTANT: Reset timestamp filter to avoid rejecting buffered data after trim
+                    _last_processed_timestamp = None
+                    _last_timestamp_update_time = 0
+                    logger.info("🔄 Reset timestamp filter after file trim")
+                    
                     # After trim, file contains last N buffered lines (already processed)
                     # Wait for file to GROW beyond trimmed size = new data appended
                     trimmed_size = os.path.getsize(path)
@@ -786,6 +800,14 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
             except Exception:
                 cur_ts = None
 
+            # TIMEOUT LOGIC: Reset timestamp filter if no data sent for 5 seconds
+            # This prevents long rejection phases after file trim or connection interruptions
+            current_time = time.time()
+            if _last_timestamp_update_time > 0 and (current_time - _last_timestamp_update_time) > 5.0:
+                logger.warning(f"⚠️ No data sent for {current_time - _last_timestamp_update_time:.1f}s - resetting timestamp filter")
+                _last_processed_timestamp = None
+                _last_timestamp_update_time = 0
+
             if not _timestamp_is_newer(cur_ts, _last_processed_timestamp):
                 logger.warning(f"⚠️ REJECTED OLD DATA: timestamp={cur_ts} (last={_last_processed_timestamp}) - preventing position reset!")
                 continue
@@ -794,15 +816,55 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
             if cur_ts is not None:
                 logger.info(f"✅ Accepted data with timestamp={cur_ts}")
                 _last_processed_timestamp = cur_ts
+                _last_timestamp_update_time = current_time
 
-            # Send to all devices with active sessions (ECDH mode)
+            # Increment player update counter
+            player_update_counter += 1
+
+            # Read entity data periodically (not every frame for performance!)
+            should_read_entity = (player_update_counter % ENTITY_UPDATE_INTERVAL) == 0
+            if should_read_entity and f_entity is not None:
+                wants_entities = any(
+                    session_mgr.sessions[session_id].entity_tracking_enabled
+                    for device_id, session_id in session_mgr.device_sessions.items()
+                    if session_id in session_mgr.sessions
+                )
+                if wants_entities:
+                    entity_line = f_entity.readline()
+                    if entity_line:
+                        entity_jsonpart = extract_json_from_line(entity_line)
+                        if entity_jsonpart:
+                            # Parse and cache entity data
+                            try:
+                                entity_parsed = safe_json_parse(entity_jsonpart, max_size=_MAX_DATA_MESSAGE_SIZE)
+                                if entity_parsed and 'nearbyUnits' in entity_parsed:
+                                    last_entity_data = entity_parsed['nearbyUnits']
+                                    logger.debug(f"📡 Cached {len(last_entity_data)} tactical units")
+                            except Exception as e:
+                                logger.debug(f"Failed to parse entity data: {e}")
+
+            # Merge cached tactical data with player data before sending
+            final_json = jsonpart
+            if last_entity_data is not None:
+                try:
+                    # Parse player data, add nearbyUnits, re-encode
+                    player_data = safe_json_parse(jsonpart, max_size=_MAX_DATA_MESSAGE_SIZE)
+                    if player_data:
+                        player_data['nearbyUnits'] = last_entity_data
+                        final_json = json.dumps(player_data)
+                        logger.debug(f"📡 Merged {len(last_entity_data)} tactical units with player data")
+                except Exception as e:
+                    logger.debug(f"Failed to merge entity data: {e}")
+                    # Fall back to player-only data
+
+            # Send merged data to all devices with active sessions (ECDH mode)
             sent_count = 0
             for device_id, session_id in list(session_mgr.device_sessions.items()):
                 # Get device info for logging
                 device = session_mgr.authorized_devices.get(device_id)
                 device_name = device.name if device else device_id[:8]
 
-                if send_udp(jsonpart.encode('utf-8'), host, port, sock,
+                if send_udp(final_json.encode('utf-8'), host, port, sock,
                            session_mgr=session_mgr, device_id=device_id):
                     sent_count += 1
                 else:
@@ -837,43 +899,8 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                 else:
                     print(f"{ts} ERROR {host}:{port} {jsonpart}")
 
-            # Check entity contacts file (if exists and any device wants entity tracking)
-            if f_entity is not None:
-                # Check if ANY active session wants entity tracking
-                wants_entities = any(
-                    session_mgr.sessions[session_id].entity_tracking_enabled
-                    for device_id, session_id in session_mgr.device_sessions.items()
-                    if session_id in session_mgr.sessions
-                )
-
-                if wants_entities:
-                    entity_line = f_entity.readline()
-                    if entity_line:
-                        entity_jsonpart = extract_json_from_line(entity_line)
-                        if entity_jsonpart:
-                            # Send ONLY to devices with entity_tracking_enabled=true
-                            entity_sent_count = 0
-                            for device_id, session_id in list(session_mgr.device_sessions.items()):
-                                session = session_mgr.sessions.get(session_id)
-                                if session and session.entity_tracking_enabled:
-                                    if send_udp(entity_jsonpart.encode('utf-8'), host, port, sock,
-                                               session_mgr=session_mgr, device_id=device_id):
-                                        entity_sent_count += 1
-                                        logger.info(f"📡 Sent entity data to {device_id[:8]}...")
-
-                            if entity_sent_count > 0:
-                                logger.info(f"📡 Entity contacts sent to {entity_sent_count} device(s)")
-                else:
-                    # No device wants entities, skip reading
-                    pass
-            elif entity_contacts_path and not f_entity:
-                # Try to open entity file if it was created after we started
-                if os.path.exists(entity_contacts_path):
-                    try:
-                        f_entity = open_for_tail(entity_contacts_path)
-                        logger.info(f"📡 Entity contacts file now available: {entity_contacts_path}")
-                    except Exception as e:
-                        logger.debug(f"Could not open entity file: {e}")
+            # Entity file handling moved to periodic reading (every N player updates) above
+            # This ensures fast player updates without massive JSON payloads every frame
 
     finally:
         try:
@@ -960,6 +987,9 @@ def repeat_last_line(path: str, host: str, port: int, session_mgr: 'SessionManag
     HEARTBEAT_INTERVAL = 30.0  # seconds
     
     try:
+        # Declare global variables at the start of the loop to avoid SyntaxError
+        global _last_processed_timestamp, _last_timestamp_update_time
+        
         last_sent = None
         last_send_time = 0
         last_file_mtime = 0  # Track file modification time to detect changes
@@ -1115,6 +1145,12 @@ def repeat_last_line(path: str, host: str, port: int, session_mgr: 'SessionManag
                 except Exception:
                     cur_ts = None
 
+                # TIMEOUT LOGIC: Reset timestamp filter if no data sent for 5 seconds
+                if _last_timestamp_update_time > 0 and (current_time - _last_timestamp_update_time) > 5.0:
+                    logger.warning(f"⚠️ No data sent for {current_time - _last_timestamp_update_time:.1f}s - resetting timestamp filter")
+                    _last_processed_timestamp = None
+                    _last_timestamp_update_time = 0
+
                 if not _timestamp_is_newer(cur_ts, _last_processed_timestamp):
                     logger.warning(f"⚠️ REJECTED OLD DATA: timestamp={cur_ts} (last={_last_processed_timestamp}) - preventing position reset!")
                     continue
@@ -1123,6 +1159,7 @@ def repeat_last_line(path: str, host: str, port: int, session_mgr: 'SessionManag
                 if cur_ts is not None:
                     logger.info(f"✅ Accepted data with timestamp={cur_ts}")
                     _last_processed_timestamp = cur_ts
+                    _last_timestamp_update_time = current_time
 
                 # Send to all devices with active sessions (ECDH mode)
                 sent_count = 0
