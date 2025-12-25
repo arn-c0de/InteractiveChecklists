@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.checklist_interactive.data.datapad.DataPadManager
+import com.example.checklist_interactive.ui.datapad.LocalDataPadManager
 import com.example.checklist_interactive.data.tactical.TacticalUnitEntity
 import com.example.checklist_interactive.data.tactical.TacticalUnitsRepository
 import java.time.Instant
@@ -41,8 +42,8 @@ fun TacticalUnitsListScreen(
     val context = LocalContext.current
     val repository = remember { TacticalUnitsRepository(context) }
     
-    // Access DataPadManager for entity tracking toggle and map update interval
-    val dataPadManager = remember { DataPadManager(context) }
+    // Use the same DataPadManager instance from CompositionLocal (shared with MapViewer)
+    val dataPadManager = LocalDataPadManager.current
     
     val viewModel: TacticalUnitsViewModel = viewModel(
         factory = TacticalUnitsViewModelFactory(
