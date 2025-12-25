@@ -193,6 +193,16 @@ fun MapViewer(
     val markerRouteViewModel = remember(mapState.tacticalDb) { if (locationRepository != null && routeRepository != null) MarkerRouteViewModel(locationRepository, routeRepository) else null }
     val routeCreationViewModel = remember(mapState.tacticalDb) { if (routeRepository != null && locationRepository != null && mapState.tacticalDb != null) MultiWaypointRouteViewModel(context.applicationContext as Application, routeRepository, locationRepository, mapState.tacticalDb!!.runwayDao()) else null }
 
+    // Tactical Units Repository for live unit tracking
+    val tacticalUnitsRepository = remember(mapState.tacticalDb) {
+        mapState.tacticalDb?.let {
+            android.util.Log.d("MapViewer", "Creating TacticalUnitsRepository")
+            com.example.checklist_interactive.data.tactical.TacticalUnitsRepository(context)
+        }.also {
+            android.util.Log.d("MapViewer", "TacticalUnitsRepository state: ${if (it != null) "READY" else "NULL"}")
+        }
+    }
+
     // Combined ready state: DB AND repositories must be initialized
     val repositoriesReady = dbReady && locationRepository != null && routeRepository != null
 
@@ -1677,6 +1687,194 @@ fun MapViewer(
                         mv.invalidate()
                         Log.d(TAG, "Loaded ${markers.size} markers onto map")
                     }
+                }
+            }
+        }
+        
+        // Load and display TACTICAL UNITS from database (live tracking)
+        LaunchedEffect(mapState.mapView, tacticalUnitsRepository, dataPadManager.isEntityTrackingEnabled.collectAsState().value) {
+            val mv = mapState.mapView
+            val repo = tacticalUnitsRepository
+            val entityTrackingEnabled = dataPadManager.isEntityTrackingEnabled.value
+            
+            if (mv != null && repo != null && entityTrackingEnabled) {
+                Log.d(TAG, "📡 Starting tactical units live tracking on map")
+                
+                // Track unit markers separately to update positions efficiently
+                val unitMarkers = mutableMapOf<Int, org.osmdroid.views.overlay.Marker>()
+                
+                repo.getAllActiveUnits().collect { units ->
+                    Log.d(TAG, "📡 Received ${units.size} active tactical units from database")
+                    
+                    // Remove markers for units that are no longer active
+                    val currentUnitIds = units.map { it.id }.toSet()
+                    val markersToRemove = unitMarkers.filter { it.key !in currentUnitIds }
+                    if (markersToRemove.isNotEmpty()) {
+                        Log.d(TAG, "📡 Removing ${markersToRemove.size} inactive unit markers")
+                    }
+                    markersToRemove.forEach { (unitId, marker) ->
+                        mv.overlays.remove(marker)
+                        unitMarkers.remove(unitId)
+                    }
+                    
+                    // Update or create markers for active units
+                    units.forEach { unit ->
+                        val existingMarker = unitMarkers[unit.id]
+                        
+                        if (existingMarker != null) {
+                            // Update existing marker position, heading, and details
+                            val oldPos = existingMarker.position
+                            val newPos = GeoPoint(unit.latitude, unit.longitude)
+                            
+                            // Only update if position actually changed (avoid unnecessary redraws)
+                            if (oldPos.latitude != newPos.latitude || oldPos.longitude != newPos.longitude) {
+                                existingMarker.position = newPos
+                                Log.d(TAG, "📡 Updated unit ${unit.name}: ${oldPos.latitude},${oldPos.longitude} -> ${newPos.latitude},${newPos.longitude}")
+                            }
+                            
+                            // Update heading rotation
+                            unit.heading?.let { 
+                                existingMarker.rotation = it.toFloat()
+                            }
+                            
+                            // Update marker title and snippet with current data
+                            existingMarker.title = unit.name
+                            existingMarker.snippet = buildString {
+                                append("${unit.category.replaceFirstChar { it.uppercase() }}")
+                                append(" • ")
+                                append(when (unit.coalition) {
+                                    0 -> "Neutral"
+                                    1 -> "Red"
+                                    2 -> "Blue"
+                                    else -> "Unknown"
+                                })
+                                unit.groupName?.let { if (it.isNotEmpty()) append("\nGroup: $it") }
+                                unit.speed?.let { append("\nSpeed: ${String.format("%.0f", it)} kts") }
+                                unit.altitude?.let { append("\nAlt: ${String.format("%.0f", it)} ft") }
+                            }
+                            
+                            // Update stored unit data
+                            try { existingMarker.setRelatedObject(unit) } catch (_: Throwable) { }
+                        } else {
+                            // Create new marker for this unit
+                            val markerIcon = withContext(kotlinx.coroutines.Dispatchers.Default) {
+                                try {
+                                    // Coalition color
+                                    val coalitionColor = when (unit.coalition) {
+                                        0 -> android.graphics.Color.parseColor("#999999") // Neutral (gray)
+                                        1 -> android.graphics.Color.parseColor("#FF4444") // Red (hostile)
+                                        2 -> android.graphics.Color.parseColor("#00A8FF") // Blue (friendly)
+                                        else -> android.graphics.Color.parseColor("#FFFF80") // Unknown (yellow)
+                                    }
+                                    
+                                    // Try to load category-specific icon
+                                    val categoryIcon = when (unit.category.lowercase()) {
+                                        "aircraft" -> "ic_mapicon_fighter"
+                                        "helicopter" -> "ic_mapicon_helicopter"
+                                        "ground" -> "ic_mapicon_armor"
+                                        "ship" -> "ic_mapicon_ship"
+                                        else -> null
+                                    }
+                                    
+                                    var drawable: BitmapDrawable? = null
+                                    
+                                    categoryIcon?.let { iconName ->
+                                        val iconResId = context.resources.getIdentifier(iconName, "drawable", context.packageName)
+                                        if (iconResId != 0) {
+                                            ContextCompat.getDrawable(context, iconResId)?.mutate()?.let { d ->
+                                                val bitmap = android.graphics.Bitmap.createBitmap(64, 64, android.graphics.Bitmap.Config.ARGB_8888)
+                                                val canvas = android.graphics.Canvas(bitmap)
+                                                d.setBounds(0, 0, 64, 64)
+                                                val colorFilter = android.graphics.PorterDuffColorFilter(coalitionColor, android.graphics.PorterDuff.Mode.SRC_ATOP)
+                                                d.colorFilter = colorFilter
+                                                d.draw(canvas)
+                                                drawable = BitmapDrawable(context.resources, bitmap)
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Fallback: colored circle with coalition color
+                                    if (drawable == null) {
+                                        val bitmap = android.graphics.Bitmap.createBitmap(48, 48, android.graphics.Bitmap.Config.ARGB_8888)
+                                        val canvas = android.graphics.Canvas(bitmap)
+                                        val paint = android.graphics.Paint().apply { 
+                                            isAntiAlias = true
+                                            color = coalitionColor
+                                            style = android.graphics.Paint.Style.FILL
+                                        }
+                                        val strokePaint = android.graphics.Paint().apply {
+                                            isAntiAlias = true
+                                            color = android.graphics.Color.WHITE
+                                            style = android.graphics.Paint.Style.STROKE
+                                            strokeWidth = 3f
+                                        }
+                                        canvas.drawCircle(24f, 24f, 16f, paint)
+                                        canvas.drawCircle(24f, 24f, 16f, strokePaint)
+                                        
+                                        // Add category indicator
+                                        val textPaint = android.graphics.Paint().apply {
+                                            isAntiAlias = true
+                                            color = android.graphics.Color.WHITE
+                                            textSize = 14f
+                                            textAlign = android.graphics.Paint.Align.CENTER
+                                            isFakeBoldText = true
+                                        }
+                                        val categoryLetter = unit.category.firstOrNull()?.uppercaseChar()?.toString() ?: "U"
+                                        canvas.drawText(categoryLetter, 24f, 28f, textPaint)
+                                        
+                                        drawable = BitmapDrawable(context.resources, bitmap)
+                                    }
+                                    
+                                    drawable
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Failed to create tactical unit icon: ${e.message}")
+                                    null
+                                }
+                            }
+                            
+                            val newMarker = org.osmdroid.views.overlay.Marker(mv).apply {
+                                position = GeoPoint(unit.latitude, unit.longitude)
+                                title = unit.name
+                                snippet = buildString {
+                                    append("${unit.category.replaceFirstChar { it.uppercase() }}")
+                                    append(" • ")
+                                    append(when (unit.coalition) {
+                                        0 -> "Neutral"
+                                        1 -> "Red"
+                                        2 -> "Blue"
+                                        else -> "Unknown"
+                                    })
+                                    unit.groupName?.let { if (it.isNotEmpty()) append("\nGroup: $it") }
+                                    unit.speed?.let { append("\nSpeed: ${String.format("%.0f", it)} kts") }
+                                    unit.altitude?.let { append("\nAlt: ${String.format("%.0f", it)} ft") }
+                                }
+                                setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_CENTER)
+                                
+                                // Set heading rotation
+                                unit.heading?.let { rotation = it.toFloat() }
+                                
+                                // Set icon
+                                markerIcon?.let { icon = it }
+                                
+                                // Store unit data
+                                try { setRelatedObject(unit) } catch (_: Throwable) { }
+                            }
+                            
+                            mv.overlays.add(newMarker)
+                            unitMarkers[unit.id] = newMarker
+                            Log.d(TAG, "📡 Created new marker for unit: ${unit.name} (${unit.category})")
+                        }
+                    }
+                    
+                    // Force map redraw to show updated positions
+                    withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        mv.invalidate()
+                    }
+                    Log.d(TAG, "📡 Map updated with ${unitMarkers.size} tactical unit markers")
+                }
+            } else {
+                if (!entityTrackingEnabled) {
+                    Log.d(TAG, "📡 Entity tracking disabled - not showing tactical units on map")
                 }
             }
         }

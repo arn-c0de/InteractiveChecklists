@@ -73,7 +73,7 @@ Das Tactical Units Tracking System exportiert alle sichtbaren Einheiten aus DCS 
 **FAB Button:**
 - TrackChanges Icon (Radar-ähnlich)
 - Position: defaultX=0.95f, defaultY=0.15f
-- In MapViewerFABs integriert
+- In MapViewerFAB Overlay integriert
 
 ## Verwendung
 
@@ -94,7 +94,7 @@ Das Tactical Units Tracking System exportiert alle sichtbaren Einheiten aus DCS 
 2. **Python forwarded** → Verschlüsselte UDP-Pakete
 3. **App empfängt** → DataPadManager verarbeitet
 4. **DB speichert** → TacticalUnitEntity + History
-5. **Map zeigt** → Marker auf Karte (TODO)
+5. **Map zeigt** → Marker auf Karte (TODO) via tactical icons enemy are red blöufor blue civilian yellow
 6. **Liste zeigt** → TacticalUnitsListScreen
 
 ### Filter & Suche
@@ -133,32 +133,32 @@ Das Tactical Units Tracking System exportiert alle sichtbaren Einheiten aus DCS 
 5. ✅ Repository erstellen
 6. ✅ UI Screen + ViewModel
 7. ✅ FAB Button hinzufügen
-8. ⏳ Map Integration (Marker auf Karte)
+8. ✅ Map Integration (Marker auf Karte) - **Live tracking mit automatischen Updates**
 9. ⏳ Navigation Integration (Screen Routing)
 10. ⏳ Unit Detail View (mit History-Anzeige)
 
 ## Nächste Schritte
 
-### Map Integration
+### Map Integration ✅ IMPLEMENTIERT
 
-Die Units sollen auch als Marker auf der Karte angezeigt werden:
+Die Units werden jetzt **automatisch live** als Marker auf der Karte angezeigt:
 
+**Features:**
+- ✅ Live-Updates: Marker bewegen sich automatisch mit Unit-Positionen
+- ✅ Auto-Remove: Inactive Units verschwinden sofort von der Karte
+- ✅ Coalition-Farben: Neutral (grau), Red (rot), Blue (blau)
+- ✅ Kategorie-Icons: Aircraft, Helicopter, Ground, Ship
+- ✅ Heading-Anzeige: Marker rotieren entsprechend Unit-Richtung
+- ✅ Details beim Click: Name, Kategorie, Coalition, Speed, Altitude, Group
+- ✅ Toggle-Control: Nur angezeigt wenn Entity Tracking aktiviert ist
+
+**Implementierung:**
 ```kotlin
-// In MapViewModel:
-val tacticalUnits: StateFlow<List<TacticalUnitEntity>> = 
-    tacticalUnitsRepository.getAllActiveUnits()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-// Marker erstellen basierend auf Category:
-fun createTacticalUnitMarkers(): List<Marker> {
-    return tacticalUnits.value.map { unit ->
-        Marker(
-            position = LatLng(unit.latitude, unit.longitude),
-            title = unit.name,
-            snippet = "${unit.category} - ${getCoalitionName(unit.coalition)}",
-            icon = getTacticalUnitIcon(unit.category, unit.coalition),
-            rotation = unit.heading?.toFloat() ?: 0f
-        )
+// In MapViewer.kt:
+LaunchedEffect(mapState.mapView, tacticalUnitsRepository, dataPadManager.isEntityTrackingEnabled) {
+    repo.getAllActiveUnits().collect { units ->
+        // Update markers: Neue Units → neue Marker, Inactive Units → Marker entfernen
+        // Bestehende Units → Position + Heading aktualisieren
     }
 }
 ```
