@@ -231,8 +231,15 @@ pcall(function()
 					elseif category == 6 then categoryName = 'weapon'
 					end
 					
-					-- Get coalition (0=Neutral, 1=Red, 2=Blue)
-					local coalition = objData.Coalition or 0
+					-- Get coalition from DCS (DCS: 0=Neutral, 1=Blue, 2=Red)
+					-- Convert to app format (App: 0=Neutral, 1=Red, 2=Blue)
+					local dcsCoalition = objData.Coalition or 0
+					local coalition = dcsCoalition
+					if dcsCoalition == 1 then
+						coalition = 2  -- DCS Blue (1) -> App Blue (2)
+					elseif dcsCoalition == 2 then
+						coalition = 1  -- DCS Red (2) -> App Red (1)
+					end
 					
 					-- Get speed (m/s)
 					local speed = 0
@@ -290,7 +297,19 @@ pcall(function()
 			data.heading = selfData.Heading or selfData.heading or 0
 			data.pitch = selfData.Pitch or selfData.pitch or 0
 			data.bank = selfData.Bank or selfData.bank or 0
-			data.coalition = selfData.Coalition or ''
+			-- Convert coalition from DCS format to app format (DCS: 1=Blue, 2=Red -> App: 1=Red, 2=Blue)
+			local dcsCoalition = selfData.Coalition or 0
+			if type(dcsCoalition) == 'number' then
+				if dcsCoalition == 1 then
+					data.coalition = 2  -- DCS Blue -> App Blue
+				elseif dcsCoalition == 2 then
+					data.coalition = 1  -- DCS Red -> App Red
+				else
+					data.coalition = dcsCoalition  -- Neutral or other
+				end
+			else
+				data.coalition = ''  -- Legacy string format or unknown
+			end
 			data.country = selfData.Country or 0
 			data.group = selfData.GroupName or ''
 			data.unitID = tostring(selfData.ID or selfData.UnitId or 'N/A')
