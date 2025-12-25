@@ -60,7 +60,7 @@ import java.util.Locale
 
 class MainActivity : ComponentActivity() {
         companion object {
-            const val SOFTWARE_VERSION = "1.0.16"
+            const val SOFTWARE_VERSION = "1.0.17"
         }
 
         val softwareVersion = SOFTWARE_VERSION
@@ -413,17 +413,6 @@ class MainActivity : ComponentActivity() {
                     }
 
                     when {
-                        showTacticalUnits -> {
-                            // Tactical Units screen
-                            com.example.checklist_interactive.ui.tactical.TacticalUnitsListScreen(
-                                onNavigateBack = { showTacticalUnits = false },
-                                onUnitClick = { unit ->
-                                    // Optional: Center map on unit location
-                                    // For now, just close the list
-                                    showTacticalUnits = false
-                                }
-                            )
-                        }
                         showSettings -> {
                             // Settings screen
                             SettingsScreen(
@@ -610,10 +599,22 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+
+                    // Tactical Units Popup Overlay (shown over map when active)
+                    if (showTacticalUnits) {
+                        com.example.checklist_interactive.ui.tactical.TacticalUnitsListScreen(
+                            onNavigateBack = { showTacticalUnits = false },
+                            onUnitClick = { unit ->
+                                // Optional: Center map on unit location
+                                // For now, just close the list
+                                showTacticalUnits = false
+                            }
+                        )
+                    }
                     }
                 }
                 }
-                
+
 
             }
         }
