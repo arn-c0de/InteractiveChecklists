@@ -109,6 +109,7 @@ object MapViewerFABs {
         onResetFabPositions: () -> Unit,
         onDataPadOpen: () -> Unit,
         onQuickAccessOpen: () -> Unit,
+        onTacticalUnitsOpen: () -> Unit = {},
         isConnected: Boolean = false,
         isScreenLocked: Boolean = false,
         mapRotationMode: Int = 0,
@@ -155,6 +156,17 @@ object MapViewerFABs {
             scope = "map"
         ),
         FABConfig(
+            id = "tactical_units",
+            icon = Icons.Default.TrackChanges,
+            contentDescription = "Tactical Units",
+            onClick = onTacticalUnitsOpen,
+            visible = datapadEnabled,
+            containerColor = if (isConnected) containerColorConnected else containerColorTertiary,
+            defaultX = 0.95f,
+            defaultY = 0.20f,
+            scope = "map"
+        ),
+        FABConfig(
             id = "map_add_symbol",
             icon = Icons.Default.Add,
             contentDescription = stringResource(R.string.fab_cd_add_military_symbol),
@@ -164,7 +176,7 @@ object MapViewerFABs {
                          else containerColorSurface,
             enabled = repositoriesReady,
             defaultX = 0.95f,
-            defaultY = 0.20f,
+            defaultY = 0.25f,
             scope = "map"
         ),
         FABConfig(
@@ -175,7 +187,7 @@ object MapViewerFABs {
             containerColor = if (repositoriesReady) containerColorTertiary else containerColorSurface,
             enabled = repositoriesReady,
             defaultX = 0.95f,
-            defaultY = 0.25f,
+            defaultY = 0.30f,
             scope = "map"
         ),
         FABConfig(
@@ -185,7 +197,7 @@ object MapViewerFABs {
             onClick = onLockScreen,
             containerColor = if (isScreenLocked) containerColorPrimary else containerColorSurface,
             defaultX = 0.95f,
-            defaultY = 0.30f,
+            defaultY = 0.35f,
             scope = "map"
         ),
         FABConfig(
@@ -195,7 +207,7 @@ object MapViewerFABs {
             onClick = onToggleMapRotation,
             containerColor = if (mapRotationMode == 1) containerColorPrimary else containerColorSurface,
             defaultX = 0.95f,
-            defaultY = 0.35f,
+            defaultY = 0.40f,
             scope = "map"
         ),
         FABConfig(
@@ -205,7 +217,7 @@ object MapViewerFABs {
             onClick = onToggleRotationGesture,
             containerColor = if (rotationGestureEnabled) containerColorPrimary else containerColorSurface,
             defaultX = 0.95f,
-            defaultY = 0.40f,
+            defaultY = 0.45f,
             scope = "map"
         ),
         FABConfig(
@@ -215,7 +227,7 @@ object MapViewerFABs {
             onClick = onDrawingTools,
             containerColor = if (isDrawingMode) containerColorPrimary else containerColorTertiary,
             defaultX = 0.95f,
-            defaultY = 0.45f,
+            defaultY = 0.50f,
             scope = "map"
         ),
         FABConfig(

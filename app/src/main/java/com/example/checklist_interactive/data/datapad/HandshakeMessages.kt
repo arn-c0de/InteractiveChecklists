@@ -23,24 +23,27 @@ sealed interface HandshakeMessage {
 data class ClientHello(
     @SerialName("type")
     override val type: String = "ClientHello",
-    
+
     @SerialName("version")
     val version: String = "1.0",
-    
+
     @SerialName("deviceId")
     val deviceId: String,
-    
+
     @SerialName("deviceName")
     val deviceName: String,
-    
+
     @SerialName("publicKey")
     val publicKey: String, // Base64 encoded EC public key
-    
+
     @SerialName("timestamp")
     override val timestamp: Long = System.currentTimeMillis(),
-    
+
     @SerialName("capabilities")
-    val capabilities: List<String> = listOf("receive", "send_commands")
+    val capabilities: List<String> = listOf("receive", "send_commands"),
+
+    @SerialName("entityTrackingEnabled")
+    val entityTrackingEnabled: Boolean = false  // Whether client wants to receive entity/tactical data
 ) : HandshakeMessage
 
 /**

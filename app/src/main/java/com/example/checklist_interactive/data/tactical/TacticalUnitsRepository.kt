@@ -1,0 +1,199 @@
+package com.example.checklist_interactive.data.tactical
+
+import android.content.Context
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import java.time.Instant
+import java.time.temporal.ChronoUnit
+
+/**
+ * Repository for Tactical Units - provides high-level API for unit management
+ */
+class TacticalUnitsRepository(private val context: Context) {
+    private val db = TacticalDatabase.getInstance(context)
+    private val unitsDao = db.tacticalUnitsDao()
+    private val historyDao = db.tacticalUnitHistoryDao()
+    
+    // --- Query functions ---
+    
+    fun getAllUnits(): Flow<List<TacticalUnitEntity>> {
+        return unitsDao.getAllUnits()
+    }
+    
+    fun getAllActiveUnits(): Flow<List<TacticalUnitEntity>> {
+        return unitsDao.getAllActiveUnits()
+    }
+    
+    fun getAllInactiveUnits(): Flow<List<TacticalUnitEntity>> {
+        return unitsDao.getAllInactiveUnits()
+    }
+    
+    fun getUnitsByCategory(category: String): Flow<List<TacticalUnitEntity>> {
+        return unitsDao.getUnitsByCategory(category)
+    }
+    
+    fun getUnitsByCoalition(coalition: Int): Flow<List<TacticalUnitEntity>> {
+        return unitsDao.getUnitsByCoalition(coalition)
+    }
+    
+    fun getUnitsByCategoryAndCoalition(category: String, coalition: Int): Flow<List<TacticalUnitEntity>> {
+        return unitsDao.getUnitsByCategoryAndCoalition(category, coalition)
+    }
+    
+    fun searchUnits(query: String): Flow<List<TacticalUnitEntity>> {
+        return unitsDao.searchUnits(query)
+    }
+    
+    suspend fun getUnitById(id: Int): TacticalUnitEntity? {
+        return unitsDao.getUnitById(id)
+    }
+    
+    // --- Filter functions ---
+    
+    /**
+     * Get units with multiple filters applied
+     */
+    fun getUnitsFiltered(
+        categories: Set<String> = emptySet(),
+        coalitions: Set<Int> = emptySet(),
+        activeOnly: Boolean = true,
+        searchQuery: String = ""
+    ): Flow<List<TacticalUnitEntity>> {
+        return getAllUnits().map { units ->
+            units.filter { unit ->
+                // Filter by active status
+                if (activeOnly && unit.isActive != 1) return@filter false
+                
+                // Filter by categories (if specified)
+                if (categories.isNotEmpty() && !categories.contains(unit.category)) return@filter false
+                
+                // Filter by coalitions (if specified)
+                if (coalitions.isNotEmpty() && !coalitions.contains(unit.coalition)) return@filter false
+                
+                // Filter by search query
+                if (searchQuery.isNotEmpty()) {
+                    val query = searchQuery.lowercase()
+                    val matchesName = unit.name.lowercase().contains(query)
+                    val matchesGroup = unit.groupName?.lowercase()?.contains(query) ?: false
+                    val matchesPilot = unit.pilotName?.lowercase()?.contains(query) ?: false
+                    if (!matchesName && !matchesGroup && !matchesPilot) return@filter false
+                }
+                
+                true
+            }
+        }
+    }
+    
+    // --- Statistics functions ---
+    
+    suspend fun getActiveUnitCount(): Int {
+        return unitsDao.getActiveUnitCount()
+    }
+    
+    suspend fun getActiveUnitCountByCategory(category: String): Int {
+        return unitsDao.getActiveUnitCountByCategory(category)
+    }
+    
+    suspend fun getActiveUnitCountByCoalition(coalition: Int): Int {
+        return unitsDao.getActiveUnitCountByCoalition(coalition)
+    }
+    
+    /**
+     * Get category distribution (map of category -> count)
+     */
+    suspend fun getCategoryDistribution(): Map<String, Int> {
+        val categories = listOf("aircraft", "helicopter", "ground", "ship", "structure", "weapon")
+        return categories.associateWith { category ->
+            unitsDao.getActiveUnitCountByCategory(category)
+        }
+    }
+    
+    /**
+     * Get coalition distribution (map of coalition -> count)
+     */
+    suspend fun getCoalitionDistribution(): Map<Int, Int> {
+        val coalitions = listOf(0, 1, 2) // Neutral, Red, Blue
+        return coalitions.associateWith { coalition ->
+            unitsDao.getActiveUnitCountByCoalition(coalition)
+        }
+    }
+    
+    // --- History functions ---
+    
+    fun getHistoryForUnit(unitId: Int): Flow<List<TacticalUnitHistoryEntity>> {
+        return historyDao.getHistoryForUnit(unitId)
+    }
+    
+    suspend fun getRecentHistoryForUnit(unitId: Int, limit: Int = 100): List<TacticalUnitHistoryEntity> {
+        return historyDao.getRecentHistoryForUnit(unitId, limit)
+    }
+    
+    // --- Cleanup functions ---
+    
+    /**
+     * Delete inactive units older than specified days
+     */
+    suspend fun deleteOldInactiveUnits(daysOld: Int = 7) {
+        val cutoffTime = Instant.now().minus(daysOld.toLong(), ChronoUnit.DAYS).toString()
+        unitsDao.deleteInactiveUnitsOlderThan(cutoffTime)
+    }
+    
+    /**
+     * Delete history entries older than specified days
+     */
+    suspend fun deleteOldHistory(daysOld: Int = 14) {
+        val cutoffTime = Instant.now().minus(daysOld.toLong(), ChronoUnit.DAYS).toString()
+        historyDao.deleteHistoryOlderThan(cutoffTime)
+    }
+    
+    /**
+     * Delete all units (both active and inactive)
+     */
+    suspend fun deleteAllUnits() {
+        unitsDao.deleteAllUnits()
+    }
+    
+    /**
+     * Delete all history entries
+     */
+    suspend fun deleteAllHistory() {
+        historyDao.deleteAllHistory()
+    }
+    
+    /**
+     * Mark all currently active units as inactive
+     * (Useful for session reset)
+     */
+    suspend fun markAllUnitsInactive() {
+        unitsDao.markAllUnitsInactive()
+    }
+    
+    // --- Utility functions ---
+    
+    /**
+     * Get coalition name from coalition code
+     */
+    fun getCoalitionName(coalition: Int): String {
+        return when (coalition) {
+            0 -> "Neutral"
+            1 -> "Red"
+            2 -> "Blue"
+            else -> "Unknown"
+        }
+    }
+    
+    /**
+     * Get category display name
+     */
+    fun getCategoryDisplayName(category: String): String {
+        return when (category.lowercase()) {
+            "aircraft" -> "Aircraft"
+            "helicopter" -> "Helicopter"
+            "ground" -> "Ground"
+            "ship" -> "Ship"
+            "structure" -> "Structure"
+            "weapon" -> "Weapon"
+            else -> category.capitalize()
+        }
+    }
+}

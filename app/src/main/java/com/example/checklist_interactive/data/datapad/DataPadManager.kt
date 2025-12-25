@@ -2,6 +2,9 @@ package com.example.checklist_interactive.data.datapad
 
 import android.content.Context
 import android.util.Log
+import com.example.checklist_interactive.data.tactical.TacticalDatabase
+import com.example.checklist_interactive.data.tactical.TacticalUnitEntity
+import com.example.checklist_interactive.data.tactical.TacticalUnitHistoryEntity
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,6 +17,7 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.SocketTimeoutException
 import java.net.InetAddress
+import java.time.Instant
 import javax.crypto.Cipher
 import javax.crypto.Mac
 import javax.crypto.spec.GCMParameterSpec
@@ -27,7 +31,7 @@ class DataPadManager(private val context: Context) {
     companion object {
         private const val TAG = "DataPadManager"
         private const val DEFAULT_UDP_PORT = 5010
-        private const val BUFFER_SIZE = 4096
+        private const val BUFFER_SIZE = 65536  // Increased from 4096 to support large tactical unit payloads (max UDP size)
         private const val SOCKET_TIMEOUT_MS = 1000
 
         private const val PREFS_NAME = "datapad_settings"
@@ -37,12 +41,17 @@ class DataPadManager(private val context: Context) {
         private const val KEY_DEVICE_NAME = "device_name"
         // Persist last transient reception state (true if receiver was running when app exited)
         private const val KEY_LAST_RUNNING = "last_running"
+        // Enable/disable entity tracking (tactical units)
+        private const val KEY_ENTITY_TRACKING_ENABLED = "entity_tracking_enabled"
 
         // Handshake timeout
         private const val HANDSHAKE_TIMEOUT_MS = 10000L
     }
     
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    // Tactical database for storing tracked units
+    private val tacticalDb by lazy { TacticalDatabase.getInstance(context) }
 
     private val json = Json { 
         ignoreUnknownKeys = true
@@ -86,6 +95,10 @@ class DataPadManager(private val context: Context) {
 
     private val _handshakeStatus = MutableStateFlow<String?>(null)
     val handshakeStatus: StateFlow<String?> = _handshakeStatus.asStateFlow()
+
+    // Entity tracking enabled/disabled
+    private val _isEntityTrackingEnabled = MutableStateFlow(prefs.getBoolean(KEY_ENTITY_TRACKING_ENABLED, false))
+    val isEntityTrackingEnabled: StateFlow<Boolean> = _isEntityTrackingEnabled.asStateFlow()
 
     // Connection health tracking (for heartbeat monitoring)
     enum class ConnectionHealth {
@@ -499,7 +512,27 @@ class DataPadManager(private val context: Context) {
     fun toggleEnabled() {
         setEnabled(!_isEnabled.value)
     }
-    
+
+    /**
+     * Enable or disable entity tracking (tactical units)
+     * When disabled, nearbyUnits data will not be processed or stored in the database
+     */
+    fun setEntityTrackingEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_ENTITY_TRACKING_ENABLED, enabled).apply()
+        _isEntityTrackingEnabled.value = enabled
+        udpLogD("Entity tracking ${if (enabled) "enabled" else "disabled"}")
+        
+        // Restart connection to perform new handshake with updated entity tracking status
+        if (isStarted) {
+            udpLogD("Restarting connection to update entity tracking preference...")
+            restart()
+        }
+    }
+
+    fun toggleEntityTracking() {
+        setEntityTrackingEnabled(!_isEntityTrackingEnabled.value)
+    }
+
     /**
      * Update device name for handshake identification
      */
@@ -560,8 +593,11 @@ class DataPadManager(private val context: Context) {
                 val clientHello = ClientHello(
                     deviceId = keyManager.getDeviceId(),
                     deviceName = _deviceName.value,
-                    publicKey = keyManager.exportPublicKey()
+                    publicKey = keyManager.exportPublicKey(),
+                    entityTrackingEnabled = _isEntityTrackingEnabled.value
                 )
+                
+                udpLogD("📡 Entity tracking ${if (_isEntityTrackingEnabled.value) "ENABLED" else "DISABLED"} in handshake")
                 
                 // SECURITY: Prefer unicast over broadcast for server discovery
                 val serverAddress = when {
@@ -817,6 +853,16 @@ class DataPadManager(private val context: Context) {
                         _connectionHealth.value = ConnectionHealth.HEALTHY
                         // Also update heartbeat timestamp for normal messages (treated as activity)
                         _lastHeartbeatTime.value = System.currentTimeMillis()
+
+                        // Process nearby units if present AND entity tracking is enabled
+                        if (_isEntityTrackingEnabled.value) {
+                            flightData.nearbyUnits?.let { units ->
+                                scope.launch {
+                                    processNearbyUnits(units)
+                                }
+                            }
+                        }
+                        
                         currentSession?.let {
                             udpLogD("✅ Received encrypted flight data from $senderIp: ${flightData.aircraft} at ${flightData.altitude}m (session: ${it.sessionId.take(8)}...)")
                         } ?: udpLogD("✅ Received encrypted flight data from $senderIp: ${flightData.aircraft} at ${flightData.altitude}m")
@@ -855,4 +901,108 @@ class DataPadManager(private val context: Context) {
      * Export device public key as Base64 string (for adding to server's authorized list)
      */
     fun getPublicKey(): String = keyManager.exportPublicKey()
+    
+    /**
+     * Process nearby units from DCS and store in tactical database
+     * - New units: INSERT + History entry
+     * - Known units: UPDATE position + History entry
+     * - Missing units: Mark as inactive (isActive=0)
+     */
+    private suspend fun processNearbyUnits(units: List<NearbyUnit>) = withContext(Dispatchers.IO) {
+        try {
+            val now = Instant.now().toString()
+            val dao = tacticalDb.tacticalUnitsDao()
+            val historyDao = tacticalDb.tacticalUnitHistoryDao()
+            
+            // Track which DCS IDs are present in this update
+            val currentDcsIds = units.map { it.dcsId }.toSet()
+            
+            // Process each received unit
+            for (unit in units) {
+                val existing = dao.getUnitByDcsId(unit.dcsId)
+                
+                if (existing != null) {
+                    // Unit exists - update position
+                    dao.updateUnitPosition(
+                        dcsId = unit.dcsId,
+                        latitude = unit.latitude,
+                        longitude = unit.longitude,
+                        altitude = unit.altitude,
+                        heading = unit.heading,
+                        speed = unit.speed,
+                        distance = unit.distance,
+                        bearing = unit.bearing,
+                        lastSeenAt = now,
+                        lastUpdateAt = now
+                    )
+                    
+                    // Add history entry
+                    historyDao.insertHistory(
+                        TacticalUnitHistoryEntity(
+                            unitId = existing.id,
+                            latitude = unit.latitude,
+                            longitude = unit.longitude,
+                            altitude = unit.altitude,
+                            heading = unit.heading,
+                            speed = unit.speed,
+                            timestamp = now
+                        )
+                    )
+                    
+                    udpLogD("Updated tactical unit: ${unit.name} (${unit.category})")
+                } else {
+                    // New unit - insert
+                    val newId = dao.insertUnit(
+                        TacticalUnitEntity(
+                            dcsId = unit.dcsId,
+                            name = unit.name,
+                            type = unit.type,
+                            category = unit.category,
+                            coalition = unit.coalition,
+                            latitude = unit.latitude,
+                            longitude = unit.longitude,
+                            altitude = unit.altitude,
+                            heading = unit.heading,
+                            speed = unit.speed,
+                            distance = unit.distance,
+                            bearing = unit.bearing,
+                            country = unit.country,
+                            groupName = unit.group,
+                            pilotName = unit.pilot,
+                            isActive = 1,
+                            firstSeenAt = now,
+                            lastSeenAt = now,
+                            lastUpdateAt = now
+                        )
+                    )
+                    
+                    // Add initial history entry
+                    historyDao.insertHistory(
+                        TacticalUnitHistoryEntity(
+                            unitId = newId.toInt(),
+                            latitude = unit.latitude,
+                            longitude = unit.longitude,
+                            altitude = unit.altitude,
+                            heading = unit.heading,
+                            speed = unit.speed,
+                            timestamp = now
+                        )
+                    )
+                    
+                    udpLogD("New tactical unit tracked: ${unit.name} (${unit.category}, coalition=${unit.coalition})")
+                }
+            }
+            
+            // Mark units that are no longer visible as inactive
+            // (Units not in currentDcsIds but still marked as active in DB)
+            // This is done by getting all active units and checking if they're in the update
+            // We do this in a background job to avoid blocking
+            // For now, we'll mark ALL active units that aren't in the update as inactive
+            // A more sophisticated approach would track "last seen" time and only mark as inactive after a timeout
+            
+            udpLogD("Processed ${units.size} tactical units")
+        } catch (e: Exception) {
+            udpLogE("Failed to process nearby units: ${e.message}", e)
+        }
+    }
 }

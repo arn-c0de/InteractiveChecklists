@@ -25,9 +25,11 @@ import java.io.File
         LocationTagCrossRef::class,
         NavaidEntity::class,
         MapDrawingEntity::class,
-        FlightPathPoint::class
+        FlightPathPoint::class,
+        TacticalUnitEntity::class,
+        TacticalUnitHistoryEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 abstract class TacticalDatabase : RoomDatabase() {
@@ -41,6 +43,8 @@ abstract class TacticalDatabase : RoomDatabase() {
     abstract fun navaidDao(): NavaidDao
     abstract fun mapDrawingDao(): MapDrawingDao
     abstract fun flightPathDao(): FlightPathDao
+    abstract fun tacticalUnitsDao(): TacticalUnitsDao
+    abstract fun tacticalUnitHistoryDao(): TacticalUnitHistoryDao
     
     companion object {
         @Volatile
@@ -348,6 +352,63 @@ abstract class TacticalDatabase : RoomDatabase() {
             }
         }
         
+        // Migration from v6 to v7: add tactical_units and tactical_unit_history tables for DCS unit tracking
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Create tactical_units table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS tactical_units (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        dcs_id TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        type TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        coalition INTEGER NOT NULL,
+                        latitude REAL NOT NULL,
+                        longitude REAL NOT NULL,
+                        altitude REAL NOT NULL,
+                        heading REAL,
+                        speed REAL,
+                        distance REAL,
+                        bearing REAL,
+                        country INTEGER,
+                        group_name TEXT,
+                        pilot_name TEXT,
+                        is_active INTEGER NOT NULL DEFAULT 1,
+                        first_seen_at TEXT NOT NULL,
+                        last_seen_at TEXT NOT NULL,
+                        last_update_at TEXT NOT NULL
+                    )
+                """)
+                
+                // Create indices for tactical_units
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_tactical_units_dcs_id ON tactical_units(dcs_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_tactical_units_category ON tactical_units(category)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_tactical_units_coalition ON tactical_units(coalition)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_tactical_units_is_active ON tactical_units(is_active)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_tactical_units_last_seen_at ON tactical_units(last_seen_at)")
+                
+                // Create tactical_unit_history table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS tactical_unit_history (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        unit_id INTEGER NOT NULL,
+                        latitude REAL NOT NULL,
+                        longitude REAL NOT NULL,
+                        altitude REAL NOT NULL,
+                        heading REAL,
+                        speed REAL,
+                        timestamp TEXT NOT NULL,
+                        FOREIGN KEY(unit_id) REFERENCES tactical_units(id) ON DELETE CASCADE
+                    )
+                """)
+                
+                // Create indices for tactical_unit_history
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_tactical_unit_history_unit_id ON tactical_unit_history(unit_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_tactical_unit_history_timestamp ON tactical_unit_history(timestamp)")
+            }
+        }
+        
         /**
          * Get database instance
          * 
@@ -489,7 +550,7 @@ abstract class TacticalDatabase : RoomDatabase() {
                 DATABASE_NAME
             )
                 .createFromAsset("databases/$DATABASE_NAME")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
 
             if (allowDestructiveMigration) {
                 builder.fallbackToDestructiveMigration()
@@ -511,7 +572,7 @@ abstract class TacticalDatabase : RoomDatabase() {
                 TacticalDatabase::class.java,
                 dbFile.absolutePath
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
 
             if (allowDestructiveMigration) {
                 builder.fallbackToDestructiveMigration()

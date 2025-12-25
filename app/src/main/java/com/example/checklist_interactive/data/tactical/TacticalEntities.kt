@@ -492,3 +492,93 @@ data class MapDrawingEntity(
     @ColumnInfo(name = "modified_at")
     val modifiedAt: String  // ISO 8601 timestamp
 )
+
+/**
+ * Tactical Unit entity - stores tracked units from DCS World
+ * (aircraft, helicopters, ground units, ships, structures)
+ */
+@Entity(
+    tableName = "tactical_units",
+    indices = [
+        Index(value = ["dcs_id"], unique = true),
+        Index(value = ["category"]),
+        Index(value = ["coalition"]),
+        Index(value = ["is_active"]),
+        Index(value = ["last_seen_at"])
+    ]
+)
+data class TacticalUnitEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Int = 0,
+    
+    @ColumnInfo(name = "dcs_id")
+    val dcsId: String,  // Unique DCS object ID
+    
+    val name: String,  // Unit display name (e.g., "MiG-29", "T-80")
+    val type: String,  // Detailed type (e.g., "MiG-29A", "T-80BV")
+    val category: String,  // aircraft, helicopter, ground, ship, structure, weapon
+    val coalition: Int,  // 0=Neutral, 1=Red, 2=Blue
+    
+    val latitude: Double,
+    val longitude: Double,
+    val altitude: Double,
+    
+    val heading: Double? = null,  // 0-360 degrees
+    val speed: Double? = null,  // m/s
+    
+    val distance: Double? = null,  // Distance to player (meters)
+    val bearing: Double? = null,  // Bearing to unit (0-360 degrees)
+    
+    val country: Int? = null,  // DCS country code
+    @ColumnInfo(name = "group_name")
+    val groupName: String? = null,  // Group name
+    @ColumnInfo(name = "pilot_name")
+    val pilotName: String? = null,  // Pilot/unit name
+    
+    @ColumnInfo(name = "is_active", defaultValue = "1")
+    val isActive: Int = 1,  // 1=currently visible, 0=contact lost
+    
+    @ColumnInfo(name = "first_seen_at")
+    val firstSeenAt: String,  // ISO 8601 timestamp
+    
+    @ColumnInfo(name = "last_seen_at")
+    val lastSeenAt: String,  // ISO 8601 timestamp (last contact)
+    
+    @ColumnInfo(name = "last_update_at")
+    val lastUpdateAt: String  // ISO 8601 timestamp (last position update)
+)
+
+/**
+ * Tactical Unit History entity - stores position history for track replay
+ */
+@Entity(
+    tableName = "tactical_unit_history",
+    foreignKeys = [
+        ForeignKey(
+            entity = TacticalUnitEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["unit_id"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index(value = ["unit_id"]),
+        Index(value = ["timestamp"])
+    ]
+)
+data class TacticalUnitHistoryEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Int = 0,
+    
+    @ColumnInfo(name = "unit_id")
+    val unitId: Int,  // Foreign key to TacticalUnitEntity
+    
+    val latitude: Double,
+    val longitude: Double,
+    val altitude: Double,
+    
+    val heading: Double? = null,
+    val speed: Double? = null,
+    
+    val timestamp: String  // ISO 8601 timestamp
+)

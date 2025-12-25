@@ -5,19 +5,22 @@ pcall(function()
 	local LOG_PATH = writeDir .. [[Scripts\player_aircraft.log]]
 	local DEBUG_LOG_PATH = writeDir .. [[Scripts\player_aircraft_debug.log]]
 	local JSON_PATH = writeDir .. [[Scripts\player_aircraft_parsed.jsonl]]
+	local ENTITY_CONTACTS_PATH = writeDir .. [[Scripts\entity-contacts-parsed.jsonl]]  -- NEW: Separate file for entity contacts
 	local COMMAND_PATH = writeDir .. [[Scripts\forwarder_command.json]]
 	local DEBUG_DUMP_TABLES = true -- set to false to disable table debug dumps
 	local dumped_tables = {}
-	local UPDATE_INTERVAL = 0.01 -- seconds (10 Hz update rate)
+	local UPDATE_INTERVAL = 0.05 -- seconds (10 Hz update rate)
 	local lastWrite = 0
 	local lastCommandCheck = 0
 	local COMMAND_CHECK_INTERVAL = 2.0 -- check for command file every 2 seconds
-	local STREAMER_VERSION = "1.0.5"
+	local STREAMER_VERSION = "1.0.6"
 	-- Maximum number of JSON lines to keep in the output file. Set to 0 to disable trimming.
 	local MAX_JSON_LINES = 20  -- Keep only last 20 lines (2 seconds @ 10 Hz) - MINIMAL buffer
+	local MAX_ENTITY_LINES = 20  -- Keep only last 20 lines for entity contacts
 	-- Trim interval: Only trim file periodically, NOT on every write (performance!)
 	local TRIM_INTERVAL = 2.0  -- Trim file every 2 seconds (VERY aggressive cleanup)
 	local lastTrim = 0
+	local lastEntityTrim = 0
 	-- If true, clear the JSON/log/debug files once when the export starts
 	local CLEAR_ON_START = true
 
@@ -153,6 +156,118 @@ pcall(function()
 		if not modelTime then modelTime = os.clock() end
 		local milliseconds = math.floor((modelTime * 1000) % 1000)
 		return string.format('%s.%03dZ', os.date('!%Y-%m-%dT%H:%M:%S'), milliseconds)
+	end
+
+	-- Maximum distance for unit tracking (meters) - 50km radius for performance
+	local MAX_UNIT_DISTANCE = 50000  -- 50km
+	local MAX_UNITS_PER_FRAME = 100  -- Hard limit to prevent huge JSON payloads
+	
+	-- Collect all nearby units (aircraft, ground, ships, structures)
+	local function collect_nearby_units()
+		local units = {}
+		local selfData = safe_get(function() return LoGetSelfData() end, nil)
+		
+		if not selfData or not selfData.LatLongAlt then
+			return units  -- No player position, can't calculate distances
+		end
+		
+		local playerLat = selfData.LatLongAlt.Lat
+		local playerLon = selfData.LatLongAlt.Long
+		local playerAlt = selfData.LatLongAlt.Alt
+		
+		-- Get all world objects
+		local worldObjects = safe_get(function() return LoGetWorldObjects() end, nil)
+		
+		if not worldObjects or type(worldObjects) ~= 'table' then
+			return units  -- No objects available
+		end
+		
+		-- Iterate through all world objects
+		for objId, objData in pairs(worldObjects) do
+			-- Stop collecting if we hit the hard limit (prevent JSON bloat)
+			if #units >= MAX_UNITS_PER_FRAME then
+				break
+			end
+			
+			if type(objData) == 'table' and objData.LatLongAlt then
+				-- Calculate distance to player
+				local lat = objData.LatLongAlt.Lat or 0
+				local lon = objData.LatLongAlt.Long or 0
+				local alt = objData.LatLongAlt.Alt or 0
+				
+				-- Simple distance calculation (Pythagorean approximation for small distances)
+				-- 1 degree latitude ≈ 111km, longitude varies by latitude
+				local dLat = (lat - playerLat) * 111000  -- meters
+				local dLon = (lon - playerLon) * 111000 * math.cos(math.rad(playerLat))  -- meters
+				local dAlt = alt - playerAlt
+				local distance = math.sqrt(dLat^2 + dLon^2 + dAlt^2)
+				
+				-- Skip units beyond max distance (performance optimization)
+				if distance <= MAX_UNIT_DISTANCE then
+					-- Calculate bearing to target (0-360 degrees, 0=North)
+					local bearing = math.deg(math.atan2(dLon, dLat))
+					if bearing < 0 then bearing = bearing + 360 end
+					
+					-- Determine category (1=Airplane, 2=Helicopter, 3=Ground, 4=Ship, 5=Structure, 6=Weapon)
+					-- Type structure: Type = {level1, level2, level3, level4}
+					local category = 0
+					local categoryName = 'unknown'
+					
+					if objData.Type then
+						-- Type can be table or number
+						if type(objData.Type) == 'table' then
+							category = objData.Type.level1 or objData.Type[1] or 0
+						elseif type(objData.Type) == 'number' then
+							category = objData.Type
+						end
+					end
+					
+					-- Map category number to name
+					if category == 1 then categoryName = 'aircraft'
+					elseif category == 2 then categoryName = 'helicopter'
+					elseif category == 3 then categoryName = 'ground'
+					elseif category == 4 then categoryName = 'ship'
+					elseif category == 5 then categoryName = 'structure'
+					elseif category == 6 then categoryName = 'weapon'
+					end
+					
+					-- Get coalition (0=Neutral, 1=Red, 2=Blue)
+					local coalition = objData.Coalition or 0
+					
+					-- Get speed (m/s)
+					local speed = 0
+					if objData.Velocity then
+						local vx = objData.Velocity.x or 0
+						local vy = objData.Velocity.y or 0
+						local vz = objData.Velocity.z or 0
+						speed = math.sqrt(vx^2 + vy^2 + vz^2)
+					end
+					
+					-- Create unit entry
+					local unit = {
+						dcsId = tostring(objId),
+						name = objData.Name or 'Unknown',
+						type = objData.Type and objData.Type.level4 or 'Unknown',
+						category = categoryName,
+						coalition = coalition,
+						latitude = round(lat, 6),
+						longitude = round(lon, 6),
+						altitude = round(alt, 2),
+						heading = round(objData.Heading or 0, 2),
+						speed = round(speed, 2),
+						distance = round(distance, 2),
+						bearing = round(bearing, 2),
+						country = objData.Country or 0,
+						group = objData.GroupName or '',
+						pilot = objData.UnitName or ''
+					}
+					
+					table.insert(units, unit)
+				end
+			end
+		end
+		
+		return units
 	end
 
 	-- Collect comprehensive telemetry data
@@ -556,6 +671,31 @@ pcall(function()
 		data.aiOn = false
 		data.born = true
 
+		-- NOTE: nearbyUnits are now collected separately in collect_entity_contacts()
+		-- This keeps the main aircraft data lightweight
+
+		return data
+	end
+
+	-- Collect entity contacts (nearby units) as a separate dataset
+	local function collect_entity_contacts()
+		local data = {
+			timestamp = generate_timestamp(),
+			streamer_version = STREAMER_VERSION,
+			updateRate = 1.0 / UPDATE_INTERVAL
+		}
+
+		-- Get player position for distance calculations
+		local selfData = safe_get(function() return LoGetSelfData() end, nil)
+		if selfData and selfData.LatLongAlt then
+			data.playerLat = selfData.LatLongAlt.Lat
+			data.playerLon = selfData.LatLongAlt.Long
+			data.playerAlt = selfData.LatLongAlt.Alt
+		end
+
+		-- Collect all nearby units
+		data.nearbyUnits = collect_nearby_units()
+
 		return data
 	end
 
@@ -578,6 +718,17 @@ pcall(function()
 			f:close()
 		end)
 		-- NOTE: File trimming moved to separate function, called periodically (not on every write!)
+	end
+
+	local function write_entity_json(data)
+		pcall(function()
+			local json = json_encode_table(data)
+			local f = io.open(ENTITY_CONTACTS_PATH, 'a')
+			if not f then return end
+			f:write(json .. '\n')
+			f:flush()  -- Force immediate flush to disk
+			f:close()
+		end)
 	end
 
 	local function trim_json_file()
@@ -627,6 +778,50 @@ pcall(function()
 		end)
 	end
 
+	local function trim_entity_file()
+		-- Trim the entity contacts JSONL file to keep only the last MAX_ENTITY_LINES entries
+		if not MAX_ENTITY_LINES or MAX_ENTITY_LINES <= 0 then return end
+
+		pcall(function()
+			local tmp = {}
+			local count = 0
+			local ok, r = pcall(io.open, ENTITY_CONTACTS_PATH, 'r')
+			if not ok or not r then return end
+
+			-- Fast path: count lines first
+			for _ in r:lines() do
+				count = count + 1
+			end
+			r:close()
+
+			-- Only trim if file exceeds threshold
+			if count <= MAX_ENTITY_LINES then return end
+
+			-- Reopen and keep only last MAX_ENTITY_LINES entries
+			local skip = count - MAX_ENTITY_LINES
+			local ok2, r2 = pcall(io.open, ENTITY_CONTACTS_PATH, 'r')
+			if not ok2 or not r2 then return end
+
+			local lineNum = 0
+			for line in r2:lines() do
+				lineNum = lineNum + 1
+				if lineNum > skip then
+					table.insert(tmp, line)
+				end
+			end
+			r2:close()
+
+			-- Write trimmed data back
+			local ok3, w = pcall(io.open, ENTITY_CONTACTS_PATH, 'w')
+			if not ok3 or not w then return end
+			for _, l in ipairs(tmp) do
+				w:write(l .. '\n')
+			end
+			w:flush()
+			w:close()
+		end)
+	end
+
 	local function serialize_table(obj, depth, maxDepth, seen)
 		depth = depth or 0
 		maxDepth = maxDepth or 3
@@ -664,11 +859,14 @@ pcall(function()
 	function LuaExportStart()
 		lastWrite = 0
 		lastTrim = 0  -- Initialize trim timer
+		lastEntityTrim = 0  -- Initialize entity trim timer
 		-- clear files once at start if requested
 		if CLEAR_ON_START then
 			pcall(function()
 				local f = io.open(JSON_PATH, 'w')
 				if f then f:write('') f:close() end
+				local ef = io.open(ENTITY_CONTACTS_PATH, 'w')
+				if ef then ef:write('') ef:close() end
 				local lf = io.open(LOG_PATH, 'w')
 				if lf then lf:write('') lf:close() end
 				local df = io.open(DEBUG_LOG_PATH, 'w')
@@ -696,15 +894,32 @@ pcall(function()
 			lastTrim = now
 		end
 
+		-- Periodic entity file trimming
+		if now - lastEntityTrim >= TRIM_INTERVAL then
+			trim_entity_file()
+			lastEntityTrim = now
+		end
+
 		if now - lastWrite >= UPDATE_INTERVAL then
+			-- Write aircraft telemetry (without nearbyUnits)
 			local telemetry = collect_telemetry()
 			write_json(telemetry)
+
+			-- Write entity contacts separately
+			local entityContacts = collect_entity_contacts()
+			write_entity_json(entityContacts)
+
 			lastWrite = now
 		end
 	end
 
 	function LuaExportStop()
+		-- Write final aircraft telemetry
 		local telemetry = collect_telemetry()
 		write_json(telemetry)
+
+		-- Write final entity contacts
+		local entityContacts = collect_entity_contacts()
+		write_entity_json(entityContacts)
 	end
 end, nil)

@@ -2,6 +2,12 @@ package com.example.checklist_interactive.data.datapad
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
 /**
  * Flight data model matching the UDP JSON stream format
@@ -598,20 +604,111 @@ data class SystemsData(
     val generatorOn: Boolean? = null
 )
 
+/**
+ * Custom serializer for coalition field that handles both string and integer formats
+ * Legacy format: "Enemies", "Allies", "Neutral"
+ * New format: 0, 1, 2
+ */
+object CoalitionSerializer : KSerializer<Int> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Coalition", PrimitiveKind.INT)
+
+    override fun deserialize(decoder: Decoder): Int {
+        return try {
+            // Try to decode as integer first (new format)
+            decoder.decodeInt()
+        } catch (e: Exception) {
+            // If that fails, try as string (legacy format)
+            try {
+                val str = decoder.decodeString()
+                when (str.lowercase()) {
+                    "neutral", "neutrals" -> 0
+                    "red", "enemies" -> 1
+                    "blue", "allies" -> 2
+                    else -> str.toIntOrNull() ?: 0
+                }
+            } catch (e2: Exception) {
+                0 // Default to neutral on any error
+            }
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: Int) {
+        encoder.encodeInt(value)
+    }
+}
+
+/**
+ * Custom serializer for type field that handles both integer and string formats
+ * DCS may send type as integer (unit type ID) or string (unit type name)
+ */
+object UnitTypeSerializer : KSerializer<String> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("UnitType", PrimitiveKind.STRING)
+
+    override fun deserialize(decoder: Decoder): String {
+        return try {
+            // Try string first
+            decoder.decodeString()
+        } catch (e: Exception) {
+            // If that fails, decode as int and convert to string
+            try {
+                decoder.decodeInt().toString()
+            } catch (e2: Exception) {
+                "Unknown"
+            }
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: String) {
+        encoder.encodeString(value)
+    }
+}
+
 @Serializable
 data class NearbyUnit(
-    @SerialName("id")
-    val id: String = "",
-    
+    @SerialName("dcsId")
+    val dcsId: String = "",
+
     @SerialName("name")
     val name: String = "",
-    
+
+    @Serializable(with = UnitTypeSerializer::class)
     @SerialName("type")
-    val type: String = "",
-    
+    val type: String = "",  // Can be integer (unit type ID) or string (unit type name)
+
+    @SerialName("category")
+    val category: String = "",  // aircraft, helicopter, ground, ship, structure, weapon
+
+    @Serializable(with = CoalitionSerializer::class)
     @SerialName("coalition")
-    val coalition: String = "",
-    
+    val coalition: Int = 0,  // 0=Neutral, 1=Red, 2=Blue (or "Enemies"/"Allies" in legacy format)
+
+    @SerialName("latitude")
+    val latitude: Double = 0.0,
+
+    @SerialName("longitude")
+    val longitude: Double = 0.0,
+
+    @SerialName("altitude")
+    val altitude: Double = 0.0,
+
+    @SerialName("heading")
+    val heading: Double? = null,
+
+    @SerialName("speed")
+    val speed: Double? = null,
+
     @SerialName("distance")
-    val distance: Double? = null // meters
+    val distance: Double? = null,  // meters
+
+    @SerialName("bearing")
+    val bearing: Double? = null,  // 0-360 degrees
+
+    @SerialName("country")
+    val country: Int? = null,
+
+    @SerialName("group")
+    val group: String? = null,
+
+    @SerialName("pilot")
+    val pilot: String? = null
 )
