@@ -45,7 +45,8 @@ class DataPadManager(private val context: Context) {
         private const val KEY_ENTITY_TRACKING_ENABLED = "entity_tracking_enabled"
         // Tactical units map update interval in seconds
         private const val KEY_TACTICAL_UNITS_MAP_UPDATE_INTERVAL = "tactical_units_map_update_interval"
-    private const val KEY_TACTICAL_UNITS_SHOW_LIVE_ONLY = "tactical_units_show_live_only"
+        private const val KEY_TACTICAL_UNITS_SHOW_LIVE_ONLY = "tactical_units_show_live_only"
+        private const val KEY_SHOW_TACTICAL_UNITS_ON_MAP = "show_tactical_units_on_map"
 
         // Handshake timeout
         private const val HANDSHAKE_TIMEOUT_MS = 10000L
@@ -110,6 +111,10 @@ class DataPadManager(private val context: Context) {
     // Tactical units live filter - only show units seen in last 10 seconds
     private val _tacticalUnitsShowLiveOnly = MutableStateFlow(prefs.getBoolean(KEY_TACTICAL_UNITS_SHOW_LIVE_ONLY, false))
     val tacticalUnitsShowLiveOnly: StateFlow<Boolean> = _tacticalUnitsShowLiveOnly.asStateFlow()
+
+    // Tactical units map visibility - show/hide units on map (independent from entity tracking)
+    private val _showTacticalUnitsOnMap = MutableStateFlow(prefs.getBoolean(KEY_SHOW_TACTICAL_UNITS_ON_MAP, true))
+    val showTacticalUnitsOnMap: StateFlow<Boolean> = _showTacticalUnitsOnMap.asStateFlow()
 
     // Connection health tracking (for heartbeat monitoring)
     enum class ConnectionHealth {
@@ -562,6 +567,20 @@ class DataPadManager(private val context: Context) {
         prefs.edit().putBoolean(KEY_TACTICAL_UNITS_SHOW_LIVE_ONLY, liveOnly).apply()
         _tacticalUnitsShowLiveOnly.value = liveOnly
         udpLogD("Tactical units live filter ${if (liveOnly) "enabled" else "disabled"}")
+    }
+
+    /**
+     * Show or hide tactical units on map
+     * This is independent from entity tracking - units are still tracked in DB when hidden
+     */
+    fun setShowTacticalUnitsOnMap(show: Boolean) {
+        prefs.edit().putBoolean(KEY_SHOW_TACTICAL_UNITS_ON_MAP, show).apply()
+        _showTacticalUnitsOnMap.value = show
+        udpLogD("Tactical units map visibility ${if (show) "enabled" else "disabled"}")
+    }
+
+    fun toggleTacticalUnitsOnMap() {
+        setShowTacticalUnitsOnMap(!_showTacticalUnitsOnMap.value)
     }
 
     /**

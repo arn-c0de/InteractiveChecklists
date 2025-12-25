@@ -1,164 +1,164 @@
 # Tactical Units Tracking System
 
-## Übersicht
+## Overview
 
-Das Tactical Units Tracking System exportiert alle sichtbaren Einheiten aus DCS World (Flugzeuge, Bodentruppen, Schiffe, etc.), sendet sie verschlüsselt an die Android-App und zeigt sie als Marker auf der Karte an.
+The Tactical Units Tracking System exports all visible units from DCS World (aircraft, ground forces, ships, etc.), sends them encrypted to the Android app, and displays them as markers on the map.
 
-## Komponenten
+## Components
 
 ### 1. DCS Export (Export.lua)
 
-**Funktion `collect_nearby_units()`** sammelt:
-- Alle sichtbaren Einheiten aus `LoGetWorldObjects()`
-- Position (lat/lon/alt), Heading, Speed
-- Kategorie (aircraft, helicopter, ground, ship, structure)
-- Coalition (0=neutral, 1=red, 2=blue)
-- Entfernung und Peilung zum Spieler
+**Function `collect_nearby_units()`** collects:
+- All visible units from `LoGetWorldObjects()`
+- Position (lat/lon/alt), heading, speed
+- Category (aircraft, helicopter, ground, ship, structure)
+- Coalition (0 = neutral, 1 = red, 2 = blue)
+- Distance and bearing to the player
 
 **Integration:**
-- Wird automatisch bei jedem Frame aufgerufen
-- Daten werden im `nearbyUnits` Array zum FlightData JSON hinzugefügt
-- Verschlüsselte Übertragung via UDP (ECDH + AES-GCM)
+- Called automatically every frame
+- Data is added to the `nearbyUnits` array inside the FlightData JSON
+- Encrypted transmission via UDP (ECDH + AES-GCM)
 
-### 2. Android Datenbank
+### 2. Android Database
 
 **TacticalUnitEntity:**
-- Speichert aktuellen Status jeder Einheit
-- `isActive` Flag: 1 = sichtbar, 0 = Sichtkontakt verloren
+- Stores the current status of each unit
+- `isActive` flag: 1 = visible, 0 = visual contact lost
 - Timestamps: `firstSeenAt`, `lastSeenAt`, `lastUpdateAt`
 
 **TacticalUnitHistoryEntity:**
-- Speichert Positionshistorie für Track-Replay
-- Foreign Key zu TacticalUnitEntity
-- Automatische Cascade-Deletion
+- Stores position history for track replay
+- Foreign key to `TacticalUnitEntity`
+- Automatic cascade deletion
 
 **Migration v6 → v7:**
-- Neue Tabellen `tactical_units` und `tactical_unit_history`
-- Indizes für Performance (dcs_id, category, coalition, is_active)
+- New tables `tactical_units` and `tactical_unit_history`
+- Indexes for performance (dcs_id, category, coalition, is_active)
 
 ### 3. DataPadManager Integration
 
-**Funktion `processNearbyUnits()`:**
-1. Vergleicht empfangene Units mit DB
-2. **Neue Units:** INSERT + History-Eintrag
-3. **Bekannte Units:** UPDATE Position + History-Eintrag
-4. **Verlorene Units:** Markiert als `isActive=0` (bleiben in DB)
+**Function `processNearbyUnits()`:**
+1. Compare received units with the DB
+2. **New units:** INSERT + history entry
+3. **Known units:** UPDATE position + history entry
+4. **Lost units:** Mark as `isActive = 0` (remain in DB)
 
 **Lifecycle:**
-- Läuft automatisch bei jedem empfangenen FlightData Paket
-- Nutzt Coroutines für DB-Operationen (non-blocking)
+- Runs automatically on every received FlightData packet
+- Uses coroutines for DB operations (non-blocking)
 
 ### 4. Repository & ViewModel
 
 **TacticalUnitsRepository:**
-- High-level API für Unit-Verwaltung
-- Filter-System (Kategorie, Coalition, Active/Inactive)
-- Statistiken (Anzahl pro Kategorie, Coalition)
-- Cleanup-Funktionen (alte inactive Units, alte History)
+- High-level API for unit management
+- Filtering system (category, coalition, active/inactive)
+- Statistics (counts per category and coalition)
+- Cleanup functions (old inactive units, old history)
 
 **TacticalUnitsViewModel:**
-- UI-State Management
-- Reaktive Flows für Units-Liste
-- Filter-Logik (Categories, Coalitions, Search)
+- UI state management
+- Reactive flows for the units list
+- Filter logic (categories, coalitions, search)
 
-### 5. UI Komponenten
+### 5. UI Components
 
 **TacticalUnitsListScreen:**
-- Liste aller tracked Units
-- Suchfunktion (Name, Group)
-- Filter-Dialog (Category, Coalition, Active/Inactive)
-- Unit-Cards mit Status-Badges
-- Statistiken-Anzeige
+- List of all tracked units
+- Search (name, group)
+- Filter dialog (category, coalition, active/inactive)
+- Unit cards with status badges
+- Statistics display
 
 **FAB Button:**
-- TrackChanges Icon (Radar-ähnlich)
-- Position: defaultX=0.95f, defaultY=0.15f
-- In MapViewerFAB Overlay integriert
+- TrackChanges icon (radar-like)
+- Position: `defaultX=0.95f`, `defaultY=0.15f`
+- Integrated in the MapViewer FAB overlay
 
-## Verwendung
+## Usage
 
 ### Setup
 
-1. **DCS:** 
-   - Export.lua in `Saved Games/DCS/Scripts/` kopieren
-   - forward_parsed_udp.py starten
+1. **DCS:**
+   - Copy `Export.lua` to `Saved Games/DCS/Scripts/`
+   - Start `forward_parsed_udp.py`
 
 2. **Android App:**
-   - DataPad aktivieren (Settings)
-   - ECDH Handshake durchführen
-   - Tactical Units FAB öffnet Liste
+   - Enable DataPad (Settings)
+   - Perform the ECDH handshake
+   - Open the Tactical Units list via the FAB
 
 ### Workflow
 
-1. **DCS sammelt Units** → Export.lua schreibt in JSON
-2. **Python forwarded** → Verschlüsselte UDP-Pakete
-3. **App empfängt** → DataPadManager verarbeitet
-4. **DB speichert** → TacticalUnitEntity + History
-5. **Map zeigt** → Marker auf Karte (TODO) via tactical icons enemy are red blöufor blue civilian yellow
-6. **Liste zeigt** → TacticalUnitsListScreen
+1. **DCS collects units** → `Export.lua` writes JSON
+2. **Python forwards** → encrypted UDP packets
+3. **App receives** → DataPadManager processes the data
+4. **DB stores** → `TacticalUnitEntity` + history entries
+5. **Map shows** → markers on the map (via tactical icons: enemy = red, BLUFOR = blue, civilian = yellow)
+6. **List shows** → `TacticalUnitsListScreen`
 
-### Filter & Suche
+### Filter & Search
 
-- **Kategorien:** aircraft, helicopter, ground, ship, structure
+- **Categories:** aircraft, helicopter, ground, ship, structure
 - **Coalitions:** Neutral, Red, Blue
-- **Status:** Active (sichtbar), Lost (Sichtkontakt verloren)
-- **Suche:** Nach Name oder Gruppe
+- **Status:** Active (visible), Lost (visual contact lost)
+- **Search:** by name or group
 
 ### Cleanup
 
-- **Auto-Cleanup:** Alte inactive Units (7 Tage)
-- **History:** Alte Einträge (14 Tage)
-- **Manuell:** "Delete All" in UI
+- **Auto-Cleanup:** old inactive units (7 days)
+- **History:** remove old history entries (14 days)
+- **Manual:** "Delete All" in the UI
 
-## Sicherheit
+## Security
 
-- **ECDH Key Exchange:** Sichere Schlüsselvereinbarung
-- **AES-GCM Encryption:** Alle Daten verschlüsselt
-- **Device Authorization:** Nur authorized devices (authorized_devices.json)
-- **DoS Protection:** Rate Limiting (per IP, global)
+- **ECDH Key Exchange:** secure key agreement
+- **AES-GCM Encryption:** all data encrypted
+- **Device Authorization:** only authorized devices (see `authorized_devices.json`)
+- **DoS Protection:** rate limiting (per IP, global)
 
 ## Performance
 
-- **DB Indizes:** Optimiert für schnelle Queries
-- **Coroutines:** Non-blocking DB Operations
-- **StateFlow:** Reaktive UI Updates
-- **History Limit:** Konfigurierbar (Standard 14 Tage)
+- **DB Indexes:** optimized for fast queries
+- **Coroutines:** non-blocking DB operations
+- **StateFlow:** reactive UI updates
+- **History Limit:** configurable (default 14 days)
 
 ## TODO
 
-1. ✅ Export.lua nearbyUnits Collection
-2. ✅ TacticalEntities erweitern
-3. ✅ Database Migration v6→v7
-4. ✅ DataPadManager Processing
-5. ✅ Repository erstellen
-6. ✅ UI Screen + ViewModel
-7. ✅ FAB Button hinzufügen
-8. ✅ Map Integration (Marker auf Karte) - **Live tracking mit automatischen Updates**
-9. ⏳ Navigation Integration (Screen Routing)
-10. ⏳ Unit Detail View (mit History-Anzeige)
+1. ✅ Export.lua nearbyUnits collection
+2. ✅ Extend tactical entities
+3. ✅ Database migration v6 → v7
+4. ✅ DataPadManager processing
+5. ✅ Create repository
+6. ✅ UI screen + ViewModel
+7. ✅ Add FAB button
+8. ✅ Map integration (markers on map) - **live tracking with automatic updates**
+9. ⏳ Navigation integration (screen routing)
+10. ⏳ Unit detail view (with history display)
 
-## Nächste Schritte
+## Next Steps
 
-### Map Integration ✅ IMPLEMENTIERT
+### Map Integration ✅ IMPLEMENTED
 
-Die Units werden jetzt **automatisch live** als Marker auf der Karte angezeigt:
+Units are now displayed **live automatically** as markers on the map:
 
 **Features:**
-- ✅ Live-Updates: Marker bewegen sich automatisch mit Unit-Positionen
-- ✅ Auto-Remove: Inactive Units verschwinden sofort von der Karte
-- ✅ Coalition-Farben: Neutral (grau), Red (rot), Blue (blau)
-- ✅ Kategorie-Icons: Aircraft, Helicopter, Ground, Ship
-- ✅ Heading-Anzeige: Marker rotieren entsprechend Unit-Richtung
-- ✅ Details beim Click: Name, Kategorie, Coalition, Speed, Altitude, Group
-- ✅ Toggle-Control: Nur angezeigt wenn Entity Tracking aktiviert ist
+- ✅ Live updates: markers move automatically with unit positions
+- ✅ Auto-remove: inactive units disappear from the map immediately
+- ✅ Coalition colors: Neutral (gray), Red (red), Blue (blue)
+- ✅ Category icons: Aircraft, Helicopter, Ground, Ship
+- ✅ Heading display: markers rotate to match unit heading
+- ✅ Details on click: name, category, coalition, speed, altitude, group
+- ✅ Toggle control: only shown when entity tracking is enabled
 
-**Implementierung:**
+**Implementation:**
 ```kotlin
 // In MapViewer.kt:
 LaunchedEffect(mapState.mapView, tacticalUnitsRepository, dataPadManager.isEntityTrackingEnabled) {
     repo.getAllActiveUnits().collect { units ->
-        // Update markers: Neue Units → neue Marker, Inactive Units → Marker entfernen
-        // Bestehende Units → Position + Heading aktualisieren
+        // Update markers: new units → create markers, inactive units → remove markers
+        // Existing units → update position + heading
     }
 }
 ```
@@ -177,29 +177,30 @@ composable("tactical_units") {
         viewModel = viewModel,
         onNavigateBack = { navController.popBackStack() },
         onUnitClick = { unit ->
-            // Navigate to detail view or center map on unit
+            // Navigate to detail view or center map on the unit
         }
     )
 }
 ```
 
-## Fehlerbehebung
+## Troubleshooting
 
-### Units werden nicht angezeigt
-- DataPad aktiviert? (Settings)
-- ECDH Handshake erfolgreich? (Connection Status)
-- DCS läuft und Export.lua aktiv?
-- forward_parsed_udp.py läuft?
+### Units are not shown
+- Is DataPad enabled? (Settings)
+- Was the ECDH handshake successful? (Connection status)
+- Is DCS running and is `Export.lua` active?
+- Is `forward_parsed_udp.py` running?
 
-### Alte Units bleiben sichtbar
-- Cleanup durchführen (Settings in TacticalUnitsListScreen)
-- Oder manuell: "Delete All Units"
+### Old units remain visible
+- Run cleanup (Settings in `TacticalUnitsListScreen`)
+- Or manually: "Delete All Units"
 
-### Performance-Probleme
-- History-Cleanup durchführen
-- Alte inactive Units löschen
-- DB-Größe prüfen
+### Performance issues
+- Run history cleanup
+- Delete old inactive units
+- Check database size
 
-## Lizenz
+## License
 
-Teil von ChecklistInteractive - Siehe Haupt-LICENSE
+Part of ChecklistInteractive — see the main LICENSE
+
