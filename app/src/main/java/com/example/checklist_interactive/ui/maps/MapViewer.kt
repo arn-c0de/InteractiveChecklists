@@ -1755,6 +1755,18 @@ fun MapViewer(
                     }.collect { units ->
                         Log.d(TAG, "📡 Database units updated: ${units.size} units collected")
                         lastUnits = units
+
+                        // Immediately remove markers for units that are no longer in the database
+                        val currentUnitIds = units.map { it.id }.toSet()
+                        val markersToRemove = unitMarkers.filter { it.key !in currentUnitIds }
+                        if (markersToRemove.isNotEmpty()) {
+                            Log.d(TAG, "📡 Immediately removing ${markersToRemove.size} deleted unit markers")
+                            markersToRemove.forEach { (unitId, marker) ->
+                                mv.overlays.remove(marker)
+                                unitMarkers.remove(unitId)
+                            }
+                            mv.invalidate() // Refresh map display
+                        }
                     }
                 }
                 
