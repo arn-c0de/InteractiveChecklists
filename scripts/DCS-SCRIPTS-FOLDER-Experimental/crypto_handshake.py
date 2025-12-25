@@ -365,12 +365,14 @@ def get_audit_logger() -> SecurityAuditLogger:
 class SessionData:
     """Information about an active session"""
     def __init__(self, session_id: str, device_id: str, session_key: bytes,
-                 peer_public_key: bytes, aircraft: Optional[str] = None):
+                 peer_public_key: bytes, aircraft: Optional[str] = None,
+                 entity_tracking_enabled: bool = False):
         self.session_id = session_id
         self.device_id = device_id
         self.session_key = session_key
         self.peer_public_key = peer_public_key
         self.aircraft = aircraft
+        self.entity_tracking_enabled = entity_tracking_enabled  # Whether client wants tactical unit data
         self.created_at = time.time()
         self.last_activity = time.time()
         # Whether the client completed KeyConfirm for this session
@@ -1095,6 +1097,7 @@ class SessionManager:
             device_name = message.get('deviceName', 'Unknown')
             client_public_key_b64 = message.get('publicKey', '')
             client_timestamp = message.get('timestamp', 0)
+            entity_tracking_enabled = message.get('entityTrackingEnabled', False)  # NEW: Entity tracking preference
             ip_address = sender_address[0]
 
             # SECURITY: Comprehensive deviceId validation
@@ -1309,7 +1312,8 @@ class SessionManager:
                 device_id=device_id,
                 session_key=session_key,
                 peer_public_key=client_public_key_b64.encode(),
-                aircraft=self.aircraft_name
+                aircraft=self.aircraft_name,
+                entity_tracking_enabled=entity_tracking_enabled  # Pass client's preference
             )
             
             # Remove old session for this device (if exists)
@@ -1321,7 +1325,10 @@ class SessionManager:
             self.sessions[session_id] = session
             self.device_sessions[device_id] = session_id
 
-            logger.info(f"🔑 Session created: {session_id[:8]}... (key derived from ECDH)")
+            entity_status = "with entity tracking" if entity_tracking_enabled else "aircraft data only"
+            logger.info(f"🔑 Session created: {session_id[:8]}... (key derived from ECDH, {entity_status})")
+            if entity_tracking_enabled:
+                logger.info(f"📡 Entity tracking ENABLED for device {device_id[:16]}... - will send tactical unit data")
 
             # SECURITY AUDIT: Log successful session establishment
             get_audit_logger().log_event('session_established', 'low', {

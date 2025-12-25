@@ -549,11 +549,21 @@ def _is_same_file(f, path: str) -> bool:
 
 def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager', send_existing=False, once=False, interval=0.2,
                   verbose=False, show_env=False, handshake_port: int = None, bind_ip: str = '127.0.0.1'):
-    """Tail a file and send only new JSON lines as UDP datagrams (ECDH only)."""
+    """Tail aircraft data file and optionally entity contacts file, sending as UDP datagrams (ECDH only)."""
     # Use global timestamp state to prevent forwarding old/cached messages
     global _last_processed_timestamp
     if not os.path.exists(path):
         raise FileNotFoundError(path)
+
+    # Auto-detect entity contacts file (parallel to aircraft data file)
+    entity_contacts_path = None
+    if 'player_aircraft_parsed.jsonl' in path:
+        potential_entity_path = path.replace('player_aircraft_parsed.jsonl', 'entity-contacts-parsed.jsonl')
+        if os.path.exists(potential_entity_path):
+            entity_contacts_path = potential_entity_path
+            logger.info(f"📡 Entity contacts file detected: {entity_contacts_path}")
+        else:
+            logger.info(f"ℹ️ Entity contacts file not found (will create when data arrives): {potential_entity_path}")
 
     # Create a UDP socket bound to handshake_port for handshake, send data to destination port
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -573,13 +583,20 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
     last_data_sent_time = time.time()
     HEARTBEAT_INTERVAL = 30.0  # seconds
 
-    def open_for_tail(read_existing: bool = False):
-        f = open(path, 'r', encoding='utf-8', errors='ignore')
+    def open_for_tail(file_path: str, read_existing: bool = False):
+        f = open(file_path, 'r', encoding='utf-8', errors='ignore')
         if not read_existing:
             f.seek(0, os.SEEK_END)
         return f
 
-    f = open_for_tail()
+    # Open aircraft data file
+    f = open_for_tail(path)
+
+    # Open entity contacts file if it exists
+    f_entity = None
+    if entity_contacts_path and os.path.exists(entity_contacts_path):
+        f_entity = open_for_tail(entity_contacts_path)
+
     try:
         while True:
             # Check heartbeat FIRST (independent of data availability)
@@ -681,7 +698,15 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                         f.close()
                     except Exception:
                         pass
-                    f = open_for_tail(True)
+                    f = open_for_tail(path, True)
+                    # Also reopen entity file if needed
+                    if f_entity and entity_contacts_path:
+                        try:
+                            f_entity.close()
+                        except Exception:
+                            pass
+                        if os.path.exists(entity_contacts_path):
+                            f_entity = open_for_tail(entity_contacts_path, True)
                     if once:
                         break
                     time.sleep(interval)
@@ -726,7 +751,15 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                         f.close()
                     except Exception:
                         pass
-                    f = open_for_tail(True)
+                    f = open_for_tail(path, True)
+                    # Also reopen entity file if needed
+                    if f_entity and entity_contacts_path:
+                        try:
+                            f_entity.close()
+                        except Exception:
+                            pass
+                        if os.path.exists(entity_contacts_path):
+                            f_entity = open_for_tail(entity_contacts_path, True)
                     if once:
                         break
                     time.sleep(interval)
@@ -803,11 +836,55 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                         print(f"{ts} SENT {host}:{port} {jsonpart}")
                 else:
                     print(f"{ts} ERROR {host}:{port} {jsonpart}")
+
+            # Check entity contacts file (if exists and any device wants entity tracking)
+            if f_entity is not None:
+                # Check if ANY active session wants entity tracking
+                wants_entities = any(
+                    session_mgr.sessions[session_id].entity_tracking_enabled
+                    for device_id, session_id in session_mgr.device_sessions.items()
+                    if session_id in session_mgr.sessions
+                )
+
+                if wants_entities:
+                    entity_line = f_entity.readline()
+                    if entity_line:
+                        entity_jsonpart = extract_json_from_line(entity_line)
+                        if entity_jsonpart:
+                            # Send ONLY to devices with entity_tracking_enabled=true
+                            entity_sent_count = 0
+                            for device_id, session_id in list(session_mgr.device_sessions.items()):
+                                session = session_mgr.sessions.get(session_id)
+                                if session and session.entity_tracking_enabled:
+                                    if send_udp(entity_jsonpart.encode('utf-8'), host, port, sock,
+                                               session_mgr=session_mgr, device_id=device_id):
+                                        entity_sent_count += 1
+                                        logger.info(f"📡 Sent entity data to {device_id[:8]}...")
+
+                            if entity_sent_count > 0:
+                                logger.info(f"📡 Entity contacts sent to {entity_sent_count} device(s)")
+                else:
+                    # No device wants entities, skip reading
+                    pass
+            elif entity_contacts_path and not f_entity:
+                # Try to open entity file if it was created after we started
+                if os.path.exists(entity_contacts_path):
+                    try:
+                        f_entity = open_for_tail(entity_contacts_path)
+                        logger.info(f"📡 Entity contacts file now available: {entity_contacts_path}")
+                    except Exception as e:
+                        logger.debug(f"Could not open entity file: {e}")
+
     finally:
         try:
             f.close()
         except Exception:
             pass
+        if f_entity:
+            try:
+                f_entity.close()
+            except Exception:
+                pass
         sock.close()
         # handshake_sock is same as sock in ECDH mode, don't close twice
 

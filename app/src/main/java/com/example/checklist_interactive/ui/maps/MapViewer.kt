@@ -122,7 +122,8 @@ private fun createPlaneDrawable(ctx: Context, sizeDp: Float, color: Int): Bitmap
 fun MapViewer(
     modifier: Modifier = Modifier,
     isScreenLocked: Boolean = false,
-    onLockScreen: () -> Unit = {}
+    onLockScreen: () -> Unit = {},
+    onTacticalUnitsOpen: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val dataPadManager = LocalDataPadManager.current
@@ -1769,6 +1770,7 @@ fun MapViewer(
 
                 onDataPadOpen = { if (datapadEnabled) mapState.showDataPad = true },
                 onQuickAccessOpen = { mapState.showQuickAccess = true },
+                onTacticalUnitsOpen = onTacticalUnitsOpen,
                 isConnected = isConnected,
                 isScreenLocked = isScreenLocked,
                 mapRotationMode = mapState.mapRotationMode,

@@ -345,3 +345,138 @@ interface MapDrawingDao {
     suspend fun deleteAllDrawings()
 }
 
+/**
+ * DAO for Tactical Units operations
+ */
+@Dao
+interface TacticalUnitsDao {
+    // --- SELECT queries ---
+    
+    @Query("SELECT * FROM tactical_units ORDER BY last_seen_at DESC")
+    fun getAllUnits(): Flow<List<TacticalUnitEntity>>
+    
+    @Query("SELECT * FROM tactical_units WHERE is_active = 1 ORDER BY last_seen_at DESC")
+    fun getAllActiveUnits(): Flow<List<TacticalUnitEntity>>
+    
+    @Query("SELECT * FROM tactical_units WHERE is_active = 0 ORDER BY last_seen_at DESC")
+    fun getAllInactiveUnits(): Flow<List<TacticalUnitEntity>>
+    
+    @Query("SELECT * FROM tactical_units WHERE id = :id")
+    suspend fun getUnitById(id: Int): TacticalUnitEntity?
+    
+    @Query("SELECT * FROM tactical_units WHERE dcs_id = :dcsId")
+    suspend fun getUnitByDcsId(dcsId: String): TacticalUnitEntity?
+    
+    @Query("SELECT * FROM tactical_units WHERE category = :category ORDER BY last_seen_at DESC")
+    fun getUnitsByCategory(category: String): Flow<List<TacticalUnitEntity>>
+    
+    @Query("SELECT * FROM tactical_units WHERE coalition = :coalition ORDER BY last_seen_at DESC")
+    fun getUnitsByCoalition(coalition: Int): Flow<List<TacticalUnitEntity>>
+    
+    @Query("""
+        SELECT * FROM tactical_units 
+        WHERE category = :category AND coalition = :coalition 
+        ORDER BY last_seen_at DESC
+    """)
+    fun getUnitsByCategoryAndCoalition(category: String, coalition: Int): Flow<List<TacticalUnitEntity>>
+    
+    @Query("""
+        SELECT * FROM tactical_units 
+        WHERE (name LIKE '%' || :query || '%' OR group_name LIKE '%' || :query || '%')
+        ORDER BY last_seen_at DESC
+    """)
+    fun searchUnits(query: String): Flow<List<TacticalUnitEntity>>
+    
+    // --- Statistics ---
+    
+    @Query("SELECT COUNT(*) FROM tactical_units WHERE is_active = 1")
+    suspend fun getActiveUnitCount(): Int
+    
+    @Query("SELECT COUNT(*) FROM tactical_units WHERE is_active = 1 AND category = :category")
+    suspend fun getActiveUnitCountByCategory(category: String): Int
+    
+    @Query("SELECT COUNT(*) FROM tactical_units WHERE is_active = 1 AND coalition = :coalition")
+    suspend fun getActiveUnitCountByCoalition(coalition: Int): Int
+    
+    // --- INSERT / UPDATE ---
+    
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertUnit(unit: TacticalUnitEntity): Long
+    
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertUnits(units: List<TacticalUnitEntity>)
+    
+    @Update
+    suspend fun updateUnit(unit: TacticalUnitEntity)
+    
+    @Query("""
+        UPDATE tactical_units 
+        SET latitude = :latitude, longitude = :longitude, altitude = :altitude,
+            heading = :heading, speed = :speed, distance = :distance, bearing = :bearing,
+            is_active = 1, last_seen_at = :lastSeenAt, last_update_at = :lastUpdateAt
+        WHERE dcs_id = :dcsId
+    """)
+    suspend fun updateUnitPosition(
+        dcsId: String,
+        latitude: Double,
+        longitude: Double,
+        altitude: Double,
+        heading: Double?,
+        speed: Double?,
+        distance: Double?,
+        bearing: Double?,
+        lastSeenAt: String,
+        lastUpdateAt: String
+    )
+    
+    @Query("UPDATE tactical_units SET is_active = 0 WHERE dcs_id = :dcsId")
+    suspend fun markUnitInactive(dcsId: String)
+    
+    @Query("UPDATE tactical_units SET is_active = 0 WHERE is_active = 1")
+    suspend fun markAllUnitsInactive()
+    
+    // --- DELETE ---
+    
+    @Delete
+    suspend fun deleteUnit(unit: TacticalUnitEntity)
+    
+    @Query("DELETE FROM tactical_units WHERE id = :id")
+    suspend fun deleteUnitById(id: Int)
+    
+    @Query("DELETE FROM tactical_units WHERE dcs_id = :dcsId")
+    suspend fun deleteUnitByDcsId(dcsId: String)
+    
+    @Query("DELETE FROM tactical_units WHERE is_active = 0 AND last_seen_at < :cutoffTime")
+    suspend fun deleteInactiveUnitsOlderThan(cutoffTime: String)
+    
+    @Query("DELETE FROM tactical_units")
+    suspend fun deleteAllUnits()
+}
+
+/**
+ * DAO for Tactical Unit History operations
+ */
+@Dao
+interface TacticalUnitHistoryDao {
+    @Query("SELECT * FROM tactical_unit_history WHERE unit_id = :unitId ORDER BY timestamp DESC")
+    fun getHistoryForUnit(unitId: Int): Flow<List<TacticalUnitHistoryEntity>>
+    
+    @Query("SELECT * FROM tactical_unit_history WHERE unit_id = :unitId ORDER BY timestamp DESC LIMIT :limit")
+    suspend fun getRecentHistoryForUnit(unitId: Int, limit: Int = 100): List<TacticalUnitHistoryEntity>
+    
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertHistory(history: TacticalUnitHistoryEntity): Long
+    
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertHistories(histories: List<TacticalUnitHistoryEntity>)
+    
+    @Query("DELETE FROM tactical_unit_history WHERE unit_id = :unitId")
+    suspend fun deleteHistoryForUnit(unitId: Int)
+    
+    @Query("DELETE FROM tactical_unit_history WHERE timestamp < :cutoffTime")
+    suspend fun deleteHistoryOlderThan(cutoffTime: String)
+    
+    @Query("DELETE FROM tactical_unit_history")
+    suspend fun deleteAllHistory()
+}
+
