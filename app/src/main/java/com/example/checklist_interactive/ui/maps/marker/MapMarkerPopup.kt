@@ -316,6 +316,7 @@ fun MapMarkerPopup(
                 val strMarkerType = stringResource(R.string.map_marker_type)
                 val strIcao = stringResource(R.string.map_marker_icao)
                 val strIata = stringResource(R.string.map_marker_iata)
+                val strMap = stringResource(R.string.map_marker_map)
                 val strCountry = stringResource(R.string.map_marker_country)
                 val strRegion = stringResource(R.string.map_marker_region)
                 val strTimezone = stringResource(R.string.map_marker_timezone)
@@ -332,12 +333,15 @@ fun MapMarkerPopup(
                 val strRunways = stringResource(R.string.map_marker_runways)
 
                 // Info grid (two columns) — expanded to include tactical/admin metadata, source and tags
-                val infoItems = remember(location, runways, strMarkerType, strIcao, strIata, strCountry, strRegion, strTimezone, strElevation, strUnit, strThreat, strStrength, strSource, strVerified, strVerifiedYes, strVerifiedNo, strVerifiedAt, strTags, strRunways) {
+                val infoItems = remember(location, runways, strMarkerType, strIcao, strIata, strMap, strCountry, strRegion, strTimezone, strElevation, strUnit, strThreat, strStrength, strSource, strVerified, strVerifiedYes, strVerifiedNo, strVerifiedAt, strTags, strRunways) {
                     mutableListOf<Pair<String, String>>().apply {
                         // Basic identifiers
                         location.markerType?.takeIf { it.isNotEmpty() }?.let { add(strMarkerType to it.replace('_', ' ')) }
                         location.icao?.takeIf { it.isNotEmpty() }?.let { add(strIcao to it) }
                         location.iata?.takeIf { it.isNotEmpty() }?.let { add(strIata to it) }
+                        
+                        // DCS Map identifier
+                        location.map?.takeIf { it.isNotEmpty() }?.let { add(strMap to it) }
 
                         // Geography / admin
                         location.country?.takeIf { it.isNotEmpty() }?.let { add(strCountry to it) }

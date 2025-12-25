@@ -23,6 +23,12 @@ interface LocationDao {
     @Query("SELECT * FROM locations WHERE name LIKE '%' || :query || '%' ORDER BY name")
     fun searchLocations(query: String): Flow<List<LocationEntity>>
     
+    @Query("SELECT * FROM locations WHERE map = :mapName ORDER BY name")
+    fun getLocationsByMap(mapName: String): Flow<List<LocationEntity>>
+    
+    @Query("SELECT DISTINCT map FROM locations WHERE map IS NOT NULL ORDER BY map")
+    fun getAllMaps(): Flow<List<String>>
+    
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLocation(location: LocationEntity): Long
     

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.checklist_interactive.R
 import com.example.checklist_interactive.data.datapad.DataPadManager
 import com.example.checklist_interactive.ui.datapad.LocalDataPadManager
 import com.example.checklist_interactive.data.tactical.TacticalUnitEntity
@@ -118,7 +120,7 @@ fun TacticalUnitsListScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Tactical Units",
+                        text = stringResource(R.string.tactical_title),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold
                     )
@@ -128,21 +130,21 @@ fun TacticalUnitsListScreen(
                         IconButton(onClick = { showOpacitySlider = !showOpacitySlider }) {
                             Icon(
                                 imageVector = if (showOpacitySlider) Icons.Default.Close else Icons.Default.Visibility,
-                                contentDescription = "Adjust opacity"
+                                contentDescription = stringResource(R.string.tactical_adjust_opacity)
                             )
                         }
 
                         // More options menu
                         Box {
                             IconButton(onClick = { showCleanupMenu = true }) {
-                                Icon(Icons.Default.MoreVert, "Options")
+                                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.tactical_options))
                             }
                             DropdownMenu(
                                 expanded = showCleanupMenu,
                                 onDismissRequest = { showCleanupMenu = false }
                             ) {
                                 DropdownMenuItem(
-                                    text = { Text("Delete Inactive Units") },
+                                    text = { Text(stringResource(R.string.tactical_delete_inactive)) },
                                     onClick = {
                                         showCleanupMenu = false
                                         viewModel.deleteInactiveUnits()
@@ -150,7 +152,7 @@ fun TacticalUnitsListScreen(
                                     leadingIcon = { Icon(Icons.Default.Delete, null) }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("Delete Old Units (>1h)") },
+                                    text = { Text(stringResource(R.string.tactical_delete_old)) },
                                     onClick = {
                                         showCleanupMenu = false
                                         viewModel.deleteOldUnits(3600)
@@ -158,7 +160,7 @@ fun TacticalUnitsListScreen(
                                     leadingIcon = { Icon(Icons.Default.Delete, null) }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("Delete All Units") },
+                                    text = { Text(stringResource(R.string.tactical_delete_all)) },
                                     onClick = {
                                         showCleanupMenu = false
                                         showDeleteConfirm = true
@@ -169,7 +171,7 @@ fun TacticalUnitsListScreen(
                         }
                         
                         IconButton(onClick = onNavigateBack) {
-                            Icon(Icons.Default.Close, contentDescription = "Close")
+                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_close))
                         }
                     }
                 }
@@ -186,7 +188,7 @@ fun TacticalUnitsListScreen(
                             .padding(top = 8.dp, bottom = 8.dp)
                     ) {
                         Text(
-                            text = "Opacity: ${(dialogOpacity * 100).toInt()}%",
+                            text = stringResource(R.string.tactical_opacity_label, (dialogOpacity * 100).toInt()),
                             style = MaterialTheme.typography.bodySmall
                         )
                         Slider(
@@ -216,11 +218,11 @@ fun TacticalUnitsListScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Live Only",
+                            text = stringResource(R.string.tactical_live_only),
                             style = MaterialTheme.typography.bodyMedium
                         )
                         IconButton(onClick = { viewModel.toggleFilterDialog() }) {
-                            Icon(Icons.Default.Tune, "Advanced Filters")
+                            Icon(Icons.Default.Tune, contentDescription = stringResource(R.string.tactical_advanced_filters))
                         }
                     }
                     Switch(
@@ -236,12 +238,12 @@ fun TacticalUnitsListScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 8.dp),
-                    placeholder = { Text("Search by name or group...") },
+                    placeholder = { Text(stringResource(R.string.tactical_search_placeholder)) },
                     leadingIcon = { Icon(Icons.Default.Search, null) },
                     trailingIcon = {
                         if (uiState.searchQuery.isNotEmpty()) {
                             IconButton(onClick = { viewModel.setSearchQuery("") }) {
-                                Icon(Icons.Default.Clear, "Clear")
+                                Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.action_clear))
                             }
                         }
                     },
@@ -302,8 +304,8 @@ fun TacticalUnitsListScreen(
         if (showDeleteConfirm) {
             AlertDialog(
                 onDismissRequest = { showDeleteConfirm = false },
-                title = { Text("Delete All Units?") },
-                text = { Text("This will delete all tracked units and their history. This cannot be undone.") },
+                title = { Text(stringResource(R.string.tactical_delete_all_confirm_title)) },
+                text = { Text(stringResource(R.string.tactical_delete_all_confirm_message)) },
                 confirmButton = {
                     TextButton(
                         onClick = {
@@ -314,12 +316,12 @@ fun TacticalUnitsListScreen(
                             contentColor = MaterialTheme.colorScheme.error
                         )
                     ) {
-                        Text("Delete")
+                        Text(stringResource(R.string.action_delete))
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showDeleteConfirm = false }) {
-                        Text("Cancel")
+                        Text(stringResource(R.string.action_cancel))
                     }
                 }
             )
@@ -364,12 +366,12 @@ private fun StatsCard(
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Text(
-                            text = "Entity Tracking",
+                            text = stringResource(R.string.tactical_entity_tracking),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Medium
                         )
                         Text(
-                            text = if (isEntityTrackingEnabled) "Receiving tactical units" else "Tracking disabled",
+                            text = if (isEntityTrackingEnabled) stringResource(R.string.tactical_receiving) else stringResource(R.string.tactical_tracking_disabled),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -403,12 +405,12 @@ private fun StatsCard(
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(
-                                text = "Unit Visibility on Map",
+                                text = stringResource(R.string.tactical_unit_visibility_on_map),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = if (showTacticalUnitsOnMap) "Units visible on map" else "Units hidden on map",
+                                text = if (showTacticalUnitsOnMap) stringResource(R.string.tactical_units_visible_on_map) else stringResource(R.string.tactical_units_hidden_on_map),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -432,7 +434,7 @@ private fun StatsCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Map Update Interval",
+                            text = stringResource(R.string.tactical_map_update_interval),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium
                         )
@@ -453,7 +455,7 @@ private fun StatsCard(
                     )
                     
                     Text(
-                        text = "Lower = smoother movement, higher = better performance",
+                        text = stringResource(R.string.tactical_map_update_explain),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -463,7 +465,7 @@ private fun StatsCard(
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
             Text(
-                text = "Active Units: ${stats.totalActive}",
+                text = stringResource(R.string.tactical_active_units_label, stats.totalActive),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -475,9 +477,9 @@ private fun StatsCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                CoalitionBadge("Neutral", stats.neutralCount, Color(0xFF999999))
-                CoalitionBadge("Red", stats.redCount, Color(0xFFE53935))
-                CoalitionBadge("Blue", stats.blueCount, Color(0xFF1E88E5))
+                CoalitionBadge(stringResource(R.string.tactical_coalition_neutral), stats.neutralCount, Color(0xFF999999))
+                CoalitionBadge(stringResource(R.string.tactical_coalition_red), stats.redCount, Color(0xFFE53935))
+                CoalitionBadge(stringResource(R.string.tactical_coalition_blue), stats.blueCount, Color(0xFF1E88E5))
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -487,10 +489,10 @@ private fun StatsCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (stats.aircraftCount > 0) CategoryChip("Aircraft", stats.aircraftCount)
-                if (stats.helicopterCount > 0) CategoryChip("Heli", stats.helicopterCount)
-                if (stats.groundCount > 0) CategoryChip("Ground", stats.groundCount)
-                if (stats.shipCount > 0) CategoryChip("Ship", stats.shipCount)
+                if (stats.aircraftCount > 0) CategoryChip(stringResource(R.string.category_aircraft), stats.aircraftCount)
+                if (stats.helicopterCount > 0) CategoryChip(stringResource(R.string.category_heli), stats.helicopterCount)
+                if (stats.groundCount > 0) CategoryChip(stringResource(R.string.category_ground), stats.groundCount)
+                if (stats.shipCount > 0) CategoryChip(stringResource(R.string.category_ship), stats.shipCount)
             }
         }
     }
@@ -580,7 +582,7 @@ private fun UnitCard(
                     // Expand/collapse icon
                     Icon(
                         imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                        contentDescription = if (isExpanded) "Collapse" else "Expand",
+                        contentDescription = if (isExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -609,7 +611,7 @@ private fun UnitCard(
                         color = Color(0xFF4CAF50).copy(alpha = 0.2f)
                     ) {
                         Text(
-                            text = "ACTIVE",
+                            text = stringResource(R.string.status_active),
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             style = MaterialTheme.typography.labelSmall,
                             color = Color(0xFF2E7D32)
@@ -621,7 +623,7 @@ private fun UnitCard(
                         color = MaterialTheme.colorScheme.errorContainer
                     ) {
                         Text(
-                            text = "LOST CONTACT",
+                            text = stringResource(R.string.status_lost_contact),
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.error
@@ -637,16 +639,16 @@ private fun UnitCard(
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(
-                        text = "Dist: ${(unit.distance / 1000.0).format(1)} km",
+                        text = "${stringResource(R.string.unit_dist_label)} ${(unit.distance / 1000.0).format(1)} km",
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(
-                        text = "Brg: ${unit.bearing.toInt()}°",
+                        text = "${stringResource(R.string.unit_brg_label)} ${unit.bearing.toInt()}°",
                         style = MaterialTheme.typography.bodySmall
                     )
                     unit.speed?.let { speed ->
                         Text(
-                            text = "Spd: ${speed.toInt()} m/s",
+                            text = "${stringResource(R.string.unit_spd_label)} ${speed.toInt()} m/s",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -665,20 +667,26 @@ private fun UnitCard(
                 }
             }
             
+            // Load string resources outside try-catch (composables can't be in try-catch)
+            val strSeconds = stringResource(R.string.tactical_time_seconds, 0)
+            val strMinutes = stringResource(R.string.tactical_time_minutes, 0)
+            val strHours = stringResource(R.string.tactical_time_hours, 0)
+            val strUnknown = stringResource(R.string.tactical_time_unknown)
+            
             val (timeAgoText, secondsAgo) = try {
                 val lastSeen = java.time.Instant.parse(unit.lastSeenAt)
                 val seconds = java.time.Duration.between(lastSeen, currentTime).seconds
                 val text = when {
-                    seconds < 60 -> "${seconds}s ago"
-                    seconds < 3600 -> "${seconds / 60}m ago"
-                    else -> "${seconds / 3600}h ago"
+                    seconds < 60 -> strSeconds.replace("0", seconds.toString())
+                    seconds < 3600 -> strMinutes.replace("0", (seconds / 60).toString())
+                    else -> strHours.replace("0", (seconds / 3600).toString())
                 }
                 Pair(text, seconds)
             } catch (_: Exception) {
-                Pair("Unknown", Long.MAX_VALUE)
+                Pair(strUnknown, Long.MAX_VALUE)
             }
             Text(
-                text = "Last seen: $timeAgoText",
+                text = "${stringResource(R.string.unit_last_seen_label)} $timeAgoText",
                 style = MaterialTheme.typography.bodySmall,
                 color = if (secondsAgo < 10) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = if (secondsAgo < 10) FontWeight.Bold else FontWeight.Normal
@@ -688,7 +696,7 @@ private fun UnitCard(
             unit.groupName?.let { group ->
                 if (group.isNotEmpty()) {
                     Text(
-                        text = "Group: $group",
+                        text = "${stringResource(R.string.unit_group_label)} $group",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -707,7 +715,7 @@ private fun UnitCard(
                     
                     // Coordinates
                     Text(
-                        text = "Coordinates",
+                        text = stringResource(R.string.coords_title),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -718,7 +726,7 @@ private fun UnitCard(
                     ) {
                         Column {
                             Text(
-                                text = "Latitude",
+                                text = stringResource(R.string.lat_label),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -730,7 +738,7 @@ private fun UnitCard(
                         }
                         Column {
                             Text(
-                                text = "Longitude",
+                                text = stringResource(R.string.lon_label),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -742,12 +750,12 @@ private fun UnitCard(
                         }
                         Column {
                             Text(
-                                text = "Altitude",
+                                text = stringResource(R.string.alt_label),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
-                                text = unit.altitude?.let { "${it.toInt()} ft" } ?: "N/A",
+                                text = unit.altitude?.let { "${it.toInt()} ft" } ?: stringResource(R.string.na_label),
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         }
@@ -756,7 +764,7 @@ private fun UnitCard(
                     // Navigation data
                     if (unit.heading != null || unit.speed != null || unit.distance != null) {
                         Text(
-                            text = "Navigation",
+                            text = stringResource(R.string.navigation_title),
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -768,7 +776,7 @@ private fun UnitCard(
                             unit.heading?.let {
                                 Column {
                                     Text(
-                                        text = "Heading",
+                                        text = stringResource(R.string.heading_label),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -781,7 +789,7 @@ private fun UnitCard(
                             unit.speed?.let {
                                 Column {
                                     Text(
-                                        text = "Speed",
+                                        text = stringResource(R.string.speed_label),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -794,7 +802,7 @@ private fun UnitCard(
                             unit.distance?.let {
                                 Column {
                                     Text(
-                                        text = "Distance",
+                                        text = stringResource(R.string.distance_label),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -807,7 +815,7 @@ private fun UnitCard(
                             unit.bearing?.let {
                                 Column {
                                     Text(
-                                        text = "Bearing",
+                                        text = stringResource(R.string.bearing_label),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -822,7 +830,7 @@ private fun UnitCard(
                     
                     // Timestamps
                     Text(
-                        text = "Tracking Info",
+                        text = stringResource(R.string.tracking_info_title),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -833,7 +841,7 @@ private fun UnitCard(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "First Seen:",
+                                text = stringResource(R.string.first_seen_label),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -843,7 +851,7 @@ private fun UnitCard(
                                     val formatter = DateTimeFormatter.ofPattern("HH:mm:ss")
                                         .withZone(ZoneId.systemDefault())
                                     formatter.format(instant)
-                                } catch (_: Exception) { "N/A" },
+                                } catch (_: Exception) { stringResource(R.string.na_label) },
                                 style = MaterialTheme.typography.bodySmall,
                                 fontFamily = FontFamily.Monospace
                             )
@@ -853,7 +861,7 @@ private fun UnitCard(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "Last Seen:",
+                                text = stringResource(R.string.last_seen_label),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -863,7 +871,7 @@ private fun UnitCard(
                                     val formatter = DateTimeFormatter.ofPattern("HH:mm:ss")
                                         .withZone(ZoneId.systemDefault())
                                     formatter.format(instant)
-                                } catch (_: Exception) { "N/A" },
+                                } catch (_: Exception) { stringResource(R.string.na_label) },
                                 style = MaterialTheme.typography.bodySmall,
                                 fontFamily = FontFamily.Monospace
                             )
@@ -873,7 +881,7 @@ private fun UnitCard(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "DCS ID:",
+                                text = stringResource(R.string.dcs_id_label),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -889,13 +897,13 @@ private fun UnitCard(
                     unit.pilotName?.let { pilot ->
                         if (pilot.isNotEmpty()) {
                             Text(
-                                text = "Pilot Info",
+                                text = stringResource(R.string.pilot_info_title),
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Text(
-                                text = "Pilot: $pilot",
+                                text = "${stringResource(R.string.pilot_label)} $pilot",
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         }
@@ -916,7 +924,7 @@ private fun UnitCard(
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Center on Map")
+                            Text(stringResource(R.string.center_on_map))
                         }
                     }
                 }
@@ -961,7 +969,7 @@ private fun FilterDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Filter Units") },
+        title = { Text(stringResource(R.string.filter_title)) },
         text = {
             Column {
                 // Active/Inactive toggle
@@ -970,7 +978,7 @@ private fun FilterDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Show active only")
+                    Text(stringResource(R.string.filter_show_active_only))
                     Switch(
                         checked = uiState.showActiveOnly,
                         onCheckedChange = onToggleActiveOnly
@@ -980,9 +988,18 @@ private fun FilterDialog(
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 // Categories
-                Text("Categories", style = MaterialTheme.typography.titleSmall)
+                Text(stringResource(R.string.filter_categories_title), style = MaterialTheme.typography.titleSmall)
                 Spacer(modifier = Modifier.height(8.dp))
                 listOf("aircraft", "helicopter", "ground", "ship", "structure", "weapon").forEach { category ->
+                    val categoryLabel = when (category) {
+                        "aircraft" -> stringResource(R.string.category_aircraft)
+                        "helicopter" -> stringResource(R.string.category_heli)
+                        "ground" -> stringResource(R.string.category_ground)
+                        "ship" -> stringResource(R.string.category_ship)
+                        "structure" -> stringResource(R.string.category_structure)
+                        "weapon" -> stringResource(R.string.category_weapon)
+                        else -> category.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+                    }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -993,16 +1010,16 @@ private fun FilterDialog(
                             checked = uiState.selectedCategories.isEmpty() || uiState.selectedCategories.contains(category),
                             onCheckedChange = { onToggleCategory(category) }
                         )
-                        Text(category.capitalize())
+                        Text(categoryLabel)
                     }
                 }
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 // Coalitions
-                Text("Coalitions", style = MaterialTheme.typography.titleSmall)
+                Text(stringResource(R.string.filter_coalitions_title), style = MaterialTheme.typography.titleSmall)
                 Spacer(modifier = Modifier.height(8.dp))
-                listOf(0 to "Neutral", 1 to "Red", 2 to "Blue").forEach { (coalition, name) ->
+                listOf(0 to stringResource(R.string.tactical_coalition_neutral), 1 to stringResource(R.string.tactical_coalition_red), 2 to stringResource(R.string.tactical_coalition_blue)).forEach { (coalition, name) ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1020,7 +1037,7 @@ private fun FilterDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Done")
+                Text(stringResource(R.string.tactical_done))
             }
         },
         dismissButton = {
@@ -1028,7 +1045,7 @@ private fun FilterDialog(
                 onClearFilters()
                 onDismiss()
             }) {
-                Text("Clear")
+                Text(stringResource(R.string.action_clear))
             }
         }
     )
@@ -1051,12 +1068,12 @@ private fun EmptyState() {
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             )
             Text(
-                text = "No units found",
+                text = stringResource(R.string.empty_no_units_found),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = "Start DCS with DataPad enabled to track units",
+                text = stringResource(R.string.empty_start_datapad_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
             )

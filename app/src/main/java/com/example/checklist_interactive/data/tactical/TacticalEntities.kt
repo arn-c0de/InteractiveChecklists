@@ -14,7 +14,8 @@ import androidx.room.*
         Index(value = ["name"]),
         Index(value = ["icao"]),
         Index(value = ["country"]),
-        Index(value = ["verified"])
+        Index(value = ["verified"]),
+        Index(value = ["map"])
     ]
 )
 data class LocationEntity(
@@ -122,7 +123,11 @@ data class LocationEntity(
     val updatedAt: String? = null,
     
     @ColumnInfo(name = "deleted_at")
-    val deletedAt: String? = null  // Soft delete
+    val deletedAt: String? = null,  // Soft delete
+    
+    // DCS Map identifier (for filtering markers by map)
+    @ColumnInfo(name = "map")
+    val map: String? = null  // e.g., "Caucasus", "Syria", "Persian Gulf", "Nevada"
 )
 
 /**
