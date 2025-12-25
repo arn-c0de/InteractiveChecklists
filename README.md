@@ -119,10 +119,16 @@ Planned enhancements include additional telemetry (speed, vertical speed, fuel, 
 </p>
 
 
+<a name="demo-videos"></a>
 ## Demo Videos 🎬
 
 <p align="center">
-[![Watch demo 1 on YouTube](https://img.youtube.com/vi/V7vRuQvTFK8/0.jpg)](https://youtu.be/V7vRuQvTFK8) &nbsp; [![Watch demo 2 on YouTube](https://img.youtube.com/vi/G5uiONmqxe0/0.jpg)](https://youtu.be/G5uiONmqxe0)
+<a href="https://youtu.be/V7vRuQvTFK8"><img src="https://img.youtube.com/vi/V7vRuQvTFK8/0.jpg" alt="Demo 1" width="360" /></a> &nbsp;
+<a href="https://youtu.be/G5uiONmqxe0"><img src="https://img.youtube.com/vi/G5uiONmqxe0/0.jpg" alt="Demo 2" width="360" /></a>
+</p>
+
+<p align="center">
+**Demo 1:** Test recording — performance / tablet capture &nbsp;&nbsp; **Demo 2:** Test recording — workflow / resolution
 </p>
 
 > 📝 **NOTE**  
