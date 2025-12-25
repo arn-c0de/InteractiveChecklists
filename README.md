@@ -23,6 +23,10 @@
 	<a href="THIRD_PARTY_LICENSES.md">Third-Party Licenses</a>
 </div>
 
+<p align="center">
+	<a href="#screenshots">Screenshots</a> • <a href="#demo-videos">Demo Videos</a>
+</p>
+
 
 # InteractiveChecklists
 
@@ -39,6 +43,7 @@ InteractiveChecklists is an Android application for viewing and interacting with
 
 - [Features](#features)
 - [Screenshots](#screenshots)
+- [Demo Videos](#demo-videos)
 - [Installation](#installation)
 - [System Requirements](#system-requirements)
 - [How to Build & Run](#how-to-build--run)
@@ -114,9 +119,11 @@ Planned enhancements include additional telemetry (speed, vertical speed, fuel, 
 </p>
 
 
-## Demo Video 🎬
+## Demo Videos 🎬
 
-[![Watch the demo on YouTube](https://img.youtube.com/vi/V7vRuQvTFK8/0.jpg)](https://youtu.be/V7vRuQvTFK8)
+<p align="center">
+[![Watch demo 1 on YouTube](https://img.youtube.com/vi/V7vRuQvTFK8/0.jpg)](https://youtu.be/V7vRuQvTFK8) &nbsp; [![Watch demo 2 on YouTube](https://img.youtube.com/vi/G5uiONmqxe0/0.jpg)](https://youtu.be/G5uiONmqxe0)
+</p>
 
 > 📝 **NOTE**  
 > This is a test recording to evaluate recording performance, tablet capture workflow, resolution settings, and overall system stability during DCS gameplay. Mission content and pacing are deliberately simple and functional.
