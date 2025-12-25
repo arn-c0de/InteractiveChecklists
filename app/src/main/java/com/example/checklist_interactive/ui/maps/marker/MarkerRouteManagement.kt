@@ -73,8 +73,20 @@ class MarkerRouteViewModel(
     private val _visibleRouteIds = MutableStateFlow<Set<Int>>(emptySet())
     val visibleRouteIds: StateFlow<Set<Int>> = _visibleRouteIds.asStateFlow()
     
+    private val _availableMaps = MutableStateFlow<List<String>>(emptyList())
+    val availableMaps: StateFlow<List<String>> = _availableMaps.asStateFlow()
+    
     init {
         loadData()
+        loadAvailableMaps()
+    }
+    
+    private fun loadAvailableMaps() {
+        viewModelScope.launch {
+            locationRepository.getAllMaps().collect { maps ->
+                _availableMaps.value = maps.filter { !it.isNullOrBlank() }
+            }
+        }
     }
     
     fun toggleRouteVisibility(routeId: Int) {
@@ -210,6 +222,9 @@ fun MarkerRouteManagementSheet(
     val view = LocalView.current
     // Live search text for filtering markers
     var markerSearch by rememberSaveable { mutableStateOf("") }
+    // Map filter for filtering by DCS map
+    var selectedMapFilter by rememberSaveable { mutableStateOf<String?>(null) }
+    val availableMaps by viewModel.availableMaps.collectAsState()
 
     // Persisted sheet fraction + opacity like DataPadPopup
     val prefs = context.getSharedPreferences("map_objects_prefs", android.content.Context.MODE_PRIVATE)
@@ -424,12 +439,39 @@ fun MarkerRouteManagementSheet(
                             singleLine = true
                         )
 
+                        // Map filter chips
+                        if (availableMaps.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // "All Maps" chip
+                                FilterChip(
+                                    selected = selectedMapFilter == null,
+                                    onClick = { selectedMapFilter = null },
+                                    label = { Text(stringResource(R.string.map_filter_all_maps)) }
+                                )
+                                // Individual map chips
+                                availableMaps.forEach { map ->
+                                    FilterChip(
+                                        selected = selectedMapFilter == map,
+                                        onClick = { selectedMapFilter = if (selectedMapFilter == map) null else map },
+                                        label = { Text(map) }
+                                    )
+                                }
+                            }
+                        }
+
                         Spacer(modifier = Modifier.height(8.dp))
 
                         MarkerGroupsList(
                             groups = markerGroups,
                             expandedGroups = expandedGroups,
                             searchText = markerSearch,
+                            selectedMap = selectedMapFilter,
                             onToggleGroup = { viewModel.toggleGroup(it) },
                             onMarkerClick = { marker ->
                                 onMarkerClick(marker)
@@ -472,26 +514,33 @@ fun MarkerGroupsList(
     groups: Map<Int, List<LocationEntity>>,
     expandedGroups: Set<Int>,
     searchText: String = "",
+    selectedMap: String? = null,
     onToggleGroup: (Int) -> Unit,
     onMarkerClick: (LocationEntity) -> Unit,
     onDeleteMarker: (Int) -> Unit,
     onCreateRouteFromGroup: (Int, String) -> Unit
 ) {
-    // If a search is active, filter the markers inside each group
-    val filteredGroups = if (searchText.isBlank()) {
-        groups
-    } else {
-        val q = searchText.trim().lowercase()
-        groups.mapValues { (_, list) ->
-            list.filter { marker ->
+    // Filter markers by search text and map selection
+    val filteredGroups = groups.mapValues { (_, list) ->
+        list.filter { marker ->
+            // Map filter
+            val matchesMap = selectedMap == null || marker.map == selectedMap
+            
+            // Search filter
+            val matchesSearch = if (searchText.isBlank()) {
+                true
+            } else {
+                val q = searchText.trim().lowercase()
                 marker.name.lowercase().contains(q) ||
                 (marker.icao?.lowercase()?.contains(q) ?: false) ||
                 (marker.iata?.lowercase()?.contains(q) ?: false) ||
                 (marker.description?.lowercase()?.contains(q) ?: false) ||
                 (marker.tags?.lowercase()?.contains(q) ?: false)
             }
-        }.filterValues { it.isNotEmpty() }
-    }
+            
+            matchesMap && matchesSearch
+        }
+    }.filterValues { it.isNotEmpty() }
 
     if (filteredGroups.isEmpty()) {
         Box(
