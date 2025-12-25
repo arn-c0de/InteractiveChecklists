@@ -142,6 +142,16 @@ private fun MarkerDetailsHeader(location: LocationEntity) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        // Show altitude if available
+        location.elevationM?.let { elevation ->
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "Altitude: ${String.format("%.0f", elevation)} m (${String.format("%.0f", elevation * 3.28084)} ft)",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
     }
 }
 
