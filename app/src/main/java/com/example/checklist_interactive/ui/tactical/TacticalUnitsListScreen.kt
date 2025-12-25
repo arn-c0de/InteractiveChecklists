@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -34,7 +35,8 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun TacticalUnitsListScreen(
     onNavigateBack: () -> Unit,
-    onUnitClick: ((TacticalUnitEntity) -> Unit)? = null
+    onUnitClick: ((TacticalUnitEntity) -> Unit)? = null,
+    onCenterOnMap: ((latitude: Double, longitude: Double) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val repository = remember { TacticalUnitsRepository(context) }
@@ -52,6 +54,7 @@ fun TacticalUnitsListScreen(
 
     val isEntityTrackingEnabled by dataPadManager.isEntityTrackingEnabled.collectAsState()
     val mapUpdateInterval by dataPadManager.tacticalUnitsMapUpdateInterval.collectAsState()
+    val showTacticalUnitsOnMap by dataPadManager.showTacticalUnitsOnMap.collectAsState()
 
     val units by viewModel.units.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
@@ -82,12 +85,7 @@ fun TacticalUnitsListScreen(
                             Icon(Icons.Default.FilterList, "Filter")
                         }
                     }
-                    
-                    // Refresh stats
-                    IconButton(onClick = { viewModel.refreshStatistics() }) {
-                        Icon(Icons.Default.Refresh, "Refresh")
-                    }
-                    
+
                     // Cleanup menu
                     Box {
                         IconButton(onClick = { showCleanupMenu = true }) {
@@ -189,6 +187,8 @@ fun TacticalUnitsListScreen(
                 stats = stats,
                 isEntityTrackingEnabled = isEntityTrackingEnabled,
                 onToggleEntityTracking = { dataPadManager.toggleEntityTracking() },
+                showTacticalUnitsOnMap = showTacticalUnitsOnMap,
+                onToggleMapVisibility = { dataPadManager.toggleTacticalUnitsOnMap() },
                 mapUpdateInterval = mapUpdateInterval,
                 onMapUpdateIntervalChange = { dataPadManager.setTacticalUnitsMapUpdateInterval(it) }
             )
@@ -209,6 +209,7 @@ fun TacticalUnitsListScreen(
                         UnitCard(
                             unit = unit,
                             onClick = { onUnitClick?.invoke(unit) },
+                            onCenterOnMap = onCenterOnMap,
                             getCoalitionName = { viewModel.getCoalitionName(it) },
                             getCategoryDisplayName = { viewModel.getCategoryDisplayName(it) }
                         )
@@ -263,6 +264,8 @@ private fun StatsCard(
     stats: UnitStatistics,
     isEntityTrackingEnabled: Boolean,
     onToggleEntityTracking: () -> Unit,
+    showTacticalUnitsOnMap: Boolean,
+    onToggleMapVisibility: () -> Unit,
     mapUpdateInterval: Float = 2.0f,
     onMapUpdateIntervalChange: (Float) -> Unit = {}
 ) {
@@ -309,9 +312,49 @@ private fun StatsCard(
                     onCheckedChange = { onToggleEntityTracking() }
                 )
             }
-            
-            // Map Update Interval Slider (only show when entity tracking is enabled)
+
+            // Map Visibility Toggle (only show when entity tracking is enabled)
             if (isEntityTrackingEnabled) {
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onToggleMapVisibility)
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = if (showTacticalUnitsOnMap) Icons.Default.Map else Icons.Default.LocationOff,
+                            contentDescription = null,
+                            tint = if (showTacticalUnitsOnMap) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = "Unit Visibility on Map",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = if (showTacticalUnitsOnMap) "Units visible on map" else "Units hidden on map",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Switch(
+                        checked = showTacticalUnitsOnMap,
+                        onCheckedChange = { onToggleMapVisibility() }
+                    )
+                }
+            }
+
+            // Map Update Interval Slider (only show when entity tracking and map visibility are enabled)
+            if (isEntityTrackingEnabled && showTacticalUnitsOnMap) {
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 Column(modifier = Modifier.fillMaxWidth()) {
@@ -427,13 +470,16 @@ private fun CategoryChip(label: String, count: Int) {
 private fun UnitCard(
     unit: TacticalUnitEntity,
     onClick: () -> Unit,
+    onCenterOnMap: ((latitude: Double, longitude: Double) -> Unit)?,
     getCoalitionName: (Int) -> String,
     getCategoryDisplayName: (String) -> String
 ) {
+    var isExpanded by remember { mutableStateOf(false) }
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable { isExpanded = !isExpanded }
     ) {
         Column(
             modifier = Modifier.padding(16.dp)
@@ -456,8 +502,20 @@ private fun UnitCard(
                     )
                 }
                 
-                // Coalition badge
-                CoalitionIndicator(unit.coalition, getCoalitionName)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Coalition badge
+                    CoalitionIndicator(unit.coalition, getCoalitionName)
+                    
+                    // Expand/collapse icon
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = if (isExpanded) "Collapse" else "Expand",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
             
             Spacer(modifier = Modifier.height(8.dp))
@@ -527,6 +585,28 @@ private fun UnitCard(
                 }
             }
             
+            // Last seen timestamp
+            Spacer(modifier = Modifier.height(4.dp))
+            val (timeAgoText, secondsAgo) = try {
+                val lastSeen = java.time.Instant.parse(unit.lastSeenAt)
+                val now = java.time.Instant.now()
+                val seconds = java.time.Duration.between(lastSeen, now).seconds
+                val text = when {
+                    seconds < 60 -> "${seconds}s ago"
+                    seconds < 3600 -> "${seconds / 60}m ago"
+                    else -> "${seconds / 3600}h ago"
+                }
+                Pair(text, seconds)
+            } catch (_: Exception) {
+                Pair("Unknown", Long.MAX_VALUE)
+            }
+            Text(
+                text = "Last seen: $timeAgoText",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (secondsAgo < 10) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = if (secondsAgo < 10) FontWeight.Bold else FontWeight.Normal
+            )
+            
             // Group info
             unit.groupName?.let { group ->
                 if (group.isNotEmpty()) {
@@ -537,6 +617,231 @@ private fun UnitCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                }
+            }
+            
+            // Expanded details
+            AnimatedVisibility(visible = isExpanded) {
+                Column(
+                    modifier = Modifier.padding(top = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Divider()
+                    
+                    // Coordinates
+                    Text(
+                        text = "Coordinates",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(
+                                text = "Latitude",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = String.format("%.6f°", unit.latitude),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = "Longitude",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = String.format("%.6f°", unit.longitude),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = "Altitude",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = unit.altitude?.let { "${it.toInt()} ft" } ?: "N/A",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+                    
+                    // Navigation data
+                    if (unit.heading != null || unit.speed != null || unit.distance != null) {
+                        Text(
+                            text = "Navigation",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            unit.heading?.let {
+                                Column {
+                                    Text(
+                                        text = "Heading",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "${it.toInt()}°",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                            }
+                            unit.speed?.let {
+                                Column {
+                                    Text(
+                                        text = "Speed",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "${it.toInt()} m/s",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                            }
+                            unit.distance?.let {
+                                Column {
+                                    Text(
+                                        text = "Distance",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = String.format("%.2f km", it / 1000.0),
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                            }
+                            unit.bearing?.let {
+                                Column {
+                                    Text(
+                                        text = "Bearing",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "${it.toInt()}°",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Timestamps
+                    Text(
+                        text = "Tracking Info",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "First Seen:",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = try {
+                                    val instant = java.time.Instant.parse(unit.firstSeenAt)
+                                    val formatter = DateTimeFormatter.ofPattern("HH:mm:ss")
+                                        .withZone(ZoneId.systemDefault())
+                                    formatter.format(instant)
+                                } catch (_: Exception) { "N/A" },
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Last Seen:",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = try {
+                                    val instant = java.time.Instant.parse(unit.lastSeenAt)
+                                    val formatter = DateTimeFormatter.ofPattern("HH:mm:ss")
+                                        .withZone(ZoneId.systemDefault())
+                                    formatter.format(instant)
+                                } catch (_: Exception) { "N/A" },
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "DCS ID:",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = unit.dcsId.toString(),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+                    
+                    // Pilot info
+                    unit.pilotName?.let { pilot ->
+                        if (pilot.isNotEmpty()) {
+                            Text(
+                                text = "Pilot Info",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Pilot: $pilot",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+                    
+                    // Center on Map button
+                    if (onCenterOnMap != null) {
+                        Button(
+                            onClick = { onCenterOnMap(unit.latitude, unit.longitude) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MyLocation,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Center on Map")
+                        }
+                    }
                 }
             }
         }
