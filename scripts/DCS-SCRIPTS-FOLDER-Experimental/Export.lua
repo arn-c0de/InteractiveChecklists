@@ -13,7 +13,7 @@ pcall(function()
 	local lastWrite = 0
 	local lastCommandCheck = 0
 	local COMMAND_CHECK_INTERVAL = 2.0 -- check for command file every 2 seconds
-	local STREAMER_VERSION = "1.0.6"
+	local STREAMER_VERSION = "1.0.7"
 	-- Maximum number of JSON lines to keep in the output file. Set to 0 to disable trimming.
 	local MAX_JSON_LINES = 20  -- Keep only last 20 lines (2 seconds @ 10 Hz) - MINIMAL buffer
 	local MAX_ENTITY_LINES = 20  -- Keep only last 20 lines for entity contacts
@@ -158,19 +158,19 @@ pcall(function()
 		return string.format('%s.%03dZ', os.date('!%Y-%m-%dT%H:%M:%S'), milliseconds)
 	end
 
-	-- Maximum distance for unit tracking (meters) - 50km radius for performance
-	local MAX_UNIT_DISTANCE = 50000  -- 50km
-	local MAX_UNITS_PER_FRAME = 100  -- Hard limit to prevent huge JSON payloads
+	-- Maximum distance for unit tracking (meters) - 150km radius for better tactical awareness
+	local MAX_UNIT_DISTANCE = 150000  -- 150km (increased from 50km)
+	local MAX_UNITS_PER_FRAME = 200  -- Hard limit to prevent huge JSON payloads (increased from 100)
 	
 	-- Collect all nearby units (aircraft, ground, ships, structures)
 	local function collect_nearby_units()
 		local units = {}
 		local selfData = safe_get(function() return LoGetSelfData() end, nil)
-		
+
 		if not selfData or not selfData.LatLongAlt then
 			return units  -- No player position, can't calculate distances
 		end
-		
+
 		local playerLat = selfData.LatLongAlt.Lat
 		local playerLon = selfData.LatLongAlt.Long
 		local playerAlt = selfData.LatLongAlt.Alt
@@ -231,14 +231,13 @@ pcall(function()
 					elseif category == 6 then categoryName = 'weapon'
 					end
 					
-					-- Get coalition from DCS (DCS: 0=Neutral, 1=Blue, 2=Red)
-					-- Convert to app format (App: 0=Neutral, 1=Red, 2=Blue)
-					local dcsCoalition = objData.Coalition or 0
-					local coalition = dcsCoalition
-					if dcsCoalition == 1 then
-						coalition = 2  -- DCS Blue (1) -> App Blue (2)
-					elseif dcsCoalition == 2 then
-						coalition = 1  -- DCS Red (2) -> App Red (1)
+					-- SIMPLE: Just swap 1 and 2
+					local dcsCoal = objData.Coalition or 0
+					local coalition = dcsCoal
+					if dcsCoal == 1 then
+						coalition = 2
+					elseif dcsCoal == 2 then
+						coalition = 1
 					end
 					
 					-- Get speed (m/s)
@@ -297,18 +296,14 @@ pcall(function()
 			data.heading = selfData.Heading or selfData.heading or 0
 			data.pitch = selfData.Pitch or selfData.pitch or 0
 			data.bank = selfData.Bank or selfData.bank or 0
-			-- Convert coalition from DCS format to app format (DCS: 1=Blue, 2=Red -> App: 1=Red, 2=Blue)
-			local dcsCoalition = selfData.Coalition or 0
-			if type(dcsCoalition) == 'number' then
-				if dcsCoalition == 1 then
-					data.coalition = 2  -- DCS Blue -> App Blue
-				elseif dcsCoalition == 2 then
-					data.coalition = 1  -- DCS Red -> App Red
-				else
-					data.coalition = dcsCoalition  -- Neutral or other
-				end
+			-- SIMPLE: Just swap 1 and 2
+			local dcsCoal = selfData.Coalition or 0
+			if dcsCoal == 1 then
+				data.coalition = 2
+			elseif dcsCoal == 2 then
+				data.coalition = 1
 			else
-				data.coalition = ''  -- Legacy string format or unknown
+				data.coalition = 0
 			end
 			data.country = selfData.Country or 0
 			data.group = selfData.GroupName or ''
