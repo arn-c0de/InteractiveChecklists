@@ -231,14 +231,9 @@ pcall(function()
 					elseif category == 6 then categoryName = 'weapon'
 					end
 					
-					-- SIMPLE: Just swap 1 and 2
 					local dcsCoal = objData.Coalition or 0
 					local coalition = dcsCoal
-					if dcsCoal == 1 then
-						coalition = 2
-					elseif dcsCoal == 2 then
-						coalition = 1
-					end
+
 					
 					-- Get speed (m/s)
 					local speed = 0
@@ -296,15 +291,7 @@ pcall(function()
 			data.heading = selfData.Heading or selfData.heading or 0
 			data.pitch = selfData.Pitch or selfData.pitch or 0
 			data.bank = selfData.Bank or selfData.bank or 0
-			-- SIMPLE: Just swap 1 and 2
-			local dcsCoal = selfData.Coalition or 0
-			if dcsCoal == 1 then
-				data.coalition = 2
-			elseif dcsCoal == 2 then
-				data.coalition = 1
-			else
-				data.coalition = 0
-			end
+			
 			data.country = selfData.Country or 0
 			data.group = selfData.GroupName or ''
 			data.unitID = tostring(selfData.ID or selfData.UnitId or 'N/A')
