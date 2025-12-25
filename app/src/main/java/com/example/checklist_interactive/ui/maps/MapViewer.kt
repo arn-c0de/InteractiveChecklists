@@ -1695,45 +1695,94 @@ fun MapViewer(
         // Load and display TACTICAL UNITS from database (live tracking)
         val isEntityTrackingEnabled by dataPadManager.isEntityTrackingEnabled.collectAsState()
         val showTacticalUnitsOnMap by dataPadManager.showTacticalUnitsOnMap.collectAsState()
-        LaunchedEffect(mapState.mapView, tacticalUnitsRepository, isEntityTrackingEnabled, showTacticalUnitsOnMap) {
+        
+        // Track unit markers separately (outside LaunchedEffect so they persist across restarts)
+        val unitMarkers = remember { mutableMapOf<Int, org.osmdroid.views.overlay.Marker>() }
+        
+        // Use Unit as key to force restart on every recomposition - we'll check the actual values inside
+        LaunchedEffect(mapState.mapView, tacticalUnitsRepository, dataPadManager) {
             val mv = mapState.mapView
             val repo = tacticalUnitsRepository
-            val entityTrackingEnabled = isEntityTrackingEnabled
-            val showOnMap = showTacticalUnitsOnMap
+            
+            // Collect the settings reactively from the Flow
+            combine(
+                dataPadManager.isEntityTrackingEnabled,
+                dataPadManager.showTacticalUnitsOnMap
+            ) { entityTracking, showOnMap ->
+                entityTracking to showOnMap
+            }.collect { (entityTrackingEnabled, showOnMap) ->
 
-            // Track unit markers separately to update positions efficiently
-            val unitMarkers = mutableMapOf<Int, org.osmdroid.views.overlay.Marker>()
+                Log.d(TAG, "📡 Settings changed: mapView=${mv != null}, repo=${repo != null}, entityTracking=$entityTrackingEnabled, showOnMap=$showOnMap, markers=${unitMarkers.size}")
 
-            try {
-                if (mv != null && repo != null && entityTrackingEnabled && showOnMap) {
+                // FIRST: Check if we should remove markers
+                if (!entityTrackingEnabled || !showOnMap) {
+                    // Remove all markers immediately
+                    if (mv != null && unitMarkers.isNotEmpty()) {
+                        Log.d(TAG, "📡 Settings disabled - removing ${unitMarkers.size} tactical unit markers (tracking=$entityTrackingEnabled, showMap=$showOnMap)")
+                        unitMarkers.values.forEach { marker ->
+                            try {
+                                mv.overlays.remove(marker)
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error removing tactical unit marker: ${e.message}")
+                            }
+                        }
+                        unitMarkers.clear()
+                        withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            mv.invalidate()
+                        }
+                        Log.d(TAG, "📡 All tactical unit markers removed")
+                    }
+                    
+                    if (!entityTrackingEnabled) {
+                        Log.d(TAG, "📡 Entity tracking disabled - not showing tactical units on map")
+                    } else if (!showOnMap) {
+                        Log.d(TAG, "📡 Tactical units map visibility disabled - units hidden")
+                    }
+                    return@collect // Exit early, don't start tracking
+                }
+
+                // Only continue if all conditions are met
+                if (mv == null || repo == null) {
+                    Log.d(TAG, "📡 MapView or Repository not ready - waiting...")
+                    return@collect
+                }
+
+                try {
                     Log.d(TAG, "📡 Starting tactical units live tracking on map")
 
-                
-                // Create a ticker flow that emits based on update interval
-                // This ensures we update at the specified rate regardless of database update frequency
-                var lastUnits: List<com.example.checklist_interactive.data.tactical.TacticalUnitEntity> = emptyList()
-                
-                // Collect latest units from database
-                // Switch between all active units and live-only units based on DataPadManager setting
-                launch {
-                    combine(
-                        dataPadManager.tacticalUnitsShowLiveOnly,
-                        repo.getAllActiveUnits(),
-                        repo.getLiveUnits()
-                    ) { showLiveOnly, allUnits, liveUnits ->
-                        if (showLiveOnly) liveUnits else allUnits
-                    }.collect { units ->
-                        lastUnits = units
+                    // Create a ticker flow that emits based on update interval
+                    // This ensures we update at the specified rate regardless of database update frequency
+                    var lastUnits: List<com.example.checklist_interactive.data.tactical.TacticalUnitEntity> = emptyList()
+                    
+                    // Collect latest units from database
+                    // Switch between all active units and live-only units based on DataPadManager setting
+                    val unitsJob = launch {
+                        combine(
+                            dataPadManager.tacticalUnitsShowLiveOnly,
+                            repo.getAllActiveUnits(),
+                            repo.getLiveUnits()
+                        ) { showLiveOnly, allUnits, liveUnits ->
+                            if (showLiveOnly) liveUnits else allUnits
+                        }.collect { units ->
+                            Log.d(TAG, "📡 Database units updated: ${units.size} units collected")
+                            lastUnits = units
+                        }
                     }
-                }
-                
-                // Separate coroutine for map updates at user-defined interval
-                launch {
-                    // Wait for initial data to be loaded before starting the update loop
-                    var retryCount = 0
-                    while (lastUnits.isEmpty() && retryCount < 50) { // Max 5 seconds wait
-                        delay(100)
-                        retryCount++
+                    
+                    // Separate coroutine for map updates at user-defined interval
+                    val updateJob = launch {
+                        // Wait for initial data to be loaded before starting the update loop
+                        var retryCount = 0
+                        Log.d(TAG, "📡 Waiting for initial tactical units data...")
+                        while (lastUnits.isEmpty() && retryCount < 50 && isActive) { // Max 5 seconds wait
+                            delay(100)
+                            retryCount++
+                    }
+                    
+                    if (lastUnits.isEmpty()) {
+                        Log.w(TAG, "📡 No tactical units data after 5 seconds wait")
+                    } else {
+                        Log.d(TAG, "📡 Initial data loaded: ${lastUnits.size} units")
                     }
 
                     while (isActive) {
@@ -2022,35 +2071,22 @@ fun MapViewer(
                         mv.invalidate()
                     }
                     Log.d(TAG, "📡 Map updated with ${unitMarkers.size} tactical unit markers")
-                        }
+                    }
                         
                         // Wait for next update cycle
                         kotlinx.coroutines.delay((updateIntervalSeconds * 1000).toLong())
-                    }
-                }
-                } else {
-                    if (!entityTrackingEnabled) {
-                        Log.d(TAG, "📡 Entity tracking disabled - not showing tactical units on map")
-                    } else if (!showOnMap) {
-                        Log.d(TAG, "📡 Tactical units map visibility disabled - units hidden")
-                    }
-                }
-            } finally {
-                // Cleanup: Remove all tactical unit markers when LaunchedEffect exits
-                if (mv != null && unitMarkers.isNotEmpty()) {
-                    Log.d(TAG, "📡 Cleaning up ${unitMarkers.size} tactical unit markers")
-                    unitMarkers.values.forEach { marker ->
-                        try {
-                            mv.overlays.remove(marker)
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error removing tactical unit marker: ${e.message}")
                         }
                     }
-                    unitMarkers.clear()
-                    withContext(kotlinx.coroutines.Dispatchers.Main) {
-                        mv.invalidate()
+                    
+                    // Wait for jobs to complete or be cancelled
+                    try {
+                        unitsJob.join()
+                        updateJob.join()
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        Log.d(TAG, "📡 Tracking jobs cancelled")
                     }
-                    Log.d(TAG, "📡 All tactical unit markers removed")
+                } catch (e: Exception) {
+                    Log.e(TAG, "📡 Error in tactical units tracking: ${e.message}", e)
                 }
             }
         }
