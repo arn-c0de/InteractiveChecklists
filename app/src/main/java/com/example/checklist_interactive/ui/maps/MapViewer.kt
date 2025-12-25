@@ -1864,6 +1864,7 @@ fun MapViewer(
                                             name = "${tacticalUnit.name} (${tacticalUnit.category})",
                                             latitude = tacticalUnit.latitude,
                                             longitude = tacticalUnit.longitude,
+                                            elevationM = tacticalUnit.altitude, // Transfer altitude from tactical unit
                                             markerType = "tactical_unit",
                                             description = buildString {
                                                 append("Coalition: ")
@@ -2024,6 +2025,7 @@ fun MapViewer(
                                                 name = "${tacticalUnit.name} (${tacticalUnit.category})",
                                                 latitude = tacticalUnit.latitude,
                                                 longitude = tacticalUnit.longitude,
+                                                elevationM = tacticalUnit.altitude, // Transfer altitude from tactical unit
                                                 markerType = "tactical_unit",
                                                 description = buildString {
                                                     append("Coalition: ")

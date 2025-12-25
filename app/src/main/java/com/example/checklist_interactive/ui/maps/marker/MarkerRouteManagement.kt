@@ -869,10 +869,12 @@ fun LocationEditDialog(
     var name by remember { mutableStateOf(location.name) }
     var latitude by remember { mutableStateOf(location.latitude.toString()) }
     var longitude by remember { mutableStateOf(location.longitude.toString()) }
+    var height by remember { mutableStateOf(location.elevationM?.toString() ?: "") }
 
     // Derived validation for numeric fields
     val latValid = latitude.toDoubleOrNull() != null
     val lonValid = longitude.toDoubleOrNull() != null
+    val heightValid = height.isBlank() || height.toDoubleOrNull() != null
     var markerType by remember { mutableStateOf(location.markerType) }
     var coalition by remember { mutableStateOf(location.coalition ?: "") }
     var icon by remember { mutableStateOf(location.icon) }
@@ -1015,6 +1017,15 @@ fun LocationEditDialog(
                             label = { Text(stringResource(R.string.map_longitude_label)) },
                             modifier = Modifier.weight(1f),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                        )
+                        OutlinedTextField(
+                            value = height,
+                            onValueChange = { height = it },
+                            label = { Text("Height (m)") },
+                            placeholder = { Text("0") },
+                            modifier = Modifier.weight(0.8f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            isError = !heightValid
                         )
                     }
                     
@@ -1472,7 +1483,7 @@ fun LocationEditDialog(
                                 isStatic = if (isStatic) 1 else 0,
                                 icao = icao.takeIf { it.isNotBlank() },
                                 iata = iata.takeIf { it.isNotBlank() },
-                                elevationM = elevationM.toDoubleOrNull(),
+                                elevationM = height.toDoubleOrNull() ?: elevationM.toDoubleOrNull(),
                                 frequencies = frequencies.takeIf { it.isNotBlank() },
                                 threatLevel = threatLevel.toIntOrNull(),
                                 unitType = unitType.takeIf { it.isNotBlank() },
@@ -1495,7 +1506,7 @@ fun LocationEditDialog(
                             }
                         },
                         modifier = Modifier.weight(1f),
-                        enabled = name.isNotBlank() && latValid && lonValid && !threatLevelError && !strengthError && runwaysValid
+                        enabled = name.isNotBlank() && latValid && lonValid && heightValid && !threatLevelError && !strengthError && runwaysValid
                     ) {
                         Text(stringResource(R.string.action_save))
                     }

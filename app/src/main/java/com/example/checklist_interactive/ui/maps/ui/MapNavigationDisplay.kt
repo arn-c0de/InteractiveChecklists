@@ -173,6 +173,15 @@ fun MapNavigationDisplay(
                                     color = MaterialTheme.colorScheme.onErrorContainer
                                 )
                             }
+                            // Show marker altitude if available
+                            activeNavigationTarget?.elevationM?.let { elevation ->
+                                Text(
+                                    text = "${String.format("%.0f", elevation)} m",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
                         }
                         // Show final runway heading when runway selected
                         selectedRunwayHeading?.let { rwyHdg ->

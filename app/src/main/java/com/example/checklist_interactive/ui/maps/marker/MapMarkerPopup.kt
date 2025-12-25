@@ -267,7 +267,24 @@ fun MapMarkerPopup(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = location.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(text = "${String.format("%.4f", location.latitude)}, ${String.format("%.4f", location.longitude)}", style = MaterialTheme.typography.bodySmall)
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "${String.format("%.4f", location.latitude)}, ${String.format("%.4f", location.longitude)}",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            // Show altitude/height next to coordinates for tactical live markers
+                            location.elevationM?.let { elevation ->
+                                Text(
+                                    text = "${String.format("%.0f", elevation)} m",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
