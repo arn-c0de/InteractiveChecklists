@@ -217,6 +217,9 @@ class Location:
     updated_at: Optional[str] = None
     deleted_at: Optional[str] = None  # Soft delete
     
+    # DCS Map identifier (for filtering markers by map)
+    map: Optional[str] = None  # e.g., "Caucasus", "Syria", "Persian Gulf", "Nevada"
+    
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
         d = asdict(self)
@@ -296,6 +299,20 @@ class MarkersDatabase:
         """Create database schema"""
         cursor = self.conn.cursor()
         
+        # Check if locations table exists and add map column if missing
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='locations'")
+        table_exists = cursor.fetchone() is not None
+        
+        if table_exists:
+            # Check if map column exists
+            cursor.execute("PRAGMA table_info(locations)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if 'map' not in columns:
+                # Add map column to existing table
+                cursor.execute("ALTER TABLE locations ADD COLUMN map TEXT")
+                self.conn.commit()
+                print("Added 'map' column to existing locations table")
+        
         # Main locations table (v2: extended schema)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS locations (
@@ -359,7 +376,10 @@ class MarkersDatabase:
                 -- Audit fields (new)
                 created_at TEXT,
                 updated_at TEXT,
-                deleted_at TEXT
+                deleted_at TEXT,
+                
+                -- DCS Map identifier (for filtering markers by map)
+                map TEXT
             )
         """)
         
@@ -371,6 +391,7 @@ class MarkersDatabase:
         cursor.execute("CREATE INDEX IF NOT EXISTS index_locations_icao ON locations(icao)")
         cursor.execute("CREATE INDEX IF NOT EXISTS index_locations_country ON locations(country)")
         cursor.execute("CREATE INDEX IF NOT EXISTS index_locations_verified ON locations(verified)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS index_locations_map ON locations(map)")
         
         # Borders table for map region boundaries
         cursor.execute("""
@@ -554,8 +575,8 @@ class MarkersDatabase:
                 frequencies, runways, threat_level, unit_type, strength,
                 country, region, timezone, source, verified, last_verified_at,
                 geom, elevation_source, elevation_accuracy_m,
-                created, modified, tags, metadata, created_at, updated_at, deleted_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                created, modified, tags, metadata, created_at, updated_at, deleted_at, map
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             location.name,
             location.latitude,
@@ -589,7 +610,8 @@ class MarkersDatabase:
             json.dumps(location.metadata) if location.metadata else None,
             location.created_at,
             location.updated_at,
-            location.deleted_at
+            location.deleted_at,
+            location.map
         ))
         
         location_id = cursor.lastrowid
@@ -642,7 +664,7 @@ class MarkersDatabase:
                 unit_type=?, strength=?, country=?, region=?, timezone=?,
                 source=?, verified=?, last_verified_at=?, geom=?,
                 elevation_source=?, elevation_accuracy_m=?,
-                modified=?, tags=?, metadata=?, updated_at=?, deleted_at=?
+                modified=?, tags=?, metadata=?, updated_at=?, deleted_at=?, map=?
             WHERE id=?
         """, (
             location.name,
@@ -676,6 +698,7 @@ class MarkersDatabase:
             json.dumps(location.metadata) if location.metadata else None,
             location.updated_at,
             location.deleted_at,
+            location.map,
             location.id
         ))
         
@@ -829,7 +852,8 @@ class MarkersDatabase:
             created=row['created'],
             modified=row['modified'],
             tags=json.loads(row['tags']) if row['tags'] else None,
-            metadata=json.loads(row['metadata']) if row['metadata'] else None
+            metadata=json.loads(row['metadata']) if row['metadata'] else None,
+            map=row['map'] if 'map' in row.keys() else None
         )
     
     @staticmethod

@@ -29,7 +29,7 @@ import java.io.File
         TacticalUnitEntity::class,
         TacticalUnitHistoryEntity::class
     ],
-    version = 7,
+    version = 9,
     exportSchema = true
 )
 abstract class TacticalDatabase : RoomDatabase() {
@@ -409,6 +409,39 @@ abstract class TacticalDatabase : RoomDatabase() {
             }
         }
         
+        // Migration from v7 to v8: add 'map' column for DCS map filtering
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Helper function to check if column exists
+                fun columnExists(tableName: String, columnName: String): Boolean {
+                    db.query("PRAGMA table_info($tableName)").use { cursor ->
+                        val nameIndex = cursor.getColumnIndex("name")
+                        while (cursor.moveToNext()) {
+                            if (cursor.getString(nameIndex) == columnName) {
+                                return true
+                            }
+                        }
+                    }
+                    return false
+                }
+
+                if (!columnExists("locations", "map")) {
+                    db.execSQL("ALTER TABLE locations ADD COLUMN map TEXT")
+                }
+                
+                // Create index for map filtering
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_locations_map ON locations(map)")
+            }
+        }
+        
+        // Migration from v8 to v9: fix map column schema (no-op, just version bump for devices with v8)
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // No-op migration: v8 already has correct schema
+                // This just bumps version for devices that had the old v8 with DEFAULT NULL
+            }
+        }
+        
         /**
          * Get database instance
          * 
@@ -550,7 +583,7 @@ abstract class TacticalDatabase : RoomDatabase() {
                 DATABASE_NAME
             )
                 .createFromAsset("databases/$DATABASE_NAME")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
 
             if (allowDestructiveMigration) {
                 builder.fallbackToDestructiveMigration()
@@ -572,7 +605,7 @@ abstract class TacticalDatabase : RoomDatabase() {
                 TacticalDatabase::class.java,
                 dbFile.absolutePath
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
 
             if (allowDestructiveMigration) {
                 builder.fallbackToDestructiveMigration()

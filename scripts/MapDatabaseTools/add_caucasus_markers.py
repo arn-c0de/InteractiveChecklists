@@ -51,7 +51,8 @@ def caucasus_samples():
             frequencies={"tower":138.0, "tower_secondary":128.0, "ground":119.0, "approach":134.6, "atis":132.8, "apron":131.7},
             country="Georgia",
             tags=["airbase", "civilian"],
-            source="OurAirports / DCS-World MAP"
+            source="OurAirports / DCS-World MAP",
+            map="Caucasus"
         ),
         Location(
             name="Batumi Intl",
@@ -65,7 +66,8 @@ def caucasus_samples():
             frequencies={"tower":131.0},
             country="Georgia",
             tags=["civilian"],
-            source="OurAirports / DCS-World MAP"
+            source="OurAirports / DCS-World MAP",
+            map="Caucasus"
         ),
         # Russia / Kuban / North Caucasus
         Location(
@@ -80,7 +82,8 @@ def caucasus_samples():
             frequencies={"tower":121.0, "tower_secondary":250.0},
             country="Russia",
             tags=["civilian"],
-            source="OurAirports / DCS-World MAP"
+            source="OurAirports / DCS-World MAP",
+            map="Caucasus"
         ),
         Location(
             name="Beslan",
@@ -94,7 +97,8 @@ def caucasus_samples():
             frequencies={"tower":141.0},
             country="Russia",
             tags=["airbase", "civilian"],
-            source="OurAirports / DCS-World MAP"
+            source="OurAirports / DCS-World MAP",
+            map="Caucasus"
         ),
         Location(
             name="Gelendzhik",
@@ -108,7 +112,8 @@ def caucasus_samples():
             frequencies={"tower":126.0},
             country="Russia",
             tags=["civilian"],
-            source="OurAirports / DCS-World MAP"
+            source="OurAirports / DCS-World MAP",
+            map="Caucasus"
         ),
         Location(
             name="Krasnodar – Pashkovsky",
@@ -122,7 +127,8 @@ def caucasus_samples():
             frequencies={"tower":128.0, "tower_secondary":257.0},
             country="Russia",
             tags=["airbase", "civilian"],
-            source="OurAirports / DCS-World MAP"
+            source="OurAirports / DCS-World MAP",
+            map="Caucasus"
         ),
         Location(
             name="Krasnodar – Center",
@@ -135,7 +141,8 @@ def caucasus_samples():
             frequencies={"tower":122.0, "tower_secondary":251.0},
             country="Russia",
             tags=["military"],
-            source="OurAirports / DCS-World MAP"
+            source="OurAirports / DCS-World MAP",
+            map="Caucasus"
         ),
         Location(
             name="Krymsk",
@@ -148,7 +155,8 @@ def caucasus_samples():
             frequencies={"tower":124.0, "tower_secondary":253.0},
             country="Russia",
             tags=["airbase"],
-            source="OurAirports / DCS-World MAP"
+            source="OurAirports / DCS-World MAP",
+            map="Caucasus"
         ),
         Location(
             name="Maykop – Khanskaya",
@@ -161,7 +169,8 @@ def caucasus_samples():
             frequencies={"tower":125.0, "tower_secondary":254.0},
             country="Russia",
             tags=["military"],
-            source="OurAirports / DCS-World MAP"
+            source="OurAirports / DCS-World MAP",
+            map="Caucasus"
         ),
         Location(
             name="Mozdok (Mozdok Air Base)",
@@ -175,7 +184,8 @@ def caucasus_samples():
             frequencies={"tower":137.0, "tower_secondary":266.0},
             country="Russia",
             tags=["airbase"],
-            source="OurAirports / DCS-World MAP"
+            source="OurAirports / DCS-World MAP",
+            map="Caucasus"
         ),
         Location(
             name="Nalchik",
@@ -189,7 +199,8 @@ def caucasus_samples():
             frequencies={"tower":"136.0 MHz", "tower_secondary":265.0},
             country="Russia",
             tags=["airbase", "civilian"],
-            source="OurAirports / DCS-World MAP"
+            source="OurAirports / DCS-World MAP",
+            map="Caucasus"
         ),
         Location(
             name="Sukhumi – Babushara",
@@ -203,7 +214,8 @@ def caucasus_samples():
             frequencies={"tower":"129.0 MHz", "tower_secondary":258.0},
             country="Abkhazia",
             tags=["civilian", "airbase"],
-            source="OurAirports / DCS-World MAP"
+            source="OurAirports / DCS-World MAP",
+            map="Caucasus"
         ),
         Location(
             name="Sochi – Adler",
@@ -220,7 +232,8 @@ def caucasus_samples():
             frequencies={"tower":"127.0 MHz", "tower_secondary":256.0},
             country="Russia",
             tags=["civilian"],
-            source="OurAirports / DCS-World MAP"
+            source="OurAirports / DCS-World MAP",
+            map="Caucasus"
         ),
         # Additional Caucasus small/field airstrips
         Location(
@@ -234,7 +247,8 @@ def caucasus_samples():
             frequencies={"tower":"132.0 MHz", "tower_secondary":261.0},
             country="Georgia",
             tags=["airbase"],
-            source="OurAirports / DCS-World MAP"
+            source="OurAirports / DCS-World MAP",
+            map="Caucasus"
         ),
         Location(
             name="Kutaisi – Kopitnari",
@@ -248,7 +262,8 @@ def caucasus_samples():
             frequencies={"tower":"134.0 MHz", "tower_secondary":263.0},
             country="Georgia",
             tags=["civilian"],
-            source="OurAirports / DCS-World MAP"
+            source="OurAirports / DCS-World MAP",
+            map="Caucasus"
         ),
         Location(
             name="Gudauta",
@@ -264,7 +279,8 @@ def caucasus_samples():
             frequencies={"tower":"130.0 MHz", "tower_secondary":259.0},
             country="Abkhazia",
             tags=["military"],
-            source="OurAirports / DCS-World MAP"
+            source="OurAirports / DCS-World MAP",
+            map="Caucasus"
         ),
         Location(
             name="Kobuleti",
@@ -278,7 +294,8 @@ def caucasus_samples():
             frequencies={"tower":"133.0 MHz", "tower_secondary":262.0},
             country="Georgia",
             tags=["civilian"],
-            source="OurAirports / DCS-World MAP"
+            source="OurAirports / DCS-World MAP",
+            map="Caucasus"
         ),
         Location(
             name="Vaziani",
@@ -292,7 +309,8 @@ def caucasus_samples():
             frequencies={"tower":"140.0 MHz", "tower_secondary":269.0},
             country="Georgia",
             tags=["military"],
-            source="OurAirports / DCS-World MAP"
+            source="OurAirports / DCS-World MAP",
+            map="Caucasus"
         ),
         Location(
             name="Soganlug",
@@ -306,7 +324,8 @@ def caucasus_samples():
             frequencies={"tower":"139.0 MHz", "tower_secondary":268.0},
             country="Georgia",
             tags=["military"],
-            source="Derived from Vaziani"
+            source="Derived from Vaziani",
+            map="Caucasus"
         ),
     ]
 

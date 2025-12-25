@@ -209,6 +209,9 @@ private fun buildMarkerInfoItems(
         location.icao?.takeIf { it.isNotEmpty() }?.let { add("ICAO" to it) }
         location.iata?.takeIf { it.isNotEmpty() }?.let { add("IATA" to it) }
         
+        // DCS Map identifier
+        location.map?.takeIf { it.isNotEmpty() }?.let { add("Map" to it) }
+        
         // Geography / admin
         location.country?.takeIf { it.isNotEmpty() }?.let { add("Country" to it) }
         location.region?.takeIf { it.isNotEmpty() }?.let { add("Region" to it) }
