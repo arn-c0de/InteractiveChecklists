@@ -430,7 +430,7 @@ interface TacticalUnitsDao {
         bearing: Double?,
         lastSeenAt: String,
         lastUpdateAt: String
-    )
+    ): Int
     
     @Query("UPDATE tactical_units SET is_active = 0 WHERE dcs_id = :dcsId")
     suspend fun markUnitInactive(dcsId: String)

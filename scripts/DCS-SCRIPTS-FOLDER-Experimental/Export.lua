@@ -690,8 +690,8 @@ pcall(function()
 		data.aiOn = false
 		data.born = true
 
-		-- NOTE: nearbyUnits are now collected separately in collect_entity_contacts()
-		-- This keeps the main aircraft data lightweight
+		-- Include nearbyUnits directly in FlightData for consistent transmission
+		data.nearbyUnits = collect_nearby_units()
 
 		return data
 	end
@@ -920,25 +920,17 @@ pcall(function()
 		end
 
 		if now - lastWrite >= UPDATE_INTERVAL then
-			-- Write aircraft telemetry (without nearbyUnits)
+			-- Write aircraft telemetry (with nearbyUnits included)
 			local telemetry = collect_telemetry()
 			write_json(telemetry)
-
-			-- Write entity contacts separately
-			local entityContacts = collect_entity_contacts()
-			write_entity_json(entityContacts)
 
 			lastWrite = now
 		end
 	end
 
 	function LuaExportStop()
-		-- Write final aircraft telemetry
+		-- Write final aircraft telemetry (with nearbyUnits included)
 		local telemetry = collect_telemetry()
 		write_json(telemetry)
-
-		-- Write final entity contacts
-		local entityContacts = collect_entity_contacts()
-		write_entity_json(entityContacts)
 	end
 end, nil)
