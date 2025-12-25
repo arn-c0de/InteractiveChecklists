@@ -80,10 +80,24 @@ fun TacticalUnitsListScreen(
     }
     
     // Box overlay instead of Dialog so map remains visible and active in background
+    // Clicking outside the popup closes it
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
+        // Background scrim - clicking here closes the popup
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null
+                ) {
+                    onNavigateBack() // Close popup when clicking outside
+                }
+        )
+
+        // Popup content - clicks don't propagate to background
         Surface(
             modifier = Modifier
                 .fillMaxWidth(0.7f)
