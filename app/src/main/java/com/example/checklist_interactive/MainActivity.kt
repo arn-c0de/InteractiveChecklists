@@ -133,12 +133,15 @@ class MainActivity : ComponentActivity() {
             // Restore last main page preference (0=file list, 1=tabs/viewer)
             var showFileList by remember { mutableStateOf(prefsManager.getLastMainPage() == 0) }
             var showSettings by remember { mutableStateOf(false) }
-            var isScreenLocked by remember { mutableStateOf(prefsManager.isScreenLocked()) }
-            val backHandlerEnabled = openTabs.isNotEmpty() || showSettings
+                    var showTacticalUnits by remember { mutableStateOf(false) }
+                    var isScreenLocked by remember { mutableStateOf(prefsManager.isScreenLocked()) }
+                    val backHandlerEnabled = openTabs.isNotEmpty() || showSettings || showTacticalUnits
 
             // Handle Android back button: return to file list instead of closing app
             BackHandler(enabled = backHandlerEnabled) {
-                if (showSettings) {
+                if (showTacticalUnits) {
+                    showTacticalUnits = false
+                } else if (showSettings) {
                     showSettings = false
                 } else if (openTabs.isNotEmpty()) {
                     // Close current tab or go to file list if last tab
@@ -410,6 +413,17 @@ class MainActivity : ComponentActivity() {
                     }
 
                     when {
+                        showTacticalUnits -> {
+                            // Tactical Units screen
+                            com.example.checklist_interactive.ui.tactical.TacticalUnitsListScreen(
+                                onNavigateBack = { showTacticalUnits = false },
+                                onUnitClick = { unit ->
+                                    // Optional: Center map on unit location
+                                    // For now, just close the list
+                                    showTacticalUnits = false
+                                }
+                            )
+                        }
                         showSettings -> {
                             // Settings screen
                             SettingsScreen(
@@ -522,14 +536,16 @@ class MainActivity : ComponentActivity() {
                                 onSettings = { showSettings = true }
                             ) { tabInfo ->
                                 // Render appropriate viewer based on tab content type
-                                when (tabInfo.content) {
-                                    is TabManager.TabContent.MapTab -> {
+                                when (tabInfo.content) {                                    is TabManager.TabContent.MapTab -> {
                                         // Render aviation map viewer
                                         com.example.checklist_interactive.ui.maps.MapViewer(
                                             isScreenLocked = isScreenLocked,
                                             onLockScreen = {
                                                 isScreenLocked = !isScreenLocked
                                                 prefsManager.setScreenLocked(isScreenLocked)
+                                            },
+                                            onTacticalUnitsOpen = {
+                                                showTacticalUnits = true
                                             }
                                         )
                                     }
