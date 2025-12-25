@@ -114,6 +114,13 @@ Planned enhancements include additional telemetry (speed, vertical speed, fuel, 
 </p>
 
 
+## Demo Video 🎬
+
+[![Watch the demo on YouTube](https://img.youtube.com/vi/V7vRuQvTFK8/0.jpg)](https://youtu.be/V7vRuQvTFK8)
+
+> 📝 **NOTE**  
+> This is a test recording to evaluate recording performance, tablet capture workflow, resolution settings, and overall system stability during DCS gameplay. Mission content and pacing are deliberately simple and functional.
+
 ## Installation
 
 Step-by-step instructions to get the project running locally.
