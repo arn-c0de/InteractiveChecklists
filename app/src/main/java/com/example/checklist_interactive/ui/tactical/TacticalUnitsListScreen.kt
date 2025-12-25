@@ -586,12 +586,21 @@ private fun UnitCard(
                 }
             }
             
-            // Last seen timestamp
+            // Last seen timestamp with live updates
             Spacer(modifier = Modifier.height(4.dp))
+            var currentTime by remember { mutableStateOf(java.time.Instant.now()) }
+            
+            // Update current time every second for live timer
+            LaunchedEffect(Unit) {
+                while (true) {
+                    kotlinx.coroutines.delay(1000)
+                    currentTime = java.time.Instant.now()
+                }
+            }
+            
             val (timeAgoText, secondsAgo) = try {
                 val lastSeen = java.time.Instant.parse(unit.lastSeenAt)
-                val now = java.time.Instant.now()
-                val seconds = java.time.Duration.between(lastSeen, now).seconds
+                val seconds = java.time.Duration.between(lastSeen, currentTime).seconds
                 val text = when {
                     seconds < 60 -> "${seconds}s ago"
                     seconds < 3600 -> "${seconds / 60}m ago"
