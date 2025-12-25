@@ -15,7 +15,8 @@ import kotlinx.coroutines.launch
  */
 class TacticalUnitsViewModel(
     application: Application,
-    private val repository: TacticalUnitsRepository
+    private val repository: TacticalUnitsRepository,
+    private val dataPadManager: com.example.checklist_interactive.data.datapad.DataPadManager
 ) : AndroidViewModel(application) {
 
     // --- UI State ---
@@ -27,9 +28,13 @@ class TacticalUnitsViewModel(
     
     val units: StateFlow<List<TacticalUnitEntity>> = combine(
         repository.getAllUnits(),
+        repository.getLiveUnits(),
         _uiState
-    ) { allUnits, state ->
-        allUnits.filter { unit ->
+    ) { allUnits, liveUnits, state ->
+        // Use live units if live filter is enabled, otherwise all units
+        val sourceUnits = if (state.showLiveOnly) liveUnits else allUnits
+        
+        sourceUnits.filter { unit ->
             // Filter by active status
             if (state.showActiveOnly && unit.isActive != 1) return@filter false
             
@@ -100,6 +105,15 @@ class TacticalUnitsViewModel(
     
     fun setShowActiveOnly(activeOnly: Boolean) {
         _uiState.update { it.copy(showActiveOnly = activeOnly) }
+    }
+    
+    fun setShowLiveOnly(liveOnly: Boolean) {
+        _uiState.update { it.copy(showLiveOnly = liveOnly) }
+        dataPadManager.setTacticalUnitsShowLiveOnly(liveOnly)
+    }
+    
+    fun toggleLiveOnly() {
+        setShowLiveOnly(!_uiState.value.showLiveOnly)
     }
     
     fun clearFilters() {
@@ -179,6 +193,7 @@ data class TacticalUnitsUiState(
     val selectedCategories: Set<String> = emptySet(),
     val selectedCoalitions: Set<Int> = emptySet(),
     val showActiveOnly: Boolean = true,
+    val showLiveOnly: Boolean = false,  // Filter: only show units seen in last 10 seconds
     val showFilterDialog: Boolean = false
 )
 
@@ -203,12 +218,13 @@ data class UnitStatistics(
  */
 class TacticalUnitsViewModelFactory(
     private val application: Application,
-    private val repository: TacticalUnitsRepository
+    private val repository: TacticalUnitsRepository,
+    private val dataPadManager: com.example.checklist_interactive.data.datapad.DataPadManager
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(TacticalUnitsViewModel::class.java)) {
-            return TacticalUnitsViewModel(application, repository) as T
+            return TacticalUnitsViewModel(application, repository, dataPadManager) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

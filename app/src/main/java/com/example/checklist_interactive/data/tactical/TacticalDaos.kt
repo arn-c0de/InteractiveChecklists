@@ -358,6 +358,9 @@ interface TacticalUnitsDao {
     @Query("SELECT * FROM tactical_units WHERE is_active = 1 ORDER BY last_seen_at DESC")
     fun getAllActiveUnits(): Flow<List<TacticalUnitEntity>>
     
+    @Query("SELECT * FROM tactical_units WHERE is_active = 1 AND datetime(last_seen_at) > datetime('now', '-10 seconds') ORDER BY last_seen_at DESC")
+    fun getLiveUnits(): Flow<List<TacticalUnitEntity>>
+    
     @Query("SELECT * FROM tactical_units WHERE is_active = 0 ORDER BY last_seen_at DESC")
     fun getAllInactiveUnits(): Flow<List<TacticalUnitEntity>>
     

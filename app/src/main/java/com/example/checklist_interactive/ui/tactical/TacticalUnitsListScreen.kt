@@ -38,16 +38,20 @@ fun TacticalUnitsListScreen(
 ) {
     val context = LocalContext.current
     val repository = remember { TacticalUnitsRepository(context) }
+    
+    // Access DataPadManager for entity tracking toggle and map update interval
+    val dataPadManager = remember { DataPadManager(context) }
+    
     val viewModel: TacticalUnitsViewModel = viewModel(
         factory = TacticalUnitsViewModelFactory(
             context.applicationContext as Application,
-            repository
+            repository,
+            dataPadManager
         )
     )
 
-    // Access DataPadManager for entity tracking toggle
-    val dataPadManager = remember { DataPadManager(context) }
     val isEntityTrackingEnabled by dataPadManager.isEntityTrackingEnabled.collectAsState()
+    val mapUpdateInterval by dataPadManager.tacticalUnitsMapUpdateInterval.collectAsState()
 
     val units by viewModel.units.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
@@ -126,6 +130,41 @@ fun TacticalUnitsListScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            // Live filter toggle
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Radar,
+                        contentDescription = null,
+                        tint = if (uiState.showLiveOnly) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = "Live Units Only",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = if (uiState.showLiveOnly) "Showing units seen in last 10s" else "Showing all units",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Switch(
+                    checked = uiState.showLiveOnly,
+                    onCheckedChange = { viewModel.toggleLiveOnly() }
+                )
+            }
+            
             // Search bar
             OutlinedTextField(
                 value = uiState.searchQuery,
@@ -145,11 +184,13 @@ fun TacticalUnitsListScreen(
                 singleLine = true
             )
             
-            // Statistics card with entity tracking toggle
+            // Statistics card with entity tracking toggle and map update interval
             StatsCard(
                 stats = stats,
                 isEntityTrackingEnabled = isEntityTrackingEnabled,
-                onToggleEntityTracking = { dataPadManager.toggleEntityTracking() }
+                onToggleEntityTracking = { dataPadManager.toggleEntityTracking() },
+                mapUpdateInterval = mapUpdateInterval,
+                onMapUpdateIntervalChange = { dataPadManager.setTacticalUnitsMapUpdateInterval(it) }
             )
             
             // Units list
@@ -221,7 +262,9 @@ fun TacticalUnitsListScreen(
 private fun StatsCard(
     stats: UnitStatistics,
     isEntityTrackingEnabled: Boolean,
-    onToggleEntityTracking: () -> Unit
+    onToggleEntityTracking: () -> Unit,
+    mapUpdateInterval: Float = 2.0f,
+    onMapUpdateIntervalChange: (Float) -> Unit = {}
 ) {
     Card(
         modifier = Modifier
@@ -265,6 +308,45 @@ private fun StatsCard(
                     checked = isEntityTrackingEnabled,
                     onCheckedChange = { onToggleEntityTracking() }
                 )
+            }
+            
+            // Map Update Interval Slider (only show when entity tracking is enabled)
+            if (isEntityTrackingEnabled) {
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Map Update Interval",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = String.format("%.1fs", mapUpdateInterval),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    
+                    Slider(
+                        value = mapUpdateInterval,
+                        onValueChange = onMapUpdateIntervalChange,
+                        valueRange = 0.5f..10.0f,
+                        steps = 18, // 0.5, 1.0, 1.5, 2.0, ..., 10.0
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    Text(
+                        text = "Lower = smoother movement, higher = better performance",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))

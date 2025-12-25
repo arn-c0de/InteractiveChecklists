@@ -28,6 +28,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.flow.combine
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -1703,8 +1704,32 @@ fun MapViewer(
                 // Track unit markers separately to update positions efficiently
                 val unitMarkers = mutableMapOf<Int, org.osmdroid.views.overlay.Marker>()
                 
-                repo.getAllActiveUnits().collect { units ->
-                    Log.d(TAG, "📡 Received ${units.size} active tactical units from database")
+                // Create a ticker flow that emits based on update interval
+                // This ensures we update at the specified rate regardless of database update frequency
+                var lastUnits: List<com.example.checklist_interactive.data.tactical.TacticalUnitEntity> = emptyList()
+                
+                // Collect latest units from database
+                // Switch between all active units and live-only units based on DataPadManager setting
+                launch {
+                    combine(
+                        dataPadManager.tacticalUnitsShowLiveOnly,
+                        repo.getAllActiveUnits(),
+                        repo.getLiveUnits()
+                    ) { showLiveOnly, allUnits, liveUnits ->
+                        if (showLiveOnly) liveUnits else allUnits
+                    }.collect { units ->
+                        lastUnits = units
+                    }
+                }
+                
+                // Separate coroutine for map updates at user-defined interval
+                launch {
+                    while (isActive) {
+                        val updateIntervalSeconds = dataPadManager.tacticalUnitsMapUpdateInterval.value
+                        
+                        if (lastUnits.isNotEmpty()) {
+                            Log.d(TAG, "📡 Updating ${lastUnits.size} tactical units on map (interval: ${updateIntervalSeconds}s)")
+                            val units = lastUnits // Snapshot current data
                     
                     // Remove markers for units that are no longer active
                     val currentUnitIds = units.map { it.id }.toSet()
@@ -1751,6 +1776,16 @@ fun MapViewer(
                                 unit.groupName?.let { if (it.isNotEmpty()) append("\nGroup: $it") }
                                 unit.speed?.let { append("\nSpeed: ${String.format("%.0f", it)} kts") }
                                 unit.altitude?.let { append("\nAlt: ${String.format("%.0f", it)} ft") }
+                                // Show last seen time
+                                try {
+                                    val lastSeen = java.time.Instant.parse(unit.lastSeenAt)
+                                    val now = java.time.Instant.now()
+                                    val secondsAgo = java.time.Duration.between(lastSeen, now).seconds
+                                    append("\nLast seen: ")
+                                    if (secondsAgo < 60) append("${secondsAgo}s ago")
+                                    else if (secondsAgo < 3600) append("${secondsAgo / 60}m ago")
+                                    else append("${secondsAgo / 3600}h ago")
+                                } catch (_: Exception) { }
                             }
                             
                             // Update stored unit data
@@ -1847,6 +1882,16 @@ fun MapViewer(
                                     unit.groupName?.let { if (it.isNotEmpty()) append("\nGroup: $it") }
                                     unit.speed?.let { append("\nSpeed: ${String.format("%.0f", it)} kts") }
                                     unit.altitude?.let { append("\nAlt: ${String.format("%.0f", it)} ft") }
+                                    // Show last seen time
+                                    try {
+                                        val lastSeen = java.time.Instant.parse(unit.lastSeenAt)
+                                        val now = java.time.Instant.now()
+                                        val secondsAgo = java.time.Duration.between(lastSeen, now).seconds
+                                        append("\nLast seen: ")
+                                        if (secondsAgo < 60) append("${secondsAgo}s ago")
+                                        else if (secondsAgo < 3600) append("${secondsAgo / 60}m ago")
+                                        else append("${secondsAgo / 3600}h ago")
+                                    } catch (_: Exception) { }
                                 }
                                 setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_CENTER)
                                 
@@ -1871,6 +1916,11 @@ fun MapViewer(
                         mv.invalidate()
                     }
                     Log.d(TAG, "📡 Map updated with ${unitMarkers.size} tactical unit markers")
+                        }
+                        
+                        // Wait for next update cycle
+                        kotlinx.coroutines.delay((updateIntervalSeconds * 1000).toLong())
+                    }
                 }
             } else {
                 if (!entityTrackingEnabled) {
