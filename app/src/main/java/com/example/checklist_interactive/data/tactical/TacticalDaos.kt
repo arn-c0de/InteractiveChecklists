@@ -451,7 +451,13 @@ interface TacticalUnitsDao {
     
     @Query("DELETE FROM tactical_units WHERE is_active = 0 AND last_seen_at < :cutoffTime")
     suspend fun deleteInactiveUnitsOlderThan(cutoffTime: String)
-    
+
+    @Query("DELETE FROM tactical_units WHERE is_active = 0")
+    suspend fun deleteAllInactiveUnits()
+
+    @Query("DELETE FROM tactical_units WHERE last_seen_at < :cutoffTime")
+    suspend fun deleteUnitsOlderThan(cutoffTime: String)
+
     @Query("DELETE FROM tactical_units")
     suspend fun deleteAllUnits()
 }
