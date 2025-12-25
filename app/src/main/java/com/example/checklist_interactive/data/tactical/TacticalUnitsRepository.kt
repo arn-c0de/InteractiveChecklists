@@ -24,6 +24,10 @@ class TacticalUnitsRepository(private val context: Context) {
         return unitsDao.getAllActiveUnits()
     }
     
+    fun getLiveUnits(): Flow<List<TacticalUnitEntity>> {
+        return unitsDao.getLiveUnits()
+    }
+    
     fun getAllInactiveUnits(): Flow<List<TacticalUnitEntity>> {
         return unitsDao.getAllInactiveUnits()
     }

@@ -43,6 +43,9 @@ class DataPadManager(private val context: Context) {
         private const val KEY_LAST_RUNNING = "last_running"
         // Enable/disable entity tracking (tactical units)
         private const val KEY_ENTITY_TRACKING_ENABLED = "entity_tracking_enabled"
+        // Tactical units map update interval in seconds
+        private const val KEY_TACTICAL_UNITS_MAP_UPDATE_INTERVAL = "tactical_units_map_update_interval"
+    private const val KEY_TACTICAL_UNITS_SHOW_LIVE_ONLY = "tactical_units_show_live_only"
 
         // Handshake timeout
         private const val HANDSHAKE_TIMEOUT_MS = 10000L
@@ -99,6 +102,14 @@ class DataPadManager(private val context: Context) {
     // Entity tracking enabled/disabled
     private val _isEntityTrackingEnabled = MutableStateFlow(prefs.getBoolean(KEY_ENTITY_TRACKING_ENABLED, false))
     val isEntityTrackingEnabled: StateFlow<Boolean> = _isEntityTrackingEnabled.asStateFlow()
+    
+    // Tactical units map update interval (seconds) - how often to redraw markers on map
+    private val _tacticalUnitsMapUpdateInterval = MutableStateFlow(prefs.getFloat(KEY_TACTICAL_UNITS_MAP_UPDATE_INTERVAL, 2.0f))
+    val tacticalUnitsMapUpdateInterval: StateFlow<Float> = _tacticalUnitsMapUpdateInterval.asStateFlow()
+    
+    // Tactical units live filter - only show units seen in last 10 seconds
+    private val _tacticalUnitsShowLiveOnly = MutableStateFlow(prefs.getBoolean(KEY_TACTICAL_UNITS_SHOW_LIVE_ONLY, false))
+    val tacticalUnitsShowLiveOnly: StateFlow<Boolean> = _tacticalUnitsShowLiveOnly.asStateFlow()
 
     // Connection health tracking (for heartbeat monitoring)
     enum class ConnectionHealth {
@@ -531,6 +542,26 @@ class DataPadManager(private val context: Context) {
 
     fun toggleEntityTracking() {
         setEntityTrackingEnabled(!_isEntityTrackingEnabled.value)
+    }
+    
+    /**
+     * Set tactical units map update interval (how often markers are redrawn on map)
+     * @param intervalSeconds Interval in seconds (0.5 to 10.0)
+     */
+    fun setTacticalUnitsMapUpdateInterval(intervalSeconds: Float) {
+        val clamped = intervalSeconds.coerceIn(0.5f, 10.0f)
+        prefs.edit().putFloat(KEY_TACTICAL_UNITS_MAP_UPDATE_INTERVAL, clamped).apply()
+        _tacticalUnitsMapUpdateInterval.value = clamped
+        udpLogD("Tactical units map update interval set to ${clamped}s")
+    }
+    
+    /**
+     * Set tactical units live filter (only show units seen in last 10 seconds)
+     */
+    fun setTacticalUnitsShowLiveOnly(liveOnly: Boolean) {
+        prefs.edit().putBoolean(KEY_TACTICAL_UNITS_SHOW_LIVE_ONLY, liveOnly).apply()
+        _tacticalUnitsShowLiveOnly.value = liveOnly
+        udpLogD("Tactical units live filter ${if (liveOnly) "enabled" else "disabled"}")
     }
 
     /**
