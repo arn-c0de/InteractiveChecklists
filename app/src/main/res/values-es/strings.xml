@@ -1195,6 +1195,7 @@
     <string name="map_marker_icao">ICAO</string>
     <string name="map_marker_iata">IATA</string>
     <string name="map_marker_map">Mapa</string>
+    <string name="map_filter_all_maps">Todos los Mapas</string>
     <string name="map_marker_country">Country</string>
     <string name="map_marker_region">Region</string>
     <string name="map_marker_timezone">Timezone</string>
