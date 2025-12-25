@@ -232,19 +232,7 @@ pcall(function()
 					end
 					
 					local dcsCoal = objData.Coalition or 0
-					-- DEBUG: coalition Wert und Format loggen
-                    pcall(function()
-                        local f = io.open(writeDir .. [[Scripts\coalition_debug.txt]], 'a')
-                        if f then
-                            f:write(os.date('%Y-%m-%d %H:%M:%S') .. ' objId=' .. tostring(objId) .. ' coalition=' .. tostring(dcsCoal) .. ' type=' .. type(dcsCoal) .. '\n')
-                            if type(dcsCoal) == 'table' then
-                                for k,v in pairs(dcsCoal) do
-                                    f:write('  ['..tostring(k)..']='..tostring(v)..'\n')
-                                end
-                            end
-                            f:close()
-                        end
-                    end)
+					
 
 					-- Coalition umkehren: Allies -> Enemies, Enemies -> Allies
 					if type(dcsCoal) == 'string' then
