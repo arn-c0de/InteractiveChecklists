@@ -1707,9 +1707,9 @@ fun MapViewer(
             Log.d(TAG, "📡 Settings changed: mapView=${mv != null}, repo=${repo != null}, entityTracking=$isEntityTrackingEnabled, showOnMap=$showTacticalUnitsOnMap, markers=${unitMarkers.size}")
 
             // IMMEDIATELY remove all markers if visibility is disabled
-            if (!isEntityTrackingEnabled || !showTacticalUnitsOnMap) {
+            if (!showTacticalUnitsOnMap) {
                 if (mv != null && unitMarkers.isNotEmpty()) {
-                    Log.d(TAG, "📡 Visibility disabled - removing ${unitMarkers.size} tactical unit markers from map")
+                    Log.d(TAG, "📡 Map visibility disabled - removing ${unitMarkers.size} tactical unit markers from map")
                     unitMarkers.values.forEach { marker ->
                         try {
                             mv.overlays.remove(marker)
@@ -1721,13 +1721,14 @@ fun MapViewer(
                     mv.invalidate()
                     Log.d(TAG, "📡 All tactical unit markers removed")
                 }
-                
-                if (!isEntityTrackingEnabled) {
-                    Log.d(TAG, "📡 Entity tracking disabled - not showing tactical units on map")
-                } else if (!showTacticalUnitsOnMap) {
-                    Log.d(TAG, "📡 Tactical units map visibility disabled - units hidden")
-                }
+
+                Log.d(TAG, "📡 Tactical units map visibility disabled - units hidden")
                 return@LaunchedEffect // Exit early - don't start tracking
+            }
+
+            // If entity tracking is disabled, we'll still show historical units when visibility is enabled
+            if (!isEntityTrackingEnabled) {
+                Log.d(TAG, "📡 Entity tracking disabled - will display historical units on map (if enabled)")
             }
 
             // Only continue if all conditions are met
@@ -1748,10 +1749,13 @@ fun MapViewer(
                 val unitsJob = launch {
                     combine(
                         dataPadManager.tacticalUnitsShowLiveOnly,
+                        dataPadManager.isEntityTrackingEnabled,
                         repo.getAllActiveUnits(),
                         repo.getLiveUnits()
-                    ) { showLiveOnly, allUnits, liveUnits ->
-                        if (showLiveOnly) liveUnits else allUnits
+                    ) { showLiveOnly, isTrackingEnabled, allUnits, liveUnits ->
+                        if (!isTrackingEnabled) allUnits
+                        else if (showLiveOnly) liveUnits
+                        else allUnits
                     }.collect { units ->
                         Log.d(TAG, "📡 Database units updated: ${units.size} units collected")
                         lastUnits = units

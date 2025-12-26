@@ -301,7 +301,9 @@
     <string name="tactical_tracking_disabled">Seguimiento desactivado</string>
     <string name="tactical_unit_visibility_on_map">Visibilidad de unidades en el mapa</string>
     <string name="tactical_units_visible_on_map">Unidades visibles en el mapa</string>
+    <string name="tactical_units_visible_on_map_history">Unidades visibles en el mapa (mostrando historial)</string>
     <string name="tactical_units_hidden_on_map">Unidades ocultas en el mapa</string>
+    <string name="tactical_unit_visibility_on_map_history_tooltip">Cuando el seguimiento de entidades está desactivado, el mapa aún puede mostrar posiciones históricas/últimas conocidas.</string>
     <string name="tactical_map_update_interval">Intervalo actualización mapa</string>
     <string name="tactical_map_update_explain">Menor = movimiento más suave, mayor = mejor rendimiento</string>
     <string name="tactical_active_units_label">Unidades activas: %1$d</string>

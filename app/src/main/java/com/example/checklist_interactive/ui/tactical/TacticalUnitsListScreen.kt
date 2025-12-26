@@ -7,6 +7,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -111,33 +114,36 @@ fun TacticalUnitsListScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp)
+                    .padding(8.dp)
             ) {
                 // Header with close button and opacity control
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = stringResource(R.string.tactical_title),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
                     )
                     
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Opacity control button
+                        // Opacity control button (smaller)
                         IconButton(onClick = { showOpacitySlider = !showOpacitySlider }) {
                             Icon(
                                 imageVector = if (showOpacitySlider) Icons.Default.Close else Icons.Default.Visibility,
-                                contentDescription = stringResource(R.string.tactical_adjust_opacity)
+                                contentDescription = stringResource(R.string.tactical_adjust_opacity),
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
                         // More options menu
                         Box {
                             IconButton(onClick = { showCleanupMenu = true }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.tactical_options))
+                                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.tactical_options), modifier = Modifier.size(20.dp))
                             }
                             DropdownMenu(
                                 expanded = showCleanupMenu,
@@ -171,7 +177,7 @@ fun TacticalUnitsListScreen(
                         }
                         
                         IconButton(onClick = onNavigateBack) {
-                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_close))
+                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_close), modifier = Modifier.size(20.dp))
                         }
                     }
                 }
@@ -185,7 +191,7 @@ fun TacticalUnitsListScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 8.dp, bottom = 8.dp)
+                            .padding(vertical = 6.dp)
                     ) {
                         Text(
                             text = stringResource(R.string.tactical_opacity_label, (dialogOpacity * 100).toInt()),
@@ -200,13 +206,13 @@ fun TacticalUnitsListScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 
                 // Live filter toggle
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 8.dp),
+                        .padding(vertical = 6.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -231,19 +237,21 @@ fun TacticalUnitsListScreen(
                     )
                 }
                 
-                // Search bar
+                // Search bar (compact)
                 OutlinedTextField(
                     value = uiState.searchQuery,
                     onValueChange = { viewModel.setSearchQuery(it) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    placeholder = { Text(stringResource(R.string.tactical_search_placeholder)) },
-                    leadingIcon = { Icon(Icons.Default.Search, null) },
+                        .height(40.dp)
+                        .padding(vertical = 4.dp),
+                    textStyle = MaterialTheme.typography.bodySmall,
+                    placeholder = { Text(stringResource(R.string.tactical_search_placeholder), style = MaterialTheme.typography.bodySmall) },
+                    leadingIcon = { Icon(Icons.Default.Search, null, modifier = Modifier.size(16.dp)) },
                     trailingIcon = {
                         if (uiState.searchQuery.isNotEmpty()) {
                             IconButton(onClick = { viewModel.setSearchQuery("") }) {
-                                Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.action_clear))
+                                Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.action_clear), modifier = Modifier.size(16.dp))
                             }
                         }
                     },
@@ -258,18 +266,22 @@ fun TacticalUnitsListScreen(
                     showTacticalUnitsOnMap = showTacticalUnitsOnMap,
                     onToggleMapVisibility = { dataPadManager.toggleTacticalUnitsOnMap() },
                     mapUpdateInterval = mapUpdateInterval,
-                    onMapUpdateIntervalChange = { dataPadManager.setTacticalUnitsMapUpdateInterval(it) }
+                    onMapUpdateIntervalChange = { dataPadManager.setTacticalUnitsMapUpdateInterval(it) },
+                    selectedCoalitions = uiState.selectedCoalitions,
+                    onToggleCoalition = { viewModel.toggleCoalition(it) }
                 )
                 
                 // Units list
                 if (units.isEmpty()) {
                     EmptyState()
                 } else {
-                    LazyColumn(
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(
                             items = units,
@@ -337,7 +349,9 @@ private fun StatsCard(
     showTacticalUnitsOnMap: Boolean,
     onToggleMapVisibility: () -> Unit,
     mapUpdateInterval: Float = 2.0f,
-    onMapUpdateIntervalChange: (Float) -> Unit = {}
+    onMapUpdateIntervalChange: (Float) -> Unit = {},
+    selectedCoalitions: Set<Int> = emptySet(),
+    onToggleCoalition: (Int) -> Unit = {}
 ) {
     Card(
         modifier = Modifier
@@ -347,6 +361,7 @@ private fun StatsCard(
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
+            var showVisibilityTooltip by remember { mutableStateOf(false) }
             // Entity Tracking Toggle
             Row(
                 modifier = Modifier
@@ -383,49 +398,76 @@ private fun StatsCard(
                 )
             }
 
-            // Map Visibility Toggle (only show when entity tracking is enabled)
-            if (isEntityTrackingEnabled) {
-                Spacer(modifier = Modifier.height(12.dp))
+            // Map Visibility Toggle (independent of entity tracking - can show historical data)
+            Spacer(modifier = Modifier.height(8.dp))
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(onClick = onToggleMapVisibility)
-                        .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = if (showTacticalUnitsOnMap) Icons.Default.Map else Icons.Default.LocationOff,
-                            contentDescription = null,
-                            tint = if (showTacticalUnitsOnMap) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onToggleMapVisibility)
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (showTacticalUnitsOnMap) Icons.Default.Map else Icons.Default.LocationOff,
+                        contentDescription = null,
+                        tint = if (showTacticalUnitsOnMap) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = stringResource(R.string.tactical_unit_visibility_on_map),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Medium
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                text = stringResource(R.string.tactical_unit_visibility_on_map),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = if (showTacticalUnitsOnMap) stringResource(R.string.tactical_units_visible_on_map) else stringResource(R.string.tactical_units_hidden_on_map),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        Text(
+                            text = when {
+                                !showTacticalUnitsOnMap -> stringResource(R.string.tactical_units_hidden_on_map)
+                                isEntityTrackingEnabled -> stringResource(R.string.tactical_units_visible_on_map)
+                                else -> stringResource(R.string.tactical_units_visible_on_map_history)
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    IconButton(
+                        onClick = { showVisibilityTooltip = true },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = stringResource(R.string.tactical_unit_visibility_on_map),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+                Switch(
+                    checked = showTacticalUnitsOnMap,
+                    onCheckedChange = { onToggleMapVisibility() }
+                )
+            
+            if (showVisibilityTooltip) {
+                AlertDialog(
+                    onDismissRequest = { showVisibilityTooltip = false },
+                    title = { Text(stringResource(R.string.tactical_unit_visibility_on_map)) },
+                    text = { Text(stringResource(R.string.tactical_unit_visibility_on_map_history_tooltip)) },
+                    confirmButton = {
+                        TextButton(onClick = { showVisibilityTooltip = false }) {
+                            Text(stringResource(R.string.action_ok))
                         }
                     }
-                    Switch(
-                        checked = showTacticalUnitsOnMap,
-                        onCheckedChange = { onToggleMapVisibility() }
-                    )
-                }
+                )
+            }
             }
 
-            // Map Update Interval Slider (only show when entity tracking and map visibility are enabled)
-            if (isEntityTrackingEnabled && showTacticalUnitsOnMap) {
-                Spacer(modifier = Modifier.height(12.dp))
+            // Map Update Interval Slider (only show when map visibility is enabled)
+            if (showTacticalUnitsOnMap) {
+                Spacer(modifier = Modifier.height(8.dp))
                 
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Row(
@@ -462,24 +504,45 @@ private fun StatsCard(
                 }
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
             Text(
                 text = stringResource(R.string.tactical_active_units_label, stats.totalActive),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Medium
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             // Coalition stats
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                CoalitionBadge(stringResource(R.string.tactical_coalition_neutral), stats.neutralCount, Color(0xFF999999))
-                CoalitionBadge(stringResource(R.string.tactical_coalition_red), stats.redCount, Color(0xFFE53935))
-                CoalitionBadge(stringResource(R.string.tactical_coalition_blue), stats.blueCount, Color(0xFF1E88E5))
+                CoalitionBadge(
+                    name = stringResource(R.string.tactical_coalition_neutral),
+                    count = stats.neutralCount,
+                    color = Color(0xFF999999),
+                    coalitionId = 0,
+                    isSelected = selectedCoalitions.contains(0),
+                    onClick = { onToggleCoalition(0) }
+                )
+                CoalitionBadge(
+                    name = stringResource(R.string.tactical_coalition_red),
+                    count = stats.redCount,
+                    color = Color(0xFFE53935),
+                    coalitionId = 1,
+                    isSelected = selectedCoalitions.contains(1),
+                    onClick = { onToggleCoalition(1) }
+                )
+                CoalitionBadge(
+                    name = stringResource(R.string.tactical_coalition_blue),
+                    count = stats.blueCount,
+                    color = Color(0xFF1E88E5),
+                    coalitionId = 2,
+                    isSelected = selectedCoalitions.contains(2),
+                    onClick = { onToggleCoalition(2) }
+                )
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -499,25 +562,36 @@ private fun StatsCard(
 }
 
 @Composable
-private fun CoalitionBadge(name: String, count: Int, color: Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+private fun CoalitionBadge(
+    name: String,
+    count: Int,
+    color: Color,
+    coalitionId: Int,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clickable(onClick = onClick)
+    ) {
         Box(
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
-                .background(color),
+                .background(color.copy(alpha = if (isSelected) 1f else 0.4f)),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = count.toString(),
                 color = Color.White,
-                fontWeight = FontWeight.Bold
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
             )
         }
         Text(
             text = name,
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
         )
     }
 }
