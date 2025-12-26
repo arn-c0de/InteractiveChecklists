@@ -2,6 +2,9 @@
 
 
 All relevant changes are summarized here by version.
+## [1.0.18] - 2025-12-26
+
+
 ## [1.0.17] - 2025-12-25
 
 ### Summary
@@ -11,6 +14,7 @@ All relevant changes are summarized here by version.
 - Map & DataPad: `MapViewer` now uses a timer-based update loop for precise redraw intervals; `DataPadManager` adds `tacticalUnitsShowLiveOnly` StateFlow and persistence, and improves the tactical units map update interval handling.
 - Fixes: Resolved compilation/import issues, fixed irregular marker update timing, ensured inactive units are removed promptly, and corrected coalition color mapping; improved logging for entity tracking.
 - Docs: Updated entity tracking and tactical units documentation (README_ENTITY_TRACKING, TACTICAL_UNITS_TRACKING).
+- Internationalization: Added Simplified Chinese translation (zh-CN) — thanks @Dawn3901.
 
 ## [1.0.16] - 2025-12-23
 
