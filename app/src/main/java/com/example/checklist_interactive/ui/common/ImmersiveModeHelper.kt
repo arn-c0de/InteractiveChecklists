@@ -66,10 +66,16 @@ fun ApplyImmersiveModeToDialog(isVisible: Boolean) {
                 or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         )
 
+        // Ensure dialog window also does not fit system windows so bars stay hidden
+        dialogWindow?.let { WindowCompat.setDecorFitsSystemWindows(it, false) }
+
         val preDrawListener = object : android.view.ViewTreeObserver.OnPreDrawListener {
             override fun onPreDraw(): Boolean {
                 controller?.hide(WindowInsetsCompat.Type.systemBars())
-                controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                try {
+                    controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                } catch (_: Throwable) {
+                }
                 dialogView.viewTreeObserver.removeOnPreDrawListener(this)
                 return true
             }
@@ -79,10 +85,15 @@ fun ApplyImmersiveModeToDialog(isVisible: Boolean) {
         val attachListener = object : View.OnAttachStateChangeListener {
             override fun onViewAttachedToWindow(v: View) {
                 val vWindow = (v.context as? android.app.Activity)?.window
+                // Make sure the attached window also opts out of fitting system windows
+                vWindow?.let { WindowCompat.setDecorFitsSystemWindows(it, false) }
                 val c = vWindow?.let { WindowCompat.getInsetsController(it, v) }
                 c?.hide(WindowInsetsCompat.Type.systemBars())
-                c?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                
+                try {
+                    c?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                } catch (_: Throwable) {
+                }
+
                 @Suppress("DEPRECATION")
                 v.systemUiVisibility = (
                     View.SYSTEM_UI_FLAG_FULLSCREEN
@@ -114,8 +125,26 @@ fun ApplyImmersiveModeToDialog(isVisible: Boolean) {
         
         while (isActive && isVisible) {
             try {
+                // Ensure both dialog window and root view window do not fit system windows
+                dialogWindow?.let { WindowCompat.setDecorFitsSystemWindows(it, false) }
                 dialogController?.hide(WindowInsetsCompat.Type.systemBars())
-                dialogController?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                try {
+                    dialogController?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                } catch (_: Throwable) {
+                }
+
+                // Also attempt to hide on the root view's window in case the modal uses a different attach point
+                try {
+                    val rootWindow = (dialogView.rootView.context as? android.app.Activity)?.window
+                    rootWindow?.let { WindowCompat.setDecorFitsSystemWindows(it, false) }
+                    val rootController = rootWindow?.let { WindowCompat.getInsetsController(it, dialogView.rootView) }
+                    rootController?.hide(WindowInsetsCompat.Type.systemBars())
+                    try {
+                        rootController?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    } catch (_: Throwable) {
+                    }
+                } catch (_: Throwable) {
+                }
             } catch (_: Throwable) {
                 // Ignore errors
             }

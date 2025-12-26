@@ -139,11 +139,10 @@ fun MapNavigationDisplay(
     // Sync manual landing collapse with the navigation panel collapse/expand
     LaunchedEffect(showNavigationDetails) {
         if (!showNavigationDetails) {
-            // When the navigation panel collapses, collapse all expandable sub-sections
+            // When the navigation panel collapses, only collapse UI details - keep pattern active!
             showManualLandingDetails = false
-            onShowTrafficPatternChange(false)
             onShowPatternDetailsChange(false)
-            Log.d("MapNavigationDisplay", "Navigation collapsed -> collapsing manual/pattern details")
+            Log.d("MapNavigationDisplay", "Navigation collapsed -> collapsing UI details only, keeping pattern active")
         } else if (showNavigationDetails && showRunwayApproach) {
             // If the panel expands while landing is active, expand manual landing details
             showManualLandingDetails = true
