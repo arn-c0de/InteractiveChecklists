@@ -1052,6 +1052,12 @@
     <string name="map_drawing_brush_size">Brush Size</string>
     <string name="map_drawing_clear_all_cd">Clear All</string>
     <string name="map_drawing_clear">Clear</string>
+    <string name="map_drawing_confirm_clear_title">Alle Zeichnungen löschen?</string>
+    <string name="map_drawing_confirm_clear_message">Dies entfernt alle Zeichnungen von der Karte. Fortfahren?</string>
+    <string name="map_drawing_confirm_clear_second_title">Bitte bestätigen</string>
+    <string name="map_drawing_confirm_clear_second_message">Dieser Vorgang ist dauerhaft. Tippen Sie auf "Bestätigen", um alle Zeichnungen zu löschen.</string>
+    <string name="map_drawing_confirm_clear_positive">Bestätigen</string>
+    <string name="map_drawing_confirm_clear_negative">Abbrechen</string>
     <string name="map_drawing_save_cd">Save</string>
     <string name="map_drawing_save">Save</string>
     <string name="map_drawing_color_selected_cd">Selected</string>
