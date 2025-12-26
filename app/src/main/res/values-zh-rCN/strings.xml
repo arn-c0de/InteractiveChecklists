@@ -1,0 +1,1239 @@
+<resources>
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- APP METADATA -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="app_name">Checklist-Interactive</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- COMMON ACTIONS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="action_save">保存</string>
+    <string name="action_cancel">取消</string>
+    <string name="action_delete">删除</string>
+    <string name="action_ok">确定</string>
+    <string name="action_close">关闭</string>
+    <string name="action_back">返回</string>
+    <string name="action_open">打开</string>
+    <string name="action_reset">重置</string>
+    <string name="action_export">导出</string>
+    <string name="action_undo">撤销</string>
+    <string name="action_refresh">刷新</string>
+    <string name="action_add">添加</string>
+    <string name="action_remove">移除</string>
+    <string name="action_create">创建</string>
+    <string name="action_copy">复制</string>
+    <string name="action_clear">清除</string>
+    <string name="action_yes">是</string>
+    <string name="action_search">搜索</string>
+    <string name="action_expand">展开</string>
+    <string name="action_collapse">折叠</string>
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- NAVIGATION & UI ELEMENTS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="nav_settings">设置</string>
+    <string name="nav_my_files">我的文件</string>
+    <string name="nav_file_list">文件列表</string>
+    <string name="nav_expand">展开</string>
+    <string name="nav_collapse">折叠</string>
+    <string name="nav_up">上移</string>
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- FILE OPERATIONS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="file_import">导入文件</string>
+    <string name="file_add">添加文件</string>
+    <string name="file_delete">删除文件?</string>
+    <string name="file_delete_confirm">您真的要删除 \"%1$s\" 吗？</string>
+    <string name="file_no_files">没有可用的文件</string>
+    <string name="file_category">类别</string>
+    <string name="file_single">文件</string>
+    <string name="file_plural">文件</string>
+    <string name="file_open">打开文件</string>
+    <string name="open_internal_viewer">打开内部查看器</string>
+    <string name="file_open_folders">打开文件夹</string>
+    <string name="file_unsupported_format">不支持的文件格式: .%1$s\n支持的格式: .md, .markdown</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- TABS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="tab_new">新建标签页</string>
+    <string name="tab_close">关闭标签页</string>
+    <string name="tab_previous">上一个标签页</string>
+    <string name="tab_next">下一个标签页</string>
+    <string name="tab_switch">切换标签页</string>
+    <string name="tab_no_tabs">没有标签页</string>
+    <string name="tab_no_open_tabs">没有打开的标签页</string>
+    <string name="tab_open_tabs">已打开的标签页</string>
+    <string name="tab_recently_used">最近使用</string>
+    <string name="tab_all_tabs">全部标签页 (%1$d)</string>
+    <string name="tab_page_number">第 %1$d 页</string>
+    <string name="tab_active">当前</string>
+    <string name="aviation_map_tab_title">航空地图</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- TAGS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="tag_edit">编辑标签</string>
+    <string name="tag_move">移动</string>
+    <string name="tag_custom">自定义标签</string>
+    <string name="tag_add_custom">添加自定义标签</string>
+    <string name="tag_clear_all">全部清除</string>
+    <string name="tag_filter_any">任意</string>
+    <string name="tag_filter_all">全部</string>
+    <string name="tag_selected">已选标签:</string>
+    <string name="tag_available">可用标签:</string>
+    <string name="tag_filter_by">按标签筛选:</string>
+    <string name="tag_startup">启动</string>
+    <string name="tag_start">开始</string>
+    <string name="tag_navigation">导航</string>
+    <string name="tag_landing">着陆</string>
+    <string name="tag_combat">战斗</string>
+    <string name="tag_takeoff">起飞</string>
+    <string name="tag_taxi">滑行</string>
+    <string name="tag_preflight">飞行前</string>
+    <string name="tag_postflight">飞行后</string>
+    <string name="tag_more_count">+%1$d 个</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- COMMON -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="common_ellipsis">...</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- CHECKLIST & MARKDOWN -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="checklist_title">检查表</string>
+    <string name="checklist_error_loading">加载错误: %1$s</string>
+    <string name="checklist_error_unknown">未知错误</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- PDF VIEWER -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="pdf_error_loading"> PDF 加载错误: %1$s</string>
+    <string name="pdf_use_unified_viewer">请使用 UnifiedViewerScreen 打开 PDF 文件</string>
+    <string name="pdf_drawing">绘制</string>
+    <string name="pdf_eraser">橡皮擦</string>
+    <string name="pdf_view">查看</string>
+    <string name="pdf_width">宽度:</string>
+    <string name="pdf_width_label">宽度:</string>
+    <string name="pdf_highlight">高亮</string>
+    <string name="pdf_highlight_page">高亮页面</string>
+    <string name="pdf_shortcut_create">创建快捷方式</string>
+    <string name="pdf_shortcut_dialog_title">创建快捷方式</string>
+    <string name="pdf_shortcut_dialog_message">为第 %1$d 页创建快捷方式</string>
+    <string name="pdf_shortcut_name_label">快捷方式名称</string>
+    <string name="pdf_shortcut_name_format">%1$s - 第 %2$d 页</string>
+    <string name="pdf_link_to_quick_note">链接到快速笔记</string>
+    <string name="pdf_marked">已标记</string>
+    <string name="pdf_outline">大纲</string>
+    <string name="pdf_sharpen">锐化</string>
+    <string name="pdf_invert_colors">反转颜色</string>
+    <string name="pdf_draw">绘制</string>
+    <string name="pdf_marker">标记</string>
+    <string name="pdf_hint_draw">绘制</string>
+    <string name="pdf_hint_undo">撤销</string>
+    <string name="pdf_hint_save">保存</string>
+    <string name="pdf_hint_eraser">橡皮擦</string>
+    <string name="pdf_brush_type_eraser">橡皮擦</string>
+    <string name="pdf_brush_type_highlight">荧光笔</string>
+    <string name="pdf_brush_type_special">特殊</string>
+    <string name="pdf_brush_type_draw">绘制</string>
+    <string name="pdf_brush_type_view">查看</string>
+    <string name="pdf_sharpness_label">锐度:</string>
+    <string name="pdf_sharpen_label">锐化: %1$s%%</string>
+    <string name="pdf_hint_pen">钢笔</string>
+    <string name="pdf_hint_marker">记号笔</string>
+    <string name="pdf_hint_special">特殊</string>
+    <string name="pdf_outline_title">大纲</string>
+    <string name="pdf_toc_title">目录</string>
+    <string name="pdf_unnamed_outline_item">未命名</string>
+    <string name="quick_notes_default_title_notes">笔记</string>
+    <string name="parser_default_general">常规</string>
+    <string name="parser_default_checklist">检查表</string>
+    <string name="pdf_link">链接</string>
+    <string name="pdf_show_text">显示文本</string>
+    <string name="pdf_delete_all_title">删除所有绘图？</string>
+    <string name="pdf_delete_all_message">您确定要永久删除此页面上的所有绘图/注释吗？</string>
+    <string name="pdf_zoom_out">缩小</string>
+    <string name="pdf_zoom_in">放大</string>
+    <string name="pdf_apply_to_current_page">应用于当前页面</string>
+    <string name="pdf_page_prefix">第 </string>
+    <string name="pdf_pen">钢笔</string>
+    <string name="pdf_special_brush">特殊画笔</string>
+    <string name="pdf_eraser_label">橡皮擦:</string>
+    <string name="pdf_reset_zoom">重置缩放</string>
+    <string name="pdf_no_chapters">未找到章节。显示页面列表作为备用。</string>
+    <string name="pdf_search_chapters">搜索章节</string>
+    <string name="pdf_text">PDF 文本</string>
+    <string name="pdf_no_text_on_page">此页面未找到文本。</string>
+    <string name="pdf_clipboard_label">PDF 文本</string>
+    <string name="pdf_hide_toolbar">隐藏工具栏</string>
+    <string name="pdf_show_toolbar">显示工具栏</string>    <string name="pdf_page_progress">第 %1$d/%2$d 页</string>
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- BROWSE & NAVIGATION -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="browse_path_label">路径:</string>
+    <string name="browse_path_separator">/</string>
+    <string name="browse_default_location">资源</string>
+    <string name="cd_folder">文件夹</string>
+    <string name="cd_file">文件</string>
+    <string name="cd_close">关闭</string>
+    <string name="cd_change_folder">更改文件夹</string>
+    <string name="cd_back">返回</string>
+    <string name="cd_outline">大纲</string>
+    <string name="cd_sharpen">锐化</string>
+    <string name="cd_invert_colors">反转颜色</string>
+    <string name="cd_draw">绘制</string>
+    <string name="cd_marker">记号笔</string>
+    <string name="cd_highlight_page">突出显示页面</string>
+    <string name="cd_link">链接</string>
+    <string name="cd_show_text">显示文本</string>
+    <string name="cd_undo">撤销</string>
+    <string name="cd_zoom_out">缩小</string>
+    <string name="cd_zoom_in">放大</string>
+    <string name="cd_eraser">橡皮擦</string>
+    <string name="cd_pen">钢笔</string>
+    <string name="cd_link_to_quick_note">链接到快速笔记</string>
+    <string name="cd_clear">清除/删除</string>
+    <string name="pdf_shortcut">快捷方式</string>
+    <string name="shortcuts_title">快捷方式</string>
+    <string name="cd_file_list">文件列表</string>
+    <string name="cd_datapad">数据板</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- QUICK ACCESS & NOTES -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="quick_access_title">快速访问</string>
+    <string name="quick_notes_title">快速笔记</string>
+    <string name="quick_notes_search_placeholder">搜索笔记…</string>
+    <string name="quick_notes_new_note">新建笔记</string>
+    <string name="quick_notes_rename_title">重命名笔记</string>
+    <string name="quick_notes_title_label">标题</string>
+    <string name="quick_notes_pin_document">固定文件</string>
+    <string name="quick_notes_callsign_label">呼号</string>
+    <string name="quick_notes_com1_label">COM1</string>
+    <string name="quick_notes_com2_label">COM2</string>
+    <string name="quick_notes_fm">FM</string>
+    <string name="quick_notes_am">AM</string>
+    <string name="quick_notes_mode_normal">普通</string>
+    <string name="quick_notes_mode_markdown">Markdown</string>
+    <string name="quick_notes_field_text">文本</string>
+    <string name="quick_notes_field_numbers">数字</string>
+    <string name="quick_notes_field_frequency">频率</string>
+    <string name="quick_notes_field_coordinates">坐标</string>
+    <string name="quick_notes_field_flight_state">飞行状态</string>
+    <string name="quick_notes_field_time">时间</string>
+    <string name="quick_notes_field_draw">绘制</string>
+    <string name="quick_notes_status_label">状态</string>
+    <string name="quick_notes_opacity_label">不透明度: %1$d%% (最小 25%%)</string>
+    <string name="quick_notes_section_flight_info">飞行信息</string>
+    <string name="quick_notes_editor_markdown">Markdown 编辑器</string>
+    <string name="quick_notes_editor_note">笔记</string>
+    <string name="quick_notes_mode_normal_chip">普通</string>
+    <string name="quick_notes_mode_markdown_chip">Markdown</string>
+    <string name="quick_notes_markdown_placeholder">Markdown 编辑器\n\n链接: [文本](internal://open?file=...)\n**加粗**, *斜体*</string>
+    <string name="quick_notes_placeholder">在此处编写您的笔记…</string>
+    <string name="quick_notes_empty_state">笔记为空</string>
+    <string name="quick_notes_empty_hint">使用下面的快速输入</string>
+    <string name="quick_notes_untitled">未命名</string>
+    <string name="quick_notes_delete_confirm">再次按下以删除</string>
+    <string name="common_empty">(空)</string>
+    <string name="text_empty">(空)</string>
+    <string name="common_placeholder_dash">-</string>
+    <string name="greeting_hello">Hello %1$s!</string>
+    <string name="quick_notes_new_button">快速新建</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- FORMATS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="format_time_hh_mm_ss">HH:mm:ss</string>
+    <string name="quick_notes_com_prefix">COM:</string>
+    <string name="quick_notes_coord_template">N       E      </string>
+    <string name="quick_notes_flight_template">高度: FL    / 速度:     / 方向:    </string>
+    <string name="quick_notes_coord_format">N %1$s E %2$s</string>
+    <string name="quick_notes_alt_prefix">高度: FL </string>
+    <string name="quick_notes_speed_separator"> / 速度: </string>
+    <string name="quick_notes_hdg_separator"> / 方向: </string>
+    <string name="quick_notes_coord_placeholder">输入数字（例如，481234 表示 N48°12\'34\"）</string>
+    <string name="quick_notes_freq_placeholder">例如，122.500</string>
+    <string name="quick_notes_time_placeholder">例如，14:30</string>
+    <string name="quick_notes_numbers_placeholder">输入数字…</string>
+    <string name="quick_notes_flight_placeholder">输入数字（例如，020000250090 表示 FL20000/250kt/HDG090）</string>
+    <string name="quick_notes_text_placeholder">添加文本…</string>
+    <string name="quick_notes_drawing_saved">绘制已保存</string>
+    <string name="quick_notes_no_active_note">没有活动笔记以保存绘制</string>
+    <string name="quick_notes_draw_button">绘制</string>
+    <string name="quick_notes_erase_button">擦除</string>
+    <string name="quick_notes_not_saved">未保存</string>
+    <string name="quick_notes_saved">已保存</string>
+    <string name="quick_notes_count_singular">笔记</string>
+    <string name="quick_notes_count_plural">笔记</string>
+    <string name="cd_add">添加</string>
+    <string name="cd_list_view">列表视图</string>
+    <string name="cd_grid_view">网格视图</string>
+    <string name="quick_notes_default_title">我的笔记</string>
+    <string name="quick_notes_new_note_title">新建笔记</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- FLIGHT STATUS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="flight_status_idle">空闲</string>
+    <string name="flight_status_startup">启动</string>
+    <string name="flight_status_taxi">滑行</string>
+    <string name="flight_status_holding">盘旋</string>
+    <string name="flight_status_start_navigation">开始导航</string>
+    <string name="flight_status_navigation">导航</string>
+    <string name="flight_status_landing">着陆</string>
+    <string name="flight_status_shutdown">关闭</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- MAPS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="map_center_on_aircraft">使航空器居中</string>
+    <string name="map_layers">地图图层</string>
+    <string name="map_layers_dialog_title">地图图层</string>
+    <string name="map_follow_system_theme">跟随系统主题</string>
+    <string name="map_openstreetmap">开放式街道地图</string>
+    <string name="map_topographic">地形图</string>
+    <string name="map_satellite">卫星图 (USGS)</string>
+    <string name="map_dark">深色地图</string>
+    <string name="map_aircraft_position">航空器位置</string>
+    <string name="map_waiting_for_data">正在等待数据…</string>
+    <string name="map_no_datapad_connection">⚠ 无DataPad连接 - 地图位置不可用</string>
+    <string name="map_waiting_for_valid_position">ℹ 正在等待有效位置…</string>
+    <string name="map_auto_centering_active">🎯 自动居中 (点击以禁用)</string>
+    <string name="map_auto_centering_off">自动居中关闭 (点击以启用)</string>
+    <string name="map_auto_center_enabled">🎯 自动居中 (点击以禁用)</string>
+    <string name="map_auto_center_disabled">自动居中关闭 (点击以启用)</string>
+    <string name="map_tip_lock_screen">提示：点击锁定以查看地图</string>
+    <string name="map_tip_tap_lock">提示：点击锁定以查看地图</string>
+    <string name="settings_clear_map_cache">清除地图缓存</string>
+    <string name="settings_clear_map_cache_explain">删除存储在设备上的已下载地图切片（osmdroid缓存）。仅在需要释放空间或强制重新下载时使用。</string>
+    <string name="settings_clear_map_cache_title">删除地图缓存？</string>
+    <string name="settings_clear_map_cache_message">这将删除所有已下载的地图切片（osmdroid缓存）。继续？</string>
+    <string name="msg_map_cache_cleared">地图缓存已清除</string>
+    <string name="msg_map_cache_clear_failed">清除地图缓存失败：%1$s</string>
+
+    <!-- MAP DB WIPE/REIMPORT -->
+    <string name="settings_wipe_map_db_title">清除并重新导入地图数据库</string>
+    <string name="settings_wipe_map_db_explain">清除内部数据库并从 assets 重新导入 map_data.db。用于更新地图标记和详情。</string>
+    <string name="settings_wipe_map_db_button">清除并重新导入 map_data.db</string>
+    <string name="settings_wipe_map_db_confirm_title">重新导入地图数据库？</string>
+    <string name="settings_wipe_map_db_confirm_message">这将清除内部数据库并重新导入内置数据库。应用将重启。是否继续？</string>
+    <string name="msg_map_db_reimported">地图数据库已重新导入 — 正在重启…</string>
+    <string name="msg_map_db_reimport_failed">重新导入地图数据库失败：%1$s</string>
+    <string name="map_select_layer">选择图层:</string>
+    <string name="map_aviation_charts_note">注意: 航空分区图需要额外配置。请参阅 docs/technical/AVIATION_MAPS.md</string>
+    <string name="map_note_aviation_charts">注意: 航空分区图需要额外配置。请参阅 docs/technical/AVIATION_MAPS.md</string>
+    <string name="map_aviation_map">航空地图</string>
+    <string name="map_overlays">叠加层</string>
+    <string name="map_overlays_dialog_title">地图叠加层</string>
+    <string name="map_compass">指南针</string>
+    <string name="map_compass_description">显示以航空器为中心的航向指示器（度）</string>
+    <string name="map_range_rings">距离环</string>
+    <string name="map_range_rings_description">同心距离环（1/2/5 海里及缩放）用于估算距离</string>
+    <string name="map_range_rings_max_label">最大范围: %1$d 海里</string>
+    <string name="map_range_rings_max_description">距离环的最大半径（海里）。滑动以增加环的数量/范围（1..500 海里）。</string>
+    <string name="marker_snippet_fmt">高度: %1$d 英尺 | 速度: %2$d 节 | 航向: %3$d°</string>
+    <string name="marker_pilot_fmt">飞行员: %1$s</string>
+    <string name="msg_map_db_backup_created">地图数据库备份已创建: %1$s</string>
+    <string name="settings_internal_db_version">内部数据库版本: %1$d</string>
+    <string name="settings_asset_db_version">内置数据库版本: %1$d</string>
+    <string name="map_objects_transparency_label">透明度: %1$d%%</string>
+    <string name="map_objects_title">地图对象</string>
+    <string name="map_group_airports">✈ 机场</string>
+    <string name="map_group_waypoints">📍 航路点</string>
+    <string name="map_group_blufor_units">🔵 蓝方单位</string>
+    <string name="map_group_opfor_units">🔴 红方单位</string>
+    <string name="map_group_neutral_units">⚪ 中立单位</string>
+    <string name="map_group_targets">🎯 目标</string>
+    <string name="map_group_threats">⚠ 威胁</string>
+    <string name="map_group_other">📌 其他</string>
+    <string name="tab_map_details">详情</string>
+    <string name="tab_map_markers_count">标记 (%1$d)</string>
+    <string name="tab_map_routes_count">路线 (%1$d)</string>
+    <string name="map_objects_no_marker_selected">未选择标记</string>
+    <string name="map_objects_no_markers_yet">尚无标记</string>
+    <string name="map_create_route_from_group">从分组创建路线</string>
+    <string name="map_objects_no_routes_yet">尚无路线</string>
+    <string name="map_create_new_route">创建新路线</string>
+    <string name="map_edit_waypoints">编辑航路点</string>
+    <string name="map_set_route">设置路线</string>
+    <string name="map_action_edit">编辑</string>
+    <string name="map_move_marker">移动标记</string>
+    <string name="map_action_move">移动</string>
+    <string name="map_center_on_map">地图居中</string>
+    <string name="map_action_center">居中</string>
+    <string name="map_delete_marker_title">删除标记</string>
+    <string name="map_delete_marker_confirm">您确定要删除 \'%1$s\' 吗？此操作无法撤销。</string>
+    <string name="map_edit_marker_title">编辑标记</string>
+    <string name="map_basic_information">基本信息</string>
+    <string name="map_name_label">名称 *</string>
+    <string name="map_latitude_label">纬度 *</string>
+    <string name="map_longitude_label">经度 *</string>
+    <string name="map_type_label">类型 *</string>
+    <string name="map_type_placeholder">机场、航路点、战术军事等</string>
+    <string name="map_coalition_label">联盟</string>
+    <string name="map_coalition_placeholder">蓝方、红方、中立</string>
+    <string name="map_description_label">描述</string>
+    <string name="map_nato_military_symbol_title">北约军事符号</string>
+    <string name="map_symbol_entity_label">符号实体</string>
+    <string name="map_symbol_entity_placeholder">迫击炮, 战斗机, 等等</string>
+    <string name="map_symbol_set_label">符号集</string>
+    <string name="map_symbol_set_placeholder">地面单位, 装备, 等等</string>
+    <string name="map_size_label">大小</string>
+    <string name="map_size_placeholder">排, 连, 等等</string>
+    <string name="map_affiliation_label">阵营</string>
+    <string name="map_affiliation_placeholder">友方, 敌方, 中立, 未知</string>
+    <string name="map_color_label">颜色</string>
+    <string name="map_color_placeholder">#00A8FF</string>
+    <string name="map_icon_label">图标</string>
+    <string name="map_icon_select_hint">点击选择图标</string>
+    <string name="map_static_marker_checkbox">静态标记（机场、设施等）</string>
+    <string name="map_airport_fields_title">机场字段</string>
+    <string name="map_collapse_airport_fields_cd">折叠机场字段</string>
+    <string name="map_expand_airport_fields_cd">展开机场字段</string>
+    <string name="map_icao_label">ICAO</string>
+    <string name="map_icao_placeholder">EDDF</string>
+    <string name="map_iata_label">IATA</string>
+    <string name="map_iata_placeholder">FRA</string>
+    <string name="map_elevation_m_label">海拔 (米)</string>
+    <string name="map_elevation_m_placeholder">100</string>
+    <string name="map_frequencies_json_label">频率 (JSON)</string>
+    <string name="map_frequencies_json_placeholder">{\"tower\":\"118.5\", \"ground\":\"121.9\"}</string>
+    <string name="map_runways_title">跑道</string>
+    <string name="map_remove_runway_cd">移除跑道</string>
+    <string name="map_runway_name_label">名称</string>
+    <string name="map_runway_length_m_label">长度 (米)</string>
+    <string name="map_runway_width_m_label">宽度 (米)</string>
+    <string name="map_runway_surface_label">表面</string>
+    <string name="map_runway_ils_mhz_label">ILS (MHz)</string>
+    <string name="map_runway_ils_range_hint">范围: 108.00–137.00 MHz</string>
+    <string name="map_runway_ils_invalid_format">格式无效</string>
+    <string name="map_runway_ils_out_of_range">超出范围 (108.00–137.00)</string>
+    <string name="map_runway_heading_deg_label">航向 (度)</string>
+    <string name="map_runway_heading_invalid_range">航向必须是 0–359.9°</string>
+    <string name="map_runway_heading_range_hint">0–359.9°</string>
+    <string name="map_runway_lighting_checkbox">照明</string>
+    <string name="map_notes_label">备注</string>
+    <string name="map_add_runway_button">添加跑道</string>
+    <string name="map_tactical_fields_title">战术字段</string>
+    <string name="map_unit_type_label">单位类型</string>
+    <string name="map_unit_type_placeholder">步兵, 装甲, 等等</string>
+    <string name="map_threat_level_label">威胁等级</string>
+    <string name="map_threat_level_placeholder">0-10</string>
+    <string name="map_threat_level_range_hint">等级范围: 0–10</string>
+    <string name="map_threat_level_invalid_error">必须是 0 到 10 之间的整数</string>
+    <string name="map_strength_label">强度</string>
+    <string name="map_strength_placeholder">单位数量</string>
+    <string name="map_strength_invalid_error">必须是非负整数</string>
+    <string name="map_geography_admin_title">地理与行政区划</string>
+    <string name="map_country_label">国家</string>
+    <string name="map_country_placeholder">德国</string>
+    <string name="map_region_label">地区</string>
+    <string name="map_region_placeholder">Hesse</string>
+    <string name="map_timezone_label">时区</string>
+    <string name="map_timezone_placeholder">欧洲/柏林</string>
+    <string name="map_metadata_title">元数据</string>
+    <string name="map_source_label">来源</string>
+    <string name="map_source_placeholder">OpenFlightMaps, user_created, 等等</string>
+    <string name="map_tags_placeholder">civil,military,public (逗号分隔)</string>
+    <string name="map_edit_route_title">编辑航线</string>
+    <string name="map_route_name_label">航线名称</string>
+    <string name="map_route_auto_generated_description">由标记组自动生成</string>
+    <string name="map_color_custom">自定义</string>
+    <string name="map_color_blue">蓝色</string>
+    <string name="map_color_red">红色</string>
+    <string name="map_color_green">绿色</string>
+    <string name="map_color_yellow">黄色</string>
+    <string name="map_color_orange">橙色</string>
+    <string name="map_color_purple">紫色</string>
+    <string name="map_color_pink">粉色</string>
+    <string name="map_color_cyan">青色</string>
+    <string name="map_color_teal">水鸭色</string>
+    <string name="map_color_indigo">靛蓝色</string>
+    <string name="map_color_mint">薄荷色</string>
+    <string name="map_color_brown">棕色</string>
+    <string name="map_color_gray">灰色</string>
+    <string name="map_color_white">白色</string>
+    <string name="map_color_black">黑色</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- DATAPAD -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="datapad_title">DataPad</string>
+    <string name="datapad_encrypted_connection">🔒 AES-GCM 加密 • %1$s:%2$d</string>
+    <string name="datapad_setup_instructions">请确保 forward_parsed_udp.py 正在运行</string>
+    <string name="datapad_command_example">python forward_parsed_udp.py --host %1$s --port %2$d</string>
+    <string name="datapad_encryption_info">🔒 数据已使用 AES-GCM 加密</string>
+    <string name="datapad_configuration_tips_label">配置提示</string>
+    <string name="datapad_configuration_tips_text">• 更改设置将重新启动 UDP 套接字
+• 绑定 IP 留空以监听所有接口
+• 默认端口：5010</string>
+    <string name="datapad_settings_description">启用或禁用 DataPad。禁用时，应用将不监听 UDP 遥测数据，且 DataPad 控件将被隐藏。</string>
+
+    <!-- ECDH / Device settings -->
+    <string name="datapad_ecdh_title">ECDH 握手模式</string>
+    <string name="datapad_ecdh_description_secure">基于会话的安全加密现已始终启用。</string>
+    <string name="datapad_device_name_label">设备名称</string>
+    <string name="datapad_device_name_placeholder">Android 平板</string>
+    <string name="datapad_device_name_support">用于在握手过程识别此设备</string>
+    <string name="datapad_device_id_label">设备 ID（从密钥派生）</string>
+    <string name="datapad_server_ip_label">服务器 IP（单播）</string>
+    <string name="datapad_server_ip_placeholder">192.168.178.100</string>
+    <string name="datapad_server_ip_hint">留空以使用广播发现（安全性较低）</string>
+    <string name="datapad_ecdh_info_title">ECDH 模式信息</string>
+    <string name="datapad_settings_generate_key">生成密钥</string>
+    <string name="datapad_ecdh_info_text">• 设备必须添加到 DCS 服务器上的 authorized_devices.json\n• 握手自动建立会话密钥\n• 会话密钥每次连接都会更改（前向保密）</string>
+    <string name="datapad_ecdh_warning">⚠️ ECDH 需要更新 Python 服务器（参见 docs/technical/ECDH_HANDSHAKE_PROPOSAL.md）</string>
+    <string name="datapad_section_aircraft_pilot">飞机与飞行员</string>
+    <string name="datapad_section_flight_performance">飞行性能</string>
+    <string name="datapad_field_angle_of_attack">迎角</string>
+    <string name="datapad_field_g_load_x">G 载荷 X</string>
+    <string name="datapad_field_g_load_y">G 载荷 Y</string>
+    <string name="datapad_field_g_load_z">G 载荷 Z</string>
+    <string name="datapad_section_engine">引擎</string>
+    <string name="datapad_field_rpm_left">左侧RPM</string>
+    <string name="datapad_field_rpm_right">右侧RPM</string>
+    <string name="datapad_field_egt_left">左侧EGT</string>
+    <string name="datapad_field_egt_right">右侧EGT</string>
+    <string name="datapad_field_throttle">油门</string>
+    <string name="datapad_field_afterburner">加力燃烧器</string>
+    <string name="datapad_section_aircraft_mass">飞机质量</string>
+    <string name="datapad_field_total_mass">总质量</string>
+    <string name="datapad_field_empty_mass">空载质量</string>
+    <string name="datapad_field_payload">有效载荷</string>
+    <string name="datapad_section_flight_controls">飞行控制与配平</string>
+    <string name="datapad_field_pitch">俯仰（Pitch）</string>
+    <string name="datapad_field_roll">滚转（Roll）</string>
+    <string name="datapad_field_yaw">偏航（Yaw）</string>
+    <string name="datapad_field_trim_pitch">俯仰配平</string>
+    <string name="datapad_field_trim_roll">滚转配平</string>
+    <string name="datapad_field_trim_yaw">偏航配平</string>
+    <string name="datapad_section_gear_config">起落架与配置</string>
+    <string name="datapad_field_nose_gear">前起落架</string>
+    <string name="datapad_field_left_gear">左起落架</string>
+    <string name="datapad_field_right_gear">右起落架</string>
+    <string name="datapad_gear_down">放下</string>
+    <string name="datapad_gear_up">收起</string>
+    <string name="datapad_gear_transit">过渡中</string>
+    <string name="datapad_field_weight_on_wheels">轮载重量</string>
+    <string name="datapad_field_flaps">襟翼</string>
+    <string name="datapad_field_speedbrake">减速板</string>
+    <string name="datapad_field_canopy">座舱罩</string>
+    <string name="datapad_canopy_open">打开</string>
+    <string name="datapad_canopy_closed">关闭</string>
+    <string name="datapad_canopy_moving">移动中</string>
+    <string name="datapad_field_hook">拦阻钩</string>
+    <string name="datapad_hook_down">放下</string>
+    <string name="datapad_hook_up">收起</string>
+    <string name="datapad_section_lights">灯光</string>
+    <string name="datapad_field_landing_light">着陆灯</string>
+    <string name="datapad_field_taxi_light">滑行灯</string>
+    <string name="datapad_field_nav_light">导航灯</string>
+    <string name="datapad_field_strobe_light">防撞闪光灯</string>
+    <string name="datapad_field_formation_light">编队灯</string>
+    <string name="datapad_section_systems_status">系统状态</string>
+    <string name="datapad_field_electrical">电气</string>
+    <string name="datapad_field_hydraulic">液压</string>
+    <string name="datapad_field_apu">APU</string>
+    <string name="datapad_field_generator">发电机</string>
+    <string name="datapad_section_mission_time">任务时间</string>
+    <string name="datapad_field_time">时间</string>
+    <string name="datapad_section_nearby_units">附近单位 (%1$d)</string>
+    <string name="datapad_section_flight_params">飞行参数</string>
+    <string name="datapad_field_altitude">高度</string>
+    <string name="datapad_field_heading">航向</string>
+    <string name="datapad_field_bank">倾斜角</string>
+    <string name="datapad_section_performance">性能</string>
+    <string name="datapad_field_indicated_airspeed">指示空速</string>
+    <string name="datapad_field_true_airspeed">真实空速</string>
+    <string name="datapad_field_vertical_speed">垂直速度</string>
+    <string name="datapad_field_mach">马赫数</string>
+    <string name="datapad_section_weapons">武器与对抗措施</string>
+    <string name="datapad_field_master_arm">主武器开关</string>
+    <string name="datapad_master_arm_armed">已武装</string>
+    <string name="datapad_master_arm_safe">安全</string>
+    <string name="datapad_field_stations">挂架</string>
+    <string name="datapad_field_total_count">总数</string>
+    <string name="datapad_field_flares">干扰弹</string>
+    <string name="datapad_field_chaff">箔条</string>
+    <string name="datapad_field_radar_active">雷达激活</string>
+    <string name="datapad_field_jamming">干扰</string>
+    <string name="datapad_field_ir_jamming">红外干扰</string>
+    <string name="datapad_field_ai_on">AI 控制</string>
+    <string name="datapad_field_human">玩家</string>
+    <string name="datapad_section_radar">雷达</string>
+    <string name="datapad_field_mode">模式</string>
+    <string name="datapad_field_range">范围</string>
+    <string name="datapad_field_locked">已锁定</string>
+    <string name="datapad_field_track_count">目标数量</string>
+    <string name="datapad_field_azimuth">方位角</string>
+    <string name="datapad_field_elevation">仰角</string>
+    <string name="datapad_field_scan">扫描</string>
+    <string name="datapad_radar_tracks">目标:</string>
+    <string name="datapad_station_label">挂架 %1$s</string>
+    <string name="datapad_type_count">类型 %1$s • 数量 %2$d</string>
+    <string name="datapad_track_label">目标 %1$d</string>
+    <string name="datapad_track_detail">%1$s • %2$s</string>
+    <string name="datapad_section_rwr_threats">RWR 威胁 (%1$d)</string>
+    <string name="datapad_rwr_azimuth_prefix">方位角:</string>
+    <string name="datapad_rwr_priority_prefix">优先级:</string>
+    <string name="datapad_section_position">位置</string>
+    <string name="datapad_time_seconds_ago">%1$ds 秒前</string>
+    <string name="datapad_time_minutes_ago">%1$dm 分钟前</string>
+    <string name="datapad_time_hours_ago">%1$dh 小时前</string>
+    <string name="datapad_field_latitude">纬度</string>
+    <string name="datapad_field_longitude">经度</string>
+    <string name="datapad_field_x">X</string>
+    <string name="datapad_field_y">Y</string>
+    <string name="datapad_field_z">Z</string>
+    <string name="datapad_section_additional_info">附加信息</string>
+    <string name="datapad_field_timestamp">时间戳</string>
+    <string name="datapad_field_unit_id">单位 ID</string>
+    <string name="datapad_field_streamer_version">Streamer 版本</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- SETTINGS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="settings_title">设置</string>
+    <string name="settings_dark_mode">深色模式</string>
+    <string name="settings_toggle_dark_mode">切换深色模式</string>
+    <string name="settings_reset_fab_positions">重置FAB位置</string>
+    <string name="settings_view_contributors_json">查看贡献者 JSON</string>
+    <string name="settings_select_visible_aircraft">选择可见飞机</string>
+    <string name="settings_reset_to_defaults">恢复默认</string>
+    <string name="settings_view_internal_tag_json">查看内部标签 JSON</string>
+    <string name="settings_view_default_asset_json">查看默认资源 JSON</string>
+    <string name="clipboard_tags_json_label">标签 JSON</string>
+    <string name="clipboard_sources_json_label">来源 JSON</string>
+    <string name="clipboard_contributors_json_label">贡献者 JSON</string>
+    <string name="settings_import_reload_tags">导入并重新加载标签</string>
+    <string name="settings_font_size">%1$d sp</string>
+    <string name="settings_aircraft_dialog_title">选择可见飞机</string>
+    <string name="settings_aircraft_select_all">全选</string>
+    <string name="settings_aircraft_select_none">全不选</string>
+    <string name="settings_tag_json_title">标签 JSON</string>
+    <string name="settings_sources_json_title">来源 JSON</string>
+    <string name="settings_contributors_json_title">贡献者 JSON</string>
+    <string name="settings_reset_visibility_title">重置可见性</string>
+    <string name="settings_reset_visibility_message">这将显示所有包含的飞机类别。是否继续？</string>
+    <string name="settings_external_import_folder">外部导入文件夹</string>
+    <string name="settings_remove_import_folder">移除导入的文件夹</string>
+    <string name="settings_reimport_bundled_assets">重新导入内置资源</string>
+    <string name="settings_reset_bundled_imports">重置导入（删除并重新导入）</string>
+    <string name="settings_reset_bundled_imports_title">重置内置导入</string>
+    <string name="settings_reset_bundled_imports_message">这将删除内部存储中的所有文件并重新导入内置资源。是否继续？</string>
+    <string name="settings_importing">导入中…</string>
+    <string name="settings_processing">处理中…</string>
+    <string name="settings_version">版本: %1$s</string>
+    <string name="settings_viewer_layout">查看器布局</string>
+    <string name="settings_fab_positions_explain">重置悬浮操作按钮(FAB)位置为默认值</string>
+    <string name="settings_fab_size">FAB大小</string>
+    <string name="settings_fab_size_explain">更改所有FAB的大小</string>
+    <string name="settings_fab_size_small">小</string>
+    <string name="settings_fab_size_medium">中</string>
+    <string name="settings_fab_size_large">大</string>
+    <string name="contributors_title">贡献者</string>
+    <string name="contributors_explain">查看和管理项目贡献者</string>
+    <string name="error_encoding_contributors">编码贡献者数据时出错</string>
+    <string name="role_label">角色: %1$s</string>
+    <string name="contributor_date">添加于 %1$s</string>
+    <string name="document_sources_title">文档来源</string>
+    <string name="document_sources_explain">管理文档来源引用</string>
+    <string name="license_label">许可证: %1$s</string>
+    <string name="settings_visibility">飞机可见性</string>
+    <string name="settings_aircraft_visibility_explain">配置浏览器中显示的飞机</string>
+    <string name="tags_title">标签</string>
+    <string name="settings_view_internal_tag_json_explain">查看内部标签配置 JSON</string>
+    <string name="error_loading_tags">加载标签时出错</string>
+    <string name="no_default_tags_asset">未找到默认标签资源</string>
+    <string name="msg_tags_imported">标签导入成功</string>
+    <string name="total_unique_tags">唯一标签总数: %1$d</string>
+    <string name="files_with_tags">带标签的文件数: %1$d</string>
+    <string name="markdown_title">Markdown 设置</string>
+    <string name="settings_markdown_font_size">Markdown 字体大小</string>
+    <string name="msg_copied_to_clipboard">已复制到剪贴板</string>
+    <string name="settings_import_title">导入设置</string>
+    <string name="folder_selected">文件夹: %1$s</string>
+    <string name="no_folder_selected_tap">未选择文件夹。点击选择。</string>
+    <string name="settings_import_help">选择一个外部文件夹以导入 PDF 和 Markdown 文件</string>
+    <string name="import_failed">导入失败</string>
+    <string name="wipe_import_failed">清除并导入失败: %1$s</string>
+    
+    <plurals name="files_imported">
+        <item quantity="one">%d 个文件已导入</item>
+        <item quantity="other">%d 个文件已导入</item>
+    </plurals>
+
+    <plurals name="imported_files">
+        <item quantity="one">%1$d 个文件已导入</item>
+        <item quantity="other">%1$d 个文件已导入</item>
+    </plurals>
+
+    <plurals name="wiped_imported_files">
+        <item quantity="one">%1$d 个文件已清除并重新导入</item>
+        <item quantity="other">%1$d 个文件已清除并重新导入</item>
+    </plurals>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- STATES & STATUS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="status_loading">加载中…</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- LANGUAGE -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="settings_language_label">语言</string>
+    <string name="language_english">英语</string>
+    <string name="language_german">德语</string>
+    <string name="language_spanish">西班牙语</string>
+    <string name="settings_language_restart_message">语言已保存。请重新启动应用以使更改生效。</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- CONTENT DESCRIPTIONS (Accessibility) -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="cd_marked">已标记</string>
+    <string name="cd_shortcut">快捷方式</string>
+    <string name="cd_note">备注</string>
+    <string name="cd_flight">飞行</string>
+    <string name="cd_reset_checklist">重置清单</string>
+    <string name="cd_collapse_all">全部折叠</string>
+    <string name="cd_expand_all">全部展开</string>
+    <string name="cd_quick_access">快速访问</string>
+    <string name="cd_filter_by_tags">按标签过滤</string>
+    <string name="cd_search_files">搜索文件</string>
+    <string name="cd_open_aviation_map">打开航空地图</string>
+    <string name="cd_edit_tags">编辑标签</string>
+    <string name="cd_rename">重命名</string>
+    <string name="cd_settings">设置</string>
+    <string name="cd_lock_screen">锁定屏幕</string>
+    <string name="cd_unlock_screen">解锁屏幕</string>
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- UI DIALOGS & MESSAGES -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="dialog_import">导入</string>
+    <string name="dialog_file">文件</string>
+    <string name="dialog_folder">文件夹</string>
+    <string name="dialog_rename_shortcut">重命名快捷方式</string>
+    <string name="dialog_name">名称</string>
+    <string name="dialog_search_files">搜索文件</string>
+    <string name="dialog_select_category">选择类别</string>
+    <string name="dialog_import_files">从设备导入文件</string>
+    <string name="dialog_import_files_message">未自动导入任何文件。是否选择文件或文件夹进行导入吗？\n（推荐用于PDF和Markdown文件）</string>
+    <string name="dialog_pick_files">选择文件</string>
+    <string name="dialog_pick_folder">选择文件夹</string>
+    <string name="msg_no_matching_files">未找到匹配的文件</string>
+    <string name="msg_file_already_in_category">文件已在此类别中</string>
+    <string name="msg_fab_positions_restored">FAB 位置已恢复</string>
+    <string name="shortcuts">快捷方式</string>
+    <string name="greeting_default_name">Android</string>
+    <string name="state_on">开</string>
+    <string name="state_off">关</string>
+    <string name="pdf_page_number">PDF 第 %1$d 页</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- DATAPAD -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="datapad_reception_on">接收：开</string>
+    <string name="datapad_reception_off">接收：关</string>
+    <string name="datapad_connected">已连接</string>
+    <string name="datapad_waiting_for_data">等待数据中</string>
+    <string name="datapad_last_heartbeat">最后心跳：%1$s</string>
+    <string name="datapad_toggle_reception_on">禁用接收</string>
+    <string name="datapad_toggle_reception_off">启用接收</string>
+    <string name="datapad_no_data">尚未接收到飞行数据</string>
+    <string name="datapad_expected_command">预期命令：</string>
+    <string name="datapad_aircraft">飞机</string>
+    <string name="datapad_pilot">飞行员</string>
+    <string name="datapad_coalition">阵营</string>
+    <string name="datapad_group">编组</string>
+    <string name="datapad_environment">环境</string>
+    <string name="datapad_temperature">温度</string>
+    <string name="datapad_pressure">气压</string>
+    <string name="datapad_wind_speed">风速</string>
+    <string name="datapad_wind_direction">风向</string>
+    <string name="datapad_visibility">能见度</string>
+    <string name="datapad_clouds">云层</string>
+    <string name="datapad_not_available">不可用</string>
+
+    <string name="datapad_packet_timing">数据包时间: %1$dms / %2$dms / %3$dms (最小/平均/最大)</string>
+    <string name="datapad_temperature_c_f">%.1f°C (%.1f°F)</string>
+    <string name="datapad_pressure_hpa_inhg">%.1f hPa (%.2f inHg)</string>
+    <string name="datapad_wind_speed_ms_kts">%.1f m/s (%.1f kt)</string>
+    <string name="datapad_direction_deg">%.1f°</string>
+    <string name="datapad_visibility_m_nm">%.0f m (%.1f nm)</string>
+    <string name="datapad_aoa_deg">%.2f°</string>
+    <string name="datapad_g_load_unit">%.2f G</string>
+    <string name="datapad_percent_format">%.1f%%</string>
+    <string name="datapad_temp_c_format">%.0f°C</string>
+    <string name="datapad_mass_kg_format">%.0f kg</string>
+    <string name="datapad_percent_format_int">%.0f%%</string>
+    <string name="datapad_altitude_m_format">%.1f m</string>
+    <string name="datapad_heading_deg_format">%.1f°</string>
+    <string name="datapad_angle_deg_format">%.2f°</string>
+    <string name="datapad_vs_ms_fpm">%.2f m/s (%.0f ft/min)</string>
+    <string name="datapad_unit_details_format">%1$s • %2$s</string>
+    <string name="datapad_distance_m_format_int">%.0f m</string>
+    <string name="datapad_na_symbol">?</string>
+    <string name="datapad_rwr_contact_format">%1$s %2$s • %3$s %4$s</string>
+    <string name="datapad_azimuth_deg_format">%.0f°</string>
+    <string name="datapad_speed_ms_kts">%.1f m/s (%.1f kt)</string>
+    <string name="datapad_range_m_format">%.0f m</string>
+    <string name="datapad_na_value">--</string>
+    <string name="datapad_time_format_hms">%02d:%02d:%02d</string>
+    <string name="datapad_last_heartbeat_with_bullet">• 最后心跳: %1$s</string>
+
+    <!--═══════════════════════════════════════════════════════════════════════ -->
+    <!-- DATAPAD SETTINGS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="datapad_settings_title">DataPad 设置</string>
+    <string name="datapad_settings_udp_port">UDP 端口</string>
+    <string name="datapad_settings_udp_port_placeholder">5010</string>
+    <string name="datapad_settings_port_range">端口范围: 1024-65535</string>
+    <string name="datapad_settings_bind_ip">绑定 IP 地址</string>
+    <string name="datapad_settings_bind_ip_placeholder">0.0.0.0 (所有接口)</string>
+    <string name="datapad_settings_bind_ip_hint">留空以监听所有接口</string>
+    <string name="datapad_settings_save_restart">保存并重启</string>
+
+    <string name="datapad_public_key_label">公钥 (Base64)</string>
+    <string name="datapad_cd_copy_public_key">复制公钥</string>
+    <string name="datapad_public_key_copied_feedback">公钥已复制到剪贴板 ✅</string>
+    <string name="datapad_public_key_copy_hint">将此 Base64 公钥复制到服务器的 authorized_devices.json 条目中</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- FILES & FOLDERS -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="files_in_folder">文件位于: %1$s</string>
+    <string name="select_another_folder">选择其他文件夹</string>
+    <string name="select_folder">选择文件夹</string>
+    <string name="select_this_folder">选择此文件夹</string>
+    <string name="import_file_or_folder">导入文件还是整个文件夹（所有 .pdf/.md 文件）？</string>
+    <string name="moved_to_category">已移动到 %1$s</string>
+    <string name="msg_could_not_move">无法移动: %1$s</string>
+    <string name="could_not_move">无法移动: %1$s</string>
+    <string name="page_text_title">页面文本 (第 %1$d 页)</string>
+    <string name="pdf_text_clip_label">PDF 文本</string>
+    <string name="pdf_error_unsupported_pixel_format">第 %1$d 页的格式不受支持</string>
+    <string name="viewer_unsupported_format_md_pdf">不支持的文件格式: .%1$s\n支持的格式: .md, .markdown, .pdf</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- MARKDOWN VIEWER -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="markdown_label_h1">一级标题</string>
+    <string name="markdown_label_custom_block">自定义块</string>
+    <string name="markdown_label_blockquote">引用块</string>
+    <string name="markdown_label_code_block">代码块</string>
+    <string name="markdown_label_ordered_list">有序列表</string>
+    <string name="markdown_label_unordered_list">无序列表</string>
+    <string name="markdown_label_table">表格</string>
+    <string name="markdown_label_horizontal_rule">水平线</string>
+    <string name="markdown_label_image">图片</string>
+    <string name="markdown_label_link">链接</string>
+    <string name="markdown_label_task_list">任务列表</string>
+    <string name="markdown_label_bullet_point_text">要点</string>
+    <string name="markdown_label_strikethrough">删除线</string>
+    <string name="markdown_label_superscript">上标</string>
+    <string name="markdown_label_subscript">下标</string>
+    <string name="markdown_label_highlight">高亮</string>
+    <string name="markdown_label_inline_code">行内代码</string>
+    <string name="markdown_label_emoji">表情</string>
+    <string name="markdown_bullet_point">• </string>
+    <string name="markdown_checkbox_count_format"> | %1$d/%2$d</string>
+    <string name="markdown_collapse">折叠</string>
+    <string name="markdown_expand">展开</string>
+    <string name="cd_menu">菜单</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- INTERNAL FILES -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="no_files_found">未找到文件</string>
+    <string name="no_subfolders_found">未找到子文件夹</string>
+    <string name="root">根目录</string>
+    <string name="file_or_files">文件</string>
+    <string name="files_multiple">文件</string>
+    <string name="shortcuts_label">快捷方式</string>
+    <string name="rename_label">重命名</string>
+    <string name="page_number_format">第 %1$d 页</string>
+    <string name="edit_tags_label">编辑标签</string>
+    <string name="cd_list_view_label">列表视图</string>
+    <string name="cd_grid_view_label">网格视图</string>
+    <string name="cd_search_files_label">搜索文件</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- LEGACY COMPATIBILITY (deprecated - use semantic names above) -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="title_my_files">@string/nav_my_files</string>
+    <string name="import_file">@string/file_import</string>
+    <string name="refresh">@string/action_refresh</string>
+    <string name="toggle_dark_mode">@string/settings_toggle_dark_mode</string>
+    <string name="no_files">@string/file_no_files</string>
+    <string name="add_file">@string/file_add</string>
+    <string name="delete_file">@string/file_delete</string>
+    <string name="delete_confirm">@string/file_delete_confirm</string>
+    <string name="delete">@string/action_delete</string>
+    <string name="cancel">@string/action_cancel</string>
+    <string name="category">@string/file_category</string>
+    <string name="file">@string/file_single</string>
+    <string name="files">@string/file_plural</string>
+    <string name="expand">@string/nav_expand</string>
+    <string name="collapse">@string/nav_collapse</string>
+    <string name="unsupported_file_format">@string/file_unsupported_format</string>
+    <string name="back">@string/action_back</string>
+    <string name="file_list">@string/nav_file_list</string>
+    <string name="settings">@string/nav_settings</string>
+    <string name="dark_mode">@string/settings_dark_mode</string>
+    <string name="ok">@string/action_ok</string>
+    <string name="error_loading_pdf">@string/pdf_error_loading</string>
+    <string name="drawing">@string/pdf_drawing</string>
+    <string name="eraser">@string/pdf_eraser</string>
+    <string name="view">@string/pdf_view</string>
+    <string name="width">@string/pdf_width</string>
+    <string name="save">@string/action_save</string>
+    <string name="undo">@string/action_undo</string>
+    <string name="highlight">@string/pdf_highlight</string>
+    <string name="checklist">@string/checklist_title</string>
+    <string name="open_folders">@string/file_open_folders</string>
+    <string name="up">@string/nav_up</string>
+    <string name="open">@string/action_open</string>
+    <string name="reset">@string/action_reset</string>
+    <string name="export">@string/action_export</string>
+    <string name="loading">@string/status_loading</string>
+    <string name="use_unified_viewer_for_pdf">@string/pdf_use_unified_viewer</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- DATABASE UPDATE -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="db_update_title">有可用的数据库更新</string>
+    <string name="db_update_message">有可用的机场/位置数据库新版本。\n\n当前版本：%1$d\n新版本：%2$d</string>
+    <string name="db_update_options">选择更新方式：</string>
+    <string name="db_update_option_merge">合并：导入新位置，同时保留现有数据</string>
+    <string name="db_update_option_clean">清除后导入：清空内部数据库并导入新版本的所有数据（建议用于重大更新）</string>
+    <string name="db_update_option_skip">跳过：暂不导入（以后可手动触发）</string>
+    <string name="db_update_btn_merge">合并</string>
+    <string name="db_update_btn_clean">清除后导入</string>
+    <string name="db_update_btn_skip">跳过</string>
+
+    <!-- MILITARY SYMBOL PICKER -->
+    <string name="military_symbols_title">军事符号</string>
+    <string name="military_symbols_close">关闭</string>
+    <string name="military_symbols_affiliation_label">阵营</string>
+    <string name="military_symbols_category_label">类别</string>
+
+    <!-- Symbol Categories -->
+    <string name="military_symbols_category_ground_units">地面单位</string>
+    <string name="military_symbols_category_equipment">设备</string>
+    <string name="military_symbols_category_installations">设施</string>
+    <string name="military_symbols_category_activities">活动</string>
+    <string name="military_symbols_category_unit_size">单位规模</string>
+    <string name="military_symbols_category_aircraft">飞机</string>
+    <string name="military_symbols_category_helicopter">直升机</string>
+    <string name="military_symbols_category_ship">舰船</string>
+    <string name="military_symbols_category_vehicle">车辆</string>
+
+    <!-- Symbol Affiliations -->
+    <string name="military_symbols_affiliation_friendly">友军</string>
+    <string name="military_symbols_affiliation_hostile">敌军</string>
+    <string name="military_symbols_affiliation_neutral">中立</string>
+    <string name="military_symbols_affiliation_unknown">未知</string>
+
+    <!-- ROUTE CREATION -->
+    <string name="route_new_name_template">新建路线 %d</string>
+    <string name="route_autosaved_player_position_description">自动保存的玩家位置</string>
+    <string name="route_description_waypoints">包含 %d 个航路点的路线</string>
+
+    <string name="route_edit_title">编辑路线</string>
+    <string name="route_create_title">创建路线</string>
+    <string name="route_edit_name_content_description">编辑路线名称</string>
+    <string name="route_toggle_opacity_content_description">切换透明度</string>
+    <string name="route_opacity_label">透明度: %d%%</string>
+    <string name="route_instructions_add_waypoints">手动添加航路点，或点击地图上的位置</string>
+    <string name="route_instructions_lock_waypoints_title">锁定航路点以固定其位置</string>
+    <string name="route_instructions_lock_waypoints_message">锁定的航路点在优化路线时保持位置不变</string>
+    <string name="route_plan_fastest_button">规划最快路线</string>
+    <string name="route_no_candidates_message">未生成可选路线。</string>
+    <string name="route_candidate_format">%d) %.1f 海里</string>
+    <string name="route_waypoints_label">航路点 (%d)</string>
+    <string name="route_total_distance_format">%.1f 海里</string>
+    <string name="route_locked_waypoints_count">已锁定 %d 个</string>
+    <string name="route_finish_button">完成路线</string>
+    <string name="route_dialog_name_title">路线名称</string>
+    <string name="route_dialog_name_label">名称</string>
+    <string name="route_dialog_add_waypoint_title">添加航路点</string>
+    <string name="route_add_current_player_position">添加当前玩家的位置</string>
+    <string name="route_player_position_coordinates_format">%.4f, %.4f</string>
+    <string name="route_search_locations_label">搜索位置</string>
+    <string name="route_search_refine_message">... 还有 %d 个。请细化搜索。</string>
+
+    <string name="route_segment_hdg_distance_format">HDG %03.0f° • %.1f 海里</string>
+
+    <string name="route_waypoint_locked_content_description">已锁定 - 位置固定</string>
+    <string name="route_waypoint_unlocked_content_description">未锁定 - 可优化</string>
+    <string name="route_waypoint_runways_content_description">有 %d 条跑道</string>
+    <string name="route_waypoint_ils_content_description">配有 ILS</string>
+    <string name="route_waypoint_airport_content_description">机场</string>
+    <string name="route_waypoint_waypoint_content_description">航路点</string>
+    <string name="route_waypoint_tactical_unit_content_description">战术单位</string>
+    <string name="route_waypoint_target_content_description">目标</string>
+    <string name="route_waypoint_static_content_description">静态对象</string>
+    <string name="action_move_up">向上移动</string>
+    <string name="action_move_down">向下移动</string>
+
+    <!-- MapFlightInstruments -->
+    <string name="map_flight_instrument_no_data">无数据</string>
+    <string name="map_flight_instrument_attitude">姿态</string>
+    <string name="map_flight_instrument_mach_format">M%.2f</string>
+    <string name="map_flight_instrument_airspeed">空速</string>
+    <string name="map_flight_instrument_vert_speed">垂直速度</string>
+    <string name="map_flight_instrument_alt">ALT</string>
+    <string name="map_flight_instrument_agl">AGL</string>
+    <string name="map_flight_instrument_hdg">HDG</string>
+    <string name="map_flight_instrument_aoa">AoA</string>
+    <string name="map_flight_instrument_g_load_label">G</string>
+    <string name="map_flight_instrument_g_load">G-LOAD</string>
+    <string name="map_flight_instrument_fuel_placeholder">--</string>
+    <string name="map_flight_instrument_fuel_of_kg">共 %1$d kg</string>
+    <string name="map_flight_instrument_fuel">燃料</string>
+    <string name="map_flight_instrument_rpm">RPM</string>
+    <string name="map_flight_instrument_wind_unit_kts">kt</string>
+    <string name="map_flight_instrument_wind">风</string>
+    <string name="map_flight_instrument_cmds">CMDS</string>
+    <string name="map_flight_instrument_cardinal_n">N</string>
+    <string name="map_flight_instrument_cardinal_e">E</string>
+    <string name="map_flight_instrument_cardinal_s">S</string>
+    <string name="map_flight_instrument_cardinal_w">W</string>
+
+    <!-- MapNavigationDisplay -->
+    <string name="map_nav_route_to">航线至: %1$s</string>
+    <string name="map_nav_dist_nm">%1$.1f 海里</string>
+    <string name="map_nav_hdg">航向 %1$03.0f°</string>
+    <string name="map_nav_final">最后进近:</string>
+    <string name="map_nav_rwy">跑道 %1$03.0f°</string>
+    <string name="map_nav_pattern_alt">P:%1$d</string>
+    <string name="map_nav_alt_climb">需要爬升</string>
+    <string name="map_nav_alt_descend">需要下降</string>
+    <string name="map_nav_current_alt">C:%1$s</string>
+    <string name="map_nav_current_alt_unavailable">n/a</string>
+    <string name="map_nav_current_alt_ft">%1$d ft</string>
+    <string name="map_nav_approach_button">着陆进近</string>
+    <string name="map_nav_cancel_button">取消导航</string>
+    <string name="map_nav_select_runway">选择跑道</string>
+    <string name="map_nav_pattern_button">航线模式</string>
+    <string name="map_nav_final_dist_nm">最后进近 %1$s 海里</string>
+    <string name="map_nav_rwy_chip">跑道 %1$02d (%2$d°)</string>
+    <string name="map_nav_pattern_config">航线模式配置</string>
+    <string name="map_nav_pattern_size">尺寸:</string>
+    <string name="map_nav_pattern_size_desc">%1$s 海里 • %2$d 英尺 AGL</string>
+    <string name="map_nav_pattern_direction">方向:</string>
+    <string name="map_nav_pattern_dir_left">左</string>
+    <string name="map_nav_pattern_dir_right">右</string>
+    <string name="map_nav_final_length">最后进近长度:</string>
+    <string name="map_nav_pattern_final_dist_nm">%1$s 海里</string>
+    <string name="map_nav_pattern_final_desc_short">短 - 快速航线</string>
+    <string name="map_nav_pattern_final_desc_medium">中 - 标准</string>
+    <string name="map_nav_pattern_final_desc_long">长 - 更多准备时间</string>
+    <string name="map_nav_pattern_final_desc_very_long">非常长 - 训练用</string>
+    <string name="map_nav_alt_indicator_settings">高度指示器设置</string>
+    <string name="map_nav_level_tolerance_ft">平飞容差（英尺）</string>
+    <string name="map_nav_warn_tolerance_ft">警告容差（英尺）</string>
+    <string name="map_nav_pattern_details">盘旋航线详情</string>
+    <string name="map_nav_pattern_leg_departure">• 起飞段: 航向 %1$03d° • %2$.1f 海里</string>
+    <string name="map_nav_pattern_leg_crosswind">• 横风段: 航向 %1$03d° • %2$.1f 海里</string>
+    <string name="map_nav_pattern_leg_downwind">• 顺风段: 航向 %1$03d° • %2$.1f 海里</string>
+    <string name="map_nav_pattern_leg_base">• 基础段: 航向 %1$03d° • %2$.1f 海里 (在 %3$.1f 海里处转弯)</string>
+    <string name="map_nav_pattern_leg_final">• 最后进近: 航向 %1$03d° • %2$.1f 海里</string>
+    <string name="map_nav_pattern_size_label">盘旋尺寸</string>
+    
+    <!-- Landing Pattern for Tactical Markers -->
+    <string name="map_landing_pattern">着陆模式</string>
+    <string name="map_landing_pattern_desc">在无跑道情况下启用航线模式</string>
+    <string name="map_landing_heading">着陆航向 (°)</string>
+    <string name="map_landing_heading_hint">输入进近着陆航向 (0-360)</string>
+    <string name="map_landing_heading_error">无效的航向 (必须是0-360之间)</string>
+    <string name="map_nav_apply_heading">应用航向并显示航线</string>
+    <string name="map_nav_show_pattern">显示航线</string>
+    <string name="map_nav_pattern_alt_msl">航线高度: %1$d 英尺 MSL ✎</string>
+    <string name="map_nav_pattern_alt_agl">(%1$d 英尺 AGL + %2$d 英尺 场高)%3$s</string>
+    <string name="map_nav_pattern_alt_custom_suffix"> [自定义]</string>
+    <string name="map_nav_current_alt_label">当前: %1$s</string>
+    <string name="map_nav_transparency">透明度</string>
+    <string name="map_nav_resize_handle">拖动以调整大小</string>
+    <string name="map_nav_opacity_percent">%1$d%%</string>
+    <string name="map_nav_edit_pattern_alt_title">编辑盘旋高度 (AGL)</string>
+    <string name="map_nav_edit_pattern_alt_label">输入地面以上盘旋高度 (AGL)，单位英尺:</string>
+    <string name="map_nav_edit_pattern_alt_hint">高度 (英尺 AGL)</string>
+    <string name="map_nav_edit_pattern_alt_error">请输入500到5000英尺之间的值</string>
+    <string name="map_nav_edit_pattern_alt_info">常见盘旋高度: 1000-2000 英尺 AGL</string>
+    <string name="map_nav_reset_to_default">恢复默认值</string>
+    <string name="map_nav_approach_target_name">%1$s 跑道 %2$02d</string>
+
+    <!-- FlightMiniStatusBar -->
+    <string name="mini_status_bar_battery_level">电量 %1$d%%</string>
+    <string name="mini_status_bar_position_ok">位置正常</string>
+    <string name="mini_status_bar_interarrival_stats">%1$d/%2$d/%3$d毫秒</string>
+
+    <!-- Map Drawing Tools -->
+    <string name="map_drawing_tools_title">绘图工具</string>
+    <string name="map_drawing_active">✓ 绘图已启用</string>
+    <string name="map_drawing_close_cd">关闭</string>
+    <string name="map_drawing_brush_type">画笔类型</string>
+    <string name="map_drawing_brush_pen">钢笔</string>
+    <string name="map_drawing_brush_marker">记号笔</string>
+    <string name="map_drawing_brush_eraser">橡皮擦</string>
+    <string name="map_drawing_color">颜色</string>
+    <string name="map_drawing_eraser_size">橡皮擦大小</string>
+    <string name="map_drawing_brush_size">画笔大小</string>
+    <string name="map_drawing_clear_all_cd">全部清除</string>
+    <string name="map_drawing_clear">清除</string>
+    <string name="map_drawing_confirm_clear_title">确认清除</string>
+    <string name="map_drawing_confirm_clear_message">这将从地图上移除所有绘图。您确定吗？</string>
+    <string name="map_drawing_confirm_clear_second_title">再次确认清除</string>
+    <string name="map_drawing_confirm_clear_second_message">此操作不可撤销。点击“确认”以删除所有绘图。</string>
+    <string name="map_drawing_confirm_clear_positive">确认</string>
+    <string name="map_drawing_confirm_clear_negative">取消</string>
+    <string name="map_drawing_save_cd">保存</string>
+    <string name="map_drawing_save">保存</string>
+    <string name="map_drawing_color_selected_cd">已选中</string>
+    <!-- Map Overlays -->
+    <string name="map_overlay_mgrs_grid">MGRS 网格</string>
+    <string name="map_overlay_mgrs_grid_desc">军用网格参考系统叠加层</string>
+    <string name="map_overlay_flight_instruments">飞行仪表</string>
+    <string name="map_overlay_flight_instruments_desc">实时姿态和转弯指示器（可拖动以重新定位）</string>
+    <string name="map_overlay_flight_path">飞行轨迹</string>
+    <string name="map_overlay_flight_path_desc">记录并显示飞机位置历史</string>
+    <string name="map_overlay_flight_path_points">%d 点已记录</string>
+    <string name="map_overlay_flight_path_clear">清除轨迹</string>
+    <string name="map_overlay_flight_path_start">开始记录</string>
+    <string name="map_overlay_flight_path_pause">暂停记录</string>
+    <string name="map_overlay_flight_path_interval">记录间隔</string>
+    <string name="map_overlay_flight_path_interval_desc">每 %d 秒记录一次位置</string>
+    <string name="map_flight_path_start">起点</string>
+    <string name="map_flight_path_cleared">飞行轨迹已清除</string>
+    <!-- Map Marker Management -->
+    <string name="map_search_markers_placeholder">搜索标记</string>
+    <string name="map_frequency_placeholder">118.50</string>
+    <string name="map_marker_manage">管理</string>
+
+    <string name="map_marker_type">类型</string>
+    <string name="map_marker_icao">ICAO</string>
+    <string name="map_marker_iata">IATA</string>
+    <string name="map_marker_map">地图</string>
+    <string name="map_filter_all_maps">全部地图</string>
+    <string name="map_marker_country">国家</string>
+    <string name="map_marker_region">地区</string>
+    <string name="map_marker_timezone">时区</string>
+    <string name="map_marker_elevation">海拔</string>
+    <string name="map_marker_unit">单位</string>
+    <string name="map_marker_threat">威胁</string>
+    <string name="map_marker_strength">强度</string>
+    <string name="map_marker_source">来源</string>
+    <string name="map_marker_verified">已验证</string>
+    <string name="map_marker_verified_at">验证时间</string>
+    <string name="map_marker_tags">标签</string>
+    <string name="map_marker_runways">跑道</string>
+    <string name="map_marker_frequencies">频率</string>
+    <string name="map_marker_elevation_m">%s 米</string>
+    <string name="map_marker_hdg_format">航向: %s</string>
+    <string name="map_marker_ils_format">ILS %s</string>
+    <string name="map_marker_lighting">助航灯光</string>
+    <string name="map_marker_verified_yes">是</string>
+    <string name="map_marker_verified_no">否</string>
+    <string name="map_marker_hdg_na">不可用</string>
+
+    <!-- Map Radial Menu -->
+    <string name="map_radial_menu_info">信息</string>
+    <string name="map_radial_menu_edit">编辑</string>
+    <string name="map_radial_menu_navigate">导航</string>
+    <string name="map_radial_menu_delete">删除</string>
+    <string name="map_label_degrees">%s°</string>
+    <string name="map_label_hdg_degrees">航向 %s°</string>
+    <string name="map_label_nm">%d 海里</string>
+    <string name="map_radial_menu_scale">比例</string>
+    <string name="map_radial_menu_alpha">透明度</string>
+    <string name="map_radial_menu_brush">画笔</string>
+    <string name="map_radial_menu_color">颜色</string>
+    <string name="map_radial_menu_eraser">橡皮擦</string>
+    <!-- FAB Content Descriptions -->
+    <string name="fab_cd_center_on_position">定位到中心</string>
+    <string name="fab_cd_add_military_symbol">添加军事符号</string>
+    <string name="fab_cd_markers_routes">标记和路线</string>
+    <string name="fab_cd_toggle_map_rotation">切换地图旋转</string>
+    <string name="fab_cd_toggle_rotation_gesture">切换两指旋转手势</string>
+    <string name="fab_cd_quick_tab_switch">快速标签切换</string>
+    <string name="fab_cd_open_menu">打开菜单</string>
+    <string name="fab_cd_reset_zoom">重置缩放</string>
+    <string name="fab_cd_file_list">文件列表</string>
+    <string name="fab_cd_menu">菜单</string>
+    <string name="fab_positions_reset">FAB 位置重置</string>
+    <string name="map_drawing_saved">绘图已保存</string>
+    <string name="map_db_not_ready_retry">地图数据库尚未准备好 — 请再次点击重试。</string>
+
+    <!-- Tactical Units -->
+    <string name="tactical_title">战术单位</string>
+    <string name="tactical_adjust_opacity">调整透明度</string>
+    <string name="tactical_delete_inactive">删除非活动单位</string>
+    <string name="tactical_delete_old">删除旧单位 (&gt;1小时)</string>
+    <string name="tactical_delete_all">删除所有单位</string>
+    <string name="tactical_delete_all_confirm_title">删除所有单位？</string>
+    <string name="tactical_delete_all_confirm_message">这将删除所有跟踪的单位及其历史记录。此操作无法撤销。</string>
+    <string name="tactical_opacity_label">透明度: %1$d%%</string>
+    <string name="tactical_live_only">仅实时</string>
+    <string name="tactical_search_placeholder">按名称或组搜索...</string>
+    <string name="tactical_advanced_filters">高级筛选</string>
+    <string name="tactical_entity_tracking">实体跟踪</string>
+    <string name="tactical_receiving">接收战术单位</string>
+    <string name="tactical_tracking_disabled">跟踪已禁用</string>
+    <string name="tactical_unit_visibility_on_map">地图上的单位可见性</string>
+    <string name="tactical_units_visible_on_map">单位在地图上可见</string>
+    <string name="tactical_units_visible_on_map_history">单位在地图上可见（显示历史）</string>
+    <string name="tactical_unit_visibility_on_map_history_tooltip">当实体跟踪被禁用时，地图仍然可以显示单位的历史/最后已知位置。</string>
+    <string name="tactical_units_hidden_on_map">单位在地图上隐藏</string>
+    <string name="tactical_map_update_interval">地图更新间隔</string>
+    <string name="tactical_map_update_explain">数值越低越流畅，数值越高性能越好</string>
+    <string name="tactical_active_units_label">活动单位: %1$d</string>
+    <string name="tactical_coalition_neutral">中立</string>
+    <string name="tactical_coalition_red">红方</string>
+    <string name="tactical_coalition_blue">蓝方</string>
+    <string name="category_aircraft">飞机</string>
+    <string name="category_heli">直升机</string>
+    <string name="category_ground">地面</string>
+    <string name="category_ship">舰船</string>
+    <string name="category_structure">结构</string>
+    <string name="category_weapon">武器</string>
+    <string name="status_active">活动中</string>
+    <string name="status_lost_contact">失去联系</string>
+    <string name="empty_no_units_found">未找到单位</string>
+    <string name="empty_start_datapad_hint">启动 DCS 并启用 DataPad 以跟踪单位</string>
+    <string name="filter_title">筛选单位</string>
+    <string name="filter_show_active_only">仅显示活动单位</string>
+    <string name="filter_categories_title">分类</string>
+    <string name="filter_coalitions_title">阵营</string>
+    <string name="tactical_done">完成</string>
+    <string name="unit_dist_label">距离:</string>
+    <string name="unit_brg_label">方位:</string>
+    <string name="unit_spd_label">速度:</string>
+    <string name="unit_last_seen_label">最后出现:</string>
+    <string name="unit_group_label">编组:</string>
+    <string name="coords_title">坐标</string>
+    <string name="lat_label">纬度</string>
+    <string name="lon_label">经度</string>
+    <string name="alt_label">高度</string>
+    <string name="na_label">无</string>
+    <string name="navigation_title">导航</string>
+    <string name="heading_label">航向</string>
+    <string name="speed_label">速度</string>
+    <string name="distance_label">距离</string>
+    <string name="bearing_label">方位</string>
+    <string name="tracking_info_title">跟踪信息</string>
+    <string name="first_seen_label">首次出现:</string>
+    <string name="last_seen_label">最后出现:</string>
+    <string name="dcs_id_label">DCS ID:</string>
+    <string name="pilot_info_title">飞行员信息</string>
+    <string name="pilot_label">飞行员:</string>
+    <string name="center_on_map">在地图上居中</string>
+    <string name="tactical_options">选项</string>
+    <string name="tactical_time_seconds">%1$ds 秒前</string>
+    <string name="tactical_time_minutes">%1$dm 分钟前</string>
+    <string name="tactical_time_hours">%1$dh 小时前</string>
+    <string name="tactical_time_unknown">未知</string>
+
+</resources>
