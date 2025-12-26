@@ -1138,6 +1138,14 @@
     <string name="map_nav_pattern_leg_base">• Base: HDG %1$03d° • %2$.1f NM (giro en %3$.1f NM)</string>
     <string name="map_nav_pattern_leg_final">• Final: HDG %1$03d° • %2$.1f NM</string>
     <string name="map_nav_pattern_size_label">Tamaño Patrón</string>
+    
+    <!-- Landing Pattern for Tactical Markers -->
+    <string name="map_landing_pattern">Patrón de Aterrizaje</string>
+    <string name="map_landing_pattern_desc">Activar circuito sin pista</string>
+    <string name="map_landing_heading">Rumbo de Aterrizaje (°)</string>
+    <string name="map_landing_heading_hint">Ingrese rumbo para aproximación (0-360)</string>
+    <string name="map_landing_heading_error">Rumbo inválido (debe ser 0-360)</string>
+    <string name="map_nav_apply_heading">Aplicar Rumbo y Mostrar Patrón</string>
     <string name="map_nav_show_pattern">Mostrar patrón</string>
     <string name="map_nav_pattern_alt_msl">Altitud Patrón: %1$d ft MSL ✎</string>
     <string name="map_nav_pattern_alt_agl">(%1$d ft AGL + %2$d ft elev campo)%3$s</string>
