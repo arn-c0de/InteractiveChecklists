@@ -45,6 +45,7 @@ import com.example.checklist_interactive.ui.maps.navigation.PatternSize
 import com.example.checklist_interactive.R
 import org.osmdroid.util.GeoPoint
 import kotlin.math.abs
+import android.util.Log
 
 /**
  * Active Navigation Display - Shows route information and runway approach options
@@ -90,11 +91,23 @@ fun MapNavigationDisplay(
     onPatternAltitudeSmallToleranceFtChange: (Double) -> Unit,
     patternAltitudeWarningToleranceFt: Double,
     onPatternAltitudeWarningToleranceFtChange: (Double) -> Unit,
-    saveNavigationState: () -> Unit
+    saveNavigationState: () -> Unit,
+    // Manual landing pattern state (for markers without runways)
+    enableManualLandingPattern: Boolean,
+    onEnableManualLandingPatternChange: (Boolean) -> Unit,
+    manualLandingHeading: String,
+    onManualLandingHeadingChange: (String) -> Unit,
+    showManualHeadingError: Boolean,
+    onShowManualHeadingErrorChange: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
+
+    // Debug log for manual landing pattern changes
+    LaunchedEffect(enableManualLandingPattern) {
+        Log.d("MapNavigationDisplay", "manualLanding toggled: $enableManualLandingPattern")
+    }
     
     // Persistent height fraction (0.0 to 1.0 of screen height)
     val prefs = context.getSharedPreferences("map_navigation_prefs", Context.MODE_PRIVATE)
@@ -114,12 +127,42 @@ fun MapNavigationDisplay(
     val savedOpacity = prefs.getFloat(KEY_OPACITY, 1.0f)
     var cardOpacity by rememberSaveable { mutableStateOf(savedOpacity.coerceIn(0.25f, 1.0f)) }
     var showOpacitySlider by remember { mutableStateOf(false) }
-    
+
+    // Manual landing details collapse state (hoisted so other controls can sync it)
+    var showManualLandingDetails by rememberSaveable { mutableStateOf(showNavigationDetails) }
+
     // Persist opacity when changed
     LaunchedEffect(cardOpacity) {
         prefs.edit().putFloat(KEY_OPACITY, cardOpacity).apply()
     }
-    
+
+    // Sync manual landing collapse with the navigation panel collapse/expand
+    LaunchedEffect(showNavigationDetails) {
+        if (!showNavigationDetails) {
+            // When the navigation panel collapses, collapse all expandable sub-sections
+            showManualLandingDetails = false
+            onShowTrafficPatternChange(false)
+            onShowPatternDetailsChange(false)
+            Log.d("MapNavigationDisplay", "Navigation collapsed -> collapsing manual/pattern details")
+        } else if (showNavigationDetails && showRunwayApproach) {
+            // If the panel expands while landing is active, expand manual landing details
+            showManualLandingDetails = true
+        }
+    }
+
+    // When landing mode toggles, expand or collapse related UI
+    LaunchedEffect(showRunwayApproach) {
+        if (showRunwayApproach) {
+            onShowNavigationDetailsChange(true)
+            showManualLandingDetails = true
+            onShowTrafficPatternChange(true)
+            onShowPatternDetailsChange(true)
+            Log.d("MapNavigationDisplay", "Landing enabled -> expanding manual/pattern details")
+        } else {
+            showManualLandingDetails = false
+        }
+    }
+
     val cardHeightDp = (configuration.screenHeightDp.toFloat() * heightFraction).dp
     
     if (activeNavigationTarget != null) {
@@ -336,33 +379,56 @@ fun MapNavigationDisplay(
                             )
                         }
 
-                        // Land button (only show if target has runways)
-                        if (targetRunways.isNotEmpty()) {
-                            FilledTonalIconButton(
-                                onClick = {
-                                    onShowRunwayApproachChange(!showRunwayApproach)
-                                    if (!showRunwayApproach) {
-                                        onSelectedRunwayIndexChange(null)
-                                        onSelectedRunwayHeadingChange(null)
-                                        onSelectedRunwayChange(null)
+                        // Land button (show always, allows manual pattern for markers without runways)
+                        FilledTonalIconButton(
+                            onClick = {
+                                val newVal = !showRunwayApproach
+                                Log.d("MapNavigationDisplay", "Land clicked: newVal=$newVal targetRunwaysEmpty=${targetRunways.isEmpty()} showNavigationDetails=$showNavigationDetails enableManual=$enableManualLandingPattern")
+                                onShowRunwayApproachChange(newVal)
+                                // Ensure details are expanded so user sees the heading UI
+                                if (newVal) {
+                                    onShowNavigationDetailsChange(true)
+                                    // Set originalAirportTarget to current navigation target if not already set
+                                    if (originalAirportTarget == null && activeNavigationTarget != null) {
+                                        onOriginalAirportTargetChange(activeNavigationTarget)
+                                        Log.d("MapNavigationDisplay", "Set originalAirportTarget to ${activeNavigationTarget?.name}")
                                     }
-                                },
-                                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                    containerColor = if (showRunwayApproach)
-                                        MaterialTheme.colorScheme.primary
-                                    else
-                                        MaterialTheme.colorScheme.surfaceVariant,
-                                    contentColor = if (showRunwayApproach)
-                                        MaterialTheme.colorScheme.onPrimary
-                                    else
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.FlightLand,
-                                    contentDescription = stringResource(R.string.map_nav_approach_button)
-                                )
-                            }
+                                    // Expand manual/pattern sections
+                                    showManualLandingDetails = true
+                                    onShowTrafficPatternChange(true)
+                                    onShowPatternDetailsChange(true)
+                                } else {
+                                    // Collapse manual/pattern sections when landing disabled
+                                    showManualLandingDetails = false
+                                    onShowTrafficPatternChange(false)
+                                    onShowPatternDetailsChange(false)
+                                }
+                                // If there are no runways, enable manual landing pattern immediately
+                                if (newVal && targetRunways.isEmpty()) {
+                                    Log.d("MapNavigationDisplay", "Enabling manual landing pattern (no runways)")
+                                    onEnableManualLandingPatternChange(true)
+                                }
+                                if (!newVal) {
+                                    onSelectedRunwayIndexChange(null)
+                                    onSelectedRunwayHeadingChange(null)
+                                    onSelectedRunwayChange(null)
+                                }
+                            },
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = if (showRunwayApproach)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = if (showRunwayApproach)
+                                    MaterialTheme.colorScheme.onPrimary
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FlightLand,
+                                contentDescription = stringResource(R.string.map_nav_approach_button)
+                            )
                         }
 
                         // Cancel button
@@ -389,7 +455,7 @@ fun MapNavigationDisplay(
 
                 // Collapsible details section (scrollable)
                 AnimatedVisibility(
-                    visible = showNavigationDetails,
+                    visible = showNavigationDetails || enableManualLandingPattern,
                     enter = expandVertically() + fadeIn(),
                     exit = shrinkVertically() + fadeOut()
                 ) {
@@ -1187,6 +1253,603 @@ fun MapNavigationDisplay(
                                 Spacer(modifier = Modifier.height(8.dp))
                                 // Runways moved into Pattern Configuration above
                                 // (previously displayed when approach mode was active)
+                            }
+                        }
+
+                        // Manual Landing Pattern (for markers without runways - tactical units, carriers, etc.)
+                        if (showRunwayApproach && targetRunways.isEmpty()) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.2f))
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp)
+                            ) {
+                                // Header with collapse button
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { showManualLandingDetails = !showManualLandingDetails },
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.map_landing_pattern),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // Pattern button (always visible)
+                                        Button(
+                                            onClick = { onShowTrafficPatternChange(!showTrafficPattern) },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = if (showTrafficPattern) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                                                contentColor = if (showTrafficPattern) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                                            ),
+                                            modifier = Modifier.height(28.dp),
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                                        ) {
+                                            Text(
+                                                text = stringResource(R.string.map_nav_pattern_button),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontSize = 11.sp
+                                            )
+                                        }
+
+                                        // Collapse/expand button
+                                        IconButton(
+                                            onClick = { showManualLandingDetails = !showManualLandingDetails },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = if (showManualLandingDetails) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                contentDescription = if (showManualLandingDetails) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Collapsible content
+                                AnimatedVisibility(
+                                    visible = showManualLandingDetails,
+                                    enter = expandVertically() + fadeIn(),
+                                    exit = shrinkVertically() + fadeOut()
+                                ) {
+                                    Column {
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        // Final approach distance dropdown
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = stringResource(R.string.map_nav_final_length),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onErrorContainer
+                                            )
+
+                                            var expanded by remember { mutableStateOf(false) }
+                                            val distances = listOf(2.5, 5.0, 10.0, 15.0, 25.0)
+
+                                            Box {
+                                                FilterChip(
+                                                    selected = false,
+                                                    onClick = { expanded = !expanded },
+                                                    label = {
+                                                        Text(
+                                                            text = stringResource(R.string.map_nav_final_dist_nm, finalApproachDistanceNm.let { if (it == it.toInt().toDouble()) it.toInt().toString() else it.toString() }),
+                                                            style = MaterialTheme.typography.labelSmall
+                                                        )
+                                                    },
+                                                    trailingIcon = {
+                                                        Icon(
+                                                            imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                            contentDescription = null,
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                    },
+                                                    modifier = Modifier.height(28.dp)
+                                                )
+
+                                                DropdownMenu(
+                                                    expanded = expanded,
+                                                    onDismissRequest = { expanded = false }
+                                                ) {
+                                                    distances.forEach { dist ->
+                                                        DropdownMenuItem(
+                                                            text = {
+                                                                Text(
+                                                                    text = "${if (dist == dist.toInt().toDouble()) dist.toInt().toString() else dist.toString()} NM Final",
+                                                                    style = MaterialTheme.typography.bodySmall
+                                                                )
+                                                            },
+                                                            onClick = {
+                                                                onFinalApproachDistanceNmChange(dist)
+                                                                expanded = false
+                                                            }
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                                Spacer(modifier = Modifier.height(8.dp))
+
+                                        // Heading input field
+                                        androidx.compose.material3.OutlinedTextField(
+                                    value = manualLandingHeading,
+                                    onValueChange = { newValue ->
+                                        onManualLandingHeadingChange(newValue)
+                                        onShowManualHeadingErrorChange(false)
+                                    },
+                                    label = { Text(stringResource(R.string.map_landing_heading)) },
+                                    placeholder = { Text("000 - 360") },
+                                    singleLine = true,
+                                    isError = showManualHeadingError,
+                                    supportingText = if (showManualHeadingError) {
+                                        { Text(stringResource(R.string.map_landing_heading_error)) }
+                                    } else {
+                                        { Text(stringResource(R.string.map_landing_heading_hint)) }
+                                    },
+                                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                                    ),
+                                    trailingIcon = {
+                                        Text(
+                                            text = "°",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                    },
+                                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = MaterialTheme.colorScheme.onErrorContainer,
+                                        unfocusedBorderColor = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.5f),
+                                        focusedLabelColor = MaterialTheme.colorScheme.onErrorContainer,
+                                        unfocusedLabelColor = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f),
+                                        cursorColor = MaterialTheme.colorScheme.onErrorContainer
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+
+                                // Apply button (validate and set heading)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = {
+                                        val heading = manualLandingHeading.toDoubleOrNull()
+                                        Log.d("MapNavigationDisplay", "Apply clicked: heading=$heading, valid=${heading != null && heading >= 0.0 && heading <= 360.0}, originalTarget=${originalAirportTarget?.name}")
+                                        if (heading != null && heading >= 0.0 && heading <= 360.0) {
+                                            onSelectedRunwayHeadingChange(heading)
+                                            Log.d("MapNavigationDisplay", "Heading set to $heading")
+                                            
+                                            // Calculate approach endpoint like runway approach
+                                            val target = originalAirportTarget
+                                            if (target != null) {
+                                                val distanceMeters = finalApproachDistanceNm * 1852.0
+                                                val rad = Math.toRadians(heading)
+                                                val lat1 = Math.toRadians(target.latitude)
+                                                val lon1 = Math.toRadians(target.longitude)
+                                                val dLat = distanceMeters * Math.cos(rad) / 6371000.0
+                                                val dLon = distanceMeters * Math.sin(rad) / (6371000.0 * Math.cos(lat1))
+                                                val endLat = lat1 + dLat
+                                                val endLon = lon1 + dLon
+                                                val endpoint = GeoPoint(Math.toDegrees(endLat), Math.toDegrees(endLon))
+
+                                                // Update navigation to approach endpoint (red line will auto-update)
+                                                val approachTarget = target.copy(
+                                                    id = -1,
+                                                    name = context.getString(R.string.map_nav_approach_target_name, target.name, heading.toInt()),
+                                                    latitude = endpoint.latitude,
+                                                    longitude = endpoint.longitude
+                                                )
+                                                onActiveNavigationTargetChange(approachTarget)
+                                                Log.d("MapNavigationDisplay", "Approach target set: ${approachTarget.name} at ${endpoint.latitude},${endpoint.longitude}")
+                                            } else {
+                                                Log.d("MapNavigationDisplay", "No original airport target - cannot calculate approach endpoint")
+                                            }
+                                            
+                                            onShowRunwayApproachChange(true)
+                                            onShowManualHeadingErrorChange(false)
+                                            saveNavigationState()
+                                            Log.d("MapNavigationDisplay", "Navigation state saved")
+                                        } else {
+                                            onShowManualHeadingErrorChange(true)
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary
+                                    )
+                                ) {
+                                    Icon(Icons.Default.FlightLand, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(R.string.map_nav_apply_heading))
+                                }
+
+                                // Pattern configuration (when pattern mode active)
+                                if (showTrafficPattern) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.2f))
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Text(
+                                        text = stringResource(R.string.map_nav_pattern_config),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
+                                    )
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    // Pattern size selector
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.map_nav_pattern_size),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+
+                                        var sizeExpanded by remember { mutableStateOf(false) }
+                                        Box {
+                                            FilterChip(
+                                                selected = false,
+                                                onClick = { sizeExpanded = !sizeExpanded },
+                                                label = {
+                                                    Text(
+                                                        text = patternSize.displayName,
+                                                        style = MaterialTheme.typography.labelSmall
+                                                    )
+                                                },
+                                                trailingIcon = {
+                                                    Icon(
+                                                        imageVector = if (sizeExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                },
+                                                modifier = Modifier.height(28.dp)
+                                            )
+
+                                            DropdownMenu(
+                                                expanded = sizeExpanded,
+                                                onDismissRequest = { sizeExpanded = false }
+                                            ) {
+                                                PatternSize.values().forEach { size ->
+                                                    DropdownMenuItem(
+                                                        text = {
+                                                            Column {
+                                                                Text(
+                                                                    text = size.displayName,
+                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                    fontWeight = FontWeight.Bold
+                                                                )
+                                                                Text(
+                                                                    text = stringResource(R.string.map_nav_pattern_size_desc, size.downwindDistanceNm, size.patternAltitudeAglFt),
+                                                                    style = MaterialTheme.typography.labelSmall,
+                                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                                                )
+                                                            }
+                                                        },
+                                                        onClick = {
+                                                            onPatternSizeChange(size)
+                                                            sizeExpanded = false
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    // Pattern direction selector
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.map_nav_pattern_direction),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            FilterChip(
+                                                selected = patternDirection == PatternDirection.LEFT_HAND,
+                                                onClick = { onPatternDirectionChange(PatternDirection.LEFT_HAND) },
+                                                label = {
+                                                    Text(
+                                                        text = "Left",
+                                                        style = MaterialTheme.typography.labelSmall
+                                                    )
+                                                },
+                                                modifier = Modifier.height(28.dp)
+                                            )
+
+                                            FilterChip(
+                                                selected = patternDirection == PatternDirection.RIGHT_HAND,
+                                                onClick = { onPatternDirectionChange(PatternDirection.RIGHT_HAND) },
+                                                label = {
+                                                    Text(
+                                                        text = "Right",
+                                                        style = MaterialTheme.typography.labelSmall
+                                                    )
+                                                },
+                                                modifier = Modifier.height(28.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    // Final approach distance selector
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.map_nav_final_length),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+
+                                        var finalExpanded by remember { mutableStateOf(false) }
+                                        val finalDistances = listOf(0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0)
+
+                                        Box {
+                                            FilterChip(
+                                                selected = false,
+                                                onClick = { finalExpanded = !finalExpanded },
+                                                label = {
+                                                    Text(
+                                                        text = stringResource(R.string.map_nav_pattern_final_dist_nm, patternFinalDistanceNm.let { if (it == it.toInt().toDouble()) it.toInt().toString() else it.toString() }),
+                                                        style = MaterialTheme.typography.labelSmall
+                                                    )
+                                                },
+                                                trailingIcon = {
+                                                    Icon(
+                                                        imageVector = if (finalExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                },
+                                                modifier = Modifier.height(28.dp)
+                                            )
+
+                                            DropdownMenu(
+                                                expanded = finalExpanded,
+                                                onDismissRequest = { finalExpanded = false }
+                                            ) {
+                                                finalDistances.forEach { dist ->
+                                                    DropdownMenuItem(
+                                                        text = {
+                                                            Column {
+                                                                Text(
+                                                                    text = stringResource(R.string.map_nav_final_dist_nm, if (dist == dist.toInt().toDouble()) dist.toInt().toString() else dist.toString()),
+                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                    fontWeight = FontWeight.Bold
+                                                                )
+                                                                Text(
+                                                                    text = when {
+                                                                        dist <= 1.0 -> stringResource(R.string.map_nav_pattern_final_desc_short)
+                                                                        dist <= 3.0 -> stringResource(R.string.map_nav_pattern_final_desc_medium)
+                                                                        dist <= 5.0 -> stringResource(R.string.map_nav_pattern_final_desc_long)
+                                                                        else -> stringResource(R.string.map_nav_pattern_final_desc_very_long)
+                                                                    },
+                                                                    style = MaterialTheme.typography.labelSmall,
+                                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                                                )
+                                                            }
+                                                        },
+                                                        onClick = {
+                                                            onPatternFinalDistanceNmChange(dist)
+                                                            finalExpanded = false
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    // Collapsible altitude threshold settings
+                                    var showAltThresholdSettings by remember { mutableStateOf(false) }
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                                    ) {
+                                        Column(modifier = Modifier.padding(8.dp)) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clickable { showAltThresholdSettings = !showAltThresholdSettings }
+                                                    .padding(vertical = 4.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text(
+                                                    text = stringResource(R.string.map_nav_alt_indicator_settings),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+
+                                                IconButton(onClick = { showAltThresholdSettings = !showAltThresholdSettings }) {
+                                                    Icon(
+                                                        imageVector = if (showAltThresholdSettings) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                        contentDescription = if (showAltThresholdSettings) "Collapse" else "Expand"
+                                                    )
+                                                }
+                                            }
+
+                                            AnimatedVisibility(
+                                                visible = showAltThresholdSettings,
+                                                enter = expandVertically() + fadeIn(),
+                                                exit = shrinkVertically() + fadeOut()
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    var smallTolText by remember { mutableStateOf(patternAltitudeSmallToleranceFt.toInt().toString()) }
+                                                    var warnTolText by remember { mutableStateOf(patternAltitudeWarningToleranceFt.toInt().toString()) }
+
+                                                    OutlinedTextField(
+                                                        value = smallTolText,
+                                                        onValueChange = { v ->
+                                                            smallTolText = v.filter { it.isDigit() }
+                                                            val intVal = smallTolText.toIntOrNull()
+                                                            if (intVal != null) {
+                                                                onPatternAltitudeSmallToleranceFtChange(intVal.toDouble())
+                                                                saveNavigationState()
+                                                            }
+                                                        },
+                                                        label = { Text(stringResource(R.string.map_nav_level_tolerance_ft)) },
+                                                        singleLine = true,
+                                                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                                                        modifier = Modifier.weight(1f)
+                                                    )
+
+                                                    OutlinedTextField(
+                                                        value = warnTolText,
+                                                        onValueChange = { v ->
+                                                            warnTolText = v.filter { it.isDigit() }
+                                                            val intVal = warnTolText.toIntOrNull()
+                                                            if (intVal != null) {
+                                                                onPatternAltitudeWarningToleranceFtChange(intVal.toDouble())
+                                                                saveNavigationState()
+                                                            }
+                                                        },
+                                                        label = { Text(stringResource(R.string.map_nav_warn_tolerance_ft)) },
+                                                        singleLine = true,
+                                                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                                                        modifier = Modifier.weight(1f)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    // Pattern details header with collapsible body
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.map_nav_pattern_details),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        IconButton(onClick = { onShowPatternDetailsChange(!showPatternDetails) }) {
+                                            Icon(
+                                                imageVector = if (showPatternDetails) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                contentDescription = if (showPatternDetails) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand)
+                                            )
+                                        }
+                                    }
+
+                                    AnimatedVisibility(
+                                        visible = showPatternDetails,
+                                        enter = expandVertically() + fadeIn(),
+                                        exit = shrinkVertically() + fadeOut()
+                                    ) {
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                            )
+                                        ) {
+                                            Column(
+                                                modifier = Modifier.padding(8.dp),
+                                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                // Use same multipliers as the generator to keep UI and calculations consistent
+                                                val sizeScale = when (patternSize) {
+                                                    PatternSize.NORMAL -> 1.25
+                                                    PatternSize.MEDIUM -> 1.5
+                                                    PatternSize.LARGE -> 1.75
+                                                    PatternSize.VERY_LARGE -> 2.25
+                                                    PatternSize.EXTRA_LARGE -> 3.0
+                                                }
+                                                val turnMultiplier = if (patternDirection == PatternDirection.LEFT_HAND) -1 else 1
+                                                val runwayHeading = selectedRunwayHeading ?: manualLandingHeading.toDoubleOrNull() ?: 0.0
+
+                                                // Compute canonical headings for each leg using runwayHeading and turn direction
+                                                val departureHdg = normalizeHeading(runwayHeading)
+                                                val crosswindHdg = normalizeHeading(runwayHeading + (90.0 * turnMultiplier))
+                                                val downwindHdg = normalizeHeading(runwayHeading + 180.0)
+                                                val baseLegHdg = normalizeHeading(downwindHdg + (90.0 * turnMultiplier))
+                                                val finalHdg = normalizeHeading(runwayHeading)
+
+                                                val departureHdgInt = departureHdg.toInt()
+                                                val crosswindHdgInt = crosswindHdg.toInt()
+                                                val downwindHdgInt = downwindHdg.toInt()
+                                                val baseLegHdgInt = baseLegHdg.toInt()
+                                                val finalHdgInt = finalHdg.toInt()
+
+                                                Text(
+                                                    text = stringResource(R.string.map_nav_pattern_leg_departure, departureHdgInt, (0.5 * sizeScale).toFloat()),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontSize = 11.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+
+                                                Text(
+                                                    text = stringResource(R.string.map_nav_pattern_leg_crosswind, crosswindHdgInt, (patternSize.downwindDistanceNm * sizeScale).toFloat()),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontSize = 11.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+
+                                                val downwindLengthNm = 2.0 / 1852.0 + patternFinalDistanceNm + (0.5 * sizeScale) // Default 2km runway length
+                                                Text(
+                                                    text = stringResource(R.string.map_nav_pattern_leg_downwind, downwindHdgInt, downwindLengthNm.toFloat()),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontSize = 11.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+
+                                                val baseExtensionNm = (0.3 + (patternFinalDistanceNm * 0.2)) * sizeScale
+                                                Text(
+                                                    text = stringResource(R.string.map_nav_pattern_leg_base, baseLegHdgInt, (patternSize.downwindDistanceNm * sizeScale).toFloat(), baseExtensionNm.toFloat()),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontSize = 11.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+
+                                                Text(
+                                                    text = stringResource(R.string.map_nav_pattern_leg_final, finalHdgInt, patternFinalDistanceNm.toFloat()),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontSize = 11.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    }
+                                        }
+                                    } // End AnimatedVisibility (manual landing details)
+                                }
                             }
                         }
                     }

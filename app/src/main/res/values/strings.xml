@@ -1048,6 +1048,14 @@
     <string name="map_nav_pattern_leg_base">• Base: HDG %1$03d° • %2$.1f NM (turn at %3$.1f NM)</string>
     <string name="map_nav_pattern_leg_final">• Final: HDG %1$03d° • %2$.1f NM</string>
     <string name="map_nav_pattern_size_label">Pattern Size</string>
+    
+    <!-- Landing Pattern for Tactical Markers -->
+    <string name="map_landing_pattern">Landing Pattern</string>
+    <string name="map_landing_pattern_desc">Enable traffic pattern without runway</string>
+    <string name="map_landing_heading">Landing Heading (°)</string>
+    <string name="map_landing_heading_hint">Enter heading for landing approach (0-360)</string>
+    <string name="map_landing_heading_error">Invalid heading (must be 0-360)</string>
+    <string name="map_nav_apply_heading">Apply Heading &amp; Show Pattern</string>
     <string name="map_nav_show_pattern">Show pattern</string>
     <string name="map_nav_pattern_alt_msl">Pattern Altitude: %1$d ft MSL ✎</string>
     <string name="map_nav_pattern_alt_agl">(%1$d ft AGL + %2$d ft field elev)%3$s</string>

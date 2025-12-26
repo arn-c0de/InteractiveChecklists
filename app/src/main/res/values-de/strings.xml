@@ -1014,6 +1014,14 @@
     <string name="map_nav_pattern_leg_base">• Endanflug: HDG %1$03d° • %2$.1f NM (Kurve bei %3$.1f NM)</string>
     <string name="map_nav_pattern_leg_final">• Final: HDG %1$03d° • %2$.1f NM</string>
     <string name="map_nav_pattern_size_label">Platzr. Größe</string>
+    
+    <!-- Landing Pattern for Tactical Markers -->
+    <string name="map_landing_pattern">Landemuster</string>
+    <string name="map_landing_pattern_desc">Platzrunde ohne Runway aktivieren</string>
+    <string name="map_landing_heading">Landerichtung (°)</string>
+    <string name="map_landing_heading_hint">Kurs für Landeanflug eingeben (0-360)</string>
+    <string name="map_landing_heading_error">Ungültiger Kurs (muss 0-360 sein)</string>
+    <string name="map_nav_apply_heading">Kurs anwenden &amp; Pattern anzeigen</string>
     <string name="map_nav_show_pattern">Platzrunde zeigen</string>
     <string name="map_nav_pattern_alt_msl">Platzr. Höhe: %1$d ft MSL ✎</string>
     <string name="map_nav_pattern_alt_agl">(%1$d ft AGL + %2$d ft Platzhöhe)%3$s</string>

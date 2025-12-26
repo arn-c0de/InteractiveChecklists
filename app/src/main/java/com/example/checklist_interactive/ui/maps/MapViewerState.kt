@@ -108,6 +108,11 @@ class MapViewerState(
     var showPatternDetails by mutableStateOf(true)
     var customPatternAltitudeAglFt by mutableStateOf<Int?>(null) // Custom override for pattern altitude AGL
 
+    // Manual landing pattern (for markers without runways - tactical units, carriers, etc.)
+    var enableManualLandingPattern by mutableStateOf(false)
+    var manualLandingHeading by mutableStateOf("")
+    var showManualHeadingError by mutableStateOf(false)
+
     // Pattern altitude indicator thresholds (in feet)
     // Small tolerance (≈) and a larger warning tolerance (yellow) used for color coding
     var patternAltitudeSmallToleranceFt by mutableStateOf(50.0)
