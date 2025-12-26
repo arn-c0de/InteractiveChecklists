@@ -416,7 +416,9 @@
     <string name="tactical_tracking_disabled">Verfolgung deaktiviert</string>
     <string name="tactical_unit_visibility_on_map">Sichtbarkeit der Einheiten auf der Karte</string>
     <string name="tactical_units_visible_on_map">Einheiten auf Karte sichtbar</string>
+    <string name="tactical_units_visible_on_map_history">Einheiten auf Karte sichtbar (historische Positionen)</string>
     <string name="tactical_units_hidden_on_map">Einheiten auf Karte verborgen</string>
+    <string name="tactical_unit_visibility_on_map_history_tooltip">Wenn die Entitätsverfolgung deaktiviert ist, kann die Karte trotzdem historische/zuletzt bekannte Positionen anzeigen.</string>
     <string name="tactical_map_update_interval">Karten-Aktualisierungsintervall</string>
     <string name="tactical_map_update_explain">Kleiner = flüssigere Bewegung, größer = bessere Leistung</string>
     <string name="tactical_active_units_label">Aktive Einheiten: %1$d</string>

@@ -1186,6 +1186,8 @@
     <string name="tactical_tracking_disabled">Tracking disabled</string>
     <string name="tactical_unit_visibility_on_map">Unit Visibility on Map</string>
     <string name="tactical_units_visible_on_map">Units visible on map</string>
+    <string name="tactical_units_visible_on_map_history">Units visible on map (showing history)</string>
+    <string name="tactical_unit_visibility_on_map_history_tooltip">When entity tracking is disabled, the map can still display historical/last-known unit positions.</string>
     <string name="tactical_units_hidden_on_map">Units hidden on map</string>
     <string name="tactical_map_update_interval">Map Update Interval</string>
     <string name="tactical_map_update_explain">Lower = smoother movement, higher = better performance</string>
