@@ -76,8 +76,14 @@ class MainActivity : ComponentActivity() {
     private fun updateLocale(context: Context): Context {
         val prefsManager = PreferencesManager(context)
         val languageCode = prefsManager.getAppLanguage()
-        val locale = Locale(languageCode)
-        Locale.setDefault(locale)
+        val locale = when {
+            languageCode.contains("-") -> Locale.forLanguageTag(languageCode) // 处理 "zh-CN"
+            languageCode.contains("_") -> {
+                val parts = languageCode.split("_")
+                if (parts.size > 1) Locale(parts[0], parts[1]) else Locale(languageCode) // 处理 "zh_CN"
+            }
+            else -> Locale(languageCode) 
+        }
         
         val config = Configuration(context.resources.configuration)
         config.setLocale(locale)
