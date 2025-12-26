@@ -1082,6 +1082,12 @@
     <string name="map_drawing_brush_size">Brush Size</string>
     <string name="map_drawing_clear_all_cd">Clear All</string>
     <string name="map_drawing_clear">Clear</string>
+    <string name="map_drawing_confirm_clear_title">Confirm clear</string>
+    <string name="map_drawing_confirm_clear_message">This will remove all drawings from the map. Are you sure?</string>
+    <string name="map_drawing_confirm_clear_second_title">Confirm clear again</string>
+    <string name="map_drawing_confirm_clear_second_message">This action is permanent. Tap "Confirm" to delete all drawings.</string>
+    <string name="map_drawing_confirm_clear_positive">Confirm</string>
+    <string name="map_drawing_confirm_clear_negative">Cancel</string>
     <string name="map_drawing_save_cd">Save</string>
     <string name="map_drawing_save">Save</string>
     <string name="map_drawing_color_selected_cd">Selected</string>

@@ -68,6 +68,9 @@ fun MapDrawingToolPopup(
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                // Clear confirmation steps (double confirmation)
+                var showClearStep1 by remember { mutableStateOf(false) }
+                var showClearStep2 by remember { mutableStateOf(false) }
                 // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -271,9 +274,9 @@ fun MapDrawingToolPopup(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Clear All
+                    // Clear All (starts double-confirm flow)
                     OutlinedButton(
-                        onClick = onClearAll,
+                        onClick = { showClearStep1 = true },
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(
@@ -298,6 +301,50 @@ fun MapDrawingToolPopup(
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(stringResource(R.string.map_drawing_save), fontSize = 12.sp)
                     }
+                }
+
+                // First confirmation dialog
+                if (showClearStep1) {
+                    AlertDialog(
+                        onDismissRequest = { showClearStep1 = false },
+                        title = { Text(stringResource(R.string.map_drawing_confirm_clear_title)) },
+                        text = { Text(stringResource(R.string.map_drawing_confirm_clear_message)) },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showClearStep1 = false
+                                showClearStep2 = true
+                            }) {
+                                Text(stringResource(R.string.map_drawing_confirm_clear_positive))
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showClearStep1 = false }) {
+                                Text(stringResource(R.string.map_drawing_confirm_clear_negative))
+                            }
+                        }
+                    )
+                }
+
+                // Second, final confirmation dialog
+                if (showClearStep2) {
+                    AlertDialog(
+                        onDismissRequest = { showClearStep2 = false },
+                        title = { Text(stringResource(R.string.map_drawing_confirm_clear_second_title)) },
+                        text = { Text(stringResource(R.string.map_drawing_confirm_clear_second_message)) },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showClearStep2 = false
+                                onClearAll()
+                            }) {
+                                Text(stringResource(R.string.map_drawing_confirm_clear_positive))
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showClearStep2 = false }) {
+                                Text(stringResource(R.string.map_drawing_confirm_clear_negative))
+                            }
+                        }
+                    )
                 }
             }
         }
