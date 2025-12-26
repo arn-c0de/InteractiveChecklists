@@ -771,6 +771,7 @@
     <string name="language_english">Inglés</string>
     <string name="language_german">Alemán</string>
     <string name="language_spanish">Español</string>
+    <string name="language_simplified_chinese">Chino Simplificado</string>
     <string name="settings_language_restart_message">Idioma guardado. Por favor reinicia la app para aplicar cambios.</string>
 
     <!-- ═══════════════════════════════════════════════════════════════════════ -->

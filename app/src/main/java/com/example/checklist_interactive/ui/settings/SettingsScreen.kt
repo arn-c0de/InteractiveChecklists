@@ -661,7 +661,8 @@ fun SettingsScreen(
                         val languages = listOf(
                             "en" to stringResource(R.string.language_english),
                             "de" to stringResource(R.string.language_german),
-                            "es" to stringResource(R.string.language_spanish)
+                            "es" to stringResource(R.string.language_spanish),
+                            "zh-CN" to stringResource(R.string.language_simplified_chinese),
                         )
                         var expandedLang by remember { mutableStateOf(false) }
                         var selectedLang by remember { mutableStateOf(prefsManager.getAppLanguage()) }
