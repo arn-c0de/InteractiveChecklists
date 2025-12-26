@@ -225,6 +225,9 @@ If you encounter issues or have questions:
 
 Thanks to all contributors and to the Jetpack Compose and Android open-source ecosystems used in this project.
 
+[![Contributors](https://contrib.rocks/image?repo=arn-c0de/InteractiveChecklists)](https://github.com/arn-c0de/InteractiveChecklists/graphs/contributors)
+
+
 
 ## License
 
