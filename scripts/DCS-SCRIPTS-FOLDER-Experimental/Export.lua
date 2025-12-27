@@ -13,7 +13,7 @@ pcall(function()
 	local lastWrite = 0
 	local lastCommandCheck = 0
 	local COMMAND_CHECK_INTERVAL = 2.0 -- check for command file every 2 seconds
-	local STREAMER_VERSION = "1.0.7"
+	local STREAMER_VERSION = "1.0.8"
 	-- Maximum number of JSON lines to keep in the output file. Set to 0 to disable trimming.
 	local MAX_JSON_LINES = 20  -- Keep only last 20 lines (2 seconds @ 10 Hz) - MINIMAL buffer
 	local MAX_ENTITY_LINES = 20  -- Keep only last 20 lines for entity contacts
@@ -208,27 +208,31 @@ pcall(function()
 					local bearing = math.deg(math.atan2(dLon, dLat))
 					if bearing < 0 then bearing = bearing + 360 end
 					
-					-- Determine category (1=Airplane, 2=Helicopter, 3=Ground, 4=Ship, 5=Structure, 6=Weapon)
-					-- Type structure: Type = {level1, level2, level3, level4}
-					local category = 0
+					-- DEBUG: Log all Type levels to understand structure
 					local categoryName = 'unknown'
-					
-					if objData.Type then
-						-- Type can be table or number
-						if type(objData.Type) == 'table' then
-							category = objData.Type.level1 or objData.Type[1] or 0
-						elseif type(objData.Type) == 'number' then
-							category = objData.Type
-						end
+					if DEBUG_DUMP_TABLES and objData.Type and type(objData.Type) == 'table' then
+						local nameStr = objData.Name or 'unknown'
+						debug_log('TYPE DEBUG: name=' .. nameStr ..
+							' level1=' .. tostring(objData.Type.level1 or 'nil') ..
+							' level2=' .. tostring(objData.Type.level2 or 'nil') ..
+							' level3=' .. tostring(objData.Type.level3 or 'nil') ..
+							' level4=' .. tostring(objData.Type.level4 or 'nil'))
 					end
-					
-					-- Map category number to name
-					if category == 1 then categoryName = 'aircraft'
-					elseif category == 2 then categoryName = 'helicopter'
-					elseif category == 3 then categoryName = 'ground'
-					elseif category == 4 then categoryName = 'ship'
-					elseif category == 5 then categoryName = 'structure'
-					elseif category == 6 then categoryName = 'weapon'
+
+					-- Try to get category from Type.level1 (0-based Object.Category enum)
+					-- Object.Category: AIRPLANE=0, HELICOPTER=1, GROUND_UNIT=2, SHIP=3, STRUCTURE=4
+					local category = objData.Type and objData.Type.level1 or -1
+
+					-- Map 0-based DCS Object.Category enum to category name
+					if category == 0 then categoryName = 'aircraft'
+					elseif category == 1 then categoryName = 'helicopter'
+					elseif category == 2 then categoryName = 'ground'
+					elseif category == 3 then categoryName = 'ship'
+					elseif category == 4 then categoryName = 'structure'
+					elseif category == 5 then categoryName = 'weapon'
+					else
+						-- Fallback if category not found
+						categoryName = 'unknown'
 					end
 					
 					local dcsCoal = objData.Coalition or 0
