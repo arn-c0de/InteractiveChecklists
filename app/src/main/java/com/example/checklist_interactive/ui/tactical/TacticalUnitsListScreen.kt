@@ -248,6 +248,13 @@ fun TacticalUnitsListScreen(
                     textStyle = MaterialTheme.typography.bodySmall,
                     placeholder = { Text(stringResource(R.string.tactical_search_placeholder), style = MaterialTheme.typography.bodySmall) },
                     leadingIcon = { Icon(Icons.Default.Search, null, modifier = Modifier.size(16.dp)) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                    ),
                     trailingIcon = {
                         if (uiState.searchQuery.isNotEmpty()) {
                             IconButton(onClick = { viewModel.setSearchQuery("") }) {
@@ -268,7 +275,9 @@ fun TacticalUnitsListScreen(
                     mapUpdateInterval = mapUpdateInterval,
                     onMapUpdateIntervalChange = { dataPadManager.setTacticalUnitsMapUpdateInterval(it) },
                     selectedCoalitions = uiState.selectedCoalitions,
-                    onToggleCoalition = { viewModel.toggleCoalition(it) }
+                    onToggleCoalition = { viewModel.toggleCoalition(it) },
+                    selectedCategories = uiState.selectedCategories,
+                    onToggleCategory = { viewModel.toggleCategory(it) }
                 )
                 
                 // Units list
@@ -351,7 +360,9 @@ private fun StatsCard(
     mapUpdateInterval: Float = 2.0f,
     onMapUpdateIntervalChange: (Float) -> Unit = {},
     selectedCoalitions: Set<Int> = emptySet(),
-    onToggleCoalition: (Int) -> Unit = {}
+    onToggleCoalition: (Int) -> Unit = {},
+    selectedCategories: Set<String> = emptySet(),
+    onToggleCategory: (String) -> Unit = {}
 ) {
     Card(
         modifier = Modifier
@@ -552,10 +563,30 @@ private fun StatsCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (stats.aircraftCount > 0) CategoryChip(stringResource(R.string.category_aircraft), stats.aircraftCount)
-                if (stats.helicopterCount > 0) CategoryChip(stringResource(R.string.category_heli), stats.helicopterCount)
-                if (stats.groundCount > 0) CategoryChip(stringResource(R.string.category_ground), stats.groundCount)
-                if (stats.shipCount > 0) CategoryChip(stringResource(R.string.category_ship), stats.shipCount)
+                if (stats.aircraftCount > 0) CategoryChip(
+                    label = stringResource(R.string.category_aircraft),
+                    count = stats.aircraftCount,
+                    isSelected = selectedCategories.contains("aircraft"),
+                    onClick = { onToggleCategory("aircraft") }
+                )
+                if (stats.helicopterCount > 0) CategoryChip(
+                    label = stringResource(R.string.category_heli),
+                    count = stats.helicopterCount,
+                    isSelected = selectedCategories.contains("helicopter"),
+                    onClick = { onToggleCategory("helicopter") }
+                )
+                if (stats.groundCount > 0) CategoryChip(
+                    label = stringResource(R.string.category_ground),
+                    count = stats.groundCount,
+                    isSelected = selectedCategories.contains("ground"),
+                    onClick = { onToggleCategory("ground") }
+                )
+                if (stats.shipCount > 0) CategoryChip(
+                    label = stringResource(R.string.category_ship),
+                    count = stats.shipCount,
+                    isSelected = selectedCategories.contains("ship"),
+                    onClick = { onToggleCategory("ship") }
+                )
             }
         }
     }
@@ -597,15 +628,23 @@ private fun CoalitionBadge(
 }
 
 @Composable
-private fun CategoryChip(label: String, count: Int) {
+private fun CategoryChip(
+    label: String,
+    count: Int,
+    isSelected: Boolean = false,
+    onClick: () -> Unit = {}
+) {
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer
+        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
+        modifier = Modifier.clickable(onClick = onClick)
     ) {
         Text(
             text = "$label: $count",
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            style = MaterialTheme.typography.bodySmall
+            style = MaterialTheme.typography.bodySmall,
+            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
         )
     }
 }
@@ -778,7 +817,20 @@ private fun UnitCard(
                     )
                 }
             }
-            
+
+            // Pilot info
+            unit.pilotName?.let { pilot ->
+                if (pilot.isNotEmpty()) {
+                    Text(
+                        text = "${stringResource(R.string.pilot_label)} $pilot",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
             // Expanded details
             AnimatedVisibility(visible = isExpanded) {
                 Column(
