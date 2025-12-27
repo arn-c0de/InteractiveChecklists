@@ -208,31 +208,35 @@ pcall(function()
 					local bearing = math.deg(math.atan2(dLon, dLat))
 					if bearing < 0 then bearing = bearing + 360 end
 					
-					-- DEBUG: Log all Type levels to understand structure
+					-- Determine category from Type structure
+					-- DCS Type structure: level1=main category, level2=country, level3=sub-category, level4=unit_type_id
+					-- level1: 1=air units, 2=ground units, 3=ships, 4=structures
+					-- For air units (level1=1): level3 differentiates aircraft (1) from helicopters (6)
 					local categoryName = 'unknown'
-					if DEBUG_DUMP_TABLES and objData.Type and type(objData.Type) == 'table' then
-						local nameStr = objData.Name or 'unknown'
-						debug_log('TYPE DEBUG: name=' .. nameStr ..
-							' level1=' .. tostring(objData.Type.level1 or 'nil') ..
-							' level2=' .. tostring(objData.Type.level2 or 'nil') ..
-							' level3=' .. tostring(objData.Type.level3 or 'nil') ..
-							' level4=' .. tostring(objData.Type.level4 or 'nil'))
-					end
 
-					-- Try to get category from Type.level1 (0-based Object.Category enum)
-					-- Object.Category: AIRPLANE=0, HELICOPTER=1, GROUND_UNIT=2, SHIP=3, STRUCTURE=4
-					local category = objData.Type and objData.Type.level1 or -1
+					if objData.Type and type(objData.Type) == 'table' then
+						local level1 = objData.Type.level1 or 0
+						local level3 = objData.Type.level3 or 0
 
-					-- Map 0-based DCS Object.Category enum to category name
-					if category == 0 then categoryName = 'aircraft'
-					elseif category == 1 then categoryName = 'helicopter'
-					elseif category == 2 then categoryName = 'ground'
-					elseif category == 3 then categoryName = 'ship'
-					elseif category == 4 then categoryName = 'structure'
-					elseif category == 5 then categoryName = 'weapon'
-					else
-						-- Fallback if category not found
-						categoryName = 'unknown'
+						if level1 == 1 then
+							-- Air units: check level3 to distinguish aircraft from helicopters
+							if level3 == 1 then
+								categoryName = 'aircraft'  -- Fixed-wing aircraft
+							elseif level3 == 6 then
+								categoryName = 'helicopter'  -- Rotary-wing
+							else
+								-- Fallback for unknown air unit types
+								categoryName = 'aircraft'
+							end
+						elseif level1 == 2 then
+							categoryName = 'ground'  -- Ground units
+						elseif level1 == 3 then
+							categoryName = 'ship'  -- Ships
+						elseif level1 == 4 then
+							categoryName = 'structure'  -- Structures
+						elseif level1 == 5 then
+							categoryName = 'weapon'  -- Weapons
+						end
 					end
 					
 					local dcsCoal = objData.Coalition or 0
