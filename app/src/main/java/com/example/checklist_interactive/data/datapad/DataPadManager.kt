@@ -972,7 +972,7 @@ class DataPadManager(private val context: Context) {
                 val existing = dao.getUnitByDcsId(unit.dcsId)
                 
                 if (existing != null) {
-                    // Unit exists - update position
+                    // Unit exists - update position and category
                     dao.updateUnitPosition(
                         dcsId = unit.dcsId,
                         latitude = unit.latitude,
@@ -982,6 +982,7 @@ class DataPadManager(private val context: Context) {
                         speed = unit.speed,
                         distance = unit.distance,
                         bearing = unit.bearing,
+                        category = unit.category,
                         lastSeenAt = now,
                         lastUpdateAt = now
                     )
