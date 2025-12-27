@@ -419,9 +419,10 @@ interface TacticalUnitsDao {
     suspend fun updateUnit(unit: TacticalUnitEntity)
     
     @Query("""
-        UPDATE tactical_units 
+        UPDATE tactical_units
         SET latitude = :latitude, longitude = :longitude, altitude = :altitude,
             heading = :heading, speed = :speed, distance = :distance, bearing = :bearing,
+            category = :category,
             is_active = 1, last_seen_at = :lastSeenAt, last_update_at = :lastUpdateAt
         WHERE dcs_id = :dcsId
     """)
@@ -434,6 +435,7 @@ interface TacticalUnitsDao {
         speed: Double?,
         distance: Double?,
         bearing: Double?,
+        category: String,
         lastSeenAt: String,
         lastUpdateAt: String
     ): Int
