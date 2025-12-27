@@ -213,10 +213,29 @@ pcall(function()
 					-- level1: 1=air units, 2=ground units, 3=ships, 4=structures
 					-- For air units (level1=1): level3 differentiates aircraft (1) from helicopters (6)
 					local categoryName = 'unknown'
+					local unitName = objData.Name or ''
 
-					if objData.Type and type(objData.Type) == 'table' then
+					-- Name-based heuristics for structures (HELIPAD, FARP, etc.)
+					if unitName:find('HELIPAD') or unitName:find('FARP') or unitName:find('Invisible FARP') then
+						categoryName = 'structure'
+					elseif unitName:find('Bunker') or unitName:find('house') or unitName:find('Building') then
+						categoryName = 'structure'
+					elseif objData.Type and type(objData.Type) == 'table' then
 						local level1 = objData.Type.level1 or 0
+						local level2 = objData.Type.level2 or 0
 						local level3 = objData.Type.level3 or 0
+						local level4 = objData.Type.level4 or 0
+
+						-- Debug log for problematic units
+						if DEBUG_DUMP_TABLES then
+							if unitName:find('HELIPAD') or unitName:find('FARP') or unitName:find('Bunker') then
+								debug_log('TYPE DEBUG: name=' .. unitName ..
+									' level1=' .. tostring(level1) ..
+									' level2=' .. tostring(level2) ..
+									' level3=' .. tostring(level3) ..
+									' level4=' .. tostring(level4))
+							end
+						end
 
 						if level1 == 1 then
 							-- Air units: check level3 to distinguish aircraft from helicopters
@@ -236,6 +255,9 @@ pcall(function()
 							categoryName = 'structure'  -- Structures
 						elseif level1 == 5 then
 							categoryName = 'weapon'  -- Weapons
+						elseif level1 == 0 then
+							-- level1=0 might be structures or special objects
+							categoryName = 'structure'
 						end
 					end
 					
