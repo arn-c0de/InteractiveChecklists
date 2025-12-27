@@ -5,6 +5,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -558,10 +559,11 @@ private fun StatsCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Category stats
-            Row(
+            // Category stats (wrap to multiple rows if needed)
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 if (stats.aircraftCount > 0) CategoryChip(
                     label = stringResource(R.string.category_aircraft),
@@ -586,6 +588,18 @@ private fun StatsCard(
                     count = stats.shipCount,
                     isSelected = selectedCategories.contains("ship"),
                     onClick = { onToggleCategory("ship") }
+                )
+                if (stats.structureCount > 0) CategoryChip(
+                    label = stringResource(R.string.category_structure),
+                    count = stats.structureCount,
+                    isSelected = selectedCategories.contains("structure"),
+                    onClick = { onToggleCategory("structure") }
+                )
+                if (stats.weaponCount > 0) CategoryChip(
+                    label = stringResource(R.string.category_weapon),
+                    count = stats.weaponCount,
+                    isSelected = selectedCategories.contains("weapon"),
+                    onClick = { onToggleCategory("weapon") }
                 )
             }
         }
