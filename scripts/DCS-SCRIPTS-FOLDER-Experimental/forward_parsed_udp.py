@@ -782,6 +782,13 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                     
                     # IMPORTANT: Reset timestamp filter to accept fresh data after trim
                     _last_processed_timestamp = None
+                    
+                    # CRITICAL: Clear entity data caches to prevent sending old markers from previous mission
+                    last_entity_data_batch1 = None
+                    last_entity_data_batch2 = None
+                    last_entity_data_batch3 = None
+                    last_entity_data_batch4 = None
+                    logger.info("🗑️ Cleared entity data caches (new mission detected)")
                     _last_timestamp_update_time = 0
                     logger.info("🔄 Reset timestamp filter after file trim")
                     

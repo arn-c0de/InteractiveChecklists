@@ -166,9 +166,16 @@ class TacticalUnitsRepository(private val context: Context) {
     }
 
     /**
-     * Delete all units (both active and inactive)
+     * Delete all units (both active and inactive) AND their history
+     * This is a complete wipe - used when starting a new mission
      */
     suspend fun deleteAllUnits() {
+        // CRITICAL: Complete database wipe to prevent old markers from reappearing
+        // Step 1: Mark all units as inactive (prevents race conditions with incoming data)
+        unitsDao.markAllUnitsInactive()
+        // Step 2: Delete all history (must be before units due to foreign keys)
+        historyDao.deleteAllHistory()
+        // Step 3: Delete all units
         unitsDao.deleteAllUnits()
     }
     
