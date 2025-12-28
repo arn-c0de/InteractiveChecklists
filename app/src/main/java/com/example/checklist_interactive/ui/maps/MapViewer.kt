@@ -1794,7 +1794,13 @@ fun MapViewer(
                                 tacticalUnit.pilotName?.let { append("\nPilot: $it") }
                             },
                             isStatic = 1,
-                            source = "tactical_tracking"
+                            source = "tactical_tracking",
+                            metadata = tacticalUnit.heading?.let {
+                                // Store heading in metadata JSON for extraction by MapMarkerPopup
+                                org.json.JSONObject().apply {
+                                    put("heading", it)
+                                }.toString()
+                            }
                         )
 
                         // Set selected location and show route management
