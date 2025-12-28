@@ -57,17 +57,33 @@ private fun formatLatLon(lat: Double, lon: Double): String {
 }
 
 private fun extractHeadingFromLocation(location: com.example.checklist_interactive.data.tactical.LocationEntity): Double? {
-    // 1) Try metadata JSON
+    // 1) Try metadata JSON with multiple variations
     location.metadata?.let { meta ->
         try {
             val obj = JSONObject(meta)
+            
+            // Try "heading" field (most common from UDP)
             if (obj.has("heading") && !obj.isNull("heading")) {
-                val v = obj.optDouble("heading")
+                val v = obj.optDouble("heading", Double.NaN)
                 if (!v.isNaN()) return v
+                
+                // Sometimes heading comes as string
                 val s = obj.optString("heading", "")
                 s.toDoubleOrNull()?.let { return it }
             }
-        } catch (_: Exception) {
+            
+            // Try alternative field names
+            listOf("hdg", "Heading", "HDG", "course", "bearing").forEach { key ->
+                if (obj.has(key) && !obj.isNull(key)) {
+                    val v = obj.optDouble(key, Double.NaN)
+                    if (!v.isNaN()) return v
+                    
+                    val s = obj.optString(key, "")
+                    s.toDoubleOrNull()?.let { return it }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("MapMarkerPopup", "Failed to parse heading from metadata: ${e.message}")
         }
     }
 
@@ -326,18 +342,17 @@ fun MapMarkerPopup(
                                     color = MaterialTheme.colorScheme.primary
                                 )
                             }
-                        }
 
-                        // Show heading below altitude if present (tries metadata, description, tags)
-                        val markerHdg = extractHeadingFromLocation(location)
-                        markerHdg?.let { hdg ->
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "${stringResource(R.string.heading_label)}: ${String.format(java.util.Locale.getDefault(), "%.0f°", (((hdg % 360) + 360) % 360))}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                            // Show heading next to altitude (same heading used by tactical marker direction indicator)
+                            val markerHdg = extractHeadingFromLocation(location)
+                            markerHdg?.let { hdg ->
+                                Text(
+                                    text = "${stringResource(R.string.heading_label)}: ${String.format(java.util.Locale.getDefault(), "%.0f°", (((hdg % 360) + 360) % 360))}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
                     }
 
