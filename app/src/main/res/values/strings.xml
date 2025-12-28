@@ -1131,6 +1131,7 @@
     <string name="map_marker_region">Region</string>
     <string name="map_marker_timezone">Timezone</string>
     <string name="map_marker_elevation">Elevation</string>
+    <string name="map_marker_heading">Heading</string>
     <string name="map_marker_unit">Unit</string>
     <string name="map_marker_threat">Threat</string>
     <string name="map_marker_strength">Strength</string>
