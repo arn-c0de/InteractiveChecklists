@@ -533,13 +533,15 @@ data class TacticalUnitEntity(
     
     val distance: Double? = null,  // Distance to player (meters)
     val bearing: Double? = null,  // Bearing to unit (0-360 degrees)
-    
+
+    val health: Double? = null,  // Unit health (0.0-1.0, 1.0 = full health)
+
     val country: Int? = null,  // DCS country code
     @ColumnInfo(name = "group_name")
     val groupName: String? = null,  // Group name
     @ColumnInfo(name = "pilot_name")
     val pilotName: String? = null,  // Pilot/unit name
-    
+
     @ColumnInfo(name = "is_active", defaultValue = "1")
     val isActive: Int = 1,  // 1=currently visible, 0=contact lost
     
