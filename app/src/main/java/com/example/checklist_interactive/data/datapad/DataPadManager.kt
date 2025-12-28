@@ -155,6 +155,11 @@ class DataPadManager(private val context: Context) {
     @Volatile private var logStatsFlightDataReceived = 0
     @Volatile private var logStatsTacticalUnitsProcessed = 0
     private val LOG_SUMMARY_INTERVAL_MS = 5000L // 5 seconds
+    
+    // Auto-cleanup for old tactical units (15 minutes timeout)
+    private val TACTICAL_UNIT_TIMEOUT_SECONDS = 900 // 15 minutes
+    private val CLEANUP_INTERVAL_MS = 60000L // Run cleanup every 60 seconds
+    private var lastCleanupTime = 0L
 
     // ECDH components
     private val keyManager = KeyManager(context)
@@ -1119,6 +1124,19 @@ class DataPadManager(private val context: Context) {
             // We do this in a background job to avoid blocking
             // For now, we'll mark ALL active units that aren't in the update as inactive
             // A more sophisticated approach would track "last seen" time and only mark as inactive after a timeout
+
+            // AUTO-CLEANUP: Delete units not seen for 15+ minutes (likely destroyed)
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastCleanupTime >= CLEANUP_INTERVAL_MS) {
+                lastCleanupTime = currentTime
+                try {
+                    val repository = com.example.checklist_interactive.data.tactical.TacticalUnitsRepository(context)
+                    repository.deleteOldUnits(TACTICAL_UNIT_TIMEOUT_SECONDS)
+                    udpLogD("Auto-cleanup: Deleted units not seen for 15+ minutes")
+                } catch (e: Exception) {
+                    udpLogE("Auto-cleanup failed: ${e.message}", e)
+                }
+            }
 
             // Increment counter instead of logging each batch
             logStatsTacticalUnitsProcessed += units.size
