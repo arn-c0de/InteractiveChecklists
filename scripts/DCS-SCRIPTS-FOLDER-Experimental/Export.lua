@@ -162,7 +162,7 @@ pcall(function()
 	end
 
 	-- Maximum distance for unit tracking (meters) - 150km radius for better tactical awareness
-	local MAX_UNIT_DISTANCE = 100000  -- 150km (increased from 50km)
+	local MAX_UNIT_DISTANCE = 300000  -- 150km (increased from 50km)
 	local MAX_UNITS_PER_BATCH = 250  -- Units per batch file - optimized for UDP packet size (~65KB)
 	local MAX_TOTAL_UNITS = 1000  -- Maximum total units across all batches (4 batches × 250 units)
 	

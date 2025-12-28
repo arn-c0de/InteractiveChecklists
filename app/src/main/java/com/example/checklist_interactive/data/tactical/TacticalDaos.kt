@@ -13,6 +13,9 @@ interface LocationDao {
     
     @Query("SELECT * FROM locations WHERE id = :id")
     suspend fun getLocationById(id: Int): LocationEntity?
+
+    @Query("SELECT * FROM locations WHERE id = :id")
+    fun observeLocationById(id: Int): Flow<LocationEntity?>
     
     @Query("SELECT * FROM locations WHERE marker_type = :type ORDER BY name")
     fun getLocationsByType(type: String): Flow<List<LocationEntity>>
