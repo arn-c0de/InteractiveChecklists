@@ -86,6 +86,11 @@ class TacticalUnitsMapOverlay(
                 newUnits.forEach { unit: TacticalUnitEntity ->
                     updateUnit(unit)
                 }
+
+                // Immediately redraw map to reflect changes (especially important for deletions)
+                withContext(Dispatchers.Main) {
+                    getMapView()?.invalidate()
+                }
             }
         }
 
