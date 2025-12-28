@@ -235,9 +235,8 @@ class DataPadManager(private val context: Context) {
                 }
             }
             
-            if (interarrival > 200) {  // Log gaps > 200ms
-                udpLogD("Packet gap: ${interarrival}ms${if (isHeartbeat) " (heartbeat)" else ""}")
-            }
+            // Packet gap logging disabled to reduce log spam
+            // (gaps are tracked in stats, visible in min/max/avg interarrival)
         }
         lastPacketTime = now
     }
