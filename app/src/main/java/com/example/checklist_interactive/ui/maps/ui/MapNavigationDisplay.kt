@@ -1366,8 +1366,10 @@ fun MapNavigationDisplay(
                                     .fillMaxWidth()
                                     .padding(12.dp)
                             ) {
-                                // Header with collapse button
-                                Row(
+                                // Only show manual landing details when expanded
+                                if (showNavigationDetails) {
+                                    // Header with collapse button
+                                    Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clickable { showManualLandingDetails = !showManualLandingDetails },
@@ -2051,6 +2053,7 @@ fun MapNavigationDisplay(
                                         }
                                     } // End AnimatedVisibility (manual landing details)
                                 }
+                                } // End showNavigationDetails
                             }
                         }
                     }
