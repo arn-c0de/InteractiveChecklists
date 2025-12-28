@@ -571,16 +571,18 @@ fun MapNavigationDisplay(
                                     .fillMaxWidth()
                                     .padding(12.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = stringResource(R.string.map_nav_select_runway),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onErrorContainer
-                                    )
+                                // Only show these elements when expanded
+                                if (showNavigationDetails) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.map_nav_select_runway),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
 
                                     // Final approach distance dropdown
                                     var expanded by remember { mutableStateOf(false) }
@@ -1348,6 +1350,7 @@ fun MapNavigationDisplay(
                                         }
                                     }
                                 }
+                                } // End showNavigationDetails
 
                                 Spacer(modifier = Modifier.height(8.dp))
                                 // Runways moved into Pattern Configuration above
@@ -1382,21 +1385,23 @@ fun MapNavigationDisplay(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        // Pattern button (always visible)
-                                        Button(
-                                            onClick = { onShowTrafficPatternChange(!showTrafficPattern) },
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = if (showTrafficPattern) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-                                                contentColor = if (showTrafficPattern) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-                                            ),
-                                            modifier = Modifier.height(28.dp),
-                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                                        ) {
-                                            Text(
-                                                text = stringResource(R.string.map_nav_pattern_button),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontSize = 11.sp
-                                            )
+                                        // Pattern button (only visible when expanded)
+                                        if (showNavigationDetails) {
+                                            Button(
+                                                onClick = { onShowTrafficPatternChange(!showTrafficPattern) },
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = if (showTrafficPattern) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                                                    contentColor = if (showTrafficPattern) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                                                ),
+                                                modifier = Modifier.height(28.dp),
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                                            ) {
+                                                Text(
+                                                    text = stringResource(R.string.map_nav_pattern_button),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontSize = 11.sp
+                                                )
+                                            }
                                         }
 
                                         // Collapse/expand button
