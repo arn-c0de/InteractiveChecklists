@@ -373,6 +373,9 @@ interface TacticalUnitsDao {
     @Query("SELECT * FROM tactical_units WHERE id = :id")
     suspend fun getUnitById(id: Int): TacticalUnitEntity?
     
+    @Query("SELECT * FROM tactical_units WHERE id = :id")
+    fun getUnitByIdFlow(id: Int): Flow<TacticalUnitEntity?>
+    
     @Query("SELECT * FROM tactical_units WHERE dcs_id = :dcsId")
     suspend fun getUnitByDcsId(dcsId: String): TacticalUnitEntity?
     

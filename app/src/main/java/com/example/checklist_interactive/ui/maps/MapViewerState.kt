@@ -88,6 +88,9 @@ class MapViewerState(
     var navigationHeading by mutableStateOf<Double?>(null)
     var showNavigationDetails by mutableStateOf(true)
     
+    // Tactical unit tracking for live route updates
+    var activeNavigationTacticalUnitId by mutableStateOf<Int?>(null) // DCS ID of tracked tactical unit
+    
     // Runway approach state
     var showRunwayApproach by mutableStateOf(false)
     var targetRunways by mutableStateOf<List<RunwayEntity>>(emptyList())
@@ -303,6 +306,15 @@ class MapViewerState(
         // Restore custom pattern altitude (AGL) if present (-1 means not set)
         val customAlt = prefs.getInt("custom_pattern_altitude_agl_ft", -1)
         customPatternAltitudeAglFt = if (customAlt < 0) null else customAlt
+        
+        // Restore tactical unit tracking ID for live route updates
+        val trackedUnitId = prefs.getInt("active_navigation_tactical_unit_id", -999)
+        if (trackedUnitId > 0) {
+            activeNavigationTacticalUnitId = trackedUnitId
+            Log.d(TAG, "🎯 Restored tactical unit tracking: ID=$trackedUnitId")
+        } else {
+            activeNavigationTacticalUnitId = null
+        }
 
         // Small delay before marking as restored
         delay(50)
@@ -374,6 +386,9 @@ class MapViewerState(
 
                 // Save whether the navigation details panel is expanded
                 putBoolean("show_navigation_details", showNavigationDetails)
+                
+                // Save tactical unit tracking ID for live route updates
+                putInt("active_navigation_tactical_unit_id", activeNavigationTacticalUnitId ?: -999)
 
                 apply()
             }

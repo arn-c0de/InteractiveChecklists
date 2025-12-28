@@ -209,7 +209,7 @@ fun MarkerRouteManagementSheet(
     onCenter: (LocationEntity) -> Unit = {},
     selectedMarker: LocationEntity? = null,
     selectedRunways: List<RunwayEntity> = emptyList(),
-    onSetActiveRoute: (LocationEntity) -> Unit = {},
+    onSetActiveRoute: (LocationEntity) -> Unit,
     onEditRouteWaypoints: (Int) -> Unit = {}
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -394,7 +394,12 @@ fun MarkerRouteManagementSheet(
                             location = selectedMarker,
                             runways = selectedRunways,
                             onClose = { selectedTab = 1 },
-                            onSetRoute = onSetActiveRoute,
+                            onSetRoute = { location ->
+                                android.util.Log.d("MarkerRouteManagement", "📡 onSetRoute received: id=${location.id}, source=${location.source}, name=${location.name}")
+                                android.util.Log.d("MarkerRouteManagement", "🎯 About to call onSetActiveRoute...")
+                                onSetActiveRoute(location)
+                                android.util.Log.d("MarkerRouteManagement", "✅ onSetActiveRoute call completed")
+                            },
                             onEdit = { updatedLocation ->
                                 viewModel.updateMarker(updatedLocation)
                             },

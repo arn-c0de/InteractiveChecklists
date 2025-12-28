@@ -672,6 +672,57 @@ fun MapViewer(
         mapState.loadRunwaysForActiveTarget()
     }
 
+    // Live update navigation target when tracking a tactical unit
+    LaunchedEffect(mapState.activeNavigationTacticalUnitId, tacticalUnitsRepository) {
+        val tacticalUnitId = mapState.activeNavigationTacticalUnitId
+        val repo = tacticalUnitsRepository
+
+        if (tacticalUnitId != null && tacticalUnitId > 0 && repo != null) {
+            Log.d(TAG, "🔄 Starting live tracking for tactical unit ID: $tacticalUnitId")
+
+            // Observe the tactical unit by ID and update navigation target when it changes
+            repo.getUnitByIdFlow(tacticalUnitId).collect { tacticalUnit ->
+                if (tacticalUnit != null) {
+                    // Update the navigation target with the new position
+                    val updatedLocation = com.example.checklist_interactive.data.tactical.LocationEntity(
+                        id = 0, // Temporary, no DB ID
+                        name = "${tacticalUnit.name} (${tacticalUnit.category})",
+                        latitude = tacticalUnit.latitude,
+                        longitude = tacticalUnit.longitude,
+                        elevationM = tacticalUnit.altitude,
+                        markerType = "tactical_unit",
+                        description = buildString {
+                            append("Coalition: ")
+                            append(when (tacticalUnit.coalition) {
+                                0 -> "Neutral"
+                                1 -> "Red"
+                                2 -> "Blue"
+                                else -> "Unknown"
+                            })
+                            tacticalUnit.groupName?.let { append("\nGroup: $it") }
+                            tacticalUnit.pilotName?.let { append("\nPilot: $it") }
+                        },
+                        isStatic = 1,
+                        source = "tactical_tracking",
+                        metadata = org.json.JSONObject().apply {
+                            put("tactical_unit_id", tacticalUnit.id)
+                            tacticalUnit.heading?.let { put("heading", it) }
+                        }.toString()
+                    )
+
+                    // Update navigation target (this will trigger the navigation line update)
+                    mapState.activeNavigationTarget = updatedLocation
+                    Log.d(TAG, "🔄 Updated navigation target position: ${tacticalUnit.name} at (${tacticalUnit.latitude}, ${tacticalUnit.longitude})")
+                } else {
+                    // Tactical unit no longer exists - clear navigation
+                    Log.w(TAG, "⚠️ Tactical unit $tacticalUnitId no longer exists, clearing navigation")
+                    mapState.activeNavigationTarget = null
+                    mapState.activeNavigationTacticalUnitId = null
+                }
+            }
+        }
+    }
+
     // Helper function to extract runway heading from runway name
     fun extractRunwayHeading(runwayName: String): Double? {
         // Parse runway name like "12/30", "09/27", "13L/31R"
@@ -939,6 +990,7 @@ fun MapViewer(
             // Clear navigation if it was pattern navigation (id = -2)
             if (mapState.activeNavigationTarget?.id == -2) {
                 mapState.activeNavigationTarget = null
+                mapState.activeNavigationTacticalUnitId = null
             }
             mv.invalidate()
         }
@@ -1792,12 +1844,12 @@ fun MapViewer(
                             },
                             isStatic = 1,
                             source = "tactical_tracking",
-                            metadata = tacticalUnit.heading?.let {
-                                // Store heading in metadata JSON for extraction by MapMarkerPopup
-                                org.json.JSONObject().apply {
-                                    put("heading", it)
-                                }.toString()
-                            }
+                            metadata = org.json.JSONObject().apply {
+                                // Store tactical unit DB ID for live tracking
+                                put("tactical_unit_id", tacticalUnit.id)
+                                // Store heading for extraction by MapMarkerPopup
+                                tacticalUnit.heading?.let { put("heading", it) }
+                            }.toString()
                         )
 
                         // Set selected location and show route management
@@ -2004,7 +2056,13 @@ fun MapViewer(
             onSelectedRunwayIndexChange = { mapState.selectedRunwayIndex = it },
             selectedRunway = mapState.selectedRunway,
             onSelectedRunwayChange = { mapState.selectedRunway = it },
-            onActiveNavigationTargetChange = { mapState.activeNavigationTarget = it },
+            onActiveNavigationTargetChange = {
+                mapState.activeNavigationTarget = it
+                // Clear tactical unit tracking when navigation is cleared
+                if (it == null) {
+                    mapState.activeNavigationTacticalUnitId = null
+                }
+            },
             onOriginalAirportTargetChange = { mapState.originalAirportTarget = it },
             onSelectedRunwayHeadingChange = { mapState.selectedRunwayHeading = it },
             customPatternAltitudeAglFt = mapState.customPatternAltitudeAglFt,
@@ -2719,6 +2777,26 @@ fun MapViewer(
                 selectedRunways = mapState.selectedRunways,
                 onSetActiveRoute = { location ->
                     mapState.activeNavigationTarget = location
+
+                    // If this is a tactical unit, extract and store its ID for live tracking
+                    if (location.source == "tactical_tracking") {
+                        try {
+                            val metadata = location.metadata?.let { org.json.JSONObject(it) }
+                            val tacticalUnitId = metadata?.optInt("tactical_unit_id", -1)
+                            if (tacticalUnitId != null && tacticalUnitId > 0) {
+                                mapState.activeNavigationTacticalUnitId = tacticalUnitId
+                                Log.d(TAG, "🎯 Set navigation to tactical unit ID: $tacticalUnitId")
+                            } else {
+                                mapState.activeNavigationTacticalUnitId = null
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to extract tactical_unit_id from metadata", e)
+                            mapState.activeNavigationTacticalUnitId = null
+                        }
+                    } else {
+                        mapState.activeNavigationTacticalUnitId = null
+                    }
+
                     // Auto-center disabled so user can see the full route
                     mapState.autoCenter = false
                     // Optionally close the sheet
