@@ -451,7 +451,10 @@ private fun MarkerDetailsActionButtons(
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         // Set Route button (prominent)
         Button(
-            onClick = { onSetRoute(location) },
+            onClick = {
+                android.util.Log.d("MarkerDetailsButtons", "🚀 Set Route button clicked: id=${location.id}, source=${location.source}, name=${location.name}")
+                onSetRoute(location)
+            },
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary
