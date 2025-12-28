@@ -292,7 +292,7 @@ pcall(function()
 						latitude = round(lat, 6),
 						longitude = round(lon, 6),
 						altitude = round(alt, 2),
-						heading = round(objData.Heading or 0, 2),
+						heading = round(math.deg(objData.Heading or 0), 2),
 						speed = round(speed, 2),
 						distance = round(distance, 2),
 						bearing = round(bearing, 2),
