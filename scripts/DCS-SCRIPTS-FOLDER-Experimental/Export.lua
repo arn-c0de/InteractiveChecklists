@@ -5,8 +5,10 @@ pcall(function()
 	local LOG_PATH = writeDir .. [[Scripts\player_aircraft.log]]
 	local DEBUG_LOG_PATH = writeDir .. [[Scripts\player_aircraft_debug.log]]
 	local JSON_PATH = writeDir .. [[Scripts\player_aircraft_parsed.jsonl]]
-	local ENTITY_CONTACTS_PATH = writeDir .. [[Scripts\entity-contacts-parsed.jsonl]]  -- Batch 1: units 0-500
-	local ENTITY_CONTACTS_PATH_2 = writeDir .. [[Scripts\entity-contacts-parsed-2.jsonl]]  -- Batch 2: units 500-1000
+	local ENTITY_CONTACTS_PATH = writeDir .. [[Scripts\entity-contacts-parsed.jsonl]]  -- Batch 1: units 0-250
+	local ENTITY_CONTACTS_PATH_2 = writeDir .. [[Scripts\entity-contacts-parsed-2.jsonl]]  -- Batch 2: units 250-500
+	local ENTITY_CONTACTS_PATH_3 = writeDir .. [[Scripts\entity-contacts-parsed-3.jsonl]]  -- Batch 3: units 500-750
+	local ENTITY_CONTACTS_PATH_4 = writeDir .. [[Scripts\entity-contacts-parsed-4.jsonl]]  -- Batch 4: units 750-1000
 	local COMMAND_PATH = writeDir .. [[Scripts\forwarder_command.json]]
 	local DEBUG_DUMP_TABLES = true -- set to false to disable table debug dumps
 	local dumped_tables = {}
@@ -17,9 +19,9 @@ pcall(function()
 	local STREAMER_VERSION = "1.0.9"
 	-- Maximum number of JSON lines to keep in the output file. Set to 0 to disable trimming.
 	local MAX_JSON_LINES = 20  -- Keep only last 20 lines (2 seconds @ 10 Hz) - MINIMAL buffer
-	local MAX_ENTITY_LINES = 20  -- Keep only last 20 lines for entity contacts
+	local MAX_ENTITY_LINES = 2  -- Keep only last 2 lines for entity contacts (FAST load, minimal backlog)
 	-- Trim interval: Only trim file periodically, NOT on every write (performance!)
-	local TRIM_INTERVAL = 2.0  -- Trim file every 2 seconds (VERY aggressive cleanup)
+	local TRIM_INTERVAL = 1.0  -- Trim file every 1 second for faster cleanup
 	local lastTrim = 0
 	local lastEntityTrim = 0
 	-- If true, clear the JSON/log/debug files once when the export starts
@@ -161,14 +163,14 @@ pcall(function()
 
 	-- Maximum distance for unit tracking (meters) - 150km radius for better tactical awareness
 	local MAX_UNIT_DISTANCE = 100000  -- 150km (increased from 50km)
-	local MAX_UNITS_PER_BATCH = 500  -- Units per batch file (increased from 200)
-	local MAX_TOTAL_UNITS = 1000  -- Maximum total units across all batches
+	local MAX_UNITS_PER_BATCH = 250  -- Units per batch file - optimized for UDP packet size (~65KB)
+	local MAX_TOTAL_UNITS = 1000  -- Maximum total units across all batches (4 batches × 250 units)
 	
 	-- Collect all nearby units (aircraft, ground, ships, structures)
 	-- NEW APPROACH: Collect ALL units in range first, then slice by batch
 	local allUnitsCache = nil  -- Cache all units to avoid recalculating
 	local allUnitsCacheTime = 0
-	local CACHE_DURATION = 0.5  -- Cache for 0.5 seconds (5 frames @ 10 Hz)
+	local CACHE_DURATION = 0.1  -- Cache for 0.1 seconds (1 frame @ 10 Hz) - REDUCED for faster aircraft updates
 	
 	local function collect_all_nearby_units()
 		local selfData = safe_get(function() return LoGetSelfData() end, nil)
@@ -733,7 +735,7 @@ pcall(function()
 	end
 
 	-- Collect entity contacts (nearby units) as a separate dataset
-	-- Returns: batch1_data, batch2_data (or nil if no second batch)
+	-- Returns: batch1_data, batch2_data, batch3_data, batch4_data (or nil if no data)
 	local function collect_entity_contacts()
 		local baseData = {
 			timestamp = generate_timestamp(),
@@ -749,28 +751,57 @@ pcall(function()
 			baseData.playerAlt = selfData.LatLongAlt.Alt
 		end
 
-		-- Collect first batch (batch index 1)
-		local batch1_units, hasMore = collect_nearby_units(1)
+		-- Determine total batches based on total units available
+		local totalBatches = 4  -- Support up to 4 batches (1000 units)
+
+		-- Collect batch 1 (units 0-250)
+		local batch1_units, hasMore1 = collect_nearby_units(1)
 		local batch1_data = {}
-		for k, v in pairs(baseData) do batch1_data[k] = v end  -- Copy base data
+		for k, v in pairs(baseData) do batch1_data[k] = v end
 		batch1_data.nearbyUnits = batch1_units
 		batch1_data.batchIndex = 1
-		batch1_data.totalBatches = hasMore and 2 or 1
+		batch1_data.totalBatches = totalBatches
 
-		-- Collect second batch (batch index 2) if needed
+		-- Collect batch 2 (units 250-500)
 		local batch2_data = nil
-		if hasMore then
-			local batch2_units, _ = collect_nearby_units(2)
+		if hasMore1 then
+			local batch2_units, hasMore2 = collect_nearby_units(2)
 			if #batch2_units > 0 then
 				batch2_data = {}
-				for k, v in pairs(baseData) do batch2_data[k] = v end  -- Copy base data
+				for k, v in pairs(baseData) do batch2_data[k] = v end
 				batch2_data.nearbyUnits = batch2_units
 				batch2_data.batchIndex = 2
-				batch2_data.totalBatches = 2
+				batch2_data.totalBatches = totalBatches
 			end
 		end
 
-		return batch1_data, batch2_data
+		-- Collect batch 3 (units 500-750)
+		local batch3_data = nil
+		if hasMore1 then
+			local batch3_units, hasMore3 = collect_nearby_units(3)
+			if #batch3_units > 0 then
+				batch3_data = {}
+				for k, v in pairs(baseData) do batch3_data[k] = v end
+				batch3_data.nearbyUnits = batch3_units
+				batch3_data.batchIndex = 3
+				batch3_data.totalBatches = totalBatches
+			end
+		end
+
+		-- Collect batch 4 (units 750-1000)
+		local batch4_data = nil
+		if hasMore1 then
+			local batch4_units, hasMore4 = collect_nearby_units(4)
+			if #batch4_units > 0 then
+				batch4_data = {}
+				for k, v in pairs(baseData) do batch4_data[k] = v end
+				batch4_data.nearbyUnits = batch4_units
+				batch4_data.batchIndex = 4
+				batch4_data.totalBatches = totalBatches
+			end
+		end
+
+		return batch1_data, batch2_data, batch3_data, batch4_data
 	end
 
 	local function write_log(aircraft, unitID, pos)
@@ -809,6 +840,28 @@ pcall(function()
 		pcall(function()
 			local json = json_encode_table(data)
 			local f = io.open(ENTITY_CONTACTS_PATH_2, 'a')
+			if not f then return end
+			f:write(json .. '\n')
+			f:flush()  -- Force immediate flush to disk
+			f:close()
+		end)
+	end
+
+	local function write_entity_json_3(data)
+		pcall(function()
+			local json = json_encode_table(data)
+			local f = io.open(ENTITY_CONTACTS_PATH_3, 'a')
+			if not f then return end
+			f:write(json .. '\n')
+			f:flush()  -- Force immediate flush to disk
+			f:close()
+		end)
+	end
+
+	local function write_entity_json_4(data)
+		pcall(function()
+			local json = json_encode_table(data)
+			local f = io.open(ENTITY_CONTACTS_PATH_4, 'a')
 			if not f then return end
 			f:write(json .. '\n')
 			f:flush()  -- Force immediate flush to disk
@@ -947,6 +1000,86 @@ pcall(function()
 		end)
 	end
 
+	local function trim_entity_file_3()
+		-- Trim the third entity contacts JSONL file
+		if not MAX_ENTITY_LINES or MAX_ENTITY_LINES <= 0 then return end
+
+		pcall(function()
+			local tmp = {}
+			local count = 0
+			local ok, r = pcall(io.open, ENTITY_CONTACTS_PATH_3, 'r')
+			if not ok or not r then return end
+
+			for _ in r:lines() do
+				count = count + 1
+			end
+			r:close()
+
+			if count <= MAX_ENTITY_LINES then return end
+
+			local skip = count - MAX_ENTITY_LINES
+			local ok2, r2 = pcall(io.open, ENTITY_CONTACTS_PATH_3, 'r')
+			if not ok2 or not r2 then return end
+
+			local lineNum = 0
+			for line in r2:lines() do
+				lineNum = lineNum + 1
+				if lineNum > skip then
+					table.insert(tmp, line)
+				end
+			end
+			r2:close()
+
+			local ok3, w = pcall(io.open, ENTITY_CONTACTS_PATH_3, 'w')
+			if not ok3 or not w then return end
+			for _, l in ipairs(tmp) do
+				w:write(l .. '\n')
+			end
+			w:flush()
+			w:close()
+		end)
+	end
+
+	local function trim_entity_file_4()
+		-- Trim the fourth entity contacts JSONL file
+		if not MAX_ENTITY_LINES or MAX_ENTITY_LINES <= 0 then return end
+
+		pcall(function()
+			local tmp = {}
+			local count = 0
+			local ok, r = pcall(io.open, ENTITY_CONTACTS_PATH_4, 'r')
+			if not ok or not r then return end
+
+			for _ in r:lines() do
+				count = count + 1
+			end
+			r:close()
+
+			if count <= MAX_ENTITY_LINES then return end
+
+			local skip = count - MAX_ENTITY_LINES
+			local ok2, r2 = pcall(io.open, ENTITY_CONTACTS_PATH_4, 'r')
+			if not ok2 or not r2 then return end
+
+			local lineNum = 0
+			for line in r2:lines() do
+				lineNum = lineNum + 1
+				if lineNum > skip then
+					table.insert(tmp, line)
+				end
+			end
+			r2:close()
+
+			local ok3, w = pcall(io.open, ENTITY_CONTACTS_PATH_4, 'w')
+			if not ok3 or not w then return end
+			for _, l in ipairs(tmp) do
+				w:write(l .. '\n')
+			end
+			w:flush()
+			w:close()
+		end)
+	end
+
 	local function serialize_table(obj, depth, maxDepth, seen)
 		depth = depth or 0
 		maxDepth = maxDepth or 3
@@ -994,6 +1127,10 @@ pcall(function()
 				if ef then ef:write('') ef:close() end
 				local ef2 = io.open(ENTITY_CONTACTS_PATH_2, 'w')
 				if ef2 then ef2:write('') ef2:close() end
+				local ef3 = io.open(ENTITY_CONTACTS_PATH_3, 'w')
+				if ef3 then ef3:write('') ef3:close() end
+				local ef4 = io.open(ENTITY_CONTACTS_PATH_4, 'w')
+				if ef4 then ef4:write('') ef4:close() end
 				local lf = io.open(LOG_PATH, 'w')
 				if lf then lf:write('') lf:close() end
 				local df = io.open(DEBUG_LOG_PATH, 'w')
@@ -1025,6 +1162,8 @@ pcall(function()
 		if now - lastEntityTrim >= TRIM_INTERVAL then
 			trim_entity_file()
 			trim_entity_file_2()
+			trim_entity_file_3()
+			trim_entity_file_4()
 			lastEntityTrim = now
 		end
 
@@ -1032,11 +1171,17 @@ pcall(function()
 			-- Write aircraft telemetry (lean, no nearbyUnits for fast updates)
 			local telemetry = collect_telemetry()
 			write_json(telemetry)
-			-- Write entity contacts to SEPARATE files (batch 1 and 2)
-			local entityBatch1, entityBatch2 = collect_entity_contacts()
+			-- Write entity contacts to SEPARATE files (batch 1-4)
+			local entityBatch1, entityBatch2, entityBatch3, entityBatch4 = collect_entity_contacts()
 			write_entity_json(entityBatch1)
 			if entityBatch2 then
 				write_entity_json_2(entityBatch2)
+			end
+			if entityBatch3 then
+				write_entity_json_3(entityBatch3)
+			end
+			if entityBatch4 then
+				write_entity_json_4(entityBatch4)
 			end
 
 			lastWrite = now
@@ -1047,11 +1192,17 @@ pcall(function()
 		-- Write final aircraft telemetry
 		local telemetry = collect_telemetry()
 		write_json(telemetry)
-		-- Write final entity contacts (both batches)
-		local entityBatch1, entityBatch2 = collect_entity_contacts()
+		-- Write final entity contacts (all 4 batches)
+		local entityBatch1, entityBatch2, entityBatch3, entityBatch4 = collect_entity_contacts()
 		write_entity_json(entityBatch1)
 		if entityBatch2 then
-				write_entity_json_2(entityBatch2)
+			write_entity_json_2(entityBatch2)
+		end
+		if entityBatch3 then
+			write_entity_json_3(entityBatch3)
+		end
+		if entityBatch4 then
+			write_entity_json_4(entityBatch4)
 		end
 	end
 end, nil)
