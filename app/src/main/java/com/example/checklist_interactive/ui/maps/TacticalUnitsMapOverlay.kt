@@ -43,6 +43,11 @@ class TacticalUnitsMapOverlay(
     private var updateJob: Job? = null
     private var dataCollectorJob: Job? = null
 
+    // Log statistics (rate limiting) - reduce log spam
+    private var lastLogTime = 0L
+    private var dbUpdateCount = 0
+    private val LOG_INTERVAL_MS = 5000L // Log summary every 5 seconds
+
     // Reusable Paint objects to avoid creating them on every draw
     private val circleFillPaint = Paint().apply {
         isAntiAlias = true
@@ -97,7 +102,14 @@ class TacticalUnitsMapOverlay(
                 else if (showLiveOnly) liveUnits
                 else allUnits
             }.collect { newUnits: List<TacticalUnitEntity> ->
-                Log.d(TAG, "📡 Database units updated: ${newUnits.size} units collected")
+                // Increment counter instead of logging each update
+                dbUpdateCount++
+                val now = System.currentTimeMillis()
+                if (now - lastLogTime >= LOG_INTERVAL_MS) {
+                    Log.d(TAG, "📊 5s Summary: DB updates=${dbUpdateCount}, Units=${newUnits.size}")
+                    dbUpdateCount = 0
+                    lastLogTime = now
+                }
                 lastUnits = newUnits
 
                 // Update units map immediately - remove deleted units
