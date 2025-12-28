@@ -618,7 +618,13 @@ fun MapViewer(
     }
 
     // Update live navigation line when flight data or target changes
-    LaunchedEffect(flightData, mapState.activeNavigationTarget) {
+    // Include target position (lat/lon) to auto-update when marker moves
+    LaunchedEffect(
+        flightData,
+        mapState.activeNavigationTarget,
+        mapState.activeNavigationTarget?.latitude,
+        mapState.activeNavigationTarget?.longitude
+    ) {
         val data = flightData
         val target = mapState.activeNavigationTarget
         val map = mapState.mapView
@@ -672,6 +678,25 @@ fun MapViewer(
         mapState.loadRunwaysForActiveTarget()
     }
 
+    // Observe originalAirportTarget for live position updates (for non-tactical markers)
+    LaunchedEffect(mapState.originalAirportTarget?.id, locationRepository) {
+        val targetId = mapState.originalAirportTarget?.id
+        val repo = locationRepository
+
+        // Only observe if it's a real database marker (id > 0) and not being tracked as tactical unit
+        if (targetId != null && targetId > 0 && repo != null && mapState.activeNavigationTacticalUnitId == null) {
+            Log.d(TAG, "🔄 Starting live observation for location ID: $targetId")
+
+            repo.observeLocationById(targetId).collect { updatedLocation ->
+                if (updatedLocation != null) {
+                    // Update originalAirportTarget with fresh data from database
+                    mapState.originalAirportTarget = updatedLocation
+                    Log.d(TAG, "🔄 Updated originalAirportTarget: ${updatedLocation.name} at (${updatedLocation.latitude}, ${updatedLocation.longitude})")
+                }
+            }
+        }
+    }
+
     // Live update navigation target when tracking a tactical unit
     LaunchedEffect(mapState.activeNavigationTacticalUnitId, tacticalUnitsRepository) {
         val tacticalUnitId = mapState.activeNavigationTacticalUnitId
@@ -712,6 +737,8 @@ fun MapViewer(
 
                     // Update navigation target (this will trigger the navigation line update)
                     mapState.activeNavigationTarget = updatedLocation
+                    // Also update originalAirportTarget to trigger pattern recalculation
+                    mapState.originalAirportTarget = updatedLocation
                     Log.d(TAG, "🔄 Updated navigation target position: ${tacticalUnit.name} at (${tacticalUnit.latitude}, ${tacticalUnit.longitude})")
                 } else {
                     // Tactical unit no longer exists - clear navigation
@@ -732,7 +759,17 @@ fun MapViewer(
     }
 
     // Draw runway approach lines when enabled (supports both runways and manual heading)
-    LaunchedEffect(mapState.showRunwayApproach, mapState.targetRunways, mapState.originalAirportTarget, mapState.mapView, mapState.finalApproachDistanceNm, mapState.selectedRunwayHeading) {
+    // Include target position (lat/lon) to auto-update when marker moves
+    LaunchedEffect(
+        mapState.showRunwayApproach,
+        mapState.targetRunways,
+        mapState.originalAirportTarget,
+        mapState.originalAirportTarget?.latitude,
+        mapState.originalAirportTarget?.longitude,
+        mapState.mapView,
+        mapState.finalApproachDistanceNm,
+        mapState.selectedRunwayHeading
+    ) {
         val map = mapState.mapView
         val target = mapState.originalAirportTarget
 
@@ -840,7 +877,13 @@ fun MapViewer(
     }
 
     // Recalculate approach point when final approach distance changes
-    LaunchedEffect(mapState.finalApproachDistanceNm, mapState.selectedRunwayIndex) {
+    // Include target position (lat/lon) to auto-update when marker moves
+    LaunchedEffect(
+        mapState.finalApproachDistanceNm,
+        mapState.selectedRunwayIndex,
+        mapState.originalAirportTarget?.latitude,
+        mapState.originalAirportTarget?.longitude
+    ) {
         val index = mapState.selectedRunwayIndex
         val runway = mapState.selectedRunway
         val target = mapState.originalAirportTarget
@@ -879,7 +922,22 @@ fun MapViewer(
     }
 
     // Generate and draw traffic pattern when enabled (supports both runways and manual heading)
-    LaunchedEffect(mapState.showTrafficPattern, mapState.selectedRunway, mapState.mapView, mapState.patternSize, mapState.patternDirection, mapState.originalAirportTarget, mapState.patternFinalDistanceNm, mapState.customPatternAltitudeAglFt, mapState.selectedRunwayHeading) {
+    // Include target position (lat/lon), elevation, and metadata to auto-update when marker moves
+    LaunchedEffect(
+        mapState.showTrafficPattern,
+        mapState.selectedRunway,
+        mapState.mapView,
+        mapState.patternSize,
+        mapState.patternDirection,
+        mapState.originalAirportTarget,
+        mapState.originalAirportTarget?.latitude,
+        mapState.originalAirportTarget?.longitude,
+        mapState.originalAirportTarget?.elevationM,
+        mapState.originalAirportTarget?.metadata,
+        mapState.patternFinalDistanceNm,
+        mapState.customPatternAltitudeAglFt,
+        mapState.selectedRunwayHeading
+    ) {
         val mv = mapState.mapView ?: return@LaunchedEffect
         val target = mapState.originalAirportTarget ?: return@LaunchedEffect
         
