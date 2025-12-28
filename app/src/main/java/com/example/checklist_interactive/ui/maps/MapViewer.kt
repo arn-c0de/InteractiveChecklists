@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.awaitCancellation
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontFamily
@@ -1761,405 +1762,103 @@ fun MapViewer(
         // Load and display TACTICAL UNITS from database (live tracking)
         val isEntityTrackingEnabled by dataPadManager.isEntityTrackingEnabled.collectAsState()
         val showTacticalUnitsOnMap by dataPadManager.showTacticalUnitsOnMap.collectAsState()
-        
-        // Track unit markers separately (outside LaunchedEffect so they persist across restarts)
-        val unitMarkers = remember { mutableMapOf<Int, org.osmdroid.views.overlay.Marker>() }
-        
-        // Restart effect when visibility settings change - this ensures immediate cleanup
-        LaunchedEffect(mapState.mapView, tacticalUnitsRepository, isEntityTrackingEnabled, showTacticalUnitsOnMap) {
-            val mv = mapState.mapView
-            val repo = tacticalUnitsRepository
 
-            Log.d(TAG, "📡 Settings changed: mapView=${mv != null}, repo=${repo != null}, entityTracking=$isEntityTrackingEnabled, showOnMap=$showTacticalUnitsOnMap, markers=${unitMarkers.size}")
-
-            // IMMEDIATELY remove all markers if visibility is disabled
-            if (!showTacticalUnitsOnMap) {
-                if (mv != null && unitMarkers.isNotEmpty()) {
-                    Log.d(TAG, "📡 Map visibility disabled - removing ${unitMarkers.size} tactical unit markers from map")
-                    unitMarkers.values.forEach { marker ->
-                        try {
-                            mv.overlays.remove(marker)
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error removing tactical unit marker: ${e.message}")
-                        }
-                    }
-                    unitMarkers.clear()
-                    mv.invalidate()
-                    Log.d(TAG, "📡 All tactical unit markers removed")
-                }
-
-                Log.d(TAG, "📡 Tactical units map visibility disabled - units hidden")
-                return@LaunchedEffect // Exit early - don't start tracking
-            }
-
-            // If entity tracking is disabled, we'll still show historical units when visibility is enabled
-            if (!isEntityTrackingEnabled) {
-                Log.d(TAG, "📡 Entity tracking disabled - will display historical units on map (if enabled)")
-            }
-
-            // Only continue if all conditions are met
-            if (mv == null || repo == null) {
-                Log.d(TAG, "📡 MapView or Repository not ready - waiting...")
-                return@LaunchedEffect
-            }
-
-            try {
-                Log.d(TAG, "📡 Starting tactical units live tracking on map")
-
-                // Create a ticker flow that emits based on update interval
-                // This ensures we update at the specified rate regardless of database update frequency
-                var lastUnits: List<com.example.checklist_interactive.data.tactical.TacticalUnitEntity> = emptyList()
-                
-                // Collect latest units from database
-                // Switch between all active units and live-only units based on DataPadManager setting
-                val unitsJob = launch {
-                    combine(
-                        dataPadManager.tacticalUnitsShowLiveOnly,
-                        dataPadManager.isEntityTrackingEnabled,
-                        repo.getAllActiveUnits(),
-                        repo.getLiveUnits()
-                    ) { showLiveOnly, isTrackingEnabled, allUnits, liveUnits ->
-                        if (!isTrackingEnabled) allUnits
-                        else if (showLiveOnly) liveUnits
-                        else allUnits
-                    }.collect { units ->
-                        Log.d(TAG, "📡 Database units updated: ${units.size} units collected")
-                        lastUnits = units
-
-                        // Immediately remove markers for units that are no longer in the database
-                        val currentUnitIds = units.map { it.id }.toSet()
-                        val markersToRemove = unitMarkers.filter { it.key !in currentUnitIds }
-                        if (markersToRemove.isNotEmpty()) {
-                            Log.d(TAG, "📡 Immediately removing ${markersToRemove.size} deleted unit markers")
-                            markersToRemove.forEach { (unitId, marker) ->
-                                mv.overlays.remove(marker)
-                                unitMarkers.remove(unitId)
-                            }
-                            mv.invalidate() // Refresh map display
-                        }
-                    }
-                }
-                
-                // Separate coroutine for map updates at user-defined interval
-                val updateJob = launch {
-                    // Wait for initial data to be loaded before starting the update loop
-                    var retryCount = 0
-                    Log.d(TAG, "📡 Waiting for initial tactical units data...")
-                    while (lastUnits.isEmpty() && retryCount < 50 && isActive) { // Max 5 seconds wait
-                        delay(100)
-                        retryCount++
-                    }
-                    
-                    if (lastUnits.isEmpty()) {
-                        Log.w(TAG, "📡 No tactical units data after 5 seconds wait")
-                    } else {
-                        Log.d(TAG, "📡 Initial data loaded: ${lastUnits.size} units")
-                    }
-
-                    while (isActive) {
-                        val updateIntervalSeconds = dataPadManager.tacticalUnitsMapUpdateInterval.value
-
-                        if (lastUnits.isNotEmpty()) {
-                            Log.d(TAG, "📡 Updating ${lastUnits.size} tactical units on map (interval: ${updateIntervalSeconds}s)")
-                            val units = lastUnits // Snapshot current data
-                    
-                    // Remove markers for units that are no longer active
-                    val currentUnitIds = units.map { it.id }.toSet()
-                    val markersToRemove = unitMarkers.filter { it.key !in currentUnitIds }
-                    if (markersToRemove.isNotEmpty()) {
-                        Log.d(TAG, "📡 Removing ${markersToRemove.size} inactive unit markers")
-                    }
-                    markersToRemove.forEach { (unitId, marker) ->
-                        mv.overlays.remove(marker)
-                        unitMarkers.remove(unitId)
-                    }
-                    
-                    // Update or create markers for active units
-                    units.forEach { unit ->
-                        val existingMarker = unitMarkers[unit.id]
-                        
-                        if (existingMarker != null) {
-                            // Update existing marker position, heading, and details
-                            val oldPos = existingMarker.position
-                            val newPos = GeoPoint(unit.latitude, unit.longitude)
-                            
-                            // Only update if position actually changed (avoid unnecessary redraws)
-                            if (oldPos.latitude != newPos.latitude || oldPos.longitude != newPos.longitude) {
-                                existingMarker.position = newPos
-                                Log.d(TAG, "📡 Updated unit ${unit.name}: ${oldPos.latitude},${oldPos.longitude} -> ${newPos.latitude},${newPos.longitude}")
-                            }
-                            
-                            // Update heading rotation
-                            unit.heading?.let { 
-                                existingMarker.rotation = it.toFloat()
-                            }
-                            
-                            // Update marker title and snippet with current data
-                            existingMarker.title = unit.name
-                            existingMarker.snippet = buildString {
-                                append("${unit.category.replaceFirstChar { it.uppercase() }}")
-                                append(" • ")
-                                append(when (unit.coalition) {
+        // Create tactical units overlay (persists across recomposition)
+        val tacticalUnitsOverlay = remember(tacticalUnitsRepository) {
+            tacticalUnitsRepository?.let { repo ->
+                TacticalUnitsMapOverlay(
+                    context = context,
+                    repository = repo,
+                    showLiveOnlyFlow = dataPadManager.tacticalUnitsShowLiveOnly,
+                    isEntityTrackingEnabledFlow = dataPadManager.isEntityTrackingEnabled,
+                    updateIntervalSecondsFlow = dataPadManager.tacticalUnitsMapUpdateInterval,
+                    getMapView = { mapState.mapView },
+                    onUnitClick = { tacticalUnit ->
+                        // Convert TacticalUnitEntity to temporary LocationEntity for navigation
+                        val tempLocation = com.example.checklist_interactive.data.tactical.LocationEntity(
+                            id = 0, // Temporary, no DB ID
+                            name = "${tacticalUnit.name} (${tacticalUnit.category})",
+                            latitude = tacticalUnit.latitude,
+                            longitude = tacticalUnit.longitude,
+                            elevationM = tacticalUnit.altitude,
+                            markerType = "tactical_unit",
+                            description = buildString {
+                                append("Coalition: ")
+                                append(when (tacticalUnit.coalition) {
                                     0 -> "Neutral"
                                     1 -> "Red"
                                     2 -> "Blue"
                                     else -> "Unknown"
                                 })
-                                unit.groupName?.let { if (it.isNotEmpty()) append("\nGroup: $it") }
-                                unit.speed?.let { append("\nSpeed: ${String.format("%.0f", it)} kts") }
-                                unit.altitude?.let { append("\nAlt: ${String.format("%.0f", it)} ft") }
-                                // Show last seen time
+                                tacticalUnit.groupName?.let { append("\nGroup: $it") }
+                                tacticalUnit.pilotName?.let { append("\nPilot: $it") }
+                            },
+                            isStatic = 1,
+                            source = "tactical_tracking"
+                        )
+
+                        // Set selected location and show route management
+                        mapState.selectedLocation = tempLocation
+                        mapState.showMarkerRouteManagement = true
+
+                        // Center on marker
+                        mapState.mapView?.let { mv ->
+                            (context as? android.app.Activity)?.runOnUiThread {
                                 try {
-                                    val lastSeen = java.time.Instant.parse(unit.lastSeenAt)
-                                    val now = java.time.Instant.now()
-                                    val secondsAgo = java.time.Duration.between(lastSeen, now).seconds
-                                    append("\nLast seen: ")
-                                    if (secondsAgo < 60) append("${secondsAgo}s ago")
-                                    else if (secondsAgo < 3600) append("${secondsAgo / 60}m ago")
-                                    else append("${secondsAgo / 3600}h ago")
+                                    mv.controller?.animateTo(org.osmdroid.util.GeoPoint(tacticalUnit.latitude, tacticalUnit.longitude))
+                                    mv.invalidate()
                                 } catch (_: Exception) { }
                             }
-
-                            // Update stored unit data
-                            try { existingMarker.setRelatedObject(unit) } catch (_: Throwable) { }
-
-                            // Ensure click listener is set (in case marker was created before click handler was added)
-                            existingMarker.setOnMarkerClickListener { clickedMarker, _ ->
-                                try {
-                                    val tacticalUnit = clickedMarker?.relatedObject as? com.example.checklist_interactive.data.tactical.TacticalUnitEntity
-                                    if (tacticalUnit != null) {
-                                        // Convert TacticalUnitEntity to temporary LocationEntity for navigation
-                                        val tempLocation = com.example.checklist_interactive.data.tactical.LocationEntity(
-                                            id = 0, // Temporary, no DB ID
-                                            name = "${tacticalUnit.name} (${tacticalUnit.category})",
-                                            latitude = tacticalUnit.latitude,
-                                            longitude = tacticalUnit.longitude,
-                                            elevationM = tacticalUnit.altitude, // Transfer altitude from tactical unit
-                                            markerType = "tactical_unit",
-                                            description = buildString {
-                                                append("Coalition: ")
-                                                append(when (tacticalUnit.coalition) {
-                                                    0 -> "Neutral"
-                                                    1 -> "Red"
-                                                    2 -> "Blue"
-                                                    else -> "Unknown"
-                                                })
-                                                tacticalUnit.groupName?.let { append("\nGroup: $it") }
-                                                tacticalUnit.pilotName?.let { append("\nPilot: $it") }
-                                            },
-                                            isStatic = 1, // Prevent editing/moving
-                                            source = "tactical_tracking"
-                                        )
-
-                                        // Set selected location and show route management
-                                        mapState.selectedLocation = tempLocation
-                                        mapState.showMarkerRouteManagement = true
-
-                                        // Center on marker
-                                        (context as? android.app.Activity)?.runOnUiThread {
-                                            try {
-                                                mv.controller?.animateTo(clickedMarker.position)
-                                                mv.invalidate()
-                                            } catch (_: Exception) { }
-                                        }
-
-                                        Log.d(TAG, "📡 Tactical unit marker clicked: ${tacticalUnit.name}")
-                                    }
-                                } catch (e: Exception) {
-                                    Log.e(TAG, "Error handling tactical unit marker click: ${e.message}")
-                                }
-                                true
-                            }
-                        } else {
-                            // Create new marker for this unit
-                            val markerIcon = withContext(kotlinx.coroutines.Dispatchers.Default) {
-                                try {
-                                    // Coalition color
-                                    val coalitionColor = when (unit.coalition) {
-                                        0 -> android.graphics.Color.parseColor("#999999") // Neutral (gray)
-                                        1 -> android.graphics.Color.parseColor("#FF4444") // Red (hostile)
-                                        2 -> android.graphics.Color.parseColor("#00A8FF") // Blue (friendly)
-                                        else -> android.graphics.Color.parseColor("#FFFF80") // Unknown (yellow)
-                                    }
-                                    
-                                    // Try to load category-specific icon
-                                    val categoryIcon = when (unit.category.lowercase()) {
-                                        "aircraft" -> "ic_mapicon_fighter"
-                                        "helicopter" -> "ic_mapicon_helicopter"
-                                        "ground" -> "ic_mapicon_armor"
-                                        "ship" -> "ic_mapicon_ship"
-                                        else -> null
-                                    }
-                                    
-                                    var drawable: BitmapDrawable? = null
-                                    
-                                    categoryIcon?.let { iconName ->
-                                        val iconResId = context.resources.getIdentifier(iconName, "drawable", context.packageName)
-                                        if (iconResId != 0) {
-                                            ContextCompat.getDrawable(context, iconResId)?.mutate()?.let { d ->
-                                                val bitmap = android.graphics.Bitmap.createBitmap(64, 64, android.graphics.Bitmap.Config.ARGB_8888)
-                                                val canvas = android.graphics.Canvas(bitmap)
-                                                d.setBounds(0, 0, 64, 64)
-                                                val colorFilter = android.graphics.PorterDuffColorFilter(coalitionColor, android.graphics.PorterDuff.Mode.SRC_ATOP)
-                                                d.colorFilter = colorFilter
-                                                d.draw(canvas)
-                                                drawable = BitmapDrawable(context.resources, bitmap)
-                                            }
-                                        }
-                                    }
-                                    
-                                    // Fallback: colored circle with coalition color
-                                    if (drawable == null) {
-                                        val bitmap = android.graphics.Bitmap.createBitmap(48, 48, android.graphics.Bitmap.Config.ARGB_8888)
-                                        val canvas = android.graphics.Canvas(bitmap)
-                                        val paint = android.graphics.Paint().apply { 
-                                            isAntiAlias = true
-                                            color = coalitionColor
-                                            style = android.graphics.Paint.Style.FILL
-                                        }
-                                        val strokePaint = android.graphics.Paint().apply {
-                                            isAntiAlias = true
-                                            color = android.graphics.Color.WHITE
-                                            style = android.graphics.Paint.Style.STROKE
-                                            strokeWidth = 3f
-                                        }
-                                        canvas.drawCircle(24f, 24f, 16f, paint)
-                                        canvas.drawCircle(24f, 24f, 16f, strokePaint)
-                                        
-                                        // Add category indicator
-                                        val textPaint = android.graphics.Paint().apply {
-                                            isAntiAlias = true
-                                            color = android.graphics.Color.WHITE
-                                            textSize = 14f
-                                            textAlign = android.graphics.Paint.Align.CENTER
-                                            isFakeBoldText = true
-                                        }
-                                        val categoryLetter = unit.category.firstOrNull()?.uppercaseChar()?.toString() ?: "U"
-                                        canvas.drawText(categoryLetter, 24f, 28f, textPaint)
-                                        
-                                        drawable = BitmapDrawable(context.resources, bitmap)
-                                    }
-                                    
-                                    drawable
-                                } catch (e: Exception) {
-                                    Log.e(TAG, "Failed to create tactical unit icon: ${e.message}")
-                                    null
-                                }
-                            }
-                            
-                            val newMarker = org.osmdroid.views.overlay.Marker(mv).apply {
-                                position = GeoPoint(unit.latitude, unit.longitude)
-                                title = unit.name
-                                snippet = buildString {
-                                    append("${unit.category.replaceFirstChar { it.uppercase() }}")
-                                    append(" • ")
-                                    append(when (unit.coalition) {
-                                        0 -> "Neutral"
-                                        1 -> "Red"
-                                        2 -> "Blue"
-                                        else -> "Unknown"
-                                    })
-                                    unit.groupName?.let { if (it.isNotEmpty()) append("\nGroup: $it") }
-                                    unit.speed?.let { append("\nSpeed: ${String.format("%.0f", it)} kts") }
-                                    unit.altitude?.let { append("\nAlt: ${String.format("%.0f", it)} ft") }
-                                    // Show last seen time
-                                    try {
-                                        val lastSeen = java.time.Instant.parse(unit.lastSeenAt)
-                                        val now = java.time.Instant.now()
-                                        val secondsAgo = java.time.Duration.between(lastSeen, now).seconds
-                                        append("\nLast seen: ")
-                                        if (secondsAgo < 60) append("${secondsAgo}s ago")
-                                        else if (secondsAgo < 3600) append("${secondsAgo / 60}m ago")
-                                        else append("${secondsAgo / 3600}h ago")
-                                    } catch (_: Exception) { }
-                                }
-                                setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_CENTER)
-                                
-                                // Set heading rotation
-                                unit.heading?.let { rotation = it.toFloat() }
-                                
-                                // Set icon
-                                markerIcon?.let { icon = it }
-                                
-                                // Store unit data
-                                try { setRelatedObject(unit) } catch (_: Throwable) { }
-
-                                // Add click listener for navigation
-                                setOnMarkerClickListener { clickedMarker, _ ->
-                                    try {
-                                        val tacticalUnit = clickedMarker?.relatedObject as? com.example.checklist_interactive.data.tactical.TacticalUnitEntity
-                                        if (tacticalUnit != null) {
-                                            // Convert TacticalUnitEntity to temporary LocationEntity for navigation
-                                            val tempLocation = com.example.checklist_interactive.data.tactical.LocationEntity(
-                                                id = 0, // Temporary, no DB ID
-                                                name = "${tacticalUnit.name} (${tacticalUnit.category})",
-                                                latitude = tacticalUnit.latitude,
-                                                longitude = tacticalUnit.longitude,
-                                                elevationM = tacticalUnit.altitude, // Transfer altitude from tactical unit
-                                                markerType = "tactical_unit",
-                                                description = buildString {
-                                                    append("Coalition: ")
-                                                    append(when (tacticalUnit.coalition) {
-                                                        0 -> "Neutral"
-                                                        1 -> "Red"
-                                                        2 -> "Blue"
-                                                        else -> "Unknown"
-                                                    })
-                                                    tacticalUnit.groupName?.let { append("\nGroup: $it") }
-                                                    tacticalUnit.pilotName?.let { append("\nPilot: $it") }
-                                                },
-                                                isStatic = 1, // Prevent editing/moving
-                                                source = "tactical_tracking"
-                                            )
-
-                                            // Set selected location and show route management
-                                            mapState.selectedLocation = tempLocation
-                                            mapState.showMarkerRouteManagement = true
-
-                                            // Center on marker
-                                            (context as? android.app.Activity)?.runOnUiThread {
-                                                try {
-                                                    mv.controller?.animateTo(clickedMarker.position)
-                                                    mv.invalidate()
-                                                } catch (_: Exception) { }
-                                            }
-
-                                            Log.d(TAG, "📡 Tactical unit marker clicked: ${tacticalUnit.name}")
-                                        }
-                                    } catch (e: Exception) {
-                                        Log.e(TAG, "Error handling tactical unit marker click: ${e.message}")
-                                    }
-                                    true
-                                }
-                            }
-
-                            mv.overlays.add(newMarker)
-                            unitMarkers[unit.id] = newMarker
-                            Log.d(TAG, "📡 Created new marker for unit: ${unit.name} (${unit.category})")
                         }
+
+                        Log.d(TAG, "📡 Tactical unit clicked: ${tacticalUnit.name}")
                     }
-                    
-                    // Force map redraw to show updated positions
-                    withContext(kotlinx.coroutines.Dispatchers.Main) {
-                        mv.invalidate()
-                    }
-                    Log.d(TAG, "📡 Map updated with ${unitMarkers.size} tactical unit markers")
-                        }
-                        
-                        // Wait for next update cycle
-                        kotlinx.coroutines.delay((updateIntervalSeconds * 1000).toLong())
-                    }
+                )
+            }
+        }
+
+        // Manage tactical units overlay lifecycle
+        LaunchedEffect(mapState.mapView, tacticalUnitsRepository, isEntityTrackingEnabled, showTacticalUnitsOnMap, tacticalUnitsOverlay) {
+            val mv = mapState.mapView
+            val repo = tacticalUnitsRepository
+            val overlay = tacticalUnitsOverlay
+
+            Log.d(TAG, "📡 Settings changed: mapView=${mv != null}, repo=${repo != null}, overlay=${overlay != null}, entityTracking=$isEntityTrackingEnabled, showOnMap=$showTacticalUnitsOnMap")
+
+            // Remove overlay if visibility is disabled
+            if (!showTacticalUnitsOnMap || overlay == null) {
+                if (mv != null && overlay != null) {
+                    Log.d(TAG, "📡 Removing tactical units overlay from map")
+                    mv.overlays.remove(overlay)
+                    overlay.stopTracking()
+                    mv.invalidate()
                 }
-                
-                // Wait for jobs to complete or be cancelled
-                try {
-                    unitsJob.join()
-                    updateJob.join()
-                } catch (e: kotlinx.coroutines.CancellationException) {
-                    Log.d(TAG, "📡 Tracking jobs cancelled")
+                Log.d(TAG, "📡 Tactical units map visibility disabled - overlay hidden")
+                return@LaunchedEffect // Exit early
+            }
+
+            // Only continue if all conditions are met
+            if (mv == null) {
+                Log.d(TAG, "📡 MapView not ready - waiting...")
+                return@LaunchedEffect
+            }
+
+            try {
+                Log.d(TAG, "📡 Adding tactical units overlay to map and starting tracking")
+
+                // Add overlay to map if not already present
+                if (!mv.overlays.contains(overlay)) {
+                    mv.overlays.add(overlay)
+                    Log.d(TAG, "📡 Tactical units overlay added to map")
                 }
+
+                // Start tracking with this coroutine scope
+                overlay.startTracking(this)
+
+                // Cleanup on effect cancellation
+                awaitCancellation()
             } catch (e: Exception) {
-                Log.e(TAG, "📡 Error in tactical units tracking: ${e.message}", e)
+                Log.e(TAG, "📡 Error in tactical units overlay: ${e.message}", e)
             }
         }
         

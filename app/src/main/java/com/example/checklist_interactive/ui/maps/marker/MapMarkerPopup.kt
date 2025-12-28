@@ -48,6 +48,46 @@ import com.example.checklist_interactive.data.tactical.LocationEntity
 import com.example.checklist_interactive.data.tactical.RunwayEntity
 import org.json.JSONObject
 
+private fun formatLatLon(lat: Double, lon: Double): String {
+    val latPrefix = if (lat >= 0) "N" else "S"
+    val lonPrefix = if (lon >= 0) "E" else "W"
+    val latAbs = String.format(java.util.Locale.getDefault(), "%.4f", kotlin.math.abs(lat))
+    val lonAbs = String.format(java.util.Locale.getDefault(), "%.4f", kotlin.math.abs(lon))
+    return "$latPrefix $latAbs, $lonPrefix $lonAbs"
+}
+
+private fun extractHeadingFromLocation(location: com.example.checklist_interactive.data.tactical.LocationEntity): Double? {
+    // 1) Try metadata JSON
+    location.metadata?.let { meta ->
+        try {
+            val obj = JSONObject(meta)
+            if (obj.has("heading") && !obj.isNull("heading")) {
+                val v = obj.optDouble("heading")
+                if (!v.isNaN()) return v
+                val s = obj.optString("heading", "")
+                s.toDoubleOrNull()?.let { return it }
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    // 2) Try description text (e.g., "HDG 123")
+    location.description.takeIf { it.isNotEmpty() }?.let { desc ->
+        val regex = Regex("(?i)\\b(?:hdg|heading)\\s*[:=]?\\s*([0-9]{1,3}(?:\\.[0-9]+)?)\\b")
+        val m = regex.find(desc)
+        if (m != null) return m.groupValues[1].toDoubleOrNull()
+    }
+
+    // 3) Try tags (e.g., "heading=123")
+    location.tags?.takeIf { it.isNotEmpty() }?.let { tags ->
+        val regex2 = Regex("(?i)\\bheading=([0-9]{1,3}(?:\\.[0-9]+)?)\\b")
+        val m2 = regex2.find(tags)
+        if (m2 != null) return m2.groupValues[1].toDoubleOrNull()
+    }
+
+    return null
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapMarkerPopup(
@@ -271,19 +311,33 @@ fun MapMarkerPopup(
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            val coordText = formatLatLon(location.latitude, location.longitude)
                             Text(
-                                text = "${String.format("%.4f", location.latitude)}, ${String.format("%.4f", location.longitude)}",
+                                text = coordText,
                                 style = MaterialTheme.typography.bodySmall
                             )
+
                             // Show altitude/height next to coordinates for tactical live markers
                             location.elevationM?.let { elevation ->
                                 Text(
-                                    text = "${String.format("%.0f", elevation)} m",
+                                    text = "${String.format(java.util.Locale.getDefault(), "%.0f", elevation)} m",
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary
                                 )
                             }
+                        }
+
+                        // Show heading below altitude if present (tries metadata, description, tags)
+                        val markerHdg = extractHeadingFromLocation(location)
+                        markerHdg?.let { hdg ->
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "${stringResource(R.string.heading_label)}: ${String.format(java.util.Locale.getDefault(), "%.0f°", (((hdg % 360) + 360) % 360))}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         }
                     }
 
