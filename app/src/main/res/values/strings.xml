@@ -1230,6 +1230,7 @@
     <string name="lon_label">Longitude</string>
     <string name="alt_label">Altitude</string>
     <string name="na_label">N/A</string>
+    <string name="unit_health_label">Health</string>
     <string name="navigation_title">Navigation</string>
     <string name="heading_label">Heading</string>
     <string name="speed_label">Speed</string>

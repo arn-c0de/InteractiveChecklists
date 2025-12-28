@@ -16,7 +16,7 @@ pcall(function()
 	local lastWrite = 0
 	local lastCommandCheck = 0
 	local COMMAND_CHECK_INTERVAL = 2.0 -- check for command file every 2 seconds
-	local STREAMER_VERSION = "1.0.9"
+	local STREAMER_VERSION = "1.0.10"
 	-- Maximum number of JSON lines to keep in the output file. Set to 0 to disable trimming.
 	local MAX_JSON_LINES = 20  -- Keep only last 20 lines (2 seconds @ 10 Hz) - MINIMAL buffer
 	local MAX_ENTITY_LINES = 2  -- Keep only last 2 lines for entity contacts (FAST load, minimal backlog)
@@ -285,7 +285,8 @@ pcall(function()
 						bearing = round(bearing, 2),
 						country = objData.Country or 0,
 						group = objData.GroupName or '',
-						pilot = objData.UnitName or ''
+						pilot = objData.UnitName or '',
+						health = objData.Life and round(objData.Life, 2) or nil
 					}
 					
 					table.insert(allUnits, unit)

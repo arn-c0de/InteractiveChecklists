@@ -2299,8 +2299,6 @@ fun MapViewer(
         // Flight Instruments Overlay
         val fd = flightData
         val instrumentsDataAvailable = fd != null
-        // Debug log to help diagnose visibility
-        android.util.Log.d("MapViewer", "flightInstrumentsEnabled=${mapState.flightInstrumentsEnabled} flightDataPresent=${instrumentsDataAvailable} pitch=${fd?.pitch} bank=${fd?.bank} vs=${fd?.verticalSpeed} ias=${fd?.indicatedAirspeed}")
 
         // Always show instruments when the overlay is enabled, even if we don't have flight data yet.
         if (mapState.flightInstrumentsEnabled) {
@@ -2310,8 +2308,6 @@ fun MapViewer(
                 val internal = fd?.fuel?.internal
                 if (internal != null) internal + (fd?.fuel?.external ?: 0.0) else null
             }
-
-            android.util.Log.d("MapViewer", "fuel rem=$fuelRemainingValue total=$fuelTotalValue fuelObj=${fd?.fuel}")
 
             // Compute sensible gLoad value: prefer vertical axis (y), then z, else use vector magnitude
             val gLoadValue: Double? = fd?.gLoad?.let { g ->
@@ -2327,8 +2323,6 @@ fun MapViewer(
                     }
                 }
             }
-
-            android.util.Log.d("MapViewer", "gLoadObj=${fd?.gLoad} selected_g=${gLoadValue}")
 
             MapFlightInstruments(
                 pitch = if (fd != null) Math.toDegrees(fd.pitch) else 0.0, // Convert radians to degrees if available, otherwise placeholder

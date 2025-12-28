@@ -903,6 +903,45 @@ private fun UnitCard(
                         }
                     }
                     
+                    // Health bar
+                    unit.health?.let { health ->
+                        Text(
+                            text = stringResource(R.string.unit_health_label),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            LinearProgressIndicator(
+                                progress = health.toFloat().coerceIn(0f, 1f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(12.dp)
+                                    .clip(RoundedCornerShape(6.dp)),
+                                color = when {
+                                    health > 0.7 -> Color(0xFF4CAF50) // Green
+                                    health > 0.3 -> Color(0xFFFFA726) // Orange
+                                    else -> Color(0xFFE53935) // Red
+                                },
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                            Text(
+                                text = "${(health * 100).toInt()}%",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = when {
+                                    health > 0.7 -> Color(0xFF4CAF50)
+                                    health > 0.3 -> Color(0xFFFFA726)
+                                    else -> Color(0xFFE53935)
+                                }
+                            )
+                        }
+                    }
+
                     // Navigation data
                     if (unit.heading != null || unit.speed != null || unit.distance != null) {
                         Text(
