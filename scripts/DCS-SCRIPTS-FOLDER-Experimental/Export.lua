@@ -159,7 +159,7 @@ pcall(function()
 	end
 
 	-- Maximum distance for unit tracking (meters) - 150km radius for better tactical awareness
-	local MAX_UNIT_DISTANCE = 150000  -- 150km (increased from 50km)
+	local MAX_UNIT_DISTANCE = 100000  -- 150km (increased from 50km)
 	local MAX_UNITS_PER_FRAME = 200  -- Hard limit to prevent huge JSON payloads (increased from 100)
 	
 	-- Collect all nearby units (aircraft, ground, ships, structures)
@@ -314,7 +314,7 @@ pcall(function()
 		local data = {
 			timestamp = generate_timestamp(),
 			streamer_version = STREAMER_VERSION,
-			dataAge = 0.0,
+			dataAge = 0.250,
 			updateRate = 1.0 / UPDATE_INTERVAL
 		}
 
