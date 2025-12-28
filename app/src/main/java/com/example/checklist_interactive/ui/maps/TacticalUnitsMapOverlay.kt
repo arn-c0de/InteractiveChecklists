@@ -36,10 +36,36 @@ class TacticalUnitsMapOverlay(
 ) : Overlay() {
 
     private val units = mutableMapOf<Int, TacticalUnitEntity>()
-    private val unitArrows = mutableMapOf<Int, Bitmap>() // Arrows for each unit with matching color
+
+    // Cache arrow bitmaps by coalition color (only 4 bitmaps needed for all units!)
+    private val arrowBitmapCache = mutableMapOf<Int, Bitmap>()
 
     private var updateJob: Job? = null
     private var dataCollectorJob: Job? = null
+
+    // Reusable Paint objects to avoid creating them on every draw
+    private val circleFillPaint = Paint().apply {
+        isAntiAlias = true
+        style = Paint.Style.FILL
+    }
+
+    private val circleStrokePaint = Paint().apply {
+        isAntiAlias = true
+        color = Color.WHITE
+        style = Paint.Style.STROKE
+        strokeWidth = 3f
+    }
+
+    private val textPaint = Paint().apply {
+        isAntiAlias = true
+        color = Color.WHITE
+        textSize = 18f
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+    }
+
+    // Reusable Rect for text bounds calculation
+    private val textBounds = Rect()
 
     // Paint for debug info
     private val debugPaint = Paint().apply {
@@ -79,7 +105,7 @@ class TacticalUnitsMapOverlay(
                 val toRemove = units.keys.filter { it !in currentUnitIds }
                 toRemove.forEach { unitId: Int ->
                     units.remove(unitId)
-                    unitArrows.remove(unitId)
+                    // Arrow bitmaps are cached by coalition color, not removed per unit
                 }
 
                 // Update existing units and add new ones
@@ -136,7 +162,7 @@ class TacticalUnitsMapOverlay(
         updateJob?.cancel()
         dataCollectorJob?.cancel()
         units.clear()
-        unitArrows.clear()
+        arrowBitmapCache.clear()
     }
 
     /**
@@ -144,12 +170,7 @@ class TacticalUnitsMapOverlay(
      */
     fun updateUnit(unit: TacticalUnitEntity) {
         units[unit.id] = unit
-
-        // Create arrow if needed (circle is now drawn directly, no icon needed)
-        if (unit.id !in unitArrows) {
-            val coalitionColor = getCoalitionColor(unit.coalition)
-            unitArrows[unit.id] = createArrowBitmap(coalitionColor)
-        }
+        // Arrow bitmaps are now cached by coalition color, created on-demand in draw()
     }
 
     /**
@@ -157,7 +178,17 @@ class TacticalUnitsMapOverlay(
      */
     fun removeUnit(unitId: Int) {
         units.remove(unitId)
-        unitArrows.remove(unitId)
+        // No need to remove arrow - they're cached by coalition, not by unit
+    }
+
+    /**
+     * Get or create arrow bitmap for a coalition color (cached)
+     */
+    private fun getArrowBitmap(coalition: Int): Bitmap {
+        val color = getCoalitionColor(coalition)
+        return arrowBitmapCache.getOrPut(color) {
+            createArrowBitmap(color)
+        }
     }
 
     /**
@@ -178,21 +209,22 @@ class TacticalUnitsMapOverlay(
         val projection = mapView.projection
         val mapRotation = mapView.mapOrientation // Map rotation in degrees
 
-        units.values.forEach { unit ->
+        // Pre-calculate all screen positions once for better performance
+        val unitPositions = units.values.mapNotNull { unit ->
             val geoPoint = GeoPoint(unit.latitude, unit.longitude)
             val screenPoint = projection.toPixels(geoPoint, null)
-            
-            // For OSMDroid Overlay: projection.toPixels() already gives correct position
-            // DO NOT manually rotate - that's only for external Compose overlays!
+            unit to screenPoint
+        }
 
-            // Draw heading arrow FIRST (points in absolute map heading direction)
+        // BATCH 1: Draw all heading arrows together
+        unitPositions.forEach { (unit, screenPoint) ->
             unit.heading?.let { heading ->
-                // Arrow must point in true map direction, compensating for map rotation
-                drawHeadingArrow(canvas, screenPoint, unit.id, heading, mapRotation)
+                drawHeadingArrow(canvas, screenPoint, unit.coalition, heading, mapRotation)
             }
+        }
 
-            // Draw circle marker with letter SECOND
-            // Circle doesn't rotate, letter stays readable
+        // BATCH 2: Draw all circle markers together
+        unitPositions.forEach { (unit, screenPoint) ->
             drawCircleMarker(canvas, screenPoint, unit, mapRotation)
         }
     }
@@ -203,48 +235,26 @@ class TacticalUnitsMapOverlay(
      */
     private fun drawCircleMarker(canvas: Canvas, point: Point, unit: TacticalUnitEntity, mapRotation: Float) {
         val coalitionColor = getCoalitionColor(unit.coalition)
-        val size = 48f
-        val center = size / 2f
-        val radius = size / 3f
+        val radius = 16f // size / 3f where size = 48f
 
-        // Paint for filled circle
-        val fillPaint = Paint().apply {
-            isAntiAlias = true
-            color = coalitionColor
-            style = Paint.Style.FILL
-        }
-
-        // Paint for white border
-        val strokePaint = Paint().apply {
-            isAntiAlias = true
-            color = Color.WHITE
-            style = Paint.Style.STROKE
-            strokeWidth = 3f
-        }
+        // Update fill paint color for this unit
+        circleFillPaint.color = coalitionColor
 
         canvas.save()
-        
+
         // Translate to marker position
         canvas.translate(point.x.toFloat(), point.y.toFloat())
-        
+
         // NO rotation for circle - it stays with map orientation
 
-        // Draw filled circle
-        canvas.drawCircle(0f, 0f, radius, fillPaint)
-        canvas.drawCircle(0f, 0f, radius, strokePaint)
+        // Draw filled circle and white border using reusable Paint objects
+        canvas.drawCircle(0f, 0f, radius, circleFillPaint)
+        canvas.drawCircle(0f, 0f, radius, circleStrokePaint)
 
         // NOW counter-rotate ONLY for text to keep it readable
         canvas.rotate(-mapRotation)
 
-        // Draw category letter
-        val textPaint = Paint().apply {
-            isAntiAlias = true
-            color = Color.WHITE
-            textSize = 18f
-            textAlign = Paint.Align.CENTER
-            isFakeBoldText = true
-        }
-
+        // Draw category letter using reusable Paint object
         val categoryLetter = when (unit.category.lowercase()) {
             "aircraft" -> "A"
             "helicopter" -> "H"
@@ -255,8 +265,7 @@ class TacticalUnitsMapOverlay(
             else -> "U" // Unknown
         }
 
-        // Center text vertically (account for text baseline)
-        val textBounds = Rect()
+        // Center text vertically (account for text baseline) using reusable Rect
         textPaint.getTextBounds(categoryLetter, 0, categoryLetter.length, textBounds)
         val textY = -textBounds.exactCenterY()
 
@@ -269,8 +278,8 @@ class TacticalUnitsMapOverlay(
      * Draw heading arrow that points in TRUE map direction
      * Arrow rotates with heading, stays fixed relative to map (not screen)
      */
-    private fun drawHeadingArrow(canvas: Canvas, point: Point, unitId: Int, heading: Double, mapRotation: Float) {
-        val arrowBitmap = unitArrows[unitId] ?: return
+    private fun drawHeadingArrow(canvas: Canvas, point: Point, coalition: Int, heading: Double, mapRotation: Float) {
+        val arrowBitmap = getArrowBitmap(coalition)
 
         canvas.save()
 
