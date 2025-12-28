@@ -912,7 +912,7 @@ fun MapViewer(
             // Update navigation target with new approach point
             val approachTarget = target.copy(
                 id = -1,
-                name = "${target.name} RWY ${String.format("%02d", heading.toInt() / 10)}",
+                name = target.name, // Keep original name, RWY indicator shown in UI
                 latitude = endpoint.latitude,
                 longitude = endpoint.longitude
             )
@@ -1023,7 +1023,7 @@ fun MapViewer(
             // This creates a red line from current position to the pattern landing point
             val patternTarget = target.copy(
                 id = -2, // Special ID for pattern navigation
-                name = "${target.name} PATTERN ${String.format("%02d", runwayHeading.toInt() / 10)}",
+                name = target.name, // Keep original name, PATTERN indicator shown in UI
                 latitude = runwayThreshold.latitude,
                 longitude = runwayThreshold.longitude
             )

@@ -249,12 +249,41 @@ fun MapNavigationDisplay(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.map_nav_route_to, activeNavigationTarget?.name ?: ""),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = stringResource(R.string.map_nav_route_to,
+                                    activeNavigationTarget?.name
+                                        ?.replace(Regex(" PATTERN \\d+"), "")
+                                        ?.replace(Regex(" RWY \\d+"), "") ?: ""),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            // Show PATTERN or RWY indicator when active (fixed, doesn't blink)
+                            selectedRunwayHeading?.let { hdg ->
+                                val indicatorText = if (showTrafficPattern) {
+                                    "PATTERN ${String.format("%02d", hdg.toInt() / 10)}"
+                                } else if (showRunwayApproach) {
+                                    "RWY ${String.format("%02d", hdg.toInt() / 10)}"
+                                } else {
+                                    null
+                                }
+                                indicatorText?.let {
+                                    Text(
+                                        text = it,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(start = 8.dp)
+                                    )
+                                }
+                            }
+                        }
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                             modifier = Modifier.padding(top = 4.dp)
@@ -275,30 +304,24 @@ fun MapNavigationDisplay(
                                     color = MaterialTheme.colorScheme.onErrorContainer
                                 )
                             }
-                            // Show marker altitude if available
-                            activeNavigationTarget?.elevationM?.let { elevation ->
+                        }
+                        // Show marker altitude in second row (meters and feet)
+                        activeNavigationTarget?.elevationM?.let { elevation ->
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                modifier = Modifier.padding(top = 2.dp)
+                            ) {
                                 Text(
                                     text = "${String.format("%.0f", elevation)} m",
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onErrorContainer
                                 )
-                            }
-                            // Show marker heading if available (live updates for tactical markers)
-                            val markerHeading = remember(
-                                originalAirportTarget,
-                                originalAirportTarget?.latitude,
-                                originalAirportTarget?.longitude,
-                                originalAirportTarget?.metadata
-                            ) {
-                                extractHeadingFromLocation(originalAirportTarget)
-                            }
-                            markerHeading?.let { hdg ->
                                 Text(
-                                    text = "M-HDG: ${String.format("%.0f°", ((hdg % 360 + 360) % 360))}",
+                                    text = "${String.format("%.0f", elevation * 3.28084)} ft",
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.secondary
+                                    color = MaterialTheme.colorScheme.onErrorContainer
                                 )
                             }
                         }
