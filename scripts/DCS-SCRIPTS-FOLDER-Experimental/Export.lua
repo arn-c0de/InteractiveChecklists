@@ -293,9 +293,19 @@ pcall(function()
 			end
 		end
 		
-		-- Sort by distance (closest first)
-		table.sort(allUnits, function(a, b) return a.distance < b.distance end)
-		
+		-- Sort by PRIORITY then distance: Aircraft/Helicopters first (they move fast!)
+		-- This ensures they're always in Batch 1+2 (sent more frequently in rotation)
+		table.sort(allUnits, function(a, b)
+			local priorityA = (a.category == 'aircraft' or a.category == 'helicopter') and 0 or 1
+			local priorityB = (b.category == 'aircraft' or b.category == 'helicopter') and 0 or 1
+
+			if priorityA ~= priorityB then
+				return priorityA < priorityB  -- Aircraft/Heli first
+			else
+				return a.distance < b.distance  -- Then by distance
+			end
+		end)
+
 		return allUnits
 	end
 	
