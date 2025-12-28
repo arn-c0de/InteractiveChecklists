@@ -22,9 +22,43 @@ import com.example.checklist_interactive.R
 import com.example.checklist_interactive.data.tactical.LocationEntity
 import com.example.checklist_interactive.data.tactical.RunwayEntity
 import com.example.checklist_interactive.data.tactical.TacticalDatabase
-import org.json.JSONObject
 import com.example.checklist_interactive.ui.maps.MapActionBus
 import com.example.checklist_interactive.ui.maps.marker.LocationEditDialog
+import org.json.JSONObject
+
+private fun formatLatLon(lat: Double, lon: Double): String {
+    val latPrefix = if (lat >= 0) "N" else "S"
+    val lonPrefix = if (lon >= 0) "E" else "W"
+    val latAbs = String.format(java.util.Locale.getDefault(), "%.4f", kotlin.math.abs(lat))
+    val lonAbs = String.format(java.util.Locale.getDefault(), "%.4f", kotlin.math.abs(lon))
+    return "$latPrefix $latAbs, $lonPrefix $lonAbs"
+}
+
+private fun extractHeadingFromLocation(location: com.example.checklist_interactive.data.tactical.LocationEntity): Double? {
+    location.metadata?.let { meta ->
+        try {
+            val obj = JSONObject(meta)
+            if (obj.has("heading") && !obj.isNull("heading")) {
+                val v = obj.optDouble("heading")
+                if (!v.isNaN()) return v
+                val s = obj.optString("heading", "")
+                s.toDoubleOrNull()?.let { return it }
+            }
+        } catch (_: Exception) {
+        }
+    }
+    location.description.takeIf { it.isNotEmpty() }?.let { desc ->
+        val regex = Regex("(?i)\\b(?:hdg|heading)\\s*[:=]?\\s*([0-9]{1,3}(?:\\.[0-9]+)?)\\b")
+        val m = regex.find(desc)
+        if (m != null) return m.groupValues[1].toDoubleOrNull()
+    }
+    location.tags?.takeIf { it.isNotEmpty() }?.let { tags ->
+        val regex2 = Regex("(?i)\\bheading=([0-9]{1,3}(?:\\.[0-9]+)?)\\b")
+        val m2 = regex2.find(tags)
+        if (m2 != null) return m2.groupValues[1].toDoubleOrNull()
+    }
+    return null
+}
 
 /**
  * Single marker navigation and details display
@@ -141,7 +175,7 @@ private fun MarkerDetailsHeader(location: LocationEntity) {
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "${String.format("%.4f", location.latitude)}, ${String.format("%.4f", location.longitude)}",
+            text = formatLatLon(location.latitude, location.longitude),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -149,7 +183,19 @@ private fun MarkerDetailsHeader(location: LocationEntity) {
         location.elevationM?.let { elevation ->
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = "Altitude: ${String.format("%.0f", elevation)} m (${String.format("%.0f", elevation * 3.28084)} ft)",
+                text = "Altitude: ${String.format(java.util.Locale.getDefault(), "%.0f", elevation)} m (${String.format(java.util.Locale.getDefault(), "%.0f", elevation * 3.28084)} ft)",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        // Show heading below altitude if present
+        val markerHdg = extractHeadingFromLocation(location)
+        markerHdg?.let { hdg ->
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "${stringResource(R.string.heading_label)}: ${String.format(java.util.Locale.getDefault(), "%.0f°", (((hdg % 360) + 360) % 360))}",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.primary
