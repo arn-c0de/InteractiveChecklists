@@ -1535,10 +1535,8 @@ fun MapViewer(
                                 if (now - lastUserTouch.value < 700) {
                                     prefsManager.setMapCenter(center.latitude, center.longitude)
                                     prefsManager.setMapAutoCenter(false)
-                                    Log.d(TAG, "User scroll detected — disabling auto-center (touch at ${now - lastUserTouch.value}ms)")
                                     // Use coroutine scope to properly update Compose state
                                     scope.launch {
-                                        Log.d(TAG, "User scroll - disabling autoCenter via scope.launch")
                                         mapState.autoCenter = false
                                     }
                                     return true
@@ -1546,7 +1544,6 @@ fun MapViewer(
 
                                 // Otherwise, ignore non-user-initiated scrolls (from animateTo)
                                 prefsManager.setMapCenter(center.latitude, center.longitude)
-                                Log.d(TAG, "Ignoring non-user scroll at ${now - lastProgrammaticMove.value}ms")
                                 return true
                             }
 
