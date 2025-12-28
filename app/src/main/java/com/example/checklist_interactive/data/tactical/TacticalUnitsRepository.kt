@@ -52,6 +52,14 @@ class TacticalUnitsRepository(private val context: Context) {
         return unitsDao.getUnitById(id)
     }
     
+    fun getUnitByIdFlow(id: Int): Flow<TacticalUnitEntity?> {
+        return unitsDao.getUnitByIdFlow(id)
+    }
+    
+    suspend fun getUnitByDcsId(dcsId: String): TacticalUnitEntity? {
+        return unitsDao.getUnitByDcsId(dcsId)
+    }
+    
     // --- Filter functions ---
     
     /**
