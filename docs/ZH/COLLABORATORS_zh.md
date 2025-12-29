@@ -22,8 +22,18 @@
 
 ## 🌟 Contributors
 
+### 翻译
+- **Ferinjoque** — 西班牙语翻译支持 — [https://github.com/Ferinjoque](https://github.com/Ferinjoque) (2025-12-23)
+- **Dawn3901** — 简体中文翻译支持 — [https://github.com/Dawn3901](https://github.com/Dawn3901) (2025-12-26)
 
+### 开发
+- _暂无_
 
+### 运维与基础设施
+- _暂无_
+
+### 支持
+- _暂无_
 
 ---
 
