@@ -29,7 +29,7 @@
 
 <div align="center">
 	<a href="README.md">English</a> |
-	<a href="README_zh.md">Chinse</a>
+	<a href="README_zh.md">Chinese (Simplified)</a>
 </div>
 
 # InteractiveChecklists
