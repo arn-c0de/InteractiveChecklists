@@ -191,7 +191,7 @@ cd InteractiveChecklists
 
 ## 贡献指南
 
-我们欢迎您为本应用做出任何贡献。有关指南、issue流程和编码标准，请参见[COLLABORATORS.md](COLLABORATORS.md)。
+我们欢迎您为本应用做出任何贡献。有关指南、issue流程和编码标准，请参见[COLLABORATORS_zh.md](COLLABORATORS_zh.md)。
 
 快速贡献思路：
 - 改进文档或添加示例。
@@ -212,7 +212,7 @@ cd InteractiveChecklists
 
 - 在此代码库中提 isuue。
 - 对于安全相关问题，请遵循 [SECURITY.md](SECURITY.md) 中的说明。
-- 有关贡献协调和讨论，请参见 [COLLABORATORS.md](COLLABORATORS_zh.md)。
+- 有关贡献协调和讨论，请参见 [COLLABORATORS_zh.md](COLLABORATORS_zh.md)。
 
 
 ## FAQ
