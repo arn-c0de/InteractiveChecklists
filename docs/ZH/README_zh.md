@@ -11,16 +11,16 @@
 
 
 <div align="center">
-	<a href="CHANGELOG.md">Changelog</a> |
-	<a href="docs/docnavigation_zh.md">Documentation</a> |
-	<a href="docs/planning/roadmap.md">Roadmap</a> |
-	<a href="SECURITY.md">Security Policy</a> |
-	<a href="LICENSE">License</a> |
-	<a href="COLLABORATORS.md">Collaborators</a>
+	<a href="../../CHANGELOG.md">Changelog</a> |
+	<a href="../EN/docnavigation.md">Documentation</a> |
+	<a href="../EN/planning/roadmap.md">Roadmap</a> |
+	<a href="../../SECURITY.md">Security Policy</a> |
+	<a href="../../LICENSE">License</a> |
+	<a href="../../COLLABORATORS.md">Collaborators</a>
 </div>
 
 <div align="center">
-	<a href="THIRD_PARTY_LICENSES.md">Third-Party Licenses</a>
+	<a href="../../THIRD_PARTY_LICENSES.md">Third-Party Licenses</a>
 </div>
 
 <p align="center">
@@ -70,9 +70,9 @@ InteractiveChecklists 是一款用于查看与操作 Markdown 及 PDF 清单的 
 - **标签系统:** 为文件分配标签以便筛选和组织。
 - **快速笔记:** 由 Room 提供支持的持久化笔记，支持搜索、自动保存和 Markdown。
 - **数据持久化:** 本地存储用户偏好设置、标注、快捷方式、标签和打开的标签页。
-- **DataPad (实验性):** 用于 DCS World 的实时飞行遥测数据显示（UDP）。 将飞机遥测数据流式传输到应用，以获取实时状态和弹窗详情——完整详情和设置说明请参见 `docs/features/DATAPAD_FEATURE.md`
-- **战术单位追踪 (实验性):** 在地图上实时更新显示战术单位标记（飞机、直升机、地面单位、舰船）。 标记弹窗包含 **“最后出现”** 时间戳以及刷新摘要（速度/高度）。**“仅显示活动单位”** 筛选器（显示最近 10 秒内出现的单位）在列表和地图间同步。设置和详情请参见 `docs/features/TACTICAL_UNITS_TRACKING.md` 和 `scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md` 
-- **航空地图 (实验性):** 基于 OpenStreetMap 的地图查看器，通过 DataPad 数据流实现实时飞机位置追踪。添加 `MapViewer` 标签页，显示飞机位置、航向、高度和基本覆盖层——详情和配置请参见 `docs/features/AVIATION_MAP_FEATURE.md`。
+- **DataPad (实验性):** 用于 DCS World 的实时飞行遥测数据显示（UDP）。 将飞机遥测数据流式传输到应用，以获取实时状态和弹窗详情——完整详情和设置说明请参见 `../EN/features/DATAPAD_FEATURE.md`
+- **战术单位追踪 (实验性):** 在地图上实时更新显示战术单位标记（飞机、直升机、地面单位、舰船）。 标记弹窗包含 **"最后出现"** 时间戳以及刷新摘要（速度/高度）。**"仅显示活动单位"** 筛选器（显示最近 10 秒内出现的单位）在列表和地图间同步。设置和详情请参见 `../EN/features/TACTICAL_UNITS_TRACKING.md` 和 `../../scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md` 
+- **航空地图 (实验性):** 基于 OpenStreetMap 的地图查看器，通过 DataPad 数据流实现实时飞机位置追踪。添加 `MapViewer` 标签页，显示飞机位置、航向、高度和基本覆盖层——详情和配置请参见 `../EN/features/AVIATION_MAP_FEATURE.md`。
 - **MapDatabaseTools (Python):** 一组用于接收、解密（AES-GCM）和可视化 DCS 飞行遥测数据的 Python 工具。包含一个带有嵌入式 OpenStreetMap/Leaflet 地图的 PySide6 GUI，用于实时飞机追踪、标记数据库以及管理地图资源的辅助脚本。使用和配置说明请参见 `scripts/MapDatabaseTools/README.md` 。
 
 ## 实验性功能: DataPad (实时飞行遥测)
@@ -98,9 +98,9 @@ python forward_parsed_udp.py --interval 10 --host 192.168.178.132 --port 5010 --
 # 将您的设备 ID 添加到服务器上的 authorized_devices.json 文件中
 ```
 
-DataPad 还支持接收从 DCS 导出的**实体接触信息**（战术单位）。在应用中启用**实体追踪**以接收战术单位并将其显示为实时标记（需要运行启用了实体追踪的转发器）。设置和详情说明请参见`scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md` 和 `docs/features/TACTICAL_UNITS_TRACKING.md`。
+DataPad 还支持接收从 DCS 导出的**实体接触信息**（战术单位）。在应用中启用**实体追踪**以接收战术单位并将其显示为实时标记（需要运行启用了实体追踪的转发器）。设置和详情说明请参见`../../scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md` 和 `../EN/features/TACTICAL_UNITS_TRACKING.md`。
 
-完整设置说明请参见 `docs/technical/ECDH_USAGE_GUIDE.md`，完整的使用、配置和故障排除信息请参见 `docs/features/DATAPAD_FEATURE.md`。
+完整设置说明请参见 `../EN/technical/ECDH_USAGE_GUIDE.md`，完整的使用、配置和故障排除信息请参见 `../EN/features/DATAPAD_FEATURE.md`。
 
 **阶段 1 (实验性)**:  此版本代表 DataPad 的第一阶段。未来阶段将扩展遥测覆盖范围，并增加视觉和安全改进，包括实时动画飞机可视化以及专用的 UI 重新设计。
 
@@ -202,7 +202,7 @@ cd InteractiveChecklists
 
 ## 路线图
 
-计划中的功能和长期改进记录在 [Roadmap](docs/planning/roadmap.md) 中。
+计划中的功能和长期改进记录在 [Roadmap](../EN/planning/roadmap.md) 中。
 
 
 ## 支持&联系
@@ -221,7 +221,7 @@ cd InteractiveChecklists
 - Q: 许可证是什么?
 	- A: 本项目采用 CC-BY-NC-SA 4.0 许可证。详情请参见 `LICENSE` 文件
 - Q: 文档在哪里?
-	- A: 请参见 `docs/` 文件夹 或点击 [Documentation index](docs/docnavigation_zh.md).
+	- A: 请参见 `docs/` 文件夹 或点击 [Documentation index](docnavigation_zh.md).
 
 
 ## 致谢&鸣谢
