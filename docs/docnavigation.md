@@ -1,31 +1,18 @@
 
 <div align="center">
 	<h1>📚 Project Documentation</h1>
-	<a href="../README.md">Home</a> | <a href="docnavigation.md">Documentation Navigation</a>
+	<a href="../README.md">Home</a> | <a href="EN/docnavigation.md">EN Docs</a> | <a href="ZH/docnavigation.md">ZH Docs</a>
 </div>
 
 ---
 
-## 🗂️ Features
+## 🌐 Language index
 
-- [Checklist Feature](features/CHECKLIST_FEATURE.md)
-- [DataPad Feature (Live Flight Data)](features/DATAPAD_FEATURE.md)
-- [Aviation Map (Live Map)](features/AVIATION_MAP_FEATURE.md)
-- [Tag System](features/TAG_SYSTEM.md)
-- [Tab System (Multi-Document Navigation)](features/TAB_SYSTEM.md)
-- [QuickNotes Architecture](features/QUICKNOTES_ARCHITECTURE.md)
+Choose your documentation language:
 
-## 🛠️ Technical & Structure
-
-- [Automatic Import of Assets](technical/AUTO_IMPORT.md)
-- [DCS Export API Reference](technical/DCS_EXPORT_API.md)
-- [Kotlin Code Structure](technical/structure.md)
-- [PDF Parser Migration](technical/PDF_PARSER_MIGRATION.md)
-
-## 📋 Planning & Roadmap
-
-- [Project Roadmap](planning/roadmap.md)
+- [English documentation](EN/docnavigation.md)
+- [中文文档](ZH/docnavigation.md)
 
 ---
 
-<sub>For more details, see each section or return to the <a href="../README.md">project home</a>.</sub>
+<sub>For detailed section lists, open the language-specific documentation index above.</sub>

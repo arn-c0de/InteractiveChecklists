@@ -1,4 +1,4 @@
-[Home](../README.md) | [Documentation Navigation](docnavigation.md)
+[Home](../../README.md) | [Documentation Navigation](../docnavigation.md)
 
 Updated-VERSION=1.0.3
 

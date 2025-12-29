@@ -1,4 +1,4 @@
-﻿[Home](../README.md) | [Documentation Navigation](docnavigation.md)
+﻿[Home](../../README.md) | [Documentation Navigation](../docnavigation.md)
 
 # Kotlin Code Structure
 
