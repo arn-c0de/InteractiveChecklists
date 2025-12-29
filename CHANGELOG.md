@@ -4,6 +4,15 @@
 All relevant changes are summarized here by version.
 ## [1.0.18] - 2025-12-26
 
+### Summary
+- Tactical Units: Full streaming implementation for tactical units with live markers and improved lifecycle management. Added **"Live Units Only"** filter, search and clickable category filters, pilot info in list items, **"Last seen"** timestamps in marker popups, auto-cleanup for old units, and navigation-to-marker features including pattern and carrier auto-calculation.
+- Map & Navigation: Added map filter UI, flight path tracking with persistent storage and overlay rendering, radial/drawing menu improvements, two-finger rotation gesture support, and multiple UX & performance fixes (debouncing, batch updates, flicker fixes).
+- DataPad & Forwarder: Improved real-time processing (heartbeat, packet interarrival tracking), handshake toggle for entity tracking, export/trimming performance improvements, and batched tactical unit exports to increase live export capacity.
+- Internationalization & Docs: Added Simplified Chinese translation and multiple Chinese documentation files (`README_zh.md`, `COLLABORATORS_zh.md`, `CONTRIBUTING_zh.md`, `docs/docnavigation_zh.md`); updated README (videos, contributors badge) and documentation for tactical units and entity tracking.
+- Fixes & Improvements: Marker heading/rotation and collision detection fixes, coalition mapping corrections, rendering performance improvements for tacmarkers, and miscellaneous UI and bug fixes.
+
+### Thanks
+- Contributors: Dawn, 张晓行 (Zhang XiaoXing) and others for translations, docs, and testing.
 
 ## [1.0.17] - 2025-12-25
 
