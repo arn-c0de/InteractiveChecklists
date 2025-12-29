@@ -5,7 +5,7 @@
 
 
 
-Welcome to the ChecklistInteractive project! Below you'll find the current maintainers and ways to get involved.
+Welcome to the InteractiveChecklists project! Below you'll find the current maintainers and ways to get involved.
 
 ---
 
