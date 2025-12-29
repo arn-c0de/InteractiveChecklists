@@ -27,6 +27,10 @@
 	<a href="#screenshots">Screenshots</a> • <a href="#demo-videos">Demo Videos</a>
 </p>
 
+<div align="center">
+	<a href="README.md">English</a> |
+	<a href="README_zh.md">Chinse</a>
+</div>
 
 # InteractiveChecklists
 
