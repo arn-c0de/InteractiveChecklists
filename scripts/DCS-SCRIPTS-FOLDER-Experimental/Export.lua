@@ -5,7 +5,10 @@ pcall(function()
 	local LOG_PATH = writeDir .. [[Scripts\player_aircraft.log]]
 	local DEBUG_LOG_PATH = writeDir .. [[Scripts\player_aircraft_debug.log]]
 	local JSON_PATH = writeDir .. [[Scripts\player_aircraft_parsed.jsonl]]
-	local ENTITY_CONTACTS_PATH = writeDir .. [[Scripts\entity-contacts-parsed.jsonl]]  -- NEW: Separate file for entity contacts
+	local ENTITY_CONTACTS_PATH = writeDir .. [[Scripts\entity-contacts-parsed.jsonl]]  -- Batch 1: units 0-250
+	local ENTITY_CONTACTS_PATH_2 = writeDir .. [[Scripts\entity-contacts-parsed-2.jsonl]]  -- Batch 2: units 250-500
+	local ENTITY_CONTACTS_PATH_3 = writeDir .. [[Scripts\entity-contacts-parsed-3.jsonl]]  -- Batch 3: units 500-750
+	local ENTITY_CONTACTS_PATH_4 = writeDir .. [[Scripts\entity-contacts-parsed-4.jsonl]]  -- Batch 4: units 750-1000
 	local COMMAND_PATH = writeDir .. [[Scripts\forwarder_command.json]]
 	local DEBUG_DUMP_TABLES = true -- set to false to disable table debug dumps
 	local dumped_tables = {}
@@ -13,12 +16,12 @@ pcall(function()
 	local lastWrite = 0
 	local lastCommandCheck = 0
 	local COMMAND_CHECK_INTERVAL = 2.0 -- check for command file every 2 seconds
-	local STREAMER_VERSION = "1.0.7"
+	local STREAMER_VERSION = "1.0.10"
 	-- Maximum number of JSON lines to keep in the output file. Set to 0 to disable trimming.
 	local MAX_JSON_LINES = 20  -- Keep only last 20 lines (2 seconds @ 10 Hz) - MINIMAL buffer
-	local MAX_ENTITY_LINES = 20  -- Keep only last 20 lines for entity contacts
+	local MAX_ENTITY_LINES = 2  -- Keep only last 2 lines for entity contacts (FAST load, minimal backlog)
 	-- Trim interval: Only trim file periodically, NOT on every write (performance!)
-	local TRIM_INTERVAL = 2.0  -- Trim file every 2 seconds (VERY aggressive cleanup)
+	local TRIM_INTERVAL = 1.0  -- Trim file every 1 second for faster cleanup
 	local lastTrim = 0
 	local lastEntityTrim = 0
 	-- If true, clear the JSON/log/debug files once when the export starts
@@ -159,16 +162,21 @@ pcall(function()
 	end
 
 	-- Maximum distance for unit tracking (meters) - 150km radius for better tactical awareness
-	local MAX_UNIT_DISTANCE = 150000  -- 150km (increased from 50km)
-	local MAX_UNITS_PER_FRAME = 200  -- Hard limit to prevent huge JSON payloads (increased from 100)
+	local MAX_UNIT_DISTANCE = 300000  -- 150km (increased from 50km)
+	local MAX_UNITS_PER_BATCH = 250  -- Units per batch file - optimized for UDP packet size (~65KB)
+	local MAX_TOTAL_UNITS = 1000  -- Maximum total units across all batches (4 batches × 250 units)
 	
 	-- Collect all nearby units (aircraft, ground, ships, structures)
-	local function collect_nearby_units()
-		local units = {}
+	-- NEW APPROACH: Collect ALL units in range first, then slice by batch
+	local allUnitsCache = nil  -- Cache all units to avoid recalculating
+	local allUnitsCacheTime = 0
+	local CACHE_DURATION = 0.1  -- Cache for 0.1 seconds (1 frame @ 10 Hz) - REDUCED for faster aircraft updates
+	
+	local function collect_all_nearby_units()
 		local selfData = safe_get(function() return LoGetSelfData() end, nil)
 
 		if not selfData or not selfData.LatLongAlt then
-			return units  -- No player position, can't calculate distances
+			return {}  -- No player position
 		end
 
 		local playerLat = selfData.LatLongAlt.Lat
@@ -179,62 +187,71 @@ pcall(function()
 		local worldObjects = safe_get(function() return LoGetWorldObjects() end, nil)
 		
 		if not worldObjects or type(worldObjects) ~= 'table' then
-			return units  -- No objects available
+			return {}
 		end
 		
-		-- Iterate through all world objects
+		local allUnits = {}
+		
+		-- Collect ALL units within range
 		for objId, objData in pairs(worldObjects) do
-			-- Stop collecting if we hit the hard limit (prevent JSON bloat)
-			if #units >= MAX_UNITS_PER_FRAME then
-				break
-			end
-			
 			if type(objData) == 'table' and objData.LatLongAlt then
-				-- Calculate distance to player
 				local lat = objData.LatLongAlt.Lat or 0
 				local lon = objData.LatLongAlt.Long or 0
 				local alt = objData.LatLongAlt.Alt or 0
 				
-				-- Simple distance calculation (Pythagorean approximation for small distances)
-				-- 1 degree latitude ≈ 111km, longitude varies by latitude
-				local dLat = (lat - playerLat) * 111000  -- meters
-				local dLon = (lon - playerLon) * 111000 * math.cos(math.rad(playerLat))  -- meters
+				-- Calculate distance
+				local dLat = (lat - playerLat) * 111000
+				local dLon = (lon - playerLon) * 111000 * math.cos(math.rad(playerLat))
 				local dAlt = alt - playerAlt
 				local distance = math.sqrt(dLat^2 + dLon^2 + dAlt^2)
 				
-				-- Skip units beyond max distance (performance optimization)
+				-- Only process units within max distance
 				if distance <= MAX_UNIT_DISTANCE then
 					-- Calculate bearing to target (0-360 degrees, 0=North)
 					local bearing = math.deg(math.atan2(dLon, dLat))
 					if bearing < 0 then bearing = bearing + 360 end
 					
-					-- Determine category (1=Airplane, 2=Helicopter, 3=Ground, 4=Ship, 5=Structure, 6=Weapon)
-					-- Type structure: Type = {level1, level2, level3, level4}
-					local category = 0
+					-- Calculate bearing to target (0-360 degrees, 0=North)
+					local bearing = math.deg(math.atan2(dLon, dLat))
+					if bearing < 0 then bearing = bearing + 360 end
+					
+					-- Determine category from Type structure
 					local categoryName = 'unknown'
-					
-					if objData.Type then
-						-- Type can be table or number
-						if type(objData.Type) == 'table' then
-							category = objData.Type.level1 or objData.Type[1] or 0
-						elseif type(objData.Type) == 'number' then
-							category = objData.Type
+					local unitName = objData.Name or ''
+
+					-- Name-based heuristics for structures
+					if unitName:find('HELIPAD') or unitName:find('FARP') or unitName:find('Invisible FARP') then
+						categoryName = 'structure'
+					elseif unitName:find('Bunker') or unitName:find('house') or unitName:find('Building') then
+						categoryName = 'structure'
+					elseif objData.Type and type(objData.Type) == 'table' then
+						local level1 = objData.Type.level1 or 0
+						local level3 = objData.Type.level3 or 0
+
+						if level1 == 1 then
+							if level3 == 1 then
+								categoryName = 'aircraft'
+							elseif level3 == 6 then
+								categoryName = 'helicopter'
+							else
+								categoryName = 'aircraft'
+							end
+						elseif level1 == 2 then
+							categoryName = 'ground'
+						elseif level1 == 3 then
+							categoryName = 'ship'
+						elseif level1 == 4 then
+							categoryName = 'structure'
+						elseif level1 == 5 then
+							categoryName = 'weapon'
+						elseif level1 == 0 then
+							categoryName = 'structure'
 						end
-					end
-					
-					-- Map category number to name
-					if category == 1 then categoryName = 'aircraft'
-					elseif category == 2 then categoryName = 'helicopter'
-					elseif category == 3 then categoryName = 'ground'
-					elseif category == 4 then categoryName = 'ship'
-					elseif category == 5 then categoryName = 'structure'
-					elseif category == 6 then categoryName = 'weapon'
 					end
 					
 					local dcsCoal = objData.Coalition or 0
 					
-
-					-- Coalition umkehren: Allies -> Enemies, Enemies -> Allies
+					-- Coalition umkehren
 					if type(dcsCoal) == 'string' then
 						if dcsCoal == 'Allies' then
 							dcsCoal = 'Enemies'
@@ -252,7 +269,7 @@ pcall(function()
 						speed = math.sqrt(vx^2 + vy^2 + vz^2)
 					end
 					
-					-- Create unit entry
+					-- Create unit entry with distance for sorting
 					local unit = {
 						dcsId = tostring(objId),
 						name = objData.Name or 'Unknown',
@@ -262,21 +279,63 @@ pcall(function()
 						latitude = round(lat, 6),
 						longitude = round(lon, 6),
 						altitude = round(alt, 2),
-						heading = round(objData.Heading or 0, 2),
+						heading = round(math.deg(objData.Heading or 0), 2),
 						speed = round(speed, 2),
 						distance = round(distance, 2),
 						bearing = round(bearing, 2),
 						country = objData.Country or 0,
 						group = objData.GroupName or '',
-						pilot = objData.UnitName or ''
+						pilot = objData.UnitName or '',
+						health = objData.Life and round(objData.Life, 2) or nil
 					}
 					
-					table.insert(units, unit)
+					table.insert(allUnits, unit)
 				end
 			end
 		end
 		
-		return units
+		-- Sort by PRIORITY then distance: Aircraft/Helicopters first (they move fast!)
+		-- This ensures they're always in Batch 1+2 (sent more frequently in rotation)
+		table.sort(allUnits, function(a, b)
+			local priorityA = (a.category == 'aircraft' or a.category == 'helicopter') and 0 or 1
+			local priorityB = (b.category == 'aircraft' or b.category == 'helicopter') and 0 or 1
+
+			if priorityA ~= priorityB then
+				return priorityA < priorityB  -- Aircraft/Heli first
+			else
+				return a.distance < b.distance  -- Then by distance
+			end
+		end)
+
+		return allUnits
+	end
+	
+	-- Get units for specific batch (uses cache)
+	local function collect_nearby_units(batchIndex)
+		batchIndex = batchIndex or 1
+		
+		-- Check cache
+		local now = LoGetModelTime() or os.clock()
+		if allUnitsCache and (now - allUnitsCacheTime) < CACHE_DURATION then
+			-- Use cached data
+		else
+			-- Refresh cache
+			allUnitsCache = collect_all_nearby_units()
+			allUnitsCacheTime = now
+		end
+		
+		-- Slice for this batch
+		local startIdx = ((batchIndex - 1) * MAX_UNITS_PER_BATCH) + 1
+		local endIdx = math.min(startIdx + MAX_UNITS_PER_BATCH - 1, #allUnitsCache)
+		
+		local batchUnits = {}
+		for i = startIdx, endIdx do
+			table.insert(batchUnits, allUnitsCache[i])
+		end
+		
+		local hasMore = endIdx < #allUnitsCache
+		
+		return batchUnits, hasMore
 	end
 
 	-- Collect comprehensive telemetry data
@@ -284,7 +343,7 @@ pcall(function()
 		local data = {
 			timestamp = generate_timestamp(),
 			streamer_version = STREAMER_VERSION,
-			dataAge = 0.0,
+			dataAge = 0.250,
 			updateRate = 1.0 / UPDATE_INTERVAL
 		}
 
@@ -687,8 +746,9 @@ pcall(function()
 	end
 
 	-- Collect entity contacts (nearby units) as a separate dataset
+	-- Returns: batch1_data, batch2_data, batch3_data, batch4_data (or nil if no data)
 	local function collect_entity_contacts()
-		local data = {
+		local baseData = {
 			timestamp = generate_timestamp(),
 			streamer_version = STREAMER_VERSION,
 			updateRate = 1.0 / UPDATE_INTERVAL
@@ -697,15 +757,62 @@ pcall(function()
 		-- Get player position for distance calculations
 		local selfData = safe_get(function() return LoGetSelfData() end, nil)
 		if selfData and selfData.LatLongAlt then
-			data.playerLat = selfData.LatLongAlt.Lat
-			data.playerLon = selfData.LatLongAlt.Long
-			data.playerAlt = selfData.LatLongAlt.Alt
+			baseData.playerLat = selfData.LatLongAlt.Lat
+			baseData.playerLon = selfData.LatLongAlt.Long
+			baseData.playerAlt = selfData.LatLongAlt.Alt
 		end
 
-		-- Collect all nearby units
-		data.nearbyUnits = collect_nearby_units()
+		-- Determine total batches based on total units available
+		local totalBatches = 4  -- Support up to 4 batches (1000 units)
 
-		return data
+		-- Collect batch 1 (units 0-250)
+		local batch1_units, hasMore1 = collect_nearby_units(1)
+		local batch1_data = {}
+		for k, v in pairs(baseData) do batch1_data[k] = v end
+		batch1_data.nearbyUnits = batch1_units
+		batch1_data.batchIndex = 1
+		batch1_data.totalBatches = totalBatches
+
+		-- Collect batch 2 (units 250-500)
+		local batch2_data = nil
+		if hasMore1 then
+			local batch2_units, hasMore2 = collect_nearby_units(2)
+			if #batch2_units > 0 then
+				batch2_data = {}
+				for k, v in pairs(baseData) do batch2_data[k] = v end
+				batch2_data.nearbyUnits = batch2_units
+				batch2_data.batchIndex = 2
+				batch2_data.totalBatches = totalBatches
+			end
+		end
+
+		-- Collect batch 3 (units 500-750)
+		local batch3_data = nil
+		if hasMore1 then
+			local batch3_units, hasMore3 = collect_nearby_units(3)
+			if #batch3_units > 0 then
+				batch3_data = {}
+				for k, v in pairs(baseData) do batch3_data[k] = v end
+				batch3_data.nearbyUnits = batch3_units
+				batch3_data.batchIndex = 3
+				batch3_data.totalBatches = totalBatches
+			end
+		end
+
+		-- Collect batch 4 (units 750-1000)
+		local batch4_data = nil
+		if hasMore1 then
+			local batch4_units, hasMore4 = collect_nearby_units(4)
+			if #batch4_units > 0 then
+				batch4_data = {}
+				for k, v in pairs(baseData) do batch4_data[k] = v end
+				batch4_data.nearbyUnits = batch4_units
+				batch4_data.batchIndex = 4
+				batch4_data.totalBatches = totalBatches
+			end
+		end
+
+		return batch1_data, batch2_data, batch3_data, batch4_data
 	end
 
 	local function write_log(aircraft, unitID, pos)
@@ -733,6 +840,39 @@ pcall(function()
 		pcall(function()
 			local json = json_encode_table(data)
 			local f = io.open(ENTITY_CONTACTS_PATH, 'a')
+			if not f then return end
+			f:write(json .. '\n')
+			f:flush()  -- Force immediate flush to disk
+			f:close()
+		end)
+	end
+
+	local function write_entity_json_2(data)
+		pcall(function()
+			local json = json_encode_table(data)
+			local f = io.open(ENTITY_CONTACTS_PATH_2, 'a')
+			if not f then return end
+			f:write(json .. '\n')
+			f:flush()  -- Force immediate flush to disk
+			f:close()
+		end)
+	end
+
+	local function write_entity_json_3(data)
+		pcall(function()
+			local json = json_encode_table(data)
+			local f = io.open(ENTITY_CONTACTS_PATH_3, 'a')
+			if not f then return end
+			f:write(json .. '\n')
+			f:flush()  -- Force immediate flush to disk
+			f:close()
+		end)
+	end
+
+	local function write_entity_json_4(data)
+		pcall(function()
+			local json = json_encode_table(data)
+			local f = io.open(ENTITY_CONTACTS_PATH_4, 'a')
 			if not f then return end
 			f:write(json .. '\n')
 			f:flush()  -- Force immediate flush to disk
@@ -831,6 +971,126 @@ pcall(function()
 		end)
 	end
 
+	local function trim_entity_file_2()
+		-- Trim the second entity contacts JSONL file
+		if not MAX_ENTITY_LINES or MAX_ENTITY_LINES <= 0 then return end
+
+		pcall(function()
+			local tmp = {}
+			local count = 0
+			local ok, r = pcall(io.open, ENTITY_CONTACTS_PATH_2, 'r')
+			if not ok or not r then return end
+
+			for _ in r:lines() do
+				count = count + 1
+			end
+			r:close()
+
+			if count <= MAX_ENTITY_LINES then return end
+
+			local skip = count - MAX_ENTITY_LINES
+			local ok2, r2 = pcall(io.open, ENTITY_CONTACTS_PATH_2, 'r')
+			if not ok2 or not r2 then return end
+
+			local lineNum = 0
+			for line in r2:lines() do
+				lineNum = lineNum + 1
+				if lineNum > skip then
+					table.insert(tmp, line)
+				end
+			end
+			r2:close()
+
+			local ok3, w = pcall(io.open, ENTITY_CONTACTS_PATH_2, 'w')
+			if not ok3 or not w then return end
+			for _, l in ipairs(tmp) do
+				w:write(l .. '\n')
+			end
+			w:flush()
+			w:close()
+		end)
+	end
+
+	local function trim_entity_file_3()
+		-- Trim the third entity contacts JSONL file
+		if not MAX_ENTITY_LINES or MAX_ENTITY_LINES <= 0 then return end
+
+		pcall(function()
+			local tmp = {}
+			local count = 0
+			local ok, r = pcall(io.open, ENTITY_CONTACTS_PATH_3, 'r')
+			if not ok or not r then return end
+
+			for _ in r:lines() do
+				count = count + 1
+			end
+			r:close()
+
+			if count <= MAX_ENTITY_LINES then return end
+
+			local skip = count - MAX_ENTITY_LINES
+			local ok2, r2 = pcall(io.open, ENTITY_CONTACTS_PATH_3, 'r')
+			if not ok2 or not r2 then return end
+
+			local lineNum = 0
+			for line in r2:lines() do
+				lineNum = lineNum + 1
+				if lineNum > skip then
+					table.insert(tmp, line)
+				end
+			end
+			r2:close()
+
+			local ok3, w = pcall(io.open, ENTITY_CONTACTS_PATH_3, 'w')
+			if not ok3 or not w then return end
+			for _, l in ipairs(tmp) do
+				w:write(l .. '\n')
+			end
+			w:flush()
+			w:close()
+		end)
+	end
+
+	local function trim_entity_file_4()
+		-- Trim the fourth entity contacts JSONL file
+		if not MAX_ENTITY_LINES or MAX_ENTITY_LINES <= 0 then return end
+
+		pcall(function()
+			local tmp = {}
+			local count = 0
+			local ok, r = pcall(io.open, ENTITY_CONTACTS_PATH_4, 'r')
+			if not ok or not r then return end
+
+			for _ in r:lines() do
+				count = count + 1
+			end
+			r:close()
+
+			if count <= MAX_ENTITY_LINES then return end
+
+			local skip = count - MAX_ENTITY_LINES
+			local ok2, r2 = pcall(io.open, ENTITY_CONTACTS_PATH_4, 'r')
+			if not ok2 or not r2 then return end
+
+			local lineNum = 0
+			for line in r2:lines() do
+				lineNum = lineNum + 1
+				if lineNum > skip then
+					table.insert(tmp, line)
+				end
+			end
+			r2:close()
+
+			local ok3, w = pcall(io.open, ENTITY_CONTACTS_PATH_4, 'w')
+			if not ok3 or not w then return end
+			for _, l in ipairs(tmp) do
+				w:write(l .. '\n')
+			end
+			w:flush()
+			w:close()
+		end)
+	end
+
 	local function serialize_table(obj, depth, maxDepth, seen)
 		depth = depth or 0
 		maxDepth = maxDepth or 3
@@ -876,6 +1136,12 @@ pcall(function()
 				if f then f:write('') f:close() end
 				local ef = io.open(ENTITY_CONTACTS_PATH, 'w')
 				if ef then ef:write('') ef:close() end
+				local ef2 = io.open(ENTITY_CONTACTS_PATH_2, 'w')
+				if ef2 then ef2:write('') ef2:close() end
+				local ef3 = io.open(ENTITY_CONTACTS_PATH_3, 'w')
+				if ef3 then ef3:write('') ef3:close() end
+				local ef4 = io.open(ENTITY_CONTACTS_PATH_4, 'w')
+				if ef4 then ef4:write('') ef4:close() end
 				local lf = io.open(LOG_PATH, 'w')
 				if lf then lf:write('') lf:close() end
 				local df = io.open(DEBUG_LOG_PATH, 'w')
@@ -906,6 +1172,9 @@ pcall(function()
 		-- Periodic entity file trimming
 		if now - lastEntityTrim >= TRIM_INTERVAL then
 			trim_entity_file()
+			trim_entity_file_2()
+			trim_entity_file_3()
+			trim_entity_file_4()
 			lastEntityTrim = now
 		end
 
@@ -913,9 +1182,18 @@ pcall(function()
 			-- Write aircraft telemetry (lean, no nearbyUnits for fast updates)
 			local telemetry = collect_telemetry()
 			write_json(telemetry)
-			-- Write entity contacts to SEPARATE file
-			local entityContacts = collect_entity_contacts()
-			write_entity_json(entityContacts)
+			-- Write entity contacts to SEPARATE files (batch 1-4)
+			local entityBatch1, entityBatch2, entityBatch3, entityBatch4 = collect_entity_contacts()
+			write_entity_json(entityBatch1)
+			if entityBatch2 then
+				write_entity_json_2(entityBatch2)
+			end
+			if entityBatch3 then
+				write_entity_json_3(entityBatch3)
+			end
+			if entityBatch4 then
+				write_entity_json_4(entityBatch4)
+			end
 
 			lastWrite = now
 		end
@@ -925,8 +1203,17 @@ pcall(function()
 		-- Write final aircraft telemetry
 		local telemetry = collect_telemetry()
 		write_json(telemetry)
-		-- Write final entity contacts
-		local entityContacts = collect_entity_contacts()
-		write_entity_json(entityContacts)
+		-- Write final entity contacts (all 4 batches)
+		local entityBatch1, entityBatch2, entityBatch3, entityBatch4 = collect_entity_contacts()
+		write_entity_json(entityBatch1)
+		if entityBatch2 then
+			write_entity_json_2(entityBatch2)
+		end
+		if entityBatch3 then
+			write_entity_json_3(entityBatch3)
+		end
+		if entityBatch4 then
+			write_entity_json_4(entityBatch4)
+		end
 	end
 end, nil)

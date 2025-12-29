@@ -133,6 +133,9 @@ class DataPadManager(private val context: Context) {
 
     private var lastMessageReceivedTime: Long = 0L
     private var healthCheckJob: Job? = null
+    private var statsLoggingJob: Job? = null
+    private var unitsProcessorJob: Job? = null
+    private val unitsChannel = kotlinx.coroutines.channels.Channel<List<NearbyUnit>>(capacity = kotlinx.coroutines.channels.Channel.CONFLATED)
     private val HEARTBEAT_WARNING_MS = 30000L // 30 seconds - show yellow
     private val HEARTBEAT_TIMEOUT_MS = 35000L  // 35 seconds - show red
 
@@ -146,6 +149,17 @@ class DataPadManager(private val context: Context) {
     val maxInterarrivalMs: StateFlow<Long?> = _maxInterarrivalMs.asStateFlow()
     private val _avgInterarrivalMs = MutableStateFlow<Long?>(null)
     val avgInterarrivalMs: StateFlow<Long?> = _avgInterarrivalMs.asStateFlow()
+
+    // Log statistics (rate limiting) - accumulate counts and log summary every 5 seconds
+    @Volatile private var logStatsUdpPacketsReceived = 0
+    @Volatile private var logStatsFlightDataReceived = 0
+    @Volatile private var logStatsTacticalUnitsProcessed = 0
+    private val LOG_SUMMARY_INTERVAL_MS = 5000L // 5 seconds
+    
+    // Auto-cleanup for old tactical units (15 minutes timeout)
+    private val TACTICAL_UNIT_TIMEOUT_SECONDS = 900 // 15 minutes
+    private val CLEANUP_INTERVAL_MS = 60000L // Run cleanup every 60 seconds
+    private var lastCleanupTime = 0L
 
     // ECDH components
     private val keyManager = KeyManager(context)
@@ -198,7 +212,7 @@ class DataPadManager(private val context: Context) {
             if (throwable != null) Log.e(TAG, message, throwable) else Log.e(TAG, message)
         }
     }
-    
+
     /**
      * Track packet interarrival time and update statistics
      * Excludes heartbeats and extreme outliers for realistic statistics
@@ -226,9 +240,8 @@ class DataPadManager(private val context: Context) {
                 }
             }
             
-            if (interarrival > 200) {  // Log gaps > 200ms
-                udpLogD("Packet gap: ${interarrival}ms${if (isHeartbeat) " (heartbeat)" else ""}")
-            }
+            // Packet gap logging disabled to reduce log spam
+            // (gaps are tracked in stats, visible in min/max/avg interarrival)
         }
         lastPacketTime = now
     }
@@ -325,6 +338,12 @@ class DataPadManager(private val context: Context) {
                 // Start health check monitoring job
                 startHealthCheckJob()
 
+                // Start statistics logging job (logs summary every 5 seconds)
+                startStatsLoggingJob()
+
+                // Start sequential units processor job (prevents race conditions)
+                startUnitsProcessorJob()
+
                 // Perform ECDH handshake in background (concurrently with receive loop)
                 handshakeJob = scope.launch {
                     try {
@@ -372,8 +391,9 @@ class DataPadManager(private val context: Context) {
                         
                         // Note: trackInterarrival will be called from handleIncomingMessage
                         // after we know if it's a heartbeat or not
-                        
-                        udpLogD("UDP packet received (${packet.length} bytes) from $senderIp:${packet.port}")
+
+                        // Increment counter (summary logged in timer job)
+                        logStatsUdpPacketsReceived++
 
                         // Filter out packets from own IP address (broadcast echoes)
                         if (senderIp == deviceIp) {
@@ -417,6 +437,11 @@ class DataPadManager(private val context: Context) {
         receiveJob = null
         healthCheckJob?.cancel()
         healthCheckJob = null
+        statsLoggingJob?.cancel()
+        statsLoggingJob = null
+        unitsProcessorJob?.cancel()
+        unitsProcessorJob = null
+        // Note: We don't close the channel so it can be reused on restart
         _connectionHealth.value = ConnectionHealth.DISCONNECTED
         // Cancel any in-progress handshake job as well
         handshakeJob?.cancel()
@@ -487,7 +512,53 @@ class DataPadManager(private val context: Context) {
             }
         }
     }
-    
+
+    /**
+     * Start periodic statistics logging job
+     * Logs summary every 5 seconds without blocking the receive loop
+     */
+    private fun startStatsLoggingJob() {
+        statsLoggingJob?.cancel()
+
+        statsLoggingJob = scope.launch {
+            while (isActive) {
+                delay(LOG_SUMMARY_INTERVAL_MS)
+
+                // Read and reset counters atomically
+                val udpPackets = logStatsUdpPacketsReceived
+                val flightData = logStatsFlightDataReceived
+                val tacticalUnits = logStatsTacticalUnitsProcessed
+
+                logStatsUdpPacketsReceived = 0
+                logStatsFlightDataReceived = 0
+                logStatsTacticalUnitsProcessed = 0
+
+                // Log summary if there was any activity
+                if (udpPackets > 0 || flightData > 0 || tacticalUnits > 0) {
+                    udpLogD("📊 5s Summary: UDP packets=${udpPackets}, Flight data=${flightData}, Tactical units=${tacticalUnits}")
+                }
+            }
+        }
+    }
+
+    /**
+     * Start sequential units processor job
+     * Processes tactical units one batch at a time to prevent database race conditions
+     */
+    private fun startUnitsProcessorJob() {
+        unitsProcessorJob?.cancel()
+
+        unitsProcessorJob = scope.launch {
+            for (units in unitsChannel) {
+                try {
+                    processNearbyUnits(units)
+                } catch (e: Exception) {
+                    udpLogE("Failed to process units batch: ${e.message}", e)
+                }
+            }
+        }
+    }
+
     /**
      * Update UDP port and restart socket if running
      */
@@ -876,8 +947,7 @@ class DataPadManager(private val context: Context) {
 
         if (decryptedData != null) {
             val message = String(decryptedData, Charsets.UTF_8)
-            val method = provider.getMethod()
-            udpLogD("Received decrypted message from $senderIp (length=${message.length} bytes, method=$method)")
+            // Decryption successful - count in stats (logged in summary)
 
             try {
                 val flightData = json.decodeFromString<FlightData>(message)
@@ -907,15 +977,13 @@ class DataPadManager(private val context: Context) {
                         // Process nearby units if present AND entity tracking is enabled
                         if (_isEntityTrackingEnabled.value) {
                             flightData.nearbyUnits?.let { units ->
-                                scope.launch {
-                                    processNearbyUnits(units)
-                                }
+                                // Send to sequential processor (CONFLATED channel keeps only latest)
+                                unitsChannel.trySend(units)
                             }
                         }
-                        
-                        currentSession?.let {
-                            udpLogD("✅ Received encrypted flight data from $senderIp: ${flightData.aircraft} at ${flightData.altitude}m (session: ${it.sessionId.take(8)}...)")
-                        } ?: udpLogD("✅ Received encrypted flight data from $senderIp: ${flightData.aircraft} at ${flightData.altitude}m")
+
+                        // Increment counter instead of logging each flight data packet
+                        logStatsFlightDataReceived++
                     }
                 }
             } catch (e: Exception) {
@@ -972,7 +1040,7 @@ class DataPadManager(private val context: Context) {
                 val existing = dao.getUnitByDcsId(unit.dcsId)
                 
                 if (existing != null) {
-                    // Unit exists - update position
+                    // Unit exists - update position and category
                     dao.updateUnitPosition(
                         dcsId = unit.dcsId,
                         latitude = unit.latitude,
@@ -982,24 +1050,28 @@ class DataPadManager(private val context: Context) {
                         speed = unit.speed,
                         distance = unit.distance,
                         bearing = unit.bearing,
+                        health = unit.health,
+                        category = unit.category,
                         lastSeenAt = now,
                         lastUpdateAt = now
                     )
-                    
-                    // Add history entry
-                    historyDao.insertHistory(
-                        TacticalUnitHistoryEntity(
-                            unitId = existing.id,
-                            latitude = unit.latitude,
-                            longitude = unit.longitude,
-                            altitude = unit.altitude,
-                            heading = unit.heading,
-                            speed = unit.speed,
-                            timestamp = now
+
+                    // Add history entry (non-critical, ignore errors)
+                    try {
+                        historyDao.insertHistory(
+                            TacticalUnitHistoryEntity(
+                                unitId = existing.id,
+                                latitude = unit.latitude,
+                                longitude = unit.longitude,
+                                altitude = unit.altitude,
+                                heading = unit.heading,
+                                speed = unit.speed,
+                                timestamp = now
+                            )
                         )
-                    )
-                    
-                    udpLogD("Updated tactical unit: ${unit.name} (${unit.category})")
+                    } catch (e: Exception) {
+                        // Ignore history insert errors (e.g., foreign key violations during race conditions)
+                    }
                 } else {
                     // New unit - insert
                     val newId = dao.insertUnit(
@@ -1016,6 +1088,7 @@ class DataPadManager(private val context: Context) {
                             speed = unit.speed,
                             distance = unit.distance,
                             bearing = unit.bearing,
+                            health = unit.health,
                             country = unit.country,
                             groupName = unit.group,
                             pilotName = unit.pilot,
@@ -1025,21 +1098,23 @@ class DataPadManager(private val context: Context) {
                             lastUpdateAt = now
                         )
                     )
-                    
-                    // Add initial history entry
-                    historyDao.insertHistory(
-                        TacticalUnitHistoryEntity(
-                            unitId = newId.toInt(),
-                            latitude = unit.latitude,
-                            longitude = unit.longitude,
-                            altitude = unit.altitude,
-                            heading = unit.heading,
-                            speed = unit.speed,
-                            timestamp = now
+
+                    // Add initial history entry (non-critical, ignore errors)
+                    try {
+                        historyDao.insertHistory(
+                            TacticalUnitHistoryEntity(
+                                unitId = newId.toInt(),
+                                latitude = unit.latitude,
+                                longitude = unit.longitude,
+                                altitude = unit.altitude,
+                                heading = unit.heading,
+                                speed = unit.speed,
+                                timestamp = now
+                            )
                         )
-                    )
-                    
-                    udpLogD("New tactical unit tracked: ${unit.name} (${unit.category}, coalition=${unit.coalition})")
+                    } catch (e: Exception) {
+                        // Ignore history insert errors (e.g., foreign key violations during race conditions)
+                    }
                 }
             }
             
@@ -1049,8 +1124,22 @@ class DataPadManager(private val context: Context) {
             // We do this in a background job to avoid blocking
             // For now, we'll mark ALL active units that aren't in the update as inactive
             // A more sophisticated approach would track "last seen" time and only mark as inactive after a timeout
-            
-            udpLogD("Processed ${units.size} tactical units")
+
+            // AUTO-CLEANUP: Delete units not seen for 15+ minutes (likely destroyed)
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastCleanupTime >= CLEANUP_INTERVAL_MS) {
+                lastCleanupTime = currentTime
+                try {
+                    val repository = com.example.checklist_interactive.data.tactical.TacticalUnitsRepository(context)
+                    repository.deleteOldUnits(TACTICAL_UNIT_TIMEOUT_SECONDS)
+                    udpLogD("Auto-cleanup: Deleted units not seen for 15+ minutes")
+                } catch (e: Exception) {
+                    udpLogE("Auto-cleanup failed: ${e.message}", e)
+                }
+            }
+
+            // Increment counter instead of logging each batch
+            logStatsTacticalUnitsProcessed += units.size
         } catch (e: Exception) {
             udpLogE("Failed to process nearby units: ${e.message}", e)
         }
