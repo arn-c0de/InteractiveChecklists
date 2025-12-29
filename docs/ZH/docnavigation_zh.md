@@ -1,9 +1,13 @@
 
-# 此文件已移动 / This file has moved
+# 文档索引（中文）
 
-此文件已移动到 `docs/ZH/docnavigation.md`。
+欢迎使用本项目的文档索引（中文版）。下面列出仓库中主要文档的目录与说明（备注：部分文档目前仍以英文为主）：
 
-This file has moved to `docs/ZH/docnavigation.md`.
+- 文档总览：请参见英文文档索引：`../docnavigation.md`
+- 功能介绍：`docs/EN/features/`
+- 规划与路线：`docs/EN/planning/`
+- 技术文档：`docs/EN/technical/`
 
-请改用新的文档索引文件。 / Please use the new documentation index file.
+如果您愿意参与中文翻译，请提交一个 **issue** 或直接发起 **Pull Request**，我们非常欢迎并会尽快处理您的贡献。感谢您的支持！
+
 
