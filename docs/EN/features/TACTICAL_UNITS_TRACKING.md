@@ -117,6 +117,29 @@ The Tactical Units Tracking System exports all visible units from DCS World (air
 - **Device Authorization:** only authorized devices (see `authorized_devices.json`)
 - **DoS Protection:** rate limiting (per IP, global)
 
+## Database Update & Asset DB Versioning
+
+- The app ships a prepackaged map database (`assets/databases/map_data.db`) which may be updated between releases. The app detects a newer asset DB by checking the SQLite `PRAGMA user_version`.
+
+- The `DatabaseUpdateManager` (see `app/src/main/java/com/example/checklist_interactive/data/tactical/DatabaseUpdateManager.kt`) performs the check on startup using `checkForDatabaseUpdate()` and exposes state for the UI: `assetDbVersion`, `currentDbVersion`, and `showUpdateDialog`.
+
+- When a newer asset version is detected (and a previous tracked version exists), the app shows a `DatabaseUpdateDialog` (see `app/src/main/java/com/example/checklist_interactive/ui/tactical/DatabaseUpdateDialog.kt`) offering three options:
+  - **Merge:** import new locations from the asset DB while preserving user data (non-destructive).
+  - **Clean:** perform a clean import — delete the installed internal DB and recreate it from the asset (destructive but safe when explicitly requested).
+  - **Skip:** dismiss the dialog and update the tracked version so the dialog won't reappear.
+
+- **First-run behavior:** on first run the manager records the asset version but does not show the dialog (to avoid surprising new users).
+
+- **Safety & destructive migration:** destructive recovery is disabled by default. Code-level callers must explicitly allow destructive migration when creating the DB (see `TacticalDatabase.getInstance(..., allowDestructiveMigration = true)`). Prefer using the **Clean** option in the dialog for an explicit, user-confirmed wipe-and-import.
+
+- **Implementation notes:** `importDatabaseMerge()` and `importDatabaseClean()` implement the two import modes; merge is currently a non-destructive implementation that updates version tracking (detailed merge logic is TODO), while clean closes the DB instance, deletes the internal DB file, recreates the DB from assets, and updates version tracking on success.
+
+- **Migration note:** the app provides explicit Room migrations in `TacticalDatabase` (see `MIGRATION_9_10` which adds a `health` column to `tactical_units`). If the installed DB schema is incompatible, the app will not automatically delete the user's DB unless destructive migration is allowed — prefer manual/explicit clean import for recovery.
+
+- **Troubleshooting:**
+  - If you expect an update dialog but don't see it: confirm the app has tracked a previous version (first-run records the version silently), and ensure the asset `user_version` is higher than the tracked version.
+  - To force a clean import programmatically: call `DatabaseUpdateManager.importDatabaseClean()` or recreate the DB with `TacticalDatabase.recreateInstance(context)`.
+
 ## Performance
 
 - **DB Indexes:** optimized for fast queries
