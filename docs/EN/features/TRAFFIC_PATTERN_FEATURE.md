@@ -1,120 +1,120 @@
-# Traffic Pattern (Platzrunde) Feature
+# Traffic Pattern (Circuit) Feature
 
-## Übersicht
+## Overview
 
-Das Traffic Pattern Feature ermöglicht es Piloten, realistische Platzrunden (Circuit Patterns) um Landebahnen herum zu fliegen. Das System generiert automatisch die korrekten Flugwege basierend auf Standard-Luftfahrtverfahren.
+The Traffic Pattern feature enables pilots to fly realistic circuit patterns around runways. The system automatically generates correct flight legs based on standard aviation procedures.
 
-## Funktionen
+## Features
 
-### Pattern-Generierung
-- **Standard Traffic Pattern**: Automatische Berechnung aller Pattern-Legs:
-  - Departure (Start)
-  - Crosswind (90° Kurve)
-  - Downwind (parallel zur Landebahn, entgegengesetzte Richtung)
-  - Base (90° Kurve zum Final)
-  - Final (Anflug zur Landebahn)
+### Pattern Generation
+- **Standard Traffic Pattern**: Automatically calculates all pattern legs:
+  - Departure
+  - Crosswind (90° turn)
+  - Downwind (parallel to runway, opposite direction)
+  - Base (90° turn toward final)
+  - Final (approach to runway)
 
-### Pattern-Konfiguration
+### Pattern Configuration
 
-#### Pattern-Größen
-- **Normal**: 0.5 NM Downwind-Abstand, 1000 ft Pattern-Höhe
-- **Medium**: 0.75 NM Downwind-Abstand, 1000 ft Pattern-Höhe
-- **Large**: 1.0 NM Downwind-Abstand, 1200 ft Pattern-Höhe
-- **Very Large**: 1.5 NM Downwind-Abstand, 1500 ft Pattern-Höhe
+#### Pattern Sizes
+- **Normal**: 0.5 NM downwind offset, 1000 ft pattern altitude
+- **Medium**: 0.75 NM downwind offset, 1000 ft pattern altitude
+- **Large**: 1.0 NM downwind offset, 1200 ft pattern altitude
+- **Very Large**: 1.5 NM downwind offset, 1500 ft pattern altitude
 
-#### Pattern-Richtung
-- **Left-Hand** (Standard): Linkskurven (Standardverfahren)
-- **Right-Hand**: Rechtskurven (für spezielle Landebahnen)
+#### Pattern Direction
+- **Left-Hand** (default): left turns
+- **Right-Hand**: right turns (for special runway configurations)
 
-## Verwendung
+## Usage
 
-### Pattern aktivieren
-1. Navigiere zu einem Flughafen mit Landebahnen
-2. Öffne das Runway Approach Popup
-3. Klicke auf den **PATTERN** Button (neben dem NM-Dropdown)
-4. Wähle eine Landebahn aus
-5. Konfiguriere Pattern-Größe und -Richtung
+### Enabling a Pattern
+1. Navigate to an airport with runways
+2. Open the Runway Approach popup
+3. Click the **PATTERN** button (next to the NM dropdown)
+4. Choose a runway
+5. Configure pattern size and direction
 
-### Pattern-Anzeige
-- **Grüne gestrichelte Linie**: Pattern-Verlauf
-- **Labels**: Anzeige der einzelnen Pattern-Legs (DEPARTURE, CROSSWIND, etc.)
-- **Navigation**: Rote Navigationslinie führt vom aktuellen Standort zum Pattern-Einstieg
+### Pattern Visualization
+- **Green dashed polyline**: the pattern path
+- **Labels**: show individual legs (DEPARTURE, CROSSWIND, etc.)
+- **Navigation guidance**: red navigation line from current position to pattern entry
 
-## Technische Details
+## Technical Details
 
-### Pattern-Berechnung (MapRoutePattern.kt)
+### Pattern Calculation (MapRoutePattern.kt)
 
-Die Pattern-Generierung basiert auf echten Luftfahrtstandards:
+Generation follows aviation conventions and scales with size presets:
 
 ```kotlin
 // Distances (in NM, converted to meters)
 // Pattern size presets scale BOTH lateral and longitudinal distances:
 // - Normal: base distances (e.g., 0.5 NM departure extension, 0.3 NM crosswind, 0.5 NM downwind offset)
-// - Medium/Large/Very Large: scale factors (1.25x, 1.5x, 2.0x) are applied to
+// - Medium/Large/Very Large: scale factors (1.25x, 1.5x, 2.0x) apply to
 //   departure extension, crosswind, downwind length, base extension, final and short-final distances
 - Departure extension (scaled): 0.5 NM * sizeScale past runway end
 - Crosswind turn (scaled): 0.3 NM * sizeScale
-- Downwind parallel: Pattern size dependent (0.5-1.5 NM) and scaled longitudinally
-- Base leg: Equal to downwind lateral distance, base extension scaled
+- Downwind parallel: pattern-size dependent (0.5–1.5 NM) and scaled longitudinally
+- Base leg: equal to downwind lateral distance, base extension scaled
 - Final approach (scaled): 0.5 NM * sizeScale from threshold
 - Short final (scaled): 0.2 NM * sizeScale from threshold
 ```
 
-### Koordinatenberechnung
-- Verwendet Haversine-Formel für Großkreis-Navigation
-- Berücksichtigt Erdkrümmung für präzise Positionierung
-- Heading-Normalisierung für korrekte Kompass-Werte
+### Coordinate Calculations
+- Uses Haversine formula for great-circle navigation
+- Accounts for earth curvature for precise placement
+- Normalizes headings to correct compass values
 
-### Pattern-Overlay
-- `Polyline`: Gestrichelte grüne Linie für Pattern-Pfad
-- `PatternLabelOverlay`: Benutzerdefiniertes Overlay für Leg-Beschriftungen
-- Automatische Skalierung mit Zoom-Level
+### Pattern Overlay
+- `Polyline`: green dashed line for the path
+- `PatternLabelOverlay`: custom overlay for leg labels
+- Auto-scales labels and rendering with zoom level
 
-## Integration mit bestehenden Features
+## Integration with Existing Features
 
 ### Runway Approach Integration
-- Pattern-Modus arbeitet parallel zum Runway Approach
-- Beide können gleichzeitig aktiv sein
-- Navigation kombiniert Pattern-Guidance mit Final Approach
+- Pattern mode works alongside Runway Approach
+- Both modes can be active concurrently
+- Navigation combines pattern guidance with final approach guidance
 
 ### Navigation System
-- Automatische Berechnung zum Pattern-Einstiegspunkt
-- Distanz- und Heading-Anzeige aktualisiert sich in Echtzeit
-- Integration mit DataPad Live-Position
+- Calculates route to pattern entry point
+- Distance and bearing update in real time
+- Integrates with DataPad live aircraft position
 
-## Zukünftige Erweiterungen
+## Future Extensions
 
-Das modulare Design ermöglicht einfache Erweiterungen:
+The modular design allows easy additions:
 
-1. **Holding Patterns**: Warteschleifen für Verkehrsmanagement
-2. **Instrument Approaches**: ILS, VOR, NDB Approach-Patterns
-3. **Custom Patterns**: Benutzer-definierte Pattern-Konfigurationen
-4. **Pattern Recording**: Aufzeichnung und Replay von geflogenen Patterns
-5. **Multi-Aircraft Patterns**: Visualisierung mehrerer Aircraft im Pattern
+1. **Holding Patterns**: holding stacks for traffic management
+2. **Instrument Approaches**: ILS, VOR, NDB approach patterns
+3. **Custom Patterns**: user-defined pattern configurations
+4. **Pattern Recording**: record and replay flown patterns
+5. **Multi-Aircraft Patterns**: visualize multiple aircraft in the pattern
 
-## Referenzen
+## References
 
-### Luftfahrt-Standards
+### Aviation Standards
 - FAA Advisory Circular AC 90-66B: "Recommended Standard Traffic Patterns for Aeronautical Operations"
-- Pattern Altitude: 1000 ft AGL (Standard), 800 ft AGL (Alternative)
-- Pattern Direction: Left-hand turns (Standard), Right-hand für spezielle Runways
+- Typical pattern altitude: 1000 ft AGL (standard), 800 ft AGL (alternate)
+- Pattern direction: left-hand turns (standard), right-hand when required
 
-### Code-Referenzen
-- `MapRoutePattern.kt`: Pattern-Generierung und Utilities
-- `MapViewer.kt`: Pattern-Integration und UI
-- `TrafficPatternGenerator`: Hauptklasse für Pattern-Berechnung
-- `PatternLabelOverlay`: Custom Overlay für Pattern-Beschriftungen
+### Code References
+- `MapRoutePattern.kt`: pattern generation and utilities
+- `MapViewer.kt`: pattern integration and UI
+- `TrafficPatternGenerator`: core pattern calculation class
+- `PatternLabelOverlay`: custom overlay for pattern labels
 
 ## Performance
 
-- Pattern-Generierung: < 1ms für Standard-Pattern
-- Overlay-Rendering: GPU-beschleunigt
-- Memory Footprint: ~100 KB pro aktives Pattern
-- Keine Auswirkung auf Frame-Rate bei aktivem Pattern
+- Pattern generation: <1 ms for a standard pattern
+- Overlay rendering: GPU-accelerated
+- Memory footprint: ~100 KB per active pattern
+- No measurable impact on frame rate when active
 
-## Bekannte Limitierungen
+## Known Limitations
 
-1. Runway-Daten müssen vollständig sein (Heading, Length)
-2. Pattern funktioniert nur mit gespeicherten Landebahnen
-3. Keine dynamische Anpassung an Wind (geplant für v2.0)
-4. Keine Höhen-Visualisierung (nur 2D)
+1. Runway data must be complete (heading, length)
+2. Pattern requires stored runways (won't generate from ad-hoc points)
+3. No dynamic wind adjustment yet (planned for v2.0)
+4. No vertical / altitude visualization (2D display only)
