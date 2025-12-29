@@ -64,7 +64,6 @@ InteractiveChecklists 是一款用于查看与操作 Markdown 及 PDF 清单的 
 
 - **统一文件系统:** 在单一层次视图中管理来自内置资源和内部存储的文件。
 - **多语言支持:** 本应用支持英语、西班牙语、德语和简体中文。您可以在设置菜单中切换语言。所有 UI 文本均有英文版本。
-- **Multi-Tab System:** Open multiple documents (MD/PDF) with a scrollable tab bar, quick tab switcher, swipe navigation, and tab persistence.
 - **多标签系统:** 通过可滚动的标签栏、快速标签切换器、滑动导航和标签持久化，打开多个文档（MD/PDF）。
 - **PDF 查看器:** 支持标注（绘制/高亮/擦除）、捏合缩放、页面对齐和颜色反相的 PDF 查看器。
 - **交互式 Markdown 清单:** 用于交互式清单的有状态复选框和可折叠区域。
@@ -210,7 +209,7 @@ cd InteractiveChecklists
 
 如果您遇到问题或有疑问
 
-- 在此代码库中提 isuue。
+- 在此代码库中提 issue。
 - 对于安全相关问题，请遵循 [SECURITY.md](SECURITY.md) 中的说明。
 - 有关贡献协调和讨论，请参见 [COLLABORATORS_zh.md](COLLABORATORS_zh.md)。
 

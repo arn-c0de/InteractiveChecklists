@@ -8,7 +8,7 @@
 
 ## 🗂️ 功能特性
 
-- [Checklist功能](features/CHECKLIST_FEATURE.md.md)
+- [Checklist功能](features/CHECKLIST_FEATURE.md)
 - [DataPad 功能 (实时飞行数据)](features/DATAPAD_FEATURE.md)
 - [航空地图 (实时地图)](features/AVIATION_MAP_FEATURE.md)
 - [标签系统](features/TAG_SYSTEM.md)
