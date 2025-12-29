@@ -209,7 +209,7 @@ fun MarkerRouteManagementSheet(
     onCenter: (LocationEntity) -> Unit = {},
     selectedMarker: LocationEntity? = null,
     selectedRunways: List<RunwayEntity> = emptyList(),
-    onSetActiveRoute: (LocationEntity) -> Unit = {},
+    onSetActiveRoute: (LocationEntity) -> Unit,
     onEditRouteWaypoints: (Int) -> Unit = {}
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -394,7 +394,12 @@ fun MarkerRouteManagementSheet(
                             location = selectedMarker,
                             runways = selectedRunways,
                             onClose = { selectedTab = 1 },
-                            onSetRoute = onSetActiveRoute,
+                            onSetRoute = { location ->
+                                android.util.Log.d("MarkerRouteManagement", "📡 onSetRoute received: id=${location.id}, source=${location.source}, name=${location.name}")
+                                android.util.Log.d("MarkerRouteManagement", "🎯 About to call onSetActiveRoute...")
+                                onSetActiveRoute(location)
+                                android.util.Log.d("MarkerRouteManagement", "✅ onSetActiveRoute call completed")
+                            },
                             onEdit = { updatedLocation ->
                                 viewModel.updateMarker(updatedLocation)
                             },
@@ -919,11 +924,26 @@ fun LocationEditDialog(
     var latitude by remember { mutableStateOf(location.latitude.toString()) }
     var longitude by remember { mutableStateOf(location.longitude.toString()) }
     var height by remember { mutableStateOf(location.elevationM?.toString() ?: "") }
+    
+    // Extract heading from metadata JSON (UDP tactical data)
+    val initialHeading = remember(location.metadata) {
+        location.metadata?.let { meta ->
+            try {
+                val obj = JSONObject(meta)
+                val hdg = obj.optDouble("heading", Double.NaN)
+                if (!hdg.isNaN()) hdg.toString() else ""
+            } catch (_: Exception) {
+                ""
+            }
+        } ?: ""
+    }
+    var heading by remember { mutableStateOf(initialHeading) }
 
     // Derived validation for numeric fields
     val latValid = latitude.toDoubleOrNull() != null
     val lonValid = longitude.toDoubleOrNull() != null
     val heightValid = height.isBlank() || height.toDoubleOrNull() != null
+    val headingValid = heading.isBlank() || heading.toDoubleOrNull()?.let { it in 0.0..360.0 } ?: false
     var markerType by remember { mutableStateOf(location.markerType) }
     var coalition by remember { mutableStateOf(location.coalition ?: "") }
     var icon by remember { mutableStateOf(location.icon) }
@@ -1075,6 +1095,15 @@ fun LocationEditDialog(
                             modifier = Modifier.weight(0.8f),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             isError = !heightValid
+                        )
+                        OutlinedTextField(
+                            value = heading,
+                            onValueChange = { heading = it },
+                            label = { Text(stringResource(R.string.heading_label)) },
+                            placeholder = { Text("0-360") },
+                            modifier = Modifier.weight(0.8f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            isError = !headingValid
                         )
                     }
                     
@@ -1515,6 +1544,20 @@ fun LocationEditDialog(
                             // Validate and save
                             val lat = latitude.toDoubleOrNull() ?: location.latitude
                             val lon = longitude.toDoubleOrNull() ?: location.longitude
+                            
+                            // Update metadata JSON with heading
+                            val updatedMetadata = try {
+                                val existingMeta = location.metadata?.let { JSONObject(it) } ?: JSONObject()
+                                heading.toDoubleOrNull()?.let { hdg ->
+                                    existingMeta.put("heading", hdg)
+                                } ?: existingMeta.remove("heading")
+                                existingMeta.toString()
+                            } catch (_: Exception) {
+                                // If parsing fails, create new metadata with just heading
+                                heading.toDoubleOrNull()?.let { hdg ->
+                                    JSONObject().put("heading", hdg).toString()
+                                } ?: location.metadata
+                            }
 
                             val updatedLocation = location.copy(
                                 name = name.takeIf { it.isNotBlank() } ?: location.name,
@@ -1541,7 +1584,8 @@ fun LocationEditDialog(
                                 region = region.takeIf { it.isNotBlank() },
                                 timezone = timezone.takeIf { it.isNotBlank() },
                                 source = source.takeIf { it.isNotBlank() },
-                                tags = tags.takeIf { it.isNotBlank() }
+                                tags = tags.takeIf { it.isNotBlank() },
+                                metadata = updatedMetadata
                             )
 
                             // Save runways first (suspend) then location
@@ -1555,7 +1599,7 @@ fun LocationEditDialog(
                             }
                         },
                         modifier = Modifier.weight(1f),
-                        enabled = name.isNotBlank() && latValid && lonValid && heightValid && !threatLevelError && !strengthError && runwaysValid
+                        enabled = name.isNotBlank() && latValid && lonValid && heightValid && headingValid && !threatLevelError && !strengthError && runwaysValid
                     ) {
                         Text(stringResource(R.string.action_save))
                     }

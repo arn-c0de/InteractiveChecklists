@@ -1131,6 +1131,7 @@
     <string name="map_marker_region">Region</string>
     <string name="map_marker_timezone">Timezone</string>
     <string name="map_marker_elevation">Elevation</string>
+    <string name="map_marker_heading">Heading</string>
     <string name="map_marker_unit">Unit</string>
     <string name="map_marker_threat">Threat</string>
     <string name="map_marker_strength">Strength</string>
@@ -1229,6 +1230,7 @@
     <string name="lon_label">Longitude</string>
     <string name="alt_label">Altitude</string>
     <string name="na_label">N/A</string>
+    <string name="unit_health_label">Health</string>
     <string name="navigation_title">Navigation</string>
     <string name="heading_label">Heading</string>
     <string name="speed_label">Speed</string>

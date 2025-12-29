@@ -1,0 +1,393 @@
+package com.example.checklist_interactive.ui.maps
+
+import android.content.Context
+import android.graphics.*
+import android.util.Log
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toBitmap
+import com.example.checklist_interactive.data.tactical.LocationEntity
+import com.example.checklist_interactive.data.tactical.TacticalUnitEntity
+import com.example.checklist_interactive.data.tactical.TacticalUnitsRepository
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Overlay
+
+private const val TAG = "TacticalUnitsOverlay"
+
+/**
+ * Custom overlay for displaying tactical units with:
+ * 1. Circle marker with letter - text rotates to stay readable, circle stays fixed
+ * 2. Heading arrow - always points in absolute heading direction, independent of map rotation
+ */
+class TacticalUnitsMapOverlay(
+    private val context: Context,
+    private val repository: TacticalUnitsRepository,
+    private val showLiveOnlyFlow: StateFlow<Boolean>,
+    private val isEntityTrackingEnabledFlow: StateFlow<Boolean>,
+    private val updateIntervalSecondsFlow: StateFlow<Float>,
+    private val getMapView: () -> MapView?,
+    private val onUnitClick: (TacticalUnitEntity) -> Unit
+) : Overlay() {
+
+    private val units = mutableMapOf<Int, TacticalUnitEntity>()
+
+    // Cache arrow bitmaps by coalition color (only 4 bitmaps needed for all units!)
+    private val arrowBitmapCache = mutableMapOf<Int, Bitmap>()
+
+    private var updateJob: Job? = null
+    private var dataCollectorJob: Job? = null
+
+    // Log statistics (rate limiting) - reduce log spam
+    private var lastLogTime = 0L
+    private var dbUpdateCount = 0
+    private val LOG_INTERVAL_MS = 5000L // Log summary every 5 seconds
+
+    // Reusable Paint objects to avoid creating them on every draw
+    private val circleFillPaint = Paint().apply {
+        isAntiAlias = true
+        style = Paint.Style.FILL
+    }
+
+    private val circleStrokePaint = Paint().apply {
+        isAntiAlias = true
+        color = Color.WHITE
+        style = Paint.Style.STROKE
+        strokeWidth = 3f
+    }
+
+    private val textPaint = Paint().apply {
+        isAntiAlias = true
+        color = Color.WHITE
+        textSize = 18f
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+    }
+
+    // Reusable Rect for text bounds calculation
+    private val textBounds = Rect()
+
+    // Paint for debug info
+    private val debugPaint = Paint().apply {
+        color = Color.WHITE
+        textSize = 12f
+        isAntiAlias = true
+        style = Paint.Style.FILL
+    }
+
+    /**
+     * Start tracking tactical units
+     */
+    fun startTracking(scope: CoroutineScope) {
+        stopTracking()
+
+        Log.d(TAG, "📡 Starting tactical units tracking")
+
+        var lastUnits: List<TacticalUnitEntity> = emptyList()
+
+        // Job 1: Collect latest units from database
+        dataCollectorJob = scope.launch {
+            combine(
+                showLiveOnlyFlow,
+                isEntityTrackingEnabledFlow,
+                repository.getAllActiveUnits(),
+                repository.getLiveUnits()
+            ) { showLiveOnly: Boolean, isTrackingEnabled: Boolean, allUnits: List<TacticalUnitEntity>, liveUnits: List<TacticalUnitEntity> ->
+                if (!isTrackingEnabled) allUnits
+                else if (showLiveOnly) liveUnits
+                else allUnits
+            }.collect { newUnits: List<TacticalUnitEntity> ->
+                // Increment counter instead of logging each update
+                dbUpdateCount++
+                val now = System.currentTimeMillis()
+                if (now - lastLogTime >= LOG_INTERVAL_MS) {
+                    Log.d(TAG, "📊 5s Summary: DB updates=${dbUpdateCount}, Units=${newUnits.size}")
+                    dbUpdateCount = 0
+                    lastLogTime = now
+                }
+                lastUnits = newUnits
+
+                // Update units map immediately - remove deleted units
+                val currentUnitIds = newUnits.map { it.id }.toSet()
+                val toRemove = units.keys.filter { it !in currentUnitIds }
+                toRemove.forEach { unitId: Int ->
+                    units.remove(unitId)
+                    // Arrow bitmaps are cached by coalition color, not removed per unit
+                }
+
+                // Update existing units and add new ones
+                newUnits.forEach { unit: TacticalUnitEntity ->
+                    updateUnit(unit)
+                }
+
+                // Immediately redraw map to reflect changes (especially important for deletions)
+                withContext(Dispatchers.Main) {
+                    getMapView()?.invalidate()
+                }
+            }
+        }
+
+        // Job 2: Update map at user-defined interval
+        updateJob = scope.launch {
+            // Wait for initial data
+            var retryCount = 0
+            Log.d(TAG, "📡 Waiting for initial tactical units data...")
+            while (lastUnits.isEmpty() && retryCount < 50 && isActive) {
+                delay(100)
+                retryCount++
+            }
+
+            if (lastUnits.isEmpty()) {
+                Log.w(TAG, "📡 No tactical units data after 5 seconds wait")
+            } else {
+                Log.d(TAG, "📡 Initial data loaded: ${lastUnits.size} units")
+            }
+
+            while (isActive) {
+                val updateIntervalSeconds = updateIntervalSecondsFlow.value
+
+                if (lastUnits.isNotEmpty()) {
+                    Log.d(TAG, "📡 Updating ${lastUnits.size} tactical units on map (interval: ${updateIntervalSeconds}s)")
+
+                    // Trigger map redraw
+                    withContext(Dispatchers.Main) {
+                        getMapView()?.invalidate()
+                    }
+                }
+
+                // Wait for next update cycle
+                delay((updateIntervalSeconds * 1000f).toLong())
+            }
+        }
+    }
+
+    /**
+     * Stop tracking tactical units
+     */
+    fun stopTracking() {
+        Log.d(TAG, "📡 Stopping tactical units tracking")
+        updateJob?.cancel()
+        dataCollectorJob?.cancel()
+        units.clear()
+        arrowBitmapCache.clear()
+    }
+
+    /**
+     * Update unit data (called from database observer)
+     */
+    fun updateUnit(unit: TacticalUnitEntity) {
+        units[unit.id] = unit
+        // Arrow bitmaps are now cached by coalition color, created on-demand in draw()
+    }
+
+    /**
+     * Remove unit
+     */
+    fun removeUnit(unitId: Int) {
+        units.remove(unitId)
+        // No need to remove arrow - they're cached by coalition, not by unit
+    }
+
+    /**
+     * Get or create arrow bitmap for a coalition color (cached)
+     */
+    private fun getArrowBitmap(coalition: Int): Bitmap {
+        val color = getCoalitionColor(coalition)
+        return arrowBitmapCache.getOrPut(color) {
+            createArrowBitmap(color)
+        }
+    }
+
+    /**
+     * Get coalition color
+     */
+    private fun getCoalitionColor(coalition: Int): Int {
+        return when (coalition) {
+            0 -> Color.parseColor("#999999") // Neutral (gray)
+            1 -> Color.parseColor("#FF4444") // Red (hostile)
+            2 -> Color.parseColor("#00A8FF") // Blue (friendly)
+            else -> Color.parseColor("#FFFF80") // Unknown (yellow)
+        }
+    }
+
+    override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
+        if (shadow) return
+
+        val projection = mapView.projection
+        val mapRotation = mapView.mapOrientation // Map rotation in degrees
+
+        // Pre-calculate all screen positions once for better performance
+        val unitPositions = units.values.mapNotNull { unit ->
+            val geoPoint = GeoPoint(unit.latitude, unit.longitude)
+            val screenPoint = projection.toPixels(geoPoint, null)
+            unit to screenPoint
+        }
+
+        // BATCH 1: Draw all heading arrows together
+        unitPositions.forEach { (unit, screenPoint) ->
+            unit.heading?.let { heading ->
+                drawHeadingArrow(canvas, screenPoint, unit.coalition, heading, mapRotation)
+            }
+        }
+
+        // BATCH 2: Draw all circle markers together
+        unitPositions.forEach { (unit, screenPoint) ->
+            drawCircleMarker(canvas, screenPoint, unit, mapRotation)
+        }
+    }
+
+    /**
+     * Draw circle marker with category letter
+     * Circle stays in map orientation, letter counter-rotates to stay readable
+     */
+    private fun drawCircleMarker(canvas: Canvas, point: Point, unit: TacticalUnitEntity, mapRotation: Float) {
+        val coalitionColor = getCoalitionColor(unit.coalition)
+        val radius = 16f // size / 3f where size = 48f
+
+        // Update fill paint color for this unit
+        circleFillPaint.color = coalitionColor
+
+        canvas.save()
+
+        // Translate to marker position
+        canvas.translate(point.x.toFloat(), point.y.toFloat())
+
+        // NO rotation for circle - it stays with map orientation
+
+        // Draw filled circle and white border using reusable Paint objects
+        canvas.drawCircle(0f, 0f, radius, circleFillPaint)
+        canvas.drawCircle(0f, 0f, radius, circleStrokePaint)
+
+        // NOW counter-rotate ONLY for text to keep it readable
+        canvas.rotate(-mapRotation)
+
+        // Draw category letter using reusable Paint object
+        val categoryLetter = when (unit.category.lowercase()) {
+            "aircraft" -> "A"
+            "helicopter" -> "H"
+            "ground" -> "G"
+            "ship" -> "S"
+            "structure" -> "B" // Building
+            "weapon" -> "W"
+            else -> "U" // Unknown
+        }
+
+        // Center text vertically (account for text baseline) using reusable Rect
+        textPaint.getTextBounds(categoryLetter, 0, categoryLetter.length, textBounds)
+        val textY = -textBounds.exactCenterY()
+
+        canvas.drawText(categoryLetter, 0f, textY, textPaint)
+
+        canvas.restore()
+    }
+
+    /**
+     * Draw heading arrow that points in TRUE map direction
+     * Arrow rotates with heading, stays fixed relative to map (not screen)
+     */
+    private fun drawHeadingArrow(canvas: Canvas, point: Point, coalition: Int, heading: Double, mapRotation: Float) {
+        val arrowBitmap = getArrowBitmap(coalition)
+
+        canvas.save()
+
+        // Translate to marker position
+        canvas.translate(point.x.toFloat(), point.y.toFloat())
+
+        // Rotate to heading on map - NO compensation for map rotation
+        // heading = 0° means North on the map
+        // When map rotates, arrow rotates with it to maintain true map direction
+        canvas.rotate(heading.toFloat())
+
+        // Draw arrow pointing up (will be rotated to heading direction)
+        val halfWidth = arrowBitmap.width / 2f
+        val halfHeight = arrowBitmap.height / 2f
+        canvas.drawBitmap(arrowBitmap, -halfWidth, -halfHeight, null)
+
+        canvas.restore()
+    }
+
+    /**
+     * Create arrow bitmap for heading indicator with coalition color
+     */
+    private fun createArrowBitmap(color: Int): Bitmap {
+        // Slightly larger arrow for better visibility
+        val width = 44
+        val height = 66
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+
+        val paint = Paint().apply {
+            isAntiAlias = true
+            this.color = color // Use coalition color
+            style = Paint.Style.FILL
+            strokeWidth = 2.5f
+        }
+
+        val strokePaint = Paint().apply {
+            isAntiAlias = true
+            this.color = Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 2.5f
+        }
+
+        // Create arrow path pointing up — keep the tip, remove the long rear shaft (short stub only)
+        val path = Path().apply {
+            val tipY = 8f // slightly lower tip for a smaller point
+            val headBaseY = height * 0.45f
+            val stubBottomY = height * 0.62f // short stub under the head
+
+            moveTo(width / 2f, tipY) // Arrow tip (top)
+            lineTo(width * 0.82f, headBaseY) // Right outer (narrower)
+            lineTo(width * 0.62f, headBaseY) // Right inner
+            lineTo(width * 0.62f, stubBottomY) // Short stub bottom right
+            lineTo(width * 0.38f, stubBottomY) // Short stub bottom left
+            lineTo(width * 0.38f, headBaseY) // Left inner
+            lineTo(width * 0.18f, headBaseY) // Left outer (narrower)
+            close()
+        }
+
+        // Draw filled arrow
+        canvas.drawPath(path, paint)
+
+        // Draw white outline
+        canvas.drawPath(path, strokePaint)
+
+        return bitmap
+    }
+
+    override fun onSingleTapConfirmed(e: android.view.MotionEvent, mapView: MapView): Boolean {
+        val projection = mapView.projection
+        val touchPoint = Point(e.x.toInt(), e.y.toInt())
+
+        // Find nearest unit within tap threshold
+        val threshold = 50 // pixels
+        var nearestUnit: TacticalUnitEntity? = null
+        var nearestDistance = Float.MAX_VALUE
+
+        units.values.forEach { unit ->
+            val geoPoint = GeoPoint(unit.latitude, unit.longitude)
+            val screenPoint = projection.toPixels(geoPoint, null)
+
+            val dx = screenPoint.x - touchPoint.x
+            val dy = screenPoint.y - touchPoint.y
+            val distance = kotlin.math.sqrt((dx * dx + dy * dy).toFloat())
+
+            if (distance < threshold && distance < nearestDistance) {
+                nearestDistance = distance
+                nearestUnit = unit
+            }
+        }
+
+        nearestUnit?.let { unit ->
+            onUnitClick(unit)
+            return true
+        }
+
+        return false
+    }
+}

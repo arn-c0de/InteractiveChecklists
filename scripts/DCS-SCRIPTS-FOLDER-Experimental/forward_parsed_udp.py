@@ -556,15 +556,29 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
     if not os.path.exists(path):
         raise FileNotFoundError(path)
 
-    # Auto-detect entity contacts file (parallel to aircraft data file)
+    # Auto-detect entity contacts files (parallel to aircraft data file)
     entity_contacts_path = None
+    entity_contacts_path_2 = None
+    entity_contacts_path_3 = None
+    entity_contacts_path_4 = None
     if 'player_aircraft_parsed.jsonl' in path:
         potential_entity_path = path.replace('player_aircraft_parsed.jsonl', 'entity-contacts-parsed.jsonl')
+        potential_entity_path_2 = path.replace('player_aircraft_parsed.jsonl', 'entity-contacts-parsed-2.jsonl')
+        potential_entity_path_3 = path.replace('player_aircraft_parsed.jsonl', 'entity-contacts-parsed-3.jsonl')
+        potential_entity_path_4 = path.replace('player_aircraft_parsed.jsonl', 'entity-contacts-parsed-4.jsonl')
+
         if os.path.exists(potential_entity_path):
             entity_contacts_path = potential_entity_path
-            logger.info(f"📡 Entity contacts file detected: {entity_contacts_path}")
-        else:
-            logger.info(f"ℹ️ Entity contacts file not found (will create when data arrives): {potential_entity_path}")
+            logger.info(f"📡 Entity contacts file (batch 1) detected: {entity_contacts_path}")
+        if os.path.exists(potential_entity_path_2):
+            entity_contacts_path_2 = potential_entity_path_2
+            logger.info(f"📡 Entity contacts file (batch 2) detected: {entity_contacts_path_2}")
+        if os.path.exists(potential_entity_path_3):
+            entity_contacts_path_3 = potential_entity_path_3
+            logger.info(f"📡 Entity contacts file (batch 3) detected: {entity_contacts_path_3}")
+        if os.path.exists(potential_entity_path_4):
+            entity_contacts_path_4 = potential_entity_path_4
+            logger.info(f"📡 Entity contacts file (batch 4) detected: {entity_contacts_path_4}")
 
     # Create a UDP socket bound to handshake_port for handshake, send data to destination port
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -593,10 +607,19 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
     # Open aircraft data file
     f = open_for_tail(path)
 
-    # Open entity contacts file if it exists
+    # Open entity contacts files if they exist
     f_entity = None
+    f_entity_2 = None
+    f_entity_3 = None
+    f_entity_4 = None
     if entity_contacts_path and os.path.exists(entity_contacts_path):
         f_entity = open_for_tail(entity_contacts_path)
+    if entity_contacts_path_2 and os.path.exists(entity_contacts_path_2):
+        f_entity_2 = open_for_tail(entity_contacts_path_2)
+    if entity_contacts_path_3 and os.path.exists(entity_contacts_path_3):
+        f_entity_3 = open_for_tail(entity_contacts_path_3)
+    if entity_contacts_path_4 and os.path.exists(entity_contacts_path_4):
+        f_entity_4 = open_for_tail(entity_contacts_path_4)
 
     try:
         # Declare global variables at the start of the loop to avoid SyntaxError
@@ -604,8 +627,12 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
         
         # Tactical data throttling: Send entity data only every N player updates for performance
         player_update_counter = 0
-        ENTITY_UPDATE_INTERVAL = 10  # Send tactical data every 10 player updates (10:1 ratio)
-        last_entity_data = None  # Cache last entity data to attach to player updates
+        ENTITY_UPDATE_INTERVAL = 1  # Send tactical data EVERY player update (~10Hz) for fast initial load
+        batch_rotation_counter = 0  # Rotate between batch groups to fit in UDP
+        last_entity_data_batch1 = None  # Cache last entity batch 1
+        last_entity_data_batch2 = None  # Cache last entity batch 2
+        last_entity_data_batch3 = None  # Cache last entity batch 3
+        last_entity_data_batch4 = None  # Cache last entity batch 4
         
         while True:
             # Check heartbeat FIRST (independent of data availability)
@@ -735,11 +762,33 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                             f_entity.close()
                         except Exception:
                             pass
-                    
+                    if f_entity_2:
+                        try:
+                            f_entity_2.close()
+                        except Exception:
+                            pass
+                    if f_entity_3:
+                        try:
+                            f_entity_3.close()
+                        except Exception:
+                            pass
+                    if f_entity_4:
+                        try:
+                            f_entity_4.close()
+                        except Exception:
+                            pass
+
                     logger.info(f"🔄 File trimmed detected (pos={cur_pos} > size={size}), flushed buffers")
                     
                     # IMPORTANT: Reset timestamp filter to accept fresh data after trim
                     _last_processed_timestamp = None
+                    
+                    # CRITICAL: Clear entity data caches to prevent sending old markers from previous mission
+                    last_entity_data_batch1 = None
+                    last_entity_data_batch2 = None
+                    last_entity_data_batch3 = None
+                    last_entity_data_batch4 = None
+                    logger.info("🗑️ Cleared entity data caches (new mission detected)")
                     _last_timestamp_update_time = 0
                     logger.info("🔄 Reset timestamp filter after file trim")
                     
@@ -766,10 +815,16 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                     f.readline()
                     logger.info(f"📖 Reading from byte {f.tell()} with clean buffer")
                     
-                    # Reopen entity file if needed
+                    # Reopen entity files if needed
                     if entity_contacts_path and os.path.exists(entity_contacts_path):
                         f_entity = open_for_tail(entity_contacts_path, False)  # Seek to end
-                    
+                    if entity_contacts_path_2 and os.path.exists(entity_contacts_path_2):
+                        f_entity_2 = open_for_tail(entity_contacts_path_2, False)  # Seek to end
+                    if entity_contacts_path_3 and os.path.exists(entity_contacts_path_3):
+                        f_entity_3 = open_for_tail(entity_contacts_path_3, False)  # Seek to end
+                    if entity_contacts_path_4 and os.path.exists(entity_contacts_path_4):
+                        f_entity_4 = open_for_tail(entity_contacts_path_4, False)  # Seek to end
+
                     if once:
                         break
                     continue
@@ -842,6 +897,12 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                     logger.warning(f"⚠️ Malformed timestamp: {repr(cur_ts)}")
                     continue
             
+            # Validate stored timestamp - if corrupted, reset filter
+            if _last_processed_timestamp and ('::' in _last_processed_timestamp or not isinstance(_last_processed_timestamp, str)):
+                logger.warning(f"⚠️ Corrupted stored timestamp detected: {repr(_last_processed_timestamp)} - resetting filter")
+                _last_processed_timestamp = None
+                _last_timestamp_update_time = 0
+
             # Check if timestamp is newer than last processed
             if not _timestamp_is_newer(cur_ts, _last_processed_timestamp):
                 logger.warning(f"⚠️ REJECTED OLD: ts={cur_ts} (last={_last_processed_timestamp})")
@@ -860,42 +921,183 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
             # OPTIMIZATION: Only read if file position is ready (non-blocking)
             should_read_entity = (player_update_counter % ENTITY_UPDATE_INTERVAL) == 0
             entity_data_updated = False  # Track if we got fresh entity data
-            if should_read_entity and f_entity is not None:
+            if should_read_entity and (f_entity is not None or f_entity_2 is not None or f_entity_3 is not None or f_entity_4 is not None):
                 wants_entities = any(
                     session_mgr.sessions[session_id].entity_tracking_enabled
                     for device_id, session_id in session_mgr.device_sessions.items()
                     if session_id in session_mgr.sessions
                 )
                 if wants_entities:
-                    # NON-BLOCKING: Try to read entity line but don't wait/seek
-                    try:
-                        entity_line = f_entity.readline()
-                        if entity_line:
-                            entity_jsonpart = extract_json_from_line(entity_line)
-                            if entity_jsonpart:
-                                # Quick parse and cache (skip if too large to prevent blocking)
-                                if len(entity_jsonpart) < 100000:  # Skip if > 100KB
-                                    entity_parsed = safe_json_parse(entity_jsonpart, max_size=_MAX_DATA_MESSAGE_SIZE)
-                                    if entity_parsed and 'nearbyUnits' in entity_parsed:
-                                        last_entity_data = entity_parsed['nearbyUnits']
-                                        entity_data_updated = True  # Mark as fresh
-                                        logger.debug(f"📡 Cached {len(last_entity_data)} tactical units")
-                                else:
-                                    logger.debug(f"⚠️ Skipped large entity data ({len(entity_jsonpart)} bytes)")
-                    except Exception as e:
-                        logger.debug(f"Failed to read entity data: {e}")
+                    # Read batch 1 (units 0-250) - read LAST line only (most recent)
+                    if f_entity is not None:
+                        try:
+                            # Read all available lines, keep only the LAST one (most recent)
+                            latest_line = None
+                            lines_read = 0
+                            while True:
+                                entity_line = f_entity.readline()
+                                if not entity_line:
+                                    break
+                                latest_line = entity_line
+                                lines_read += 1
+                                if lines_read > 100:  # Safety limit
+                                    break
 
-            # Merge cached tactical data with player data ONLY when it was just updated
-            # This reduces JSON parsing/encoding overhead on non-entity frames
+                            if latest_line:
+                                entity_jsonpart = extract_json_from_line(latest_line)
+                                if entity_jsonpart and len(entity_jsonpart) < 500000:
+                                    entity_parsed = safe_json_parse(entity_jsonpart, max_size=500000)
+                                    if entity_parsed and 'nearbyUnits' in entity_parsed:
+                                        last_entity_data_batch1 = entity_parsed['nearbyUnits']
+                                        entity_data_updated = True
+                                        if lines_read > 1:
+                                            logger.info(f"📡 Batch 1: Skipped {lines_read-1} old lines, cached {len(last_entity_data_batch1)} units from latest")
+                                        else:
+                                            logger.debug(f"📡 Cached batch 1: {len(last_entity_data_batch1)} units")
+                        except Exception as e:
+                            logger.debug(f"Failed to read entity batch 1: {e}")
+                    
+                    # Read batch 2 (units 250-500) - read LAST line only (most recent)
+                    if f_entity_2 is not None:
+                        try:
+                            latest_line = None
+                            lines_read = 0
+                            while True:
+                                entity_line_2 = f_entity_2.readline()
+                                if not entity_line_2:
+                                    break
+                                latest_line = entity_line_2
+                                lines_read += 1
+                                if lines_read > 100:
+                                    break
+
+                            if latest_line:
+                                entity_jsonpart_2 = extract_json_from_line(latest_line)
+                                if entity_jsonpart_2 and len(entity_jsonpart_2) < 500000:
+                                    entity_parsed_2 = safe_json_parse(entity_jsonpart_2, max_size=500000)
+                                    if entity_parsed_2 and 'nearbyUnits' in entity_parsed_2:
+                                        last_entity_data_batch2 = entity_parsed_2['nearbyUnits']
+                                        entity_data_updated = True
+                                        if lines_read > 1:
+                                            logger.info(f"📡 Batch 2: Skipped {lines_read-1} old lines, cached {len(last_entity_data_batch2)} units")
+                                        else:
+                                            logger.debug(f"📡 Cached batch 2: {len(last_entity_data_batch2)} units")
+                        except Exception as e:
+                            logger.debug(f"Failed to read entity batch 2: {e}")
+
+                    # Read batch 3 (units 500-750) - read LAST line only (most recent)
+                    if f_entity_3 is not None:
+                        try:
+                            latest_line = None
+                            lines_read = 0
+                            while True:
+                                entity_line_3 = f_entity_3.readline()
+                                if not entity_line_3:
+                                    break
+                                latest_line = entity_line_3
+                                lines_read += 1
+                                if lines_read > 100:
+                                    break
+
+                            if latest_line:
+                                entity_jsonpart_3 = extract_json_from_line(latest_line)
+                                if entity_jsonpart_3 and len(entity_jsonpart_3) < 500000:
+                                    entity_parsed_3 = safe_json_parse(entity_jsonpart_3, max_size=500000)
+                                    if entity_parsed_3 and 'nearbyUnits' in entity_parsed_3:
+                                        last_entity_data_batch3 = entity_parsed_3['nearbyUnits']
+                                        entity_data_updated = True
+                                        if lines_read > 1:
+                                            logger.info(f"📡 Batch 3: Skipped {lines_read-1} old lines, cached {len(last_entity_data_batch3)} units")
+                                        else:
+                                            logger.debug(f"📡 Cached batch 3: {len(last_entity_data_batch3)} units")
+                        except Exception as e:
+                            logger.debug(f"Failed to read entity batch 3: {e}")
+
+                    # Read batch 4 (units 750-1000) - read LAST line only (most recent)
+                    if f_entity_4 is not None:
+                        try:
+                            latest_line = None
+                            lines_read = 0
+                            while True:
+                                entity_line_4 = f_entity_4.readline()
+                                if not entity_line_4:
+                                    break
+                                latest_line = entity_line_4
+                                lines_read += 1
+                                if lines_read > 100:
+                                    break
+
+                            if latest_line:
+                                entity_jsonpart_4 = extract_json_from_line(latest_line)
+                                if entity_jsonpart_4 and len(entity_jsonpart_4) < 500000:
+                                    entity_parsed_4 = safe_json_parse(entity_jsonpart_4, max_size=500000)
+                                    if entity_parsed_4 and 'nearbyUnits' in entity_parsed_4:
+                                        last_entity_data_batch4 = entity_parsed_4['nearbyUnits']
+                                        entity_data_updated = True
+                                        if lines_read > 1:
+                                            logger.info(f"📡 Batch 4: Skipped {lines_read-1} old lines, cached {len(last_entity_data_batch4)} units")
+                                        else:
+                                            logger.debug(f"📡 Cached batch 4: {len(last_entity_data_batch4)} units")
+                        except Exception as e:
+                            logger.debug(f"Failed to read entity batch 4: {e}")
+
+            # Merge cached tactical data with player data whenever available (uses cached data)
+            # ROTATION: Alternate between batch groups to fit all units in UDP packets
             final_json = jsonpart
-            if entity_data_updated and last_entity_data is not None:
+            # Send entity data if ANY cached batches are available (not just when freshly updated!)
+            if (last_entity_data_batch1 is not None or last_entity_data_batch2 is not None
+                or last_entity_data_batch3 is not None or last_entity_data_batch4 is not None):
                 try:
-                    # Parse player data, add nearbyUnits, re-encode
+                    # Parse player data, combine batches based on rotation, re-encode
                     player_data = safe_json_parse(jsonpart, max_size=_MAX_DATA_MESSAGE_SIZE)
                     if player_data:
-                        player_data['nearbyUnits'] = last_entity_data
-                        final_json = json.dumps(player_data)
-                        logger.debug(f"📡 Merged {len(last_entity_data)} tactical units with player data")
+                        # ROTATION LOGIC: Alternate between batch groups
+                        # Even frames (0, 2, 4...): Send batch 1+2 (units 0-500, closer)
+                        # Odd frames (1, 3, 5...): Send batch 3+4 (units 500-1000, farther)
+                        combined_units = []
+                        if batch_rotation_counter % 2 == 0:
+                            # Send batch 1+2 (closer units)
+                            if last_entity_data_batch1:
+                                combined_units.extend(last_entity_data_batch1)
+                            if last_entity_data_batch2:
+                                combined_units.extend(last_entity_data_batch2)
+                            batch_group = "1+2"
+                        else:
+                            # Send batch 3+4 (farther units)
+                            if last_entity_data_batch3:
+                                combined_units.extend(last_entity_data_batch3)
+                            if last_entity_data_batch4:
+                                combined_units.extend(last_entity_data_batch4)
+                            batch_group = "3+4"
+
+                        # Increment rotation counter for next update
+                        batch_rotation_counter += 1
+
+                        if combined_units:
+                            # Start with all units and reduce if too large
+                            units_to_send = combined_units
+                            max_attempts = 5
+
+                            for attempt in range(max_attempts):
+                                player_data['nearbyUnits'] = units_to_send
+                                final_json = json.dumps(player_data)
+                                final_size = len(final_json.encode('utf-8'))
+
+                                # Check if it fits in UDP packet (~65KB after encryption)
+                                if final_size <= _MAX_DATA_MESSAGE_SIZE:
+                                    logger.debug(f"📡 Sending {len(units_to_send)} units ({final_size} bytes) from batch group {batch_group}")
+                                    break
+                                else:
+                                    # Too large! Reduce by 20% and try again
+                                    new_count = int(len(units_to_send) * 0.8)
+                                    logger.warning(f"⚠️ JSON too large ({final_size} bytes > {_MAX_DATA_MESSAGE_SIZE}), reducing batch group {batch_group} from {len(units_to_send)} to {new_count} units")
+                                    units_to_send = units_to_send[:new_count]
+
+                                    if new_count == 0:
+                                        logger.error("❌ Cannot fit any units in UDP packet!")
+                                        player_data['nearbyUnits'] = []
+                                        final_json = json.dumps(player_data)
+                                        break
                 except Exception as e:
                     logger.debug(f"Failed to merge entity data: {e}")
                     # Fall back to player-only data
@@ -950,11 +1152,26 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
             f.close()
         except Exception:
             pass
-        if f_entity:
-            try:
+        try:
+            if f_entity:
                 f_entity.close()
-            except Exception:
-                pass
+        except Exception:
+            pass
+        try:
+            if f_entity_2:
+                f_entity_2.close()
+        except Exception:
+            pass
+        try:
+            if f_entity_3:
+                f_entity_3.close()
+        except Exception:
+            pass
+        try:
+            if f_entity_4:
+                f_entity_4.close()
+        except Exception:
+            pass
         sock.close()
         # handshake_sock is same as sock in ECDH mode, don't close twice
 

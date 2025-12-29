@@ -75,10 +75,7 @@ fun MapFlightInstruments(
     enabled: Boolean = true,
     dataAvailable: Boolean = true
 ) {
-    // Log when the instruments composable is active and whenever data changes
-    LaunchedEffect(enabled, pitch, bank, verticalSpeed, airspeed, altitude, heading, angleOfAttack, gLoad, dataAvailable, fuelRemaining, fuelTotal) {
-        Log.d("MapFlightInstruments", "composed enabled=$enabled dataAvailable=$dataAvailable pitch=$pitch bank=$bank vs=$verticalSpeed ias=$airspeed alt=$altitude hdg=$heading aoa=$angleOfAttack g=$gLoad rpm_l=$engineRpmLeft rpm_r=$engineRpmRight wind=${windSpeed}@${windDirection}° flares=$flareCount chaff=$chaffCount fuelRem=$fuelRemaining fuelTot=$fuelTotal")
-    }
+    // Debug logging removed to reduce log spam
 
     if (!enabled) return
 
@@ -219,9 +216,7 @@ fun AttitudeIndicator(
     modifier: Modifier = Modifier
 ) {
     // Debug log for visibility
-    LaunchedEffect(pitch, bank) {
-        Log.d("AttitudeIndicator", "pitch=${pitch}° bank=${bank}°")
-    }
+    // Debug logging removed to reduce log spam
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -412,9 +407,7 @@ fun AirspeedIndicator(
     size: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier
 ) {
-    LaunchedEffect(airspeed, mach) {
-        Log.d("AirspeedIndicator", "airspeed=$airspeed mach=$mach")
-    }
+    // Debug logging removed to reduce log spam
 
     val textPaint = remember {
         android.graphics.Paint().apply {
@@ -560,9 +553,7 @@ fun VerticalSpeedIndicator(
     size: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier
 ) {
-    LaunchedEffect(verticalSpeed) {
-        Log.d("VerticalSpeedIndicator", "verticalSpeed=$verticalSpeed")
-    }
+    // Debug logging removed to reduce log spam
 
     val textPaint = remember {
         android.graphics.Paint().apply {
