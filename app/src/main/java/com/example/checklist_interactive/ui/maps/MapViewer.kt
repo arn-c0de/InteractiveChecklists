@@ -1029,8 +1029,6 @@ fun MapViewer(
             )
             mapState.activeNavigationTarget = patternTarget
             // Respect the user's saved navigation panel state; do NOT force it open when restoring/generating a pattern
-            // Keep auto-centering off so generation doesn't pan the map unexpectedly
-            mapState.autoCenter = false
             // Persist pattern/navigation state (but do not change showNavigationDetails here)
             mapState.saveNavigationState()
 
