@@ -1,5 +1,5 @@
 
-[← Back to README](README.md) | [Documentation Index](docs/docnavigation.md)
+[← Back to README](README.md) | [Documentation Index](docs/EN/docnavigation.md)
 
 # 🛡️ Security Policy
 

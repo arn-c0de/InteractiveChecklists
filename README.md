@@ -12,7 +12,7 @@
 
 <div align="center">
 	<a href="CHANGELOG.md">Changelog</a> |
-	<a href="docs/docnavigation.md">Documentation</a> |
+	<a href="docs/EN/docnavigation.md">Documentation</a> |
 	<a href="docs/planning/roadmap.md">Roadmap</a> |
 	<a href="SECURITY.md">Security Policy</a> |
 	<a href="LICENSE">License</a> |
@@ -204,7 +204,7 @@ For larger or breaking changes, please open an issue first to discuss design and
 
 ## Roadmap
 
-Planned features and long-term improvements are tracked in the [Roadmap](docs/planning/roadmap.md) document.
+Planned features and long-term improvements are tracked in the [Roadmap](docs/EN/planning/roadmap.md) document.
 
 
 ## Support & Contact
@@ -223,7 +223,7 @@ If you encounter issues or have questions:
 - Q: What is the license?
 	- A: This project is licensed under CC-BY-NC-SA 4.0. See the `LICENSE` file for details.
 - Q: Where is the documentation?
-	- A: See the `docs/` folder or the [Documentation index](docs/docnavigation.md).
+	- A: See the `docs/` folder or the [Documentation index](docs/EN/docnavigation.md).
 
 
 ## Acknowledgements & Credits
