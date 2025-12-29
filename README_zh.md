@@ -212,7 +212,7 @@ cd InteractiveChecklists
 
 - 在此代码库中提 isuue。
 - 对于安全相关问题，请遵循 [SECURITY.md](SECURITY.md) 中的说明。
-- 有关贡献协调和讨论，请参见 [COLLABORATORS.md](COLLABORATORS.md)。
+- 有关贡献协调和讨论，请参见 [COLLABORATORS.md](COLLABORATORS_zh.md)。
 
 
 ## FAQ
