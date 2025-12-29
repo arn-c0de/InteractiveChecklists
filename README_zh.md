@@ -222,7 +222,7 @@ cd InteractiveChecklists
 - Q: 许可证是什么?
 	- A: 本项目采用 CC-BY-NC-SA 4.0 许可证。详情请参见 `LICENSE` 文件
 - Q: 文档在哪里?
-	- A: 请参见 `docs/` 文件夹 或点击 [Documentation index](docs/docnavigation.md).
+	- A: 请参见 `docs/` 文件夹 或点击 [Documentation index](docs/docnavigation_zh.md).
 
 
 ## 致谢&鸣谢
