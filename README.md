@@ -9,6 +9,10 @@
 	<img src="https://img.shields.io/badge/license-CC--BY--NC--SA%204.0-lightgrey.svg" alt="License: CC BY-NC-SA 4.0" />
 </p>
 
+<div align="center">
+	<a href="README.md">English</a> |
+	<a href="/docs/ZH/README_zh.md">Chinese (Simplified)</a>
+</div>
 
 <div align="center">
 	<a href="CHANGELOG.md">Changelog</a> |
@@ -27,10 +31,7 @@
 	<a href="#screenshots">Screenshots</a> • <a href="#demo-videos">Demo Videos</a>
 </p>
 
-<div align="center">
-	<a href="README.md">English</a> |
-	<a href="/docs/ZH/README_zh.md">Chinese (Simplified)</a>
-</div>
+
 
 # InteractiveChecklists
 
