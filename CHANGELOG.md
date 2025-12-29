@@ -2,6 +2,10 @@
 
 
 All relevant changes are summarized here by version.
+
+## [1.0.19] - 2025-12-29
+
+
 ## [1.0.18] - 2025-12-26
 
 ### Summary
