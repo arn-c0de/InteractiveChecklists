@@ -13,7 +13,7 @@
 <div align="center">
 	<a href="CHANGELOG.md">Changelog</a> |
 	<a href="docs/EN/docnavigation.md">Documentation</a> |
-	<a href="docs/planning/roadmap.md">Roadmap</a> |
+	<a href="docs/EN/planning/roadmap.md">Roadmap</a> |
 	<a href="SECURITY.md">Security Policy</a> |
 	<a href="LICENSE">License</a> |
 	<a href="COLLABORATORS.md">Collaborators</a>
@@ -29,7 +29,7 @@
 
 <div align="center">
 	<a href="README.md">English</a> |
-	<a href="README_zh.md">Chinese (Simplified)</a>
+	<a href="/docs/ZH/README_zh.md">Chinese (Simplified)</a>
 </div>
 
 # InteractiveChecklists
@@ -69,9 +69,9 @@ InteractiveChecklists is an Android application for viewing and interacting with
 - **Tagging System:** Assign tags to files for filtering and organization.
 - **QuickNotes:** Persistent notes powered by Room, with search, autosave, and markdown support.
 - **Data Persistence:** Stores user preferences, annotations, shortcuts, tags, and open tabs locally.
-- **DataPad (experimental):** Live flight telemetry display (UDP) for DCS World. Streams aircraft telemetry to the app for realtime status and popup details — see `docs/features/DATAPAD_FEATURE.md` for full details and setup instructions.
-- **Tactical Units Tracking (experimental):** Live tactical unit markers (aircraft, helicopter, ground, ship) on the map with real-time updates. Marker popups include **"Last seen"** timestamps and refresh snippets with speed/altitude. A **"Live Units Only"** filter (shows units seen in the last 10s) is synchronized between the list and the map. See `docs/features/TACTICAL_UNITS_TRACKING.md` and `scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md` for setup and details.
-- **Aviation Map (experimental):** OpenStreetMap-based map viewer with live aircraft position tracking from the DataPad stream. Adds a `MapViewer` tab showing aircraft position, heading, altitude and basic overlays — see `docs/features/AVIATION_MAP_FEATURE.md` for details and configuration.
+- **DataPad (experimental):** Live flight telemetry display (UDP) for DCS World. Streams aircraft telemetry to the app for realtime status and popup details — see `docs/EN/features/DATAPAD_FEATURE.md` for full details and setup instructions.
+- **Tactical Units Tracking (experimental):** Live tactical unit markers (aircraft, helicopter, ground, ship) on the map with real-time updates. Marker popups include **"Last seen"** timestamps and refresh snippets with speed/altitude. A **"Live Units Only"** filter (shows units seen in the last 10s) is synchronized between the list and the map. See `docs/EN/features/TACTICAL_UNITS_TRACKING.md` and `scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md` for setup and details.
+- **Aviation Map (experimental):** OpenStreetMap-based map viewer with live aircraft position tracking from the DataPad stream. Adds a `MapViewer` tab showing aircraft position, heading, altitude and basic overlays — see `docs/EN/features/AVIATION_MAP_FEATURE.md` for details and configuration.
 - **MapDatabaseTools (Python):** A collection of Python utilities for receiving, decrypting (AES-GCM), and visualizing DCS flight telemetry. Includes a PySide6 GUI with an embedded OpenStreetMap/Leaflet map for live aircraft tracking, a marker database, and helper scripts to manage map assets. See `scripts/MapDatabaseTools/README.md` for usage and configuration.
 
 ## Experimental: DataPad (Live Flight Telemetry)
@@ -97,9 +97,9 @@ python forward_parsed_udp.py --interval 10 --host 192.168.178.132 --port 5010 --
 # Add your device ID to authorized_devices.json on server
 ```
 
-DataPad also supports receiving **entity contacts** (tactical units) exported from DCS. Enable **Entity Tracking** in the app to receive tactical units and display them as live markers (requires running the forwarder with entity tracking enabled). For details and setup instructions, see `scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md` and `docs/features/TACTICAL_UNITS_TRACKING.md`.
+DataPad also supports receiving **entity contacts** (tactical units) exported from DCS. Enable **Entity Tracking** in the app to receive tactical units and display them as live markers (requires running the forwarder with entity tracking enabled). For details and setup instructions, see `scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md` and `docs/EN/features/TACTICAL_UNITS_TRACKING.md`.
 
-See `docs/technical/ECDH_USAGE_GUIDE.md` for complete setup instructions and `docs/features/DATAPAD_FEATURE.md` for full usage, configuration, and troubleshooting.
+See `docs/EN/technical/ECDH_USAGE_GUIDE.md` for complete setup instructions and `docs/EN/features/DATAPAD_FEATURE.md` for full usage, configuration, and troubleshooting.
 
 **Phase 1 (experimental)**: This release represents Phase 1 of DataPad. Future phases will expand telemetry coverage and add visual and security improvements, including live animated aircraft visualizations and a dedicated UI redesign.
 

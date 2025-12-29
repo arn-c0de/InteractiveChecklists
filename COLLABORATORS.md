@@ -24,8 +24,18 @@ Welcome to the ChecklistInteractive project! Below you'll find the current maint
 
 ## 🌟 Contributors
 
+### Translation
+- **Ferinjoque** — Spanish language support — [https://github.com/Ferinjoque](https://github.com/Ferinjoque) (2025-12-23)
+- **Dawn3901** — Simplified Chinese language support — [https://github.com/Dawn3901](https://github.com/Dawn3901) (2025-12-26)
 
+### Development
+- _No entries yet_
 
+### DevOps & Infrastructure
+- _No entries yet_
+
+### Support
+- _No entries yet_
 
 ---
 
