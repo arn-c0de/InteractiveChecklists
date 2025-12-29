@@ -1327,8 +1327,6 @@ class SessionManager:
 
             entity_status = "with entity tracking" if entity_tracking_enabled else "aircraft data only"
             logger.info(f"🔑 Session created: {session_id[:8]}... (key derived from ECDH, {entity_status})")
-            if entity_tracking_enabled:
-                logger.info(f"📡 Entity tracking ENABLED for device {device_id[:16]}... - will send tactical unit data")
 
             # SECURITY AUDIT: Log successful session establishment
             get_audit_logger().log_event('session_established', 'low', {

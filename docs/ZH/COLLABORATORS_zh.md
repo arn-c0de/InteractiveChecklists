@@ -3,7 +3,7 @@
 
 # 🤝 贡献者
 
-欢迎来到 ChecklistInteractive 项目！您将在下面找到当前的项目维护人，以及加入本项目的途径。
+欢迎来到 InteractiveChecklists 项目！您将在下面找到当前的项目维护人，以及加入本项目的途径。
 
 ---
 
