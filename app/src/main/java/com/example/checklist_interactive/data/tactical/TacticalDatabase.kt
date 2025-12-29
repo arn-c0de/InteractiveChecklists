@@ -29,7 +29,7 @@ import java.io.File
         TacticalUnitEntity::class,
         TacticalUnitHistoryEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = true
 )
 abstract class TacticalDatabase : RoomDatabase() {
@@ -441,6 +441,28 @@ abstract class TacticalDatabase : RoomDatabase() {
                 // This just bumps version for devices that had the old v8 with DEFAULT NULL
             }
         }
+
+        // Migration from v9 to v10: add health column to tactical_units table
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Helper function to check if column exists
+                fun columnExists(tableName: String, columnName: String): Boolean {
+                    db.query("PRAGMA table_info($tableName)").use { cursor ->
+                        val nameIndex = cursor.getColumnIndex("name")
+                        while (cursor.moveToNext()) {
+                            if (cursor.getString(nameIndex) == columnName) {
+                                return true
+                            }
+                        }
+                    }
+                    return false
+                }
+
+                if (!columnExists("tactical_units", "health")) {
+                    db.execSQL("ALTER TABLE tactical_units ADD COLUMN health REAL")
+                }
+            }
+        }
         
         /**
          * Get database instance
@@ -583,7 +605,7 @@ abstract class TacticalDatabase : RoomDatabase() {
                 DATABASE_NAME
             )
                 .createFromAsset("databases/$DATABASE_NAME")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
 
             if (allowDestructiveMigration) {
                 builder.fallbackToDestructiveMigration()
@@ -605,7 +627,7 @@ abstract class TacticalDatabase : RoomDatabase() {
                 TacticalDatabase::class.java,
                 dbFile.absolutePath
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
 
             if (allowDestructiveMigration) {
                 builder.fallbackToDestructiveMigration()

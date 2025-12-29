@@ -115,6 +115,7 @@ Planned enhancements include additional telemetry (speed, vertical speed, fuel, 
 		<img src="images/pdf_viewer.png" alt="PDF viewer with annotation tools" width="360" />
 		<img src="images/quick_notes.png" alt="QuickNotes bottom sheet and editor" width="360" />
 		<img src="images/map_pattern_calculator.png" alt="Calculator for landing patterns" width="360" />
+		<img src="images/map_tacmarker_live-data.png" alt="Full tactical live data Support" width="360" />
 		<img src="images/map-route.png" alt="Route lines overlay with labels" width="360" />
 		<img src="images/routeplanner.png" alt="Route planner - line preview" width="360" />
 		<img src="images/landingroute-planner.png" alt="Create Route sheet" width="360" />
@@ -228,6 +229,9 @@ If you encounter issues or have questions:
 ## Acknowledgements & Credits
 
 Thanks to all contributors and to the Jetpack Compose and Android open-source ecosystems used in this project.
+
+[![Contributors](https://contrib.rocks/image?repo=arn-c0de/InteractiveChecklists)](https://github.com/arn-c0de/InteractiveChecklists/graphs/contributors)
+
 
 
 ## License

@@ -15,6 +15,7 @@ interface LocationRepository {
     fun searchLocations(query: String): Flow<List<LocationEntity>>
     fun getAllMaps(): Flow<List<String>>
     suspend fun getLocationById(id: Int): LocationEntity?
+    fun observeLocationById(id: Int): Flow<LocationEntity?>
     suspend fun saveLocation(location: LocationEntity): Long
     suspend fun updateLocation(location: LocationEntity)
     suspend fun deleteLocation(id: Int)
@@ -122,7 +123,10 @@ class LocationRepositoryImpl(
     
     override suspend fun getLocationById(id: Int): LocationEntity? =
         locationDao.getLocationById(id)
-    
+
+    override fun observeLocationById(id: Int): Flow<LocationEntity?> =
+        locationDao.observeLocationById(id)
+
     override suspend fun saveLocation(location: LocationEntity): Long {
         val now = Instant.now().toString()
         val newLocation = location.copy(

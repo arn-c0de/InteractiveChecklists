@@ -13,6 +13,9 @@ interface LocationDao {
     
     @Query("SELECT * FROM locations WHERE id = :id")
     suspend fun getLocationById(id: Int): LocationEntity?
+
+    @Query("SELECT * FROM locations WHERE id = :id")
+    fun observeLocationById(id: Int): Flow<LocationEntity?>
     
     @Query("SELECT * FROM locations WHERE marker_type = :type ORDER BY name")
     fun getLocationsByType(type: String): Flow<List<LocationEntity>>
@@ -373,6 +376,9 @@ interface TacticalUnitsDao {
     @Query("SELECT * FROM tactical_units WHERE id = :id")
     suspend fun getUnitById(id: Int): TacticalUnitEntity?
     
+    @Query("SELECT * FROM tactical_units WHERE id = :id")
+    fun getUnitByIdFlow(id: Int): Flow<TacticalUnitEntity?>
+    
     @Query("SELECT * FROM tactical_units WHERE dcs_id = :dcsId")
     suspend fun getUnitByDcsId(dcsId: String): TacticalUnitEntity?
     
@@ -419,9 +425,10 @@ interface TacticalUnitsDao {
     suspend fun updateUnit(unit: TacticalUnitEntity)
     
     @Query("""
-        UPDATE tactical_units 
+        UPDATE tactical_units
         SET latitude = :latitude, longitude = :longitude, altitude = :altitude,
             heading = :heading, speed = :speed, distance = :distance, bearing = :bearing,
+            health = :health, category = :category,
             is_active = 1, last_seen_at = :lastSeenAt, last_update_at = :lastUpdateAt
         WHERE dcs_id = :dcsId
     """)
@@ -434,6 +441,8 @@ interface TacticalUnitsDao {
         speed: Double?,
         distance: Double?,
         bearing: Double?,
+        health: Double?,
+        category: String,
         lastSeenAt: String,
         lastUpdateAt: String
     ): Int

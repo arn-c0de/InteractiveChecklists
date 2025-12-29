@@ -703,6 +703,9 @@ data class NearbyUnit(
     @SerialName("bearing")
     val bearing: Double? = null,  // 0-360 degrees
 
+    @SerialName("health")
+    val health: Double? = null,  // Unit health (0.0-1.0, 1.0 = full health)
+
     @SerialName("country")
     val country: Int? = null,
 

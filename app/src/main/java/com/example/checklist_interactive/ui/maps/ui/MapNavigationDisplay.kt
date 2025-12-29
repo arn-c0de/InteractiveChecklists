@@ -46,6 +46,37 @@ import com.example.checklist_interactive.R
 import org.osmdroid.util.GeoPoint
 import kotlin.math.abs
 import android.util.Log
+import org.json.JSONObject
+
+/**
+ * Extract heading from location metadata, description, or tags
+ */
+private fun extractHeadingFromLocation(location: LocationEntity?): Double? {
+    if (location == null) return null
+    location.metadata?.let { meta ->
+        try {
+            val obj = JSONObject(meta)
+            if (obj.has("heading") && !obj.isNull("heading")) {
+                val v = obj.optDouble("heading")
+                if (!v.isNaN()) return v
+                val s = obj.optString("heading", "")
+                s.toDoubleOrNull()?.let { return it }
+            }
+        } catch (_: Exception) {
+        }
+    }
+    location.description.takeIf { it.isNotEmpty() }?.let { desc ->
+        val regex = Regex("(?i)\\b(?:hdg|heading)\\s*[:=]?\\s*([0-9]{1,3}(?:\\.[0-9]+)?)\\b")
+        val m = regex.find(desc)
+        if (m != null) return m.groupValues[1].toDoubleOrNull()
+    }
+    location.tags?.takeIf { it.isNotEmpty() }?.let { tags ->
+        val regex2 = Regex("(?i)\\bheading=([0-9]{1,3}(?:\\.[0-9]+)?)\\b")
+        val m2 = regex2.find(tags)
+        if (m2 != null) return m2.groupValues[1].toDoubleOrNull()
+    }
+    return null
+}
 
 /**
  * Active Navigation Display - Shows route information and runway approach options
@@ -131,6 +162,35 @@ fun MapNavigationDisplay(
     // Manual landing details collapse state (hoisted so other controls can sync it)
     var showManualLandingDetails by rememberSaveable { mutableStateOf(showNavigationDetails) }
 
+    // Auto-update heading modes
+    var autoUpdateMarkerHeading by rememberSaveable { mutableStateOf(false) }
+    var autoUpdateCarrierHeading by rememberSaveable { mutableStateOf(false) }
+
+    // Auto-update heading when mode is active and marker heading changes
+    LaunchedEffect(
+        autoUpdateMarkerHeading,
+        autoUpdateCarrierHeading,
+        originalAirportTarget?.latitude,
+        originalAirportTarget?.longitude,
+        originalAirportTarget?.metadata
+    ) {
+        val markerHeading = extractHeadingFromLocation(originalAirportTarget)
+        if (markerHeading != null) {
+            when {
+                autoUpdateMarkerHeading -> {
+                    val normalizedHeading = ((markerHeading % 360 + 360) % 360)
+                    onManualLandingHeadingChange(String.format("%.0f", normalizedHeading))
+                    onShowManualHeadingErrorChange(false)
+                }
+                autoUpdateCarrierHeading -> {
+                    val carrierHeading = ((markerHeading - 8.0) % 360 + 360) % 360
+                    onManualLandingHeadingChange(String.format("%.0f", carrierHeading))
+                    onShowManualHeadingErrorChange(false)
+                }
+            }
+        }
+    }
+
     // Persist opacity when changed
     LaunchedEffect(cardOpacity) {
         prefs.edit().putFloat(KEY_OPACITY, cardOpacity).apply()
@@ -189,12 +249,41 @@ fun MapNavigationDisplay(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.map_nav_route_to, activeNavigationTarget?.name ?: ""),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = stringResource(R.string.map_nav_route_to,
+                                    activeNavigationTarget?.name
+                                        ?.replace(Regex(" PATTERN \\d+"), "")
+                                        ?.replace(Regex(" RWY \\d+"), "") ?: ""),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            // Show PATTERN or RWY indicator when active (fixed, doesn't blink)
+                            selectedRunwayHeading?.let { hdg ->
+                                val indicatorText = if (showTrafficPattern) {
+                                    "PATTERN ${String.format("%02d", hdg.toInt() / 10)}"
+                                } else if (showRunwayApproach) {
+                                    "RWY ${String.format("%02d", hdg.toInt() / 10)}"
+                                } else {
+                                    null
+                                }
+                                indicatorText?.let {
+                                    Text(
+                                        text = it,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(start = 8.dp)
+                                    )
+                                }
+                            }
+                        }
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                             modifier = Modifier.padding(top = 4.dp)
@@ -215,10 +304,21 @@ fun MapNavigationDisplay(
                                     color = MaterialTheme.colorScheme.onErrorContainer
                                 )
                             }
-                            // Show marker altitude if available
-                            activeNavigationTarget?.elevationM?.let { elevation ->
+                        }
+                        // Show marker altitude in second row (meters and feet)
+                        activeNavigationTarget?.elevationM?.let { elevation ->
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                modifier = Modifier.padding(top = 2.dp)
+                            ) {
                                 Text(
                                     text = "${String.format("%.0f", elevation)} m",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                                Text(
+                                    text = "${String.format("%.0f", elevation * 3.28084)} ft",
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onErrorContainer
@@ -471,16 +571,18 @@ fun MapNavigationDisplay(
                                     .fillMaxWidth()
                                     .padding(12.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = stringResource(R.string.map_nav_select_runway),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onErrorContainer
-                                    )
+                                // Only show these elements when expanded
+                                if (showNavigationDetails) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.map_nav_select_runway),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
 
                                     // Final approach distance dropdown
                                     var expanded by remember { mutableStateOf(false) }
@@ -1248,6 +1350,7 @@ fun MapNavigationDisplay(
                                         }
                                     }
                                 }
+                                } // End showNavigationDetails
 
                                 Spacer(modifier = Modifier.height(8.dp))
                                 // Runways moved into Pattern Configuration above
@@ -1263,8 +1366,10 @@ fun MapNavigationDisplay(
                                     .fillMaxWidth()
                                     .padding(12.dp)
                             ) {
-                                // Header with collapse button
-                                Row(
+                                // Only show manual landing details when expanded
+                                if (showNavigationDetails) {
+                                    // Header with collapse button
+                                    Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clickable { showManualLandingDetails = !showManualLandingDetails },
@@ -1282,21 +1387,23 @@ fun MapNavigationDisplay(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        // Pattern button (always visible)
-                                        Button(
-                                            onClick = { onShowTrafficPatternChange(!showTrafficPattern) },
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = if (showTrafficPattern) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-                                                contentColor = if (showTrafficPattern) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-                                            ),
-                                            modifier = Modifier.height(28.dp),
-                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                                        ) {
-                                            Text(
-                                                text = stringResource(R.string.map_nav_pattern_button),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontSize = 11.sp
-                                            )
+                                        // Pattern button (only visible when expanded)
+                                        if (showNavigationDetails) {
+                                            Button(
+                                                onClick = { onShowTrafficPatternChange(!showTrafficPattern) },
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = if (showTrafficPattern) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                                                    contentColor = if (showTrafficPattern) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                                                ),
+                                                modifier = Modifier.height(28.dp),
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                                            ) {
+                                                Text(
+                                                    text = stringResource(R.string.map_nav_pattern_button),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontSize = 11.sp
+                                                )
+                                            }
                                         }
 
                                         // Collapse/expand button
@@ -1381,41 +1488,138 @@ fun MapNavigationDisplay(
 
                                                 Spacer(modifier = Modifier.height(8.dp))
 
-                                        // Heading input field
-                                        androidx.compose.material3.OutlinedTextField(
-                                    value = manualLandingHeading,
-                                    onValueChange = { newValue ->
-                                        onManualLandingHeadingChange(newValue)
-                                        onShowManualHeadingErrorChange(false)
-                                    },
-                                    label = { Text(stringResource(R.string.map_landing_heading)) },
-                                    placeholder = { Text("000 - 360") },
-                                    singleLine = true,
-                                    isError = showManualHeadingError,
-                                    supportingText = if (showManualHeadingError) {
-                                        { Text(stringResource(R.string.map_landing_heading_error)) }
-                                    } else {
-                                        { Text(stringResource(R.string.map_landing_heading_hint)) }
-                                    },
-                                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
-                                    ),
-                                    trailingIcon = {
-                                        Text(
-                                            text = "°",
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = MaterialTheme.colorScheme.onErrorContainer
-                                        )
-                                    },
-                                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = MaterialTheme.colorScheme.onErrorContainer,
-                                        unfocusedBorderColor = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.5f),
-                                        focusedLabelColor = MaterialTheme.colorScheme.onErrorContainer,
-                                        unfocusedLabelColor = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f),
-                                        cursorColor = MaterialTheme.colorScheme.onErrorContainer
-                                    ),
-                                    modifier = Modifier.fillMaxWidth()
-                                )
+                                        // Heading input field with auto-update buttons
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalAlignment = Alignment.Top
+                                        ) {
+                                            // Heading input field (1/3 width)
+                                            androidx.compose.material3.OutlinedTextField(
+                                                value = manualLandingHeading,
+                                                onValueChange = { newValue ->
+                                                    onManualLandingHeadingChange(newValue)
+                                                    onShowManualHeadingErrorChange(false)
+                                                },
+                                                label = { Text(stringResource(R.string.map_landing_heading)) },
+                                                placeholder = { Text("000") },
+                                                singleLine = true,
+                                                isError = showManualHeadingError,
+                                                supportingText = if (showManualHeadingError) {
+                                                    { Text(stringResource(R.string.map_landing_heading_error)) }
+                                                } else {
+                                                    { Text(stringResource(R.string.map_landing_heading_hint)) }
+                                                },
+                                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                                                ),
+                                                trailingIcon = {
+                                                    Text(
+                                                        text = "°",
+                                                        style = MaterialTheme.typography.bodyLarge,
+                                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                                    )
+                                                },
+                                                colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                                                    focusedBorderColor = MaterialTheme.colorScheme.onErrorContainer,
+                                                    unfocusedBorderColor = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.5f),
+                                                    focusedLabelColor = MaterialTheme.colorScheme.onErrorContainer,
+                                                    unfocusedLabelColor = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f),
+                                                    cursorColor = MaterialTheme.colorScheme.onErrorContainer
+                                                ),
+                                                modifier = Modifier.weight(1f)
+                                            )
+
+                                            // Column for the two toggle buttons (2/3 width)
+                                            Column(
+                                                modifier = Modifier.weight(2f),
+                                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                // Auto-update heading toggle button
+                                                // Track position and metadata changes for live updates
+                                                val markerHeading = remember(
+                                                    originalAirportTarget,
+                                                    originalAirportTarget?.latitude,
+                                                    originalAirportTarget?.longitude,
+                                                    originalAirportTarget?.metadata
+                                                ) {
+                                                    extractHeadingFromLocation(originalAirportTarget)
+                                                }
+                                                FilterChip(
+                                                    selected = autoUpdateMarkerHeading,
+                                                    onClick = {
+                                                        if (markerHeading != null) {
+                                                            autoUpdateMarkerHeading = !autoUpdateMarkerHeading
+                                                            if (autoUpdateMarkerHeading) {
+                                                                // Deactivate carrier mode
+                                                                autoUpdateCarrierHeading = false
+                                                                // Set heading immediately
+                                                                val normalizedHeading = ((markerHeading % 360 + 360) % 360)
+                                                                onManualLandingHeadingChange(String.format("%.0f", normalizedHeading))
+                                                                onShowManualHeadingErrorChange(false)
+                                                            }
+                                                        }
+                                                    },
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    enabled = markerHeading != null,
+                                                    label = {
+                                                        Text(
+                                                            text = if (markerHeading != null) {
+                                                                if (autoUpdateMarkerHeading) {
+                                                                    "🔴 LIVE HDG: ${String.format("%.0f°", ((markerHeading % 360 + 360) % 360))}"
+                                                                } else {
+                                                                    "→ Marker HDG (${String.format("%.0f°", ((markerHeading % 360 + 360) % 360))})"
+                                                                }
+                                                            } else {
+                                                                "→ Marker HDG (N/A)"
+                                                            },
+                                                            fontSize = 12.sp
+                                                        )
+                                                    },
+                                                    leadingIcon = if (autoUpdateMarkerHeading) {
+                                                        { Icon(Icons.Default.FlightLand, contentDescription = null) }
+                                                    } else null
+                                                )
+
+                                                // Carrier landing toggle button (-8 degrees)
+                                                FilterChip(
+                                                    selected = autoUpdateCarrierHeading,
+                                                    onClick = {
+                                                        if (markerHeading != null) {
+                                                            autoUpdateCarrierHeading = !autoUpdateCarrierHeading
+                                                            if (autoUpdateCarrierHeading) {
+                                                                // Deactivate marker mode
+                                                                autoUpdateMarkerHeading = false
+                                                                // Set carrier heading immediately
+                                                                val carrierHeading = ((markerHeading - 8.0) % 360 + 360) % 360
+                                                                onManualLandingHeadingChange(String.format("%.0f", carrierHeading))
+                                                                onShowManualHeadingErrorChange(false)
+                                                            }
+                                                        }
+                                                    },
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    enabled = markerHeading != null,
+                                                    label = {
+                                                        Text(
+                                                            text = if (markerHeading != null) {
+                                                                val carrierHdg = ((markerHeading - 8.0) % 360 + 360) % 360
+                                                                if (autoUpdateCarrierHeading) {
+                                                                    "🔴 CARRIER: ${String.format("%.0f°", carrierHdg)}"
+                                                                } else {
+                                                                    "⚓ Carrier (-8°): ${String.format("%.0f°", carrierHdg)}"
+                                                                }
+                                                            } else {
+                                                                "⚓ Carrier (-8°)"
+                                                            },
+                                                            fontSize = 12.sp
+                                                        )
+                                                    },
+                                                    leadingIcon = if (autoUpdateCarrierHeading) {
+                                                        { Icon(Icons.Default.FlightLand, contentDescription = null) }
+                                                    } else null
+                                                )
+                                            }
+                                        }
 
                                 // Apply button (validate and set heading)
                                 Spacer(modifier = Modifier.height(8.dp))
@@ -1849,6 +2053,7 @@ fun MapNavigationDisplay(
                                         }
                                     } // End AnimatedVisibility (manual landing details)
                                 }
+                                } // End showNavigationDetails
                             }
                         }
                     }
