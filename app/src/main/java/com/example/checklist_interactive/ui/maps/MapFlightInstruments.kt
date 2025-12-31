@@ -38,6 +38,11 @@ import androidx.compose.ui.unit.sp
 import com.example.checklist_interactive.R
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.abs
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 
 /**
  * MapFlightInstruments - Flight instruments panel overlay for map view
@@ -111,11 +116,14 @@ fun MapFlightInstruments(
                             size = 120.dp
                         )
 
-                        // Attitude Indicator (larger, centered)
+                        // Attitude Indicator (larger, centered) with HUD Altitude Overlay
                         AttitudeIndicator(
                             pitch = pitch,
                             bank = bank,
-                            size = 160.dp
+                            size = 220.dp,
+                            altitude = altitude,
+                            terrainElevation = terrainElevation,
+                            verticalSpeed = verticalSpeed
                         )
 
                         // Vertical Speed Indicator
@@ -145,13 +153,6 @@ fun MapFlightInstruments(
                         // G-Meter (left side)
                         GMeterIndicator(
                             gLoad = gLoad ?: 1.0,
-                            size = 64.dp
-                        )
-
-                        // Altimeter (center-left)
-                        AltimeterIndicator(
-                            altitude = altitude ?: 0.0,
-                            terrainElevation = terrainElevation,
                             size = 64.dp
                         )
 
@@ -207,13 +208,17 @@ fun MapFlightInstruments(
 /**
  * Attitude Indicator (Artificial Horizon)
  * Shows pitch and bank angles (expects values in degrees)
+ * With integrated HUD altitude display overlay
  */
 @Composable
 fun AttitudeIndicator(
     pitch: Double, // in degrees
     bank: Double, // in degrees
     size: androidx.compose.ui.unit.Dp,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    altitude: Double? = null,
+    terrainElevation: Double? = null,
+    verticalSpeed: Double? = null
 ) {
     // Debug log for visibility
     // Debug logging removed to reduce log spam
@@ -223,51 +228,68 @@ fun AttitudeIndicator(
         modifier = modifier
     ) {
         Box(
-            modifier = Modifier
-                .size(size)
-                .clip(CircleShape)
-                .background(Color(0xFF1A1A1A))
+            modifier = Modifier.size(size)
         ) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val centerX = this.size.width / 2
-                val centerY = this.size.height / 2
-                val radius = this.size.minDimension / 2
+            // Attitude Indicator (circular, clipped)
+            Box(
+                modifier = Modifier
+                    .size(size)
+                    .clip(CircleShape)
+                    .background(Color(0xFF1A1A1A))
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val centerX = this.size.width / 2
+                    val centerY = this.size.height / 2
+                    val radius = this.size.minDimension / 2
 
-                // Rotate canvas for bank angle
-                rotate(-bank.toFloat(), Offset(centerX, centerY)) {
-                    // Sky (blue) - upper half
-                    val pitchOffset = (pitch.toFloat() * radius * 0.02f).coerceIn(-radius * 2, radius * 2)
+                    // Rotate canvas for bank angle
+                    rotate(-bank.toFloat(), Offset(centerX, centerY)) {
+                        // Sky (blue) - upper half
+                        val pitchOffset = (pitch.toFloat() * radius * 0.02f).coerceIn(-radius * 2, radius * 2)
 
-                    drawRect(
-                        color = Color(0xFF4A90E2),
-                        topLeft = Offset(0f, centerY + pitchOffset - radius * 2),
-                        size = Size(this.size.width, radius * 2)
-                    )
+                        drawRect(
+                            color = Color(0xFF4A90E2),
+                            topLeft = Offset(0f, centerY + pitchOffset - radius * 2),
+                            size = Size(this.size.width, radius * 2)
+                        )
 
-                    // Ground (brown) - lower half
-                    drawRect(
-                        color = Color(0xFF8B4513),
-                        topLeft = Offset(0f, centerY + pitchOffset),
-                        size = Size(this.size.width, radius * 2)
-                    )
+                        // Ground (brown) - lower half
+                        drawRect(
+                            color = Color(0xFF8B4513),
+                            topLeft = Offset(0f, centerY + pitchOffset),
+                            size = Size(this.size.width, radius * 2)
+                        )
 
-                    // Horizon line
-                    drawLine(
-                        color = Color.White,
-                        start = Offset(0f, centerY + pitchOffset),
-                        end = Offset(this.size.width, centerY + pitchOffset),
-                        strokeWidth = 3f
-                    )
+                        // Horizon line
+                        drawLine(
+                            color = Color.White,
+                            start = Offset(0f, centerY + pitchOffset),
+                            end = Offset(this.size.width, centerY + pitchOffset),
+                            strokeWidth = 3f
+                        )
 
-                    // Pitch ladder
-                    drawPitchLadder(centerX, centerY, pitchOffset, radius)
+                        // Pitch ladder
+                        drawPitchLadder(centerX, centerY, pitchOffset, radius)
+                    }
+
+                    // Bank angle indicator (fixed reference)
+                    drawBankIndicator(centerX, centerY, radius, bank)
+
+                    // Aircraft symbol (fixed in center)
+                    drawAircraftSymbol(centerX, centerY, radius * 0.6f)
                 }
+            }
 
-                // Bank angle indicator (fixed reference)
-                drawBankIndicator(centerX, centerY, radius, bank)
-
-                // Aircraft symbol (fixed in center)
-                drawAircraftSymbol(centerX, centerY, radius * 0.6f)
+            // HUD Altitude Overlay (left side) - positioned OVER the attitude indicator
+            if (altitude != null) {
+                HUDAltitudeOverlay(
+                    altitude = altitude,
+                    terrainElevation = terrainElevation,
+                    verticalSpeed = verticalSpeed,
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 8.dp)
+                )
             }
         }
 
@@ -277,6 +299,319 @@ fun AttitudeIndicator(
             color = Color.White,
             modifier = Modifier.padding(top = 4.dp)
         )
+    }
+}
+
+/**
+ * HUD-Style Altitude Overlay for Attitude Indicator
+ * Displays altitude tape on left side of artificial horizon
+ */
+@Composable
+fun HUDAltitudeOverlay(
+    altitude: Double,
+    terrainElevation: Double?,
+    verticalSpeed: Double?,
+    modifier: Modifier = Modifier
+) {
+    // Convert meters to feet
+    val altFeet by remember(altitude) {
+        derivedStateOf { (altitude * 3.28084).coerceIn(-1000.0, 99999.0) }
+    }
+
+    val aglFeet by remember(altitude, terrainElevation) {
+        derivedStateOf {
+            if (terrainElevation != null) {
+                ((altitude - terrainElevation) * 3.28084).coerceIn(-1000.0, 99999.0)
+            } else {
+                altFeet
+            }
+        }
+    }
+
+    val vsFpm by remember(verticalSpeed) {
+        derivedStateOf {
+            ((verticalSpeed ?: 0.0) * 196.85).coerceIn(-6000.0, 6000.0)
+        }
+    }
+
+    // Predicted altitude in 6 seconds
+    val trendAltitude by remember(altFeet, vsFpm) {
+        derivedStateOf {
+            (altFeet + (vsFpm / 60.0 * 6.0)).coerceIn(-1000.0, 99999.0)
+        }
+    }
+
+    // Color coding based on AGL
+    val aglColor by remember(aglFeet) {
+        derivedStateOf {
+            when {
+                aglFeet < 100 -> Color(0xFFFF0000) // Red: Critical
+                aglFeet < 500 -> Color(0xFFFFAA00) // Amber: Caution
+                aglFeet < 1000 -> Color(0xFFFFFF00) // Yellow: Warning
+                else -> Color(0xFF00FF00) // Green: Safe
+            }
+        }
+    }
+
+    // Cached Paint objects
+    val tapePaint = remember {
+        android.graphics.Paint().apply {
+            isAntiAlias = true
+            color = android.graphics.Color.argb(0xDD, 0x0A, 0x0A, 0x0A) // More opaque
+            style = android.graphics.Paint.Style.FILL
+        }
+    }
+
+    val textPaint = remember {
+        android.graphics.Paint().apply {
+            isAntiAlias = true
+            color = android.graphics.Color.argb(0xFF, 0x00, 0xFF, 0x00)
+            textSize = 20f
+            textAlign = android.graphics.Paint.Align.RIGHT
+            typeface = android.graphics.Typeface.MONOSPACE
+        }
+    }
+
+    val textShadowPaint = remember {
+        android.graphics.Paint().apply {
+            isAntiAlias = true
+            color = android.graphics.Color.argb(0xAA, 0x00, 0x00, 0x00)
+            textSize = 20f
+            textAlign = android.graphics.Paint.Align.RIGHT
+            typeface = android.graphics.Typeface.MONOSPACE
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .size(width = 80.dp, height = 160.dp)
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val width = this.size.width
+            val height = this.size.height
+            val centerY = height / 2f
+
+            if (!altFeet.isFinite() || !aglFeet.isFinite()) return@Canvas
+
+            // Draw tape background
+            drawIntoCanvas { canvas ->
+                canvas.nativeCanvas.drawRoundRect(
+                    0f,
+                    0f,
+                    width,
+                    height,
+                    8f,
+                    8f,
+                    tapePaint
+                )
+
+                // Draw green border for visibility
+                val borderPaint = android.graphics.Paint().apply {
+                    isAntiAlias = true
+                    color = android.graphics.Color.argb(0xFF, 0x00, 0xFF, 0x00)
+                    style = android.graphics.Paint.Style.STROKE
+                    strokeWidth = 3f
+                }
+                canvas.nativeCanvas.drawRoundRect(
+                    0f,
+                    0f,
+                    width,
+                    height,
+                    8f,
+                    8f,
+                    borderPaint
+                )
+            }
+
+            // Draw altitude tick marks
+            val altitudeRange = 600f // Show ±300ft range
+            val pixelsPerFoot = height / altitudeRange
+            val tickInterval = 100
+            val minorTickInterval = 50
+
+            val minAlt = (altFeet - 300).toInt()
+            val maxAlt = (altFeet + 300).toInt()
+
+            drawIntoCanvas { canvas ->
+                // Draw ticks and labels
+                for (alt in ((minAlt / minorTickInterval) * minorTickInterval)..(maxAlt / minorTickInterval) * minorTickInterval step minorTickInterval) {
+                    val yPos = centerY - ((alt - altFeet) * pixelsPerFoot).toFloat()
+
+                    if (yPos < 0 || yPos > height) continue
+
+                    val isMajorTick = alt % tickInterval == 0
+                    val tickLength = if (isMajorTick) width * 0.4f else width * 0.2f
+
+                    // Tick line
+                    val tickPaint = android.graphics.Paint().apply {
+                        isAntiAlias = true
+                        color = if (isMajorTick) android.graphics.Color.argb(0xFF, 0x00, 0xFF, 0x00)
+                                else android.graphics.Color.argb(0x88, 0x00, 0xFF, 0x00)
+                        style = android.graphics.Paint.Style.STROKE
+                        strokeWidth = if (isMajorTick) 2f else 1f
+                    }
+
+                    canvas.nativeCanvas.drawLine(
+                        width - tickLength,
+                        yPos,
+                        width,
+                        yPos,
+                        tickPaint
+                    )
+
+                    // Major tick labels
+                    if (isMajorTick && abs(yPos - centerY) > 25f) {
+                        val label = (alt / 100).toString()
+                        // Shadow
+                        canvas.nativeCanvas.drawText(
+                            label,
+                            width - tickLength - 3f,
+                            yPos + 7f,
+                            textShadowPaint
+                        )
+                        // Text
+                        canvas.nativeCanvas.drawText(
+                            label,
+                            width - tickLength - 4f,
+                            yPos + 6f,
+                            textPaint
+                        )
+                    }
+                }
+            }
+
+            // Draw trend vector
+            if (abs(vsFpm) > 100) {
+                val trendY = centerY - ((trendAltitude - altFeet) * pixelsPerFoot).toFloat()
+                val trendColor = if (vsFpm > 0) Color(0xFF00FF00) else Color(0xFFFF6600)
+
+                // Trend line
+                drawLine(
+                    color = trendColor.copy(alpha = 0.4f),
+                    start = Offset(width * 0.3f - 1f, centerY),
+                    end = Offset(width * 0.3f - 1f, trendY.coerceIn(10f, height - 10f)),
+                    strokeWidth = 6f,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+                drawLine(
+                    color = trendColor,
+                    start = Offset(width * 0.3f, centerY),
+                    end = Offset(width * 0.3f, trendY.coerceIn(10f, height - 10f)),
+                    strokeWidth = 2f,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+
+                // Arrow head
+                val arrowY = trendY.coerceIn(10f, height - 10f)
+                val arrowSize = 5f
+                val arrowPath = Path().apply {
+                    if (vsFpm > 0) {
+                        moveTo(width * 0.3f, arrowY)
+                        lineTo(width * 0.3f - arrowSize, arrowY + arrowSize)
+                        lineTo(width * 0.3f + arrowSize, arrowY + arrowSize)
+                    } else {
+                        moveTo(width * 0.3f, arrowY)
+                        lineTo(width * 0.3f - arrowSize, arrowY - arrowSize)
+                        lineTo(width * 0.3f + arrowSize, arrowY - arrowSize)
+                    }
+                    close()
+                }
+                drawPath(arrowPath, trendColor)
+            }
+
+            // Draw current altitude box
+            drawIntoCanvas { canvas ->
+                val boxHeight = 40f
+                val boxWidth = width * 0.95f
+                val boxLeft = width - boxWidth
+                val boxTop = centerY - boxHeight / 2f
+
+                // Box background
+                val boxPaint = android.graphics.Paint().apply {
+                    isAntiAlias = true
+                    color = android.graphics.Color.argb(0xEE, 0x00, 0x00, 0x00)
+                    style = android.graphics.Paint.Style.FILL
+                }
+
+                canvas.nativeCanvas.drawRoundRect(
+                    boxLeft,
+                    boxTop,
+                    width,
+                    boxTop + boxHeight,
+                    4f,
+                    4f,
+                    boxPaint
+                )
+
+                // Box border with AGL color
+                val boxStrokePaint = android.graphics.Paint().apply {
+                    isAntiAlias = true
+                    color = aglColor.value.toInt()
+                    style = android.graphics.Paint.Style.STROKE
+                    strokeWidth = 2f
+                }
+
+                canvas.nativeCanvas.drawRoundRect(
+                    boxLeft,
+                    boxTop,
+                    width,
+                    boxTop + boxHeight,
+                    4f,
+                    4f,
+                    boxStrokePaint
+                )
+
+                // Altitude text
+                val altText = String.format("%05d", altFeet.toInt())
+                val altTextPaint = android.graphics.Paint().apply {
+                    isAntiAlias = true
+                    color = android.graphics.Color.argb(0xFF, 0x00, 0xFF, 0x00)
+                    textSize = 24f
+                    textAlign = android.graphics.Paint.Align.CENTER
+                    typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
+                }
+
+                canvas.nativeCanvas.drawText(
+                    altText,
+                    boxLeft + boxWidth / 2f,
+                    centerY + 9f,
+                    altTextPaint
+                )
+            }
+
+            // Draw AGL readout at bottom
+            if (terrainElevation != null) {
+                drawIntoCanvas { canvas ->
+                    val aglText = "${aglFeet.toInt()}"
+                    val aglPaint = android.graphics.Paint().apply {
+                        isAntiAlias = true
+                        color = aglColor.value.toInt()
+                        textSize = 18f
+                        textAlign = android.graphics.Paint.Align.CENTER
+                        typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
+                    }
+
+                    canvas.nativeCanvas.drawText(
+                        aglText,
+                        width / 2f,
+                        height - 10f,
+                        aglPaint
+                    )
+                }
+            }
+
+            // Draw "ALT" label at top
+            drawIntoCanvas { canvas ->
+                val labelPaint = android.graphics.Paint().apply {
+                    isAntiAlias = true
+                    color = android.graphics.Color.argb(0xFF, 0x00, 0xFF, 0x00)
+                    textSize = 16f
+                    textAlign = android.graphics.Paint.Align.CENTER
+                    typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
+                }
+                canvas.nativeCanvas.drawText("ALT", width / 2f, 16f, labelPaint)
+            }
+        }
     }
 }
 
@@ -1368,6 +1703,454 @@ fun CountermeasuresIndicator(
         }
         Text(
             text = stringResource(R.string.map_flight_instrument_cmds),
+            fontSize = 8.sp,
+            color = Color.White,
+            modifier = Modifier.padding(top = 2.dp)
+        )
+    }
+}
+
+/**
+ * Enhanced 3D Altitude Indicator with HUD-style display
+ * Combines tape-style altimeter with terrain awareness, trend vectors, and 3D visual effects
+ *
+ * Features:
+ * - Vertical scrolling altitude tape (glass cockpit PFD standard)
+ * - 3D depth effects with shadows and glows (HUD-style)
+ * - Terrain elevation overlay with AGL visualization
+ * - Vertical speed trend vector
+ * - Color-coded altitude zones (green/yellow/red based on AGL)
+ * - Performance optimized with cached Paint objects
+ */
+@Composable
+fun EnhancedAltitudeIndicator(
+    altitude: Double,
+    terrainElevation: Double? = null,
+    verticalSpeed: Double? = null,
+    size: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
+    showTerrainProfile: Boolean = true,
+    showTrendVector: Boolean = true
+) {
+    // Convert meters to feet
+    val altFeet by remember(altitude) {
+        derivedStateOf { (altitude * 3.28084).coerceIn(-1000.0, 99999.0) }
+    }
+
+    val aglFeet by remember(altitude, terrainElevation) {
+        derivedStateOf {
+            if (terrainElevation != null) {
+                ((altitude - terrainElevation) * 3.28084).coerceIn(-1000.0, 99999.0)
+            } else {
+                altFeet
+            }
+        }
+    }
+
+    val vsFpm by remember(verticalSpeed) {
+        derivedStateOf {
+            ((verticalSpeed ?: 0.0) * 196.85).coerceIn(-6000.0, 6000.0)
+        }
+    }
+
+    // Predicted altitude in 6 seconds (standard trend vector)
+    val trendAltitude by remember(altFeet, vsFpm) {
+        derivedStateOf {
+            (altFeet + (vsFpm / 60.0 * 6.0)).coerceIn(-1000.0, 99999.0)
+        }
+    }
+
+    // Color coding based on AGL (aviation standards)
+    val aglColor by remember(aglFeet) {
+        derivedStateOf {
+            when {
+                aglFeet < 100 -> Color(0xFFFF0000) // Red: Critical
+                aglFeet < 500 -> Color(0xFFFFAA00) // Amber: Caution
+                aglFeet < 1000 -> Color(0xFFFFFF00) // Yellow: Warning
+                else -> Color(0xFF00FF00) // Green: Safe (HUD standard color)
+            }
+        }
+    }
+
+    // Cached Paint objects for performance
+    val tapePaint = remember {
+        android.graphics.Paint().apply {
+            isAntiAlias = true
+            color = android.graphics.Color.argb(0xCC, 0x1A, 0x1A, 0x1A)
+            style = android.graphics.Paint.Style.FILL
+        }
+    }
+
+    val tapeStrokePaint = remember {
+        android.graphics.Paint().apply {
+            isAntiAlias = true
+            color = android.graphics.Color.argb(0xFF, 0x00, 0xFF, 0x00) // HUD green
+            style = android.graphics.Paint.Style.STROKE
+            strokeWidth = 2f
+        }
+    }
+
+    val textPaint = remember {
+        android.graphics.Paint().apply {
+            isAntiAlias = true
+            color = android.graphics.Color.argb(0xFF, 0x00, 0xFF, 0x00) // HUD green
+            textSize = 24f
+            textAlign = android.graphics.Paint.Align.RIGHT
+            typeface = android.graphics.Typeface.MONOSPACE
+        }
+    }
+
+    val textShadowPaint = remember {
+        android.graphics.Paint().apply {
+            isAntiAlias = true
+            color = android.graphics.Color.argb(0xAA, 0x00, 0x00, 0x00)
+            textSize = 24f
+            textAlign = android.graphics.Paint.Align.RIGHT
+            typeface = android.graphics.Typeface.MONOSPACE
+        }
+    }
+
+    val smallTextPaint = remember {
+        android.graphics.Paint().apply {
+            isAntiAlias = true
+            color = android.graphics.Color.argb(0xFF, 0x00, 0xFF, 0xFF) // Cyan for secondary info
+            textSize = 16f
+            textAlign = android.graphics.Paint.Align.CENTER
+            typeface = android.graphics.Typeface.MONOSPACE
+        }
+    }
+
+    val centerBoxPaint = remember {
+        android.graphics.Paint().apply {
+            isAntiAlias = true
+            color = android.graphics.Color.argb(0xEE, 0x00, 0x00, 0x00)
+            style = android.graphics.Paint.Style.FILL
+        }
+    }
+
+    val centerBoxStrokePaint = remember {
+        android.graphics.Paint().apply {
+            isAntiAlias = true
+            style = android.graphics.Paint.Style.STROKE
+            strokeWidth = 3f
+        }
+    }
+
+    val terrainPaint = remember {
+        android.graphics.Paint().apply {
+            isAntiAlias = true
+            style = android.graphics.Paint.Style.FILL
+        }
+    }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+    ) {
+        Box(
+            modifier = Modifier
+                .size(width = size * 1.2f, height = size * 2f)
+                .background(Color(0xFF0A0A0A))
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val width = this.size.width
+                val height = this.size.height
+                val centerY = height / 2f
+                val tapeWidth = width * 0.6f
+                val tapeLeft = width - tapeWidth
+
+                // Safe values check
+                if (!altFeet.isFinite() || !aglFeet.isFinite()) return@Canvas
+
+                // Draw altitude tape background with 3D depth effect
+                drawIntoCanvas { canvas ->
+                    // Shadow for depth
+                    val shadowPaint = android.graphics.Paint().apply {
+                        isAntiAlias = true
+                        color = android.graphics.Color.argb(0x80, 0x00, 0x00, 0x00)
+                        maskFilter = android.graphics.BlurMaskFilter(8f, android.graphics.BlurMaskFilter.Blur.NORMAL)
+                    }
+                    canvas.nativeCanvas.drawRect(
+                        tapeLeft + 4f,
+                        4f,
+                        width + 4f,
+                        height + 4f,
+                        shadowPaint
+                    )
+
+                    // Tape background
+                    canvas.nativeCanvas.drawRect(
+                        tapeLeft,
+                        0f,
+                        width,
+                        height,
+                        tapePaint
+                    )
+
+                    // Tape border
+                    canvas.nativeCanvas.drawRect(
+                        tapeLeft,
+                        0f,
+                        width,
+                        height,
+                        tapeStrokePaint
+                    )
+                }
+
+                // Draw altitude tick marks and numbers
+                val altitudeRange = 1000f // Show ±500ft range
+                val pixelsPerFoot = height / altitudeRange
+                val tickInterval = 100 // Major ticks every 100ft
+                val minorTickInterval = 20 // Minor ticks every 20ft
+
+                val minAlt = (altFeet - 500).toInt()
+                val maxAlt = (altFeet + 500).toInt()
+
+                drawIntoCanvas { canvas ->
+                    // Draw ticks
+                    for (alt in ((minAlt / minorTickInterval) * minorTickInterval)..(maxAlt / minorTickInterval) * minorTickInterval step minorTickInterval) {
+                        val yPos = centerY - ((alt - altFeet) * pixelsPerFoot).toFloat()
+
+                        if (yPos < 0 || yPos > height) continue
+
+                        val isMajorTick = alt % tickInterval == 0
+                        val tickLength = if (isMajorTick) tapeWidth * 0.3f else tapeWidth * 0.15f
+
+                        // Tick line
+                        val tickPaint = if (isMajorTick) tapeStrokePaint else android.graphics.Paint().apply {
+                            isAntiAlias = true
+                            color = android.graphics.Color.argb(0x88, 0x00, 0xFF, 0x00)
+                            style = android.graphics.Paint.Style.STROKE
+                            strokeWidth = 1f
+                        }
+
+                        canvas.nativeCanvas.drawLine(
+                            width - tickLength,
+                            yPos,
+                            width,
+                            yPos,
+                            tickPaint
+                        )
+
+                        // Major tick labels
+                        if (isMajorTick && abs(yPos - centerY) > 40f) {
+                            val label = (alt / 100).toString()
+                            // Shadow
+                            canvas.nativeCanvas.drawText(
+                                label,
+                                width - tickLength - 8f,
+                                yPos + 10f,
+                                textShadowPaint
+                            )
+                            // Text
+                            canvas.nativeCanvas.drawText(
+                                label,
+                                width - tickLength - 10f,
+                                yPos + 8f,
+                                textPaint
+                            )
+                        }
+                    }
+                }
+
+                // Draw trend vector (6-second altitude prediction)
+                if (showTrendVector && abs(vsFpm) > 100) {
+                    val trendY = centerY - ((trendAltitude - altFeet) * pixelsPerFoot).toFloat()
+                    val trendColor = if (vsFpm > 0) Color(0xFF00FF00) else Color(0xFFFF6600)
+
+                    // Trend arrow with glow effect
+                    drawLine(
+                        color = trendColor.copy(alpha = 0.3f),
+                        start = Offset(width - tapeWidth * 0.5f - 2f, centerY),
+                        end = Offset(width - tapeWidth * 0.5f - 2f, trendY.coerceIn(20f, height - 20f)),
+                        strokeWidth = 8f,
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round
+                    )
+                    drawLine(
+                        color = trendColor,
+                        start = Offset(width - tapeWidth * 0.5f, centerY),
+                        end = Offset(width - tapeWidth * 0.5f, trendY.coerceIn(20f, height - 20f)),
+                        strokeWidth = 3f,
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round
+                    )
+
+                    // Trend arrow head
+                    val arrowY = trendY.coerceIn(20f, height - 20f)
+                    val arrowSize = 8f
+                    val arrowPath = Path().apply {
+                        if (vsFpm > 0) {
+                            moveTo(width - tapeWidth * 0.5f, arrowY)
+                            lineTo(width - tapeWidth * 0.5f - arrowSize, arrowY + arrowSize)
+                            lineTo(width - tapeWidth * 0.5f + arrowSize, arrowY + arrowSize)
+                        } else {
+                            moveTo(width - tapeWidth * 0.5f, arrowY)
+                            lineTo(width - tapeWidth * 0.5f - arrowSize, arrowY - arrowSize)
+                            lineTo(width - tapeWidth * 0.5f + arrowSize, arrowY - arrowSize)
+                        }
+                        close()
+                    }
+                    drawPath(arrowPath, trendColor)
+                }
+
+                // Draw center altitude readout box (current altitude)
+                drawIntoCanvas { canvas ->
+                    val boxHeight = 50f
+                    val boxWidth = tapeWidth * 1.3f
+                    val boxLeft = width - boxWidth
+                    val boxTop = centerY - boxHeight / 2f
+
+                    // Box shadow for 3D depth
+                    val boxShadowPaint = android.graphics.Paint().apply {
+                        isAntiAlias = true
+                        color = android.graphics.Color.argb(0xAA, 0x00, 0x00, 0x00)
+                        maskFilter = android.graphics.BlurMaskFilter(6f, android.graphics.BlurMaskFilter.Blur.NORMAL)
+                    }
+                    canvas.nativeCanvas.drawRoundRect(
+                        boxLeft + 3f,
+                        boxTop + 3f,
+                        width + 3f,
+                        boxTop + boxHeight + 3f,
+                        8f,
+                        8f,
+                        boxShadowPaint
+                    )
+
+                    // Box background
+                    canvas.nativeCanvas.drawRoundRect(
+                        boxLeft,
+                        boxTop,
+                        width,
+                        boxTop + boxHeight,
+                        8f,
+                        8f,
+                        centerBoxPaint
+                    )
+
+                    // Box border with AGL-based color
+                    centerBoxStrokePaint.color = aglColor.value.toInt()
+                    canvas.nativeCanvas.drawRoundRect(
+                        boxLeft,
+                        boxTop,
+                        width,
+                        boxTop + boxHeight,
+                        8f,
+                        8f,
+                        centerBoxStrokePaint
+                    )
+
+                    // Current altitude text
+                    val altText = String.format("%05d", altFeet.toInt())
+                    val altTextPaint = android.graphics.Paint().apply {
+                        isAntiAlias = true
+                        color = android.graphics.Color.argb(0xFF, 0x00, 0xFF, 0x00)
+                        textSize = 32f
+                        textAlign = android.graphics.Paint.Align.CENTER
+                        typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
+                    }
+
+                    // Text shadow
+                    val altTextShadowPaint = android.graphics.Paint(altTextPaint).apply {
+                        color = android.graphics.Color.argb(0xDD, 0x00, 0x00, 0x00)
+                    }
+
+                    canvas.nativeCanvas.drawText(
+                        altText,
+                        boxLeft + boxWidth / 2f + 1f,
+                        centerY + 12f,
+                        altTextShadowPaint
+                    )
+                    canvas.nativeCanvas.drawText(
+                        altText,
+                        boxLeft + boxWidth / 2f,
+                        centerY + 11f,
+                        altTextPaint
+                    )
+                }
+
+                // Draw terrain elevation bar (if available)
+                if (showTerrainProfile && terrainElevation != null) {
+                    val terrainFeet = (terrainElevation * 3.28084).coerceIn(-1000.0, 99999.0)
+                    val terrainY = centerY - ((terrainFeet - altFeet) * pixelsPerFoot).toFloat()
+
+                    if (terrainY > 0 && terrainY < height) {
+                        // Terrain baseline
+                        terrainPaint.color = android.graphics.Color.argb(0x88, 0x8B, 0x45, 0x13) // Semi-transparent brown
+                        drawIntoCanvas { canvas ->
+                            canvas.nativeCanvas.drawRect(
+                                0f,
+                                terrainY,
+                                tapeLeft,
+                                height,
+                                terrainPaint
+                            )
+                        }
+
+                        // Terrain line
+                        drawLine(
+                            color = Color(0xFF8B4513),
+                            start = Offset(0f, terrainY),
+                            end = Offset(tapeLeft, terrainY),
+                            strokeWidth = 2f
+                        )
+                    }
+
+                    // AGL digital readout at bottom
+                    drawIntoCanvas { canvas ->
+                        val aglText = "${aglFeet.toInt()} AGL"
+                        val aglPaint = android.graphics.Paint().apply {
+                            isAntiAlias = true
+                            color = aglColor.value.toInt()
+                            textSize = 20f
+                            textAlign = android.graphics.Paint.Align.CENTER
+                            typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
+                        }
+
+                        // Background box for AGL
+                        val aglBoxPaint = android.graphics.Paint().apply {
+                            isAntiAlias = true
+                            color = android.graphics.Color.argb(0xDD, 0x00, 0x00, 0x00)
+                            style = android.graphics.Paint.Style.FILL
+                        }
+
+                        val textBounds = android.graphics.Rect()
+                        aglPaint.getTextBounds(aglText, 0, aglText.length, textBounds)
+
+                        val aglBoxY = height - 35f
+                        canvas.nativeCanvas.drawRoundRect(
+                            width / 2f - textBounds.width() / 2f - 8f,
+                            aglBoxY - textBounds.height() - 4f,
+                            width / 2f + textBounds.width() / 2f + 8f,
+                            aglBoxY + 4f,
+                            4f,
+                            4f,
+                            aglBoxPaint
+                        )
+
+                        canvas.nativeCanvas.drawText(
+                            aglText,
+                            width / 2f,
+                            aglBoxY,
+                            aglPaint
+                        )
+                    }
+                }
+
+                // Draw "ALT" label at top
+                drawIntoCanvas { canvas ->
+                    val labelPaint = android.graphics.Paint().apply {
+                        isAntiAlias = true
+                        color = android.graphics.Color.argb(0xFF, 0x00, 0xFF, 0x00)
+                        textSize = 16f
+                        textAlign = android.graphics.Paint.Align.CENTER
+                        typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
+                    }
+                    canvas.nativeCanvas.drawText("ALT", width / 2f, 20f, labelPaint)
+                }
+            }
+        }
+
+        Text(
+            text = stringResource(R.string.map_flight_instrument_alt),
             fontSize = 8.sp,
             color = Color.White,
             modifier = Modifier.padding(top = 2.dp)
