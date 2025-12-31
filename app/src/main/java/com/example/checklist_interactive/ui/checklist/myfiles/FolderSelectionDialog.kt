@@ -1,4 +1,4 @@
-package com.example.checklist_interactive.ui.checklist
+package com.example.checklist_interactive.ui.checklist.myfiles
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*

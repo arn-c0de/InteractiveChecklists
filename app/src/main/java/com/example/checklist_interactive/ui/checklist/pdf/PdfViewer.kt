@@ -112,8 +112,8 @@ import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
 import com.example.checklist_interactive.ui.common.DraggableFab
 import com.example.checklist_interactive.ui.common.FABOverlay
 import com.example.checklist_interactive.ui.common.PdfViewerFABs
-import com.example.checklist_interactive.ui.checklist.AnnotationsRepository
-import com.example.checklist_interactive.ui.checklist.AnnotationStroke
+import com.example.checklist_interactive.ui.checklist.pdf.AnnotationsRepository
+import com.example.checklist_interactive.ui.checklist.pdf.AnnotationStroke
 
 /**
  * Custom PDF viewer with no external heavy dependencies.

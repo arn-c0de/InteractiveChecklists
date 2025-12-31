@@ -31,6 +31,7 @@ import com.example.checklist_interactive.data.checklist.ChecklistSection
 import com.example.checklist_interactive.data.checklist.AssetBrowser
 import com.example.checklist_interactive.data.checklist.AssetNode
 import com.example.checklist_interactive.ui.checklist.markdown.parseInlineMarkdown
+import com.example.checklist_interactive.ui.checklist.myfiles.ThemeSettingsDialog
 
 import androidx.compose.ui.platform.LocalContext
 
