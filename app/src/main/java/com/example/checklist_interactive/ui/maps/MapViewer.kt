@@ -2288,50 +2288,6 @@ fun MapViewer(
                 }
             }
         }
-        
-        // Flight data HUD - shows Altitude, Speed, Pitch, Bank, Mach live from DataPad
-        // Positioned at bottom-center, directly below Flight Instruments when they are active
-        if (datapadEnabled && flightData != null) {
-            val fd = flightData!!
-            val altFt = (fd.altitude * 3.28084).toInt()
-            val speedSource = fd.groundSpeed ?: fd.trueAirspeed ?: fd.indicatedAirspeed
-            val speedKts = speedSource?.let { (it * 1.9438).toInt() }
-            val pitchDeg = Math.toDegrees(fd.pitch)
-            val bankDeg = Math.toDegrees(fd.bank)
-            val machVal = fd.mach
-
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    // Position below flight instruments when they are active
-                    .padding(bottom = if (mapState.flightInstrumentsEnabled) 172.dp else 88.dp)
-                    .padding(horizontal = 8.dp),
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-                tonalElevation = if (mapState.flightInstrumentsEnabled) 4.dp else 2.dp, // Lower elevation when behind instruments
-                shape = MaterialTheme.shapes.small
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(text = "ALT ${altFt} ft", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
-
-                    Divider(modifier = Modifier.height(18.dp).width(1.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-
-                    Text(text = "SPD ${speedKts ?: "--"} kt", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
-
-                    Divider(modifier = Modifier.height(18.dp).width(1.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-
-                    Text(text = "P ${String.format("%.1f", pitchDeg)}°", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
-                    Text(text = "B ${String.format("%.1f", bankDeg)}°", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
-
-                    Divider(modifier = Modifier.height(18.dp).width(1.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-
-                    Text(text = "Mach ${if (machVal != null) String.format("%.2f", machVal) else "--"}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
-                }
-            }
-        }
 
         // Drawing mode indicator (top-right, shows when drawing is active)
         if (drawingState.isDrawingMode) {
