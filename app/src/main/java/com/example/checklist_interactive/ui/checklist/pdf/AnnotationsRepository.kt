@@ -1,4 +1,4 @@
-package com.example.checklist_interactive.ui.checklist
+package com.example.checklist_interactive.ui.checklist.pdf
 
 import android.content.Context
 import org.json.JSONArray

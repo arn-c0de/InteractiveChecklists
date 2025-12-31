@@ -1,4 +1,4 @@
-package com.example.checklist_interactive.ui.checklist
+package com.example.checklist_interactive.ui.checklist.pdf
 
 import androidx.compose.ui.geometry.Offset
 
