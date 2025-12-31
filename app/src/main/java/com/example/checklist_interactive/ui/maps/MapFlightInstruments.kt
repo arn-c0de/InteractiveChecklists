@@ -116,14 +116,15 @@ fun MapFlightInstruments(
                             size = 120.dp
                         )
 
-                        // Attitude Indicator (larger, centered) with HUD Altitude Overlay
+                        // Attitude Indicator (larger, centered) with HUD Altitude and Speed Overlays
                         AttitudeIndicator(
                             pitch = pitch,
                             bank = bank,
                             size = 220.dp,
                             altitude = altitude,
                             terrainElevation = terrainElevation,
-                            verticalSpeed = verticalSpeed
+                            verticalSpeed = verticalSpeed,
+                            airspeed = airspeed
                         )
 
                         // Vertical Speed Indicator
@@ -208,7 +209,7 @@ fun MapFlightInstruments(
 /**
  * Attitude Indicator (Artificial Horizon)
  * Shows pitch and bank angles (expects values in degrees)
- * With integrated HUD altitude display overlay
+ * With integrated HUD altitude and speed display overlays
  */
 @Composable
 fun AttitudeIndicator(
@@ -218,7 +219,8 @@ fun AttitudeIndicator(
     modifier: Modifier = Modifier,
     altitude: Double? = null,
     terrainElevation: Double? = null,
-    verticalSpeed: Double? = null
+    verticalSpeed: Double? = null,
+    airspeed: Double? = null
 ) {
     // Debug log for visibility
     // Debug logging removed to reduce log spam
@@ -228,13 +230,14 @@ fun AttitudeIndicator(
         modifier = modifier
     ) {
         Box(
-            modifier = Modifier.size(size)
+            modifier = Modifier
+                .size(size)
+                .clip(CircleShape) // Clip everything inside to circle shape
         ) {
             // Attitude Indicator (circular, clipped)
             Box(
                 modifier = Modifier
                     .size(size)
-                    .clip(CircleShape)
                     .background(Color(0xFF1A1A1A))
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
@@ -280,17 +283,23 @@ fun AttitudeIndicator(
                 }
             }
 
-            // HUD Altitude Overlay (left side) - positioned OVER the attitude indicator
-            if (altitude != null) {
-                HUDAltitudeOverlay(
-                    altitude = altitude,
-                    terrainElevation = terrainElevation,
-                    verticalSpeed = verticalSpeed,
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .padding(start = 8.dp)
-                )
-            }
+            // HUD Altitude Overlay (right side) - positioned OVER the attitude indicator
+            HUDAltitudeOverlay(
+                altitude = altitude ?: 0.0,
+                terrainElevation = terrainElevation,
+                verticalSpeed = verticalSpeed,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 4.dp)
+            )
+
+            // HUD Speed Overlay (top left) - positioned OVER the attitude indicator
+            HUDSpeedOverlay(
+                airspeed = airspeed ?: 0.0,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 4.dp, top = 20.dp)
+            )
         }
 
         Text(
@@ -357,7 +366,7 @@ fun HUDAltitudeOverlay(
     val tapePaint = remember {
         android.graphics.Paint().apply {
             isAntiAlias = true
-            color = android.graphics.Color.argb(0xDD, 0x0A, 0x0A, 0x0A) // More opaque
+            color = android.graphics.Color.argb(0x99, 0x0A, 0x0A, 0x0A) // More transparent
             style = android.graphics.Paint.Style.FILL
         }
     }
@@ -366,7 +375,7 @@ fun HUDAltitudeOverlay(
         android.graphics.Paint().apply {
             isAntiAlias = true
             color = android.graphics.Color.argb(0xFF, 0x00, 0xFF, 0x00)
-            textSize = 20f
+            textSize = 22f
             textAlign = android.graphics.Paint.Align.RIGHT
             typeface = android.graphics.Typeface.MONOSPACE
         }
@@ -376,7 +385,7 @@ fun HUDAltitudeOverlay(
         android.graphics.Paint().apply {
             isAntiAlias = true
             color = android.graphics.Color.argb(0xAA, 0x00, 0x00, 0x00)
-            textSize = 20f
+            textSize = 22f
             textAlign = android.graphics.Paint.Align.RIGHT
             typeface = android.graphics.Typeface.MONOSPACE
         }
@@ -384,7 +393,7 @@ fun HUDAltitudeOverlay(
 
     Box(
         modifier = modifier
-            .size(width = 80.dp, height = 160.dp)
+            .size(width = 70.dp, height = 160.dp)
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val width = this.size.width
@@ -403,23 +412,6 @@ fun HUDAltitudeOverlay(
                     8f,
                     8f,
                     tapePaint
-                )
-
-                // Draw green border for visibility
-                val borderPaint = android.graphics.Paint().apply {
-                    isAntiAlias = true
-                    color = android.graphics.Color.argb(0xFF, 0x00, 0xFF, 0x00)
-                    style = android.graphics.Paint.Style.STROKE
-                    strokeWidth = 3f
-                }
-                canvas.nativeCanvas.drawRoundRect(
-                    0f,
-                    0f,
-                    width,
-                    height,
-                    8f,
-                    8f,
-                    borderPaint
                 )
             }
 
@@ -521,7 +513,7 @@ fun HUDAltitudeOverlay(
 
             // Draw current altitude box
             drawIntoCanvas { canvas ->
-                val boxHeight = 40f
+                val boxHeight = 45f
                 val boxWidth = width * 0.95f
                 val boxLeft = width - boxWidth
                 val boxTop = centerY - boxHeight / 2f
@@ -566,7 +558,7 @@ fun HUDAltitudeOverlay(
                 val altTextPaint = android.graphics.Paint().apply {
                     isAntiAlias = true
                     color = android.graphics.Color.argb(0xFF, 0x00, 0xFF, 0x00)
-                    textSize = 24f
+                    textSize = 26f
                     textAlign = android.graphics.Paint.Align.CENTER
                     typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
                 }
@@ -574,7 +566,7 @@ fun HUDAltitudeOverlay(
                 canvas.nativeCanvas.drawText(
                     altText,
                     boxLeft + boxWidth / 2f,
-                    centerY + 9f,
+                    centerY + 10f,
                     altTextPaint
                 )
             }
@@ -586,7 +578,7 @@ fun HUDAltitudeOverlay(
                     val aglPaint = android.graphics.Paint().apply {
                         isAntiAlias = true
                         color = aglColor.value.toInt()
-                        textSize = 18f
+                        textSize = 20f
                         textAlign = android.graphics.Paint.Align.CENTER
                         typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
                     }
@@ -594,7 +586,7 @@ fun HUDAltitudeOverlay(
                     canvas.nativeCanvas.drawText(
                         aglText,
                         width / 2f,
-                        height - 10f,
+                        height - 12f,
                         aglPaint
                     )
                 }
@@ -605,11 +597,130 @@ fun HUDAltitudeOverlay(
                 val labelPaint = android.graphics.Paint().apply {
                     isAntiAlias = true
                     color = android.graphics.Color.argb(0xFF, 0x00, 0xFF, 0x00)
-                    textSize = 16f
+                    textSize = 18f
                     textAlign = android.graphics.Paint.Align.CENTER
                     typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
                 }
-                canvas.nativeCanvas.drawText("ALT", width / 2f, 16f, labelPaint)
+                canvas.nativeCanvas.drawText("ALT", width / 2f, 18f, labelPaint)
+            }
+        }
+    }
+}
+
+/**
+ * HUD-Style Speed Overlay for Attitude Indicator
+ * Displays airspeed in km/h and miles on top left of artificial horizon
+ */
+@Composable
+fun HUDSpeedOverlay(
+    airspeed: Double, // in m/s
+    modifier: Modifier = Modifier
+) {
+    // Convert m/s to km/h and mph
+    val speedKmh by remember(airspeed) {
+        derivedStateOf { (airspeed * 3.6).coerceIn(0.0, 999.0) }
+    }
+
+    val speedMph by remember(airspeed) {
+        derivedStateOf { (airspeed * 2.23694).coerceIn(0.0, 999.0) }
+    }
+
+    // Cached Paint objects
+    val bgPaint = remember {
+        android.graphics.Paint().apply {
+            isAntiAlias = true
+            color = android.graphics.Color.argb(0x99, 0x0A, 0x0A, 0x0A) // More transparent
+            style = android.graphics.Paint.Style.FILL
+        }
+    }
+
+    val kmhTextPaint = remember {
+        android.graphics.Paint().apply {
+            isAntiAlias = true
+            color = android.graphics.Color.argb(0xFF, 0x00, 0xFF, 0x00)
+            textSize = 24f
+            textAlign = android.graphics.Paint.Align.CENTER
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
+        }
+    }
+
+    val mphTextPaint = remember {
+        android.graphics.Paint().apply {
+            isAntiAlias = true
+            color = android.graphics.Color.argb(0xFF, 0x00, 0xFF, 0xFF) // Cyan
+            textSize = 18f
+            textAlign = android.graphics.Paint.Align.CENTER
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
+        }
+    }
+
+    val labelPaint = remember {
+        android.graphics.Paint().apply {
+            isAntiAlias = true
+            color = android.graphics.Color.argb(0xAA, 0xFF, 0xFF, 0xFF)
+            textSize = 12f
+            textAlign = android.graphics.Paint.Align.CENTER
+            typeface = android.graphics.Typeface.MONOSPACE
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .size(width = 70.dp, height = 70.dp)
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val width = this.size.width
+            val height = this.size.height
+
+            if (!speedKmh.isFinite() || !speedMph.isFinite()) return@Canvas
+
+            // Draw background with rounded corners
+            drawIntoCanvas { canvas ->
+                canvas.nativeCanvas.drawRoundRect(
+                    0f,
+                    0f,
+                    width,
+                    height,
+                    8f,
+                    8f,
+                    bgPaint
+                )
+            }
+
+            // Draw km/h value
+            drawIntoCanvas { canvas ->
+                val kmhText = String.format("%03d", speedKmh.toInt())
+                canvas.nativeCanvas.drawText(
+                    kmhText,
+                    width / 2f,
+                    height / 2f - 5f,
+                    kmhTextPaint
+                )
+
+                // km/h label
+                canvas.nativeCanvas.drawText(
+                    "km/h",
+                    width / 2f,
+                    height / 2f + 10f,
+                    labelPaint
+                )
+
+                // mph value (smaller, below)
+                val mphText = String.format("%03d", speedMph.toInt())
+                canvas.nativeCanvas.drawText(
+                    mphText,
+                    width / 2f,
+                    height / 2f + 28f,
+                    mphTextPaint
+                )
+
+                // mph label
+                canvas.nativeCanvas.drawText(
+                    "mph",
+                    width / 2f,
+                    height / 2f + 40f,
+                    labelPaint
+                )
             }
         }
     }
