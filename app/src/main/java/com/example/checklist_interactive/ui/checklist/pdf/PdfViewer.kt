@@ -1,4 +1,4 @@
-package com.example.checklist_interactive.ui.checklist
+package com.example.checklist_interactive.ui.checklist.pdf
 
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
@@ -112,6 +112,8 @@ import com.example.checklist_interactive.data.quicknotes.QuickNoteManager
 import com.example.checklist_interactive.ui.common.DraggableFab
 import com.example.checklist_interactive.ui.common.FABOverlay
 import com.example.checklist_interactive.ui.common.PdfViewerFABs
+import com.example.checklist_interactive.ui.checklist.AnnotationsRepository
+import com.example.checklist_interactive.ui.checklist.AnnotationStroke
 
 /**
  * Custom PDF viewer with no external heavy dependencies.

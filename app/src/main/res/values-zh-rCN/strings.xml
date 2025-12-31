@@ -800,6 +800,14 @@
     <string name="datapad_public_key_copied_feedback">公钥已复制到剪贴板 ✅</string>
     <string name="datapad_public_key_copy_hint">将此 Base64 公钥复制到服务器的 authorized_devices.json 条目中</string>
 
+    <!-- Copy helpers -->
+    <string name="datapad_cd_copy_device_id">复制设备 ID</string>
+    <string name="datapad_device_id_copied_feedback">设备 ID 已复制到剪贴板 ✅</string>
+    <string name="datapad_copy_both">复制两者</string>
+    <string name="datapad_copy_both_copied_feedback">设备 ID + 公钥 已复制到剪贴板 ✅</string>
+    <string name="datapad_combined_device_id_label">设备 ID：</string>
+    <string name="datapad_combined_public_key_label">公钥：\n</string>
+
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <!-- FILES & FOLDERS -->
     <!-- ═══════════════════════════════════════════════════════════════════════ -->

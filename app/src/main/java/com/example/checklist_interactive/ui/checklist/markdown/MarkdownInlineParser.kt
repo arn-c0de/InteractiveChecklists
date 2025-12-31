@@ -1,4 +1,4 @@
-package com.example.checklist_interactive.ui.checklist
+package com.example.checklist_interactive.ui.checklist.markdown
 
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle

@@ -23,8 +23,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.layout.offset
 import com.example.checklist_interactive.data.files.FileInfo
-import com.example.checklist_interactive.ui.checklist.MarkdownViewer
-import com.example.checklist_interactive.ui.checklist.PdfViewer
+import com.example.checklist_interactive.ui.checklist.markdown.MarkdownViewer
+import com.example.checklist_interactive.ui.checklist.pdf.PdfViewer
 import com.example.checklist_interactive.ui.quickaccess.QuickAccessSheet
 import com.example.checklist_interactive.ui.datapad.DataPadPopup
 import com.example.checklist_interactive.ui.datapad.LocalDataPadManager

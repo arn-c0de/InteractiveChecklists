@@ -169,65 +169,147 @@ fun DataPadSettingsDialog(
                         }
                     )
                     
-                    // Show Device ID
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        val clipboard = LocalClipboardManager.current
+                        var copiedDeviceId by remember { mutableStateOf(false) }
+                        var copiedPublicKey by remember { mutableStateOf(false) }
+                        var copiedBoth by remember { mutableStateOf(false) }
+                        val publicKey = try { manager.getPublicKey() } catch (_: Throwable) { "" }
+
+                        // Show Device ID (copyable)
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer
+                            )
                         ) {
-                            Text(
-                                text = stringResource(R.string.datapad_device_id_label),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                            Text(
-                                text = manager.getDeviceId(),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                        }
-                    }
-
-                    // Show Base64 Public Key with copy action
-                    val clipboard = LocalClipboardManager.current
-                    var copiedPublicKey by remember { mutableStateOf(false) }
-                    val publicKey = try { manager.getPublicKey() } catch (_: Throwable) { "" }
-
-                    OutlinedTextField(
-                        value = publicKey,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text(stringResource(R.string.datapad_public_key_label)) },
-                        singleLine = false,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 56.dp, max = 160.dp),
-                        trailingIcon = {
-                            IconButton(onClick = {
-                                if (publicKey.isNotEmpty()) {
-                                    clipboard.setText(AnnotatedString(publicKey))
-                                    copiedPublicKey = true
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.datapad_device_id_label),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                    Text(
+                                        text = manager.getDeviceId(),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                    if (copiedDeviceId) {
+                                        Text(
+                                            text = stringResource(R.string.datapad_device_id_copied_feedback),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                                        )
+                                    }
                                 }
-                            }) {
-                                Icon(
-                                    imageVector = Icons.Default.ContentCopy,
-                                    contentDescription = stringResource(R.string.datapad_cd_copy_public_key)
-                                )
-                            }
-                        },
-                        supportingText = {
-                            if (copiedPublicKey) {
-                                Text(stringResource(R.string.datapad_public_key_copied_feedback))
-                            } else {
-                                Text(stringResource(R.string.datapad_public_key_copy_hint))
+                                IconButton(onClick = {
+                                    val id = manager.getDeviceId()
+                                    if (id.isNotEmpty()) {
+                                        clipboard.setText(AnnotatedString(id))
+                                        copiedDeviceId = true
+                                    }
+                                }) {
+                                    Icon(
+                                        imageVector = Icons.Default.ContentCopy,
+                                        contentDescription = stringResource(R.string.datapad_cd_copy_device_id)
+                                    )
+                                }
                             }
                         }
-                    )
+
+                        LaunchedEffect(copiedDeviceId) {
+                            if (copiedDeviceId) {
+                                delay(2000L)
+                                copiedDeviceId = false
+                            }
+                        }
+
+                        // Show Base64 Public Key with copy action
+                        OutlinedTextField(
+                            value = publicKey,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text(stringResource(R.string.datapad_public_key_label)) },
+                            singleLine = false,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 56.dp, max = 160.dp),
+                            trailingIcon = {
+                                IconButton(onClick = {
+                                    if (publicKey.isNotEmpty()) {
+                                        clipboard.setText(AnnotatedString(publicKey))
+                                        copiedPublicKey = true
+                                    }
+                                }) {
+                                    Icon(
+                                        imageVector = Icons.Default.ContentCopy,
+                                        contentDescription = stringResource(R.string.datapad_cd_copy_public_key)
+                                    )
+                                }
+                            },
+                            supportingText = {
+                                when {
+                                    copiedBoth -> Text(stringResource(R.string.datapad_copy_both_copied_feedback))
+                                    copiedPublicKey -> Text(stringResource(R.string.datapad_public_key_copied_feedback))
+                                    else -> Text(stringResource(R.string.datapad_public_key_copy_hint))
+                                }
+                            }
+                        )
+
+                        // Button to copy both Device ID and Public Key together
+                        val combinedDeviceLabel = stringResource(R.string.datapad_combined_device_id_label)
+                        val combinedPublicKeyLabel = stringResource(R.string.datapad_combined_public_key_label)
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    val id = manager.getDeviceId()
+                                    if (publicKey.isNotEmpty() && id.isNotEmpty()) {
+                                        val combined = buildString {
+                                            append(combinedDeviceLabel)
+                                            append(id)
+                                            append("\n\n")
+                                            append(combinedPublicKeyLabel)
+                                            append(publicKey)
+                                        }
+                                        clipboard.setText(AnnotatedString(combined))
+                                        copiedBoth = true
+                                        copiedPublicKey = true
+                                        copiedDeviceId = true
+                                    }
+                                },
+                                enabled = publicKey.isNotEmpty() && manager.getDeviceId().isNotEmpty()
+                            ) {
+                                Text(stringResource(R.string.datapad_copy_both))
+                            }
+                        }
+
+                        LaunchedEffect(copiedBoth) {
+                            if (copiedBoth) {
+                                delay(2000L)
+                                copiedBoth = false
+                                copiedPublicKey = false
+                                copiedDeviceId = false
+                            }
+                        }
+
+                        LaunchedEffect(copiedPublicKey) {
+                            if (copiedPublicKey) {
+                                delay(2000L)
+                                copiedPublicKey = false
+                            }
+                        }
 
                 HorizontalDivider()
                 
