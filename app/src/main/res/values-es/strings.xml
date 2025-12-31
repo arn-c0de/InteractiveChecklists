@@ -887,6 +887,14 @@
     <string name="datapad_public_key_copied_feedback">Public key copied to clipboard ✅</string>
     <string name="datapad_public_key_copy_hint">Copy this Base64 public key into the server\'s authorized_devices.json entry</string>
 
+    <!-- Copy helpers -->
+    <string name="datapad_cd_copy_device_id">Copiar ID del dispositivo</string>
+    <string name="datapad_device_id_copied_feedback">ID del dispositivo copiado al portapapeles ✅</string>
+    <string name="datapad_copy_both">Copiar ambos</string>
+    <string name="datapad_copy_both_copied_feedback">ID del dispositivo + clave pública copiados al portapapeles ✅</string>
+    <string name="datapad_combined_device_id_label">ID del dispositivo: </string>
+    <string name="datapad_combined_public_key_label">Clave pública:\n</string>
+
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <!-- FILES & FOLDERS -->
     <!-- ═══════════════════════════════════════════════════════════════════════ -->

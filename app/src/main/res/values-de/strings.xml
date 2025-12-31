@@ -828,6 +828,14 @@
     <string name="datapad_public_key_copied_feedback">Public key copied to clipboard ✅</string>
     <string name="datapad_public_key_copy_hint">Copy this Base64 public key into the server\'s authorized_devices.json entry</string>
 
+    <!-- Copy helpers -->
+    <string name="datapad_cd_copy_device_id">Geräte‑ID kopieren</string>
+    <string name="datapad_device_id_copied_feedback">Geräte‑ID in die Zwischenablage kopiert ✅</string>
+    <string name="datapad_copy_both">Beides kopieren</string>
+    <string name="datapad_copy_both_copied_feedback">Geräte‑ID + Public Key in die Zwischenablage kopiert ✅</string>
+    <string name="datapad_combined_device_id_label">Geräte‑ID: </string>
+    <string name="datapad_combined_public_key_label">Public Key:\n</string>
+
     <string name="pdf_hide_toolbar">Werkzeugleiste ausblenden</string>
     <string name="pdf_show_toolbar">Werkzeugleiste einblenden</string>
     <string name="pdf_page_progress">Seite %1$d/%2$d</string>

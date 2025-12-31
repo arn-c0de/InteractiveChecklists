@@ -17,6 +17,9 @@ import com.example.checklist_interactive.data.checklist.ChecklistRepository
 import com.example.checklist_interactive.data.checklist.MarkdownChecklistParser
 import com.example.checklist_interactive.ui.checklist.ChecklistViewModel
 import com.example.checklist_interactive.ui.checklist.ChecklistViewModelFactory
+import com.example.checklist_interactive.ui.checklist.markdown.MarkdownViewer
+import com.example.checklist_interactive.ui.checklist.markdown.MarkdownViewerScreen
+import com.example.checklist_interactive.ui.checklist.pdf.PdfViewer
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
