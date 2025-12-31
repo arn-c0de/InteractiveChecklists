@@ -107,7 +107,7 @@ fun MapFlightInstruments(
                     // Primary flight instruments (top row)
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.Bottom
                     ) {
                         // Airspeed Indicator
                         AirspeedIndicator(
