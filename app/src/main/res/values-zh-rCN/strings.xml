@@ -1009,6 +1009,10 @@
     <string name="map_flight_instrument_cardinal_e">E</string>
     <string name="map_flight_instrument_cardinal_s">S</string>
     <string name="map_flight_instrument_cardinal_w">W</string>
+    <string name="map_flight_instrument_altitude_settings_title">高度警告设置</string>
+    <string name="map_flight_instrument_ground_height_label">地面高度 (英尺)</string>
+    <string name="map_flight_instrument_warning_height_label">警告高度 AGL (英尺)</string>
+    <string name="map_flight_instrument_warning_info">• 低于警告高度时黄色警告\n• 低于警告高度50%时红色警告</string>
 
     <!-- MapNavigationDisplay -->
     <string name="map_nav_route_to">航线至: %1$s</string>
