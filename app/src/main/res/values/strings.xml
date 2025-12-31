@@ -1016,6 +1016,10 @@
     <string name="map_flight_instrument_cardinal_e">E</string>
     <string name="map_flight_instrument_cardinal_s">S</string>
     <string name="map_flight_instrument_cardinal_w">W</string>
+    <string name="map_flight_instrument_altitude_settings_title">Altitude Warning Settings</string>
+    <string name="map_flight_instrument_ground_height_label">Ground Height (ft)</string>
+    <string name="map_flight_instrument_warning_height_label">Warning Height AGL (ft)</string>
+    <string name="map_flight_instrument_warning_info">• Yellow warning when below warning height\n• Red warning when below 50% of warning height</string>
 
     <!-- MapNavigationDisplay -->
     <string name="map_nav_route_to">ROUTE TO: %1$s</string>

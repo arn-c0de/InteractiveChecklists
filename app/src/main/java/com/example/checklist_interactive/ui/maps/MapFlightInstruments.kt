@@ -3,22 +3,30 @@ package com.example.checklist_interactive.ui.maps
 import android.util.Log
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,6 +41,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.checklist_interactive.R
@@ -322,17 +331,23 @@ fun HUDAltitudeOverlay(
     verticalSpeed: Double?,
     modifier: Modifier = Modifier
 ) {
+    // Ground height and warning height settings
+    var showSettingsDialog by remember { mutableStateOf(false) }
+    var groundHeight by remember { mutableStateOf(0.0) } // Ground elevation in feet
+    var warningHeight by remember { mutableStateOf(500.0) } // Warning threshold in feet AGL
+
     // Convert meters to feet
     val altFeet by remember(altitude) {
         derivedStateOf { (altitude * 3.28084).coerceIn(-1000.0, 99999.0) }
     }
 
-    val aglFeet by remember(altitude, terrainElevation) {
+    val aglFeet by remember(altitude, terrainElevation, groundHeight) {
         derivedStateOf {
             if (terrainElevation != null) {
                 ((altitude - terrainElevation) * 3.28084).coerceIn(-1000.0, 99999.0)
             } else {
-                altFeet
+                // Use manual ground height if no terrain data
+                (altFeet - groundHeight).coerceIn(-1000.0, 99999.0)
             }
         }
     }
@@ -395,7 +410,10 @@ fun HUDAltitudeOverlay(
         modifier = modifier
             .size(width = 70.dp, height = 160.dp)
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
+        Canvas(modifier = Modifier
+            .fillMaxSize()
+            .clickable { showSettingsDialog = true }
+        ) {
             val width = this.size.width
             val height = this.size.height
             val centerY = height / 2f
@@ -511,7 +529,7 @@ fun HUDAltitudeOverlay(
                 drawPath(arrowPath, trendColor)
             }
 
-            // Draw current altitude box
+            // Draw current altitude box (clickable area handled by modifier)
             drawIntoCanvas { canvas ->
                 val boxHeight = 45f
                 val boxWidth = width * 0.95f
@@ -553,11 +571,17 @@ fun HUDAltitudeOverlay(
                     boxStrokePaint
                 )
 
-                // Altitude text
+                // Altitude text - color changes based on warning height
+                val altTextColor = when {
+                    aglFeet < warningHeight * 0.5 -> android.graphics.Color.argb(0xFF, 0xFF, 0x00, 0x00) // Red when below 50% of warning height
+                    aglFeet < warningHeight -> android.graphics.Color.argb(0xFF, 0xFF, 0xFF, 0x00) // Yellow when below warning height
+                    else -> android.graphics.Color.argb(0xFF, 0x00, 0xFF, 0x00) // Green when above warning height
+                }
+
                 val altText = String.format("%05d", altFeet.toInt())
                 val altTextPaint = android.graphics.Paint().apply {
                     isAntiAlias = true
-                    color = android.graphics.Color.argb(0xFF, 0x00, 0xFF, 0x00)
+                    color = altTextColor
                     textSize = 26f
                     textAlign = android.graphics.Paint.Align.CENTER
                     typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
@@ -569,6 +593,26 @@ fun HUDAltitudeOverlay(
                     centerY + 10f,
                     altTextPaint
                 )
+            }
+
+            // Draw vertical speed at top (left-aligned to avoid clipping)
+            drawIntoCanvas { canvas ->
+                val vsColor = when {
+                    vsFpm > 500 -> android.graphics.Color.argb(0xFF, 0x00, 0xFF, 0x00) // Green for climbing
+                    vsFpm < -500 -> android.graphics.Color.argb(0xFF, 0xFF, 0x66, 0x00) // Orange for descending
+                    else -> android.graphics.Color.argb(0xFF, 0xFF, 0xFF, 0xFF) // White for near level
+                }
+
+                val vsPaint = android.graphics.Paint().apply {
+                    isAntiAlias = true
+                    color = vsColor
+                    textSize = 18f
+                    textAlign = android.graphics.Paint.Align.LEFT
+                    typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
+                }
+
+                val vsText = if (vsFpm >= 0) "+${vsFpm.toInt()}" else "${vsFpm.toInt()}"
+                canvas.nativeCanvas.drawText(vsText, 8f, 20f, vsPaint)
             }
 
             // Draw AGL readout at bottom
@@ -591,18 +635,62 @@ fun HUDAltitudeOverlay(
                     )
                 }
             }
+        }
 
-            // Draw "ALT" label at top
-            drawIntoCanvas { canvas ->
-                val labelPaint = android.graphics.Paint().apply {
-                    isAntiAlias = true
-                    color = android.graphics.Color.argb(0xFF, 0x00, 0xFF, 0x00)
-                    textSize = 18f
-                    textAlign = android.graphics.Paint.Align.CENTER
-                    typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
+        // Settings dialog for ground height and warning height
+        if (showSettingsDialog) {
+            var groundHeightInput by remember { mutableStateOf(groundHeight.toInt().toString()) }
+            var warningHeightInput by remember { mutableStateOf(warningHeight.toInt().toString()) }
+
+            AlertDialog(
+                onDismissRequest = { showSettingsDialog = false },
+                title = { Text(stringResource(R.string.map_flight_instrument_altitude_settings_title)) },
+                text = {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = groundHeightInput,
+                            onValueChange = { groundHeightInput = it },
+                            label = { Text(stringResource(R.string.map_flight_instrument_ground_height_label)) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        OutlinedTextField(
+                            value = warningHeightInput,
+                            onValueChange = { warningHeightInput = it },
+                            label = { Text(stringResource(R.string.map_flight_instrument_warning_height_label)) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Text(
+                            text = stringResource(R.string.map_flight_instrument_warning_info),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            groundHeight = groundHeightInput.toDoubleOrNull() ?: 0.0
+                            warningHeight = warningHeightInput.toDoubleOrNull() ?: 500.0
+                            showSettingsDialog = false
+                        }
+                    ) {
+                        Text(stringResource(R.string.action_ok))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showSettingsDialog = false }) {
+                        Text(stringResource(R.string.action_cancel))
+                    }
                 }
-                canvas.nativeCanvas.drawText("ALT", width / 2f, 18f, labelPaint)
-            }
+            )
         }
     }
 }

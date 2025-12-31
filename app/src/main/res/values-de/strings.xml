@@ -979,6 +979,10 @@
     <string name="map_flight_instrument_cardinal_e">O</string>
     <string name="map_flight_instrument_cardinal_s">S</string>
     <string name="map_flight_instrument_cardinal_w">W</string>
+    <string name="map_flight_instrument_altitude_settings_title">Höhenwarnung Einstellungen</string>
+    <string name="map_flight_instrument_ground_height_label">Bodenhöhe (ft)</string>
+    <string name="map_flight_instrument_warning_height_label">Warnhöhe AGL (ft)</string>
+    <string name="map_flight_instrument_warning_info">• Gelbe Warnung wenn unter Warnhöhe\n• Rote Warnung wenn unter 50% der Warnhöhe</string>
 
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <!-- MapNavigationDisplay -->

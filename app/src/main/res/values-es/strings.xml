@@ -1103,8 +1103,12 @@
     <string name="map_flight_instrument_cardinal_e">E</string>
     <string name="map_flight_instrument_cardinal_s">S</string>
     <string name="map_flight_instrument_cardinal_w">O</string>
+    <string name="map_flight_instrument_altitude_settings_title">Configuración de Alerta de Altitud</string>
+    <string name="map_flight_instrument_ground_height_label">Altura del Suelo (ft)</string>
+    <string name="map_flight_instrument_warning_height_label">Altura de Alerta AGL (ft)</string>
+    <string name="map_flight_instrument_warning_info">• Alerta amarilla cuando está por debajo de la altura de alerta\n• Alerta roja cuando está por debajo del 50% de la altura de alerta</string>
 
-    
+
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <!-- MapNavigationDisplay -->
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
