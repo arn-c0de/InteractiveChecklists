@@ -539,11 +539,117 @@ class AuthorizedDevice:
         self.added_date = added_date
 
 
+class ProofOfWorkChallenge:
+    """
+    Proof-of-Work challenge generator and verifier for DoS protection
+    Requires client to find nonce such that SHA-256(challenge + nonce) has N leading zero bits
+    """
+    def __init__(self, difficulty: int = 16):
+        """
+        Initialize PoW challenge system
+        
+        Args:
+            difficulty: Number of leading zero bits required (default 16 = ~65k hashes)
+                       12 bits = ~4k hashes (~5-20ms)
+                       16 bits = ~65k hashes (~50-100ms)
+                       20 bits = ~1M hashes (~500-1000ms)
+        """
+        self.difficulty = difficulty
+        self.challenges: Dict[str, Tuple[bytes, float]] = {}  # IP -> (challenge, timestamp)
+        self._lock = __import__('threading').Lock()
+        self.CHALLENGE_TIMEOUT = 300.0  # 5 minutes
+        
+    def generate_challenge(self, client_ip: str) -> str:
+        """Generate a new PoW challenge for client"""
+        challenge = os.urandom(32)  # 32 random bytes
+        
+        with self._lock:
+            self.challenges[client_ip] = (challenge, time.time())
+            # Cleanup old challenges
+            self._cleanup_expired()
+        
+        import base64
+        return base64.b64encode(challenge).decode('ascii')
+    
+    def verify_solution(self, client_ip: str, nonce: str) -> bool:
+        """
+        Verify client's PoW solution
+        
+        Args:
+            client_ip: Client IP address
+            nonce: Client's solution nonce (as string)
+            
+        Returns:
+            True if solution is valid, False otherwise
+        """
+        with self._lock:
+            if client_ip not in self.challenges:
+                logger.warning(f"⚠️ PoW verification failed: no challenge for {client_ip}")
+                return False
+            
+            challenge, timestamp = self.challenges[client_ip]
+            
+            # Check if challenge expired
+            if time.time() - timestamp > self.CHALLENGE_TIMEOUT:
+                logger.warning(f"⚠️ PoW verification failed: challenge expired for {client_ip}")
+                del self.challenges[client_ip]
+                return False
+            
+            # Verify solution
+            try:
+                digest = hashlib.sha256()
+                digest.update(challenge)
+                digest.update(nonce.encode('utf-8'))
+                hash_result = digest.digest()
+                
+                # Count leading zero bits
+                zero_bits = self._count_leading_zero_bits(hash_result)
+                
+                if zero_bits >= self.difficulty:
+                    logger.info(f"✅ PoW verified for {client_ip} (difficulty: {self.difficulty}, found: {zero_bits})")
+                    # Remove challenge after successful verification (one-time use)
+                    del self.challenges[client_ip]
+                    return True
+                else:
+                    logger.warning(f"⚠️ PoW verification failed: insufficient difficulty (need {self.difficulty}, got {zero_bits})")
+                    return False
+                    
+            except Exception as e:
+                logger.error(f"❌ PoW verification error: {e}")
+                return False
+    
+    @staticmethod
+    def _count_leading_zero_bits(data: bytes) -> int:
+        """Count leading zero bits in byte array"""
+        count = 0
+        for byte in data:
+            if byte == 0:
+                count += 8
+            else:
+                # Count leading zeros in this byte
+                b = byte
+                while (b & 0x80) == 0:
+                    count += 1
+                    b = (b << 1) & 0xFF
+                break
+        return count
+    
+    def _cleanup_expired(self):
+        """Remove expired challenges (called with lock held)"""
+        current_time = time.time()
+        expired = [ip for ip, (_, timestamp) in self.challenges.items() 
+                   if current_time - timestamp > self.CHALLENGE_TIMEOUT]
+        for ip in expired:
+            del self.challenges[ip]
+
+
 class SessionManager:
     """Manages ECDH handshake and session lifecycle"""
 
     def __init__(self, authorized_devices_path: str = "authorized_devices.json",
-                 aircraft_name: Optional[str] = None):
+                 aircraft_name: Optional[str] = None,
+                 enable_pow: bool = False,
+                 pow_difficulty: int = 16):
         self.sessions: Dict[str, SessionData] = {}  # session_id -> SessionData
         self.device_sessions: Dict[str, str] = {}  # device_id -> session_id (latest)
         self.authorized_devices: Dict[str, AuthorizedDevice] = {}
@@ -552,6 +658,12 @@ class SessionManager:
         self.last_cleanup = time.time()
         self._cleanup_thread = None
         self._stop_cleanup = False
+
+        # Proof-of-Work DoS protection (optional)
+        self.enable_pow = enable_pow
+        self.pow_challenge = ProofOfWorkChallenge(difficulty=pow_difficulty) if enable_pow else None
+        if enable_pow:
+            logger.info(f"🔐 Proof-of-Work enabled (difficulty: {pow_difficulty} bits)")
 
         # SECURITY: Whitelist file integrity tracking
         self._whitelist_hash: Optional[str] = None  # SHA-256 hash of loaded whitelist

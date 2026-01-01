@@ -1557,6 +1557,8 @@ def main(argv=None):
     p.add_argument('--show-env', action='store_true', help='Print temperature/pressure/wind when sending')
     p.add_argument('--authorized-devices', default='authorized_devices.json', help='Path to authorized devices file')
     p.add_argument('--aircraft', default=None, help='Aircraft name to send in handshake')
+    p.add_argument('--enable-pow', action='store_true', help='Enable Proof-of-Work DoS protection (adds 50-100ms latency)')
+    p.add_argument('--pow-difficulty', type=int, default=16, help='PoW difficulty in bits (default: 16 = ~50-100ms, 12 = ~5-20ms, 20 = ~500-1000ms)')
     p.add_argument('--export-lua-path', default=None, help='Path to Export.lua to update interval. If not provided, will search in script folder.')
     p.add_argument('--no-update-lua', action='store_true', help='Do not attempt to update Export.lua.')
     args = p.parse_args(argv)
@@ -1622,13 +1624,17 @@ def main(argv=None):
 
     print("🔐 ECDH Handshake Mode (PSK removed)")
     print(f"📂 Authorized devices: {args.authorized_devices}")
+    if args.enable_pow:
+        print(f"🛡️  Proof-of-Work enabled (difficulty: {args.pow_difficulty} bits)")
 
     # Security check: warn if binding to all interfaces
     check_bind_security(args.bind_ip)
 
     session_mgr = SessionManager(
         authorized_devices_path=args.authorized_devices,
-        aircraft_name=args.aircraft
+        aircraft_name=args.aircraft,
+        enable_pow=args.enable_pow,
+        pow_difficulty=args.pow_difficulty
     )
 
     enc_status = "🔒 ECDH-AES-GCM"
