@@ -2,6 +2,7 @@ package com.example.checklist_interactive.ui.maps.drawing
 
 import androidx.compose.ui.graphics.Color
 import org.osmdroid.util.GeoPoint
+import java.util.Locale
 
 /**
  * Map drawing brush types
@@ -34,11 +35,14 @@ data class MapDrawingStroke(
             append("[")
             geoPoints.forEachIndexed { index, point ->
                 if (index > 0) append(",")
-                // Use proper JSON number format with controlled precision
-                append("[%.8f,%.8f]".format(point.latitude, point.longitude))
+                // CRITICAL: Use Locale.US to ensure period decimal separator, not comma!
+                append("[%.8f,%.8f]".format(Locale.US, point.latitude, point.longitude))
             }
             append("]")
         }
+        
+        android.util.Log.d("MapDrawingStroke", "toEntity: geoPoints.size=${geoPoints.size}, sample: lat=${geoPoints.firstOrNull()?.latitude}, lon=${geoPoints.firstOrNull()?.longitude}")
+        android.util.Log.d("MapDrawingStroke", "toEntity: pointsJson=$pointsJson")
         
         return com.example.checklist_interactive.data.tactical.MapDrawingEntity(
             id = if (id == 0) 0 else id,  // Let DB auto-generate if 0
@@ -62,10 +66,13 @@ data class MapDrawingStroke(
             val geoPoints = mutableListOf<GeoPoint>()
             try {
                 val json = org.json.JSONArray(entity.points)
+                android.util.Log.d("MapDrawingStroke", "fromEntity: parsing ${json.length()} points from JSON")
                 for (i in 0 until json.length()) {
                     val point = json.getJSONArray(i)
                     val lat = point.getDouble(0)
                     val lon = point.getDouble(1)
+                    
+                    android.util.Log.d("MapDrawingStroke", "fromEntity: point[$i]: raw lat=$lat, lon=$lon")
                     geoPoints.add(GeoPoint(lat, lon))
                 }
             } catch (e: Exception) {

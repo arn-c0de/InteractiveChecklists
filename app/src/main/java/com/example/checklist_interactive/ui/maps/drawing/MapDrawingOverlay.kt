@@ -107,8 +107,10 @@ fun MapDrawingOverlay(
     
     Box(modifier = modifier.fillMaxSize()) {
         // Canvas for rendering strokes (always visible)
-        // Use mapInvalidationKey to force redraw when map moves
-        key(mapInvalidationKey) {
+        // Trigger redraw when map moves (mapInvalidationKey) OR when strokes list changes
+        // Note: strokes is a mutableStateListOf, so changes will automatically trigger recomposition
+        val redrawTrigger = mapInvalidationKey to strokes.size // Combine both triggers
+        key(redrawTrigger) {
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
@@ -257,14 +259,23 @@ fun MapDrawingOverlay(
         ) {
             // CRITICAL: Get fresh projection on EVERY draw to handle map rotation/zoom/pan
             // The projection object contains the current map transformation state
-            val currentMapView = mapView ?: return@Canvas
+            val currentMapView = mapView
+            if (currentMapView == null) {
+                android.util.Log.w("MapDrawingOverlay", "Canvas draw: mapView is null, cannot render ${strokes.size} strokes")
+                return@Canvas
+            }
             val projection = currentMapView.projection
             // MapView may be offset in the parent; account for its left/top when translating
             val mapLeft = currentMapView.left.toFloat()
             val mapTop = currentMapView.top.toFloat()
         
         // Draw all saved strokes
+        android.util.Log.d("MapDrawingOverlay", "Drawing ${strokes.size} strokes on canvas; mapCenter=${currentMapView.mapCenter?.latitude},${currentMapView.mapCenter?.longitude}, mapOrientation=${currentMapView.mapOrientation}")
         strokes.forEach { stroke ->
+            if (stroke.geoPoints.isNotEmpty()) {
+                val sample = stroke.geoPoints.take(3).map { "(lat=${it.latitude},lon=${it.longitude})" }.joinToString(",")
+                android.util.Log.d("MapDrawingOverlay", "  Stroke id=${stroke.id}, pts=${stroke.geoPoints.size}, sample=$sample, strokeWidth=${stroke.strokeWidth}, isHighlight=${stroke.isHighlight}")
+            }
             if (stroke.geoPoints.size < 2) return@forEach
             
             val path = Path()
