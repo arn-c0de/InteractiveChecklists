@@ -395,8 +395,16 @@ object TrafficPatternGenerator {
  * Overlay for displaying pattern leg labels
  */
 class PatternLabelOverlay(
-    private val labels: List<Pair<GeoPoint, String>>
+    private val labels: List<Pair<GeoPoint, String>>,
+    private var mapRotationDegrees: Float = 0f
 ) : org.osmdroid.views.overlay.Overlay() {
+
+    /**
+     * Update the map rotation angle (to be called when map rotation changes)
+     */
+    fun updateMapRotation(rotationDegrees: Float) {
+        mapRotationDegrees = rotationDegrees
+    }
     
     private val textPaint = android.graphics.Paint().apply {
         color = 0xFF00FF00.toInt() // Green
@@ -423,18 +431,18 @@ class PatternLabelOverlay(
     
     override fun draw(canvas: android.graphics.Canvas?, mapView: org.osmdroid.views.MapView?, shadow: Boolean) {
         if (shadow || canvas == null || mapView == null) return
-        
+
         val projection = mapView.projection
-        
+
         labels.forEach { (geoPoint, label) ->
             val point = projection.toPixels(geoPoint, null)
             val lines = label.split("\n")
-            
+
             // Calculate total height and max width for background
             var maxWidth = 0f
             var totalHeight = 0f
             val lineHeights = mutableListOf<Float>()
-            
+
             lines.forEachIndexed { index, line ->
                 val paint = if (index == 0) textPaint else textPaintSmall
                 val bounds = android.graphics.Rect()
@@ -444,7 +452,13 @@ class PatternLabelOverlay(
                 lineHeights.add(lineHeight)
                 totalHeight += lineHeight
             }
-            
+
+            // Save canvas state and apply counter-rotation to keep text upright
+            canvas.save()
+            // Counter-rotate around the label position to keep text upright
+            // The map rotation is negative, so we negate it to counter-rotate
+            canvas.rotate(-mapRotationDegrees, point.x.toFloat(), point.y.toFloat())
+
             val padding = 10f
             val bgRect = android.graphics.RectF(
                 point.x - maxWidth / 2f - padding,
@@ -453,7 +467,7 @@ class PatternLabelOverlay(
                 point.y + totalHeight / 2f + padding
             )
             canvas.drawRoundRect(bgRect, 8f, 8f, bgPaint)
-            
+
             // Draw each line
             var currentY = point.y.toFloat() - totalHeight / 2f
             lines.forEachIndexed { index, line ->
@@ -461,6 +475,9 @@ class PatternLabelOverlay(
                 currentY += lineHeights[index]
                 canvas.drawText(line, point.x.toFloat(), currentY, paint)
             }
+
+            // Restore canvas state
+            canvas.restore()
         }
     }
 }
