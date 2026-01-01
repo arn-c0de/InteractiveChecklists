@@ -76,7 +76,7 @@ class MapViewerState(
     var mgrsGridOverlay by mutableStateOf<Overlay?>(null)
     
     // Map rotation: 0 = North-up, 1 = HDG-up (follow aircraft heading)
-    var mapRotationMode by mutableStateOf(0)
+    var mapRotationMode by mutableStateOf(prefsManager.getMapRotationMode())
     
     // 2-finger rotation gesture control
     var rotationGestureEnabled by mutableStateOf(prefsManager.isMapRotationGestureEnabled())
