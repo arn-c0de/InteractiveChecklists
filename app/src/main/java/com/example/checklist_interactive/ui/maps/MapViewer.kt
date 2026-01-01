@@ -625,33 +625,26 @@ fun MapViewer(
     }
     
     // Separate effect for map rotation to prevent flicker from frequent data updates
-    LaunchedEffect(mapState.mapRotationMode) {
-        val map = mapState.mapView
-        
+    LaunchedEffect(mapState.mapRotationMode, flightData?.heading) {
+        val map = mapState.mapView ?: return@LaunchedEffect
+        val rotationMode = mapState.mapRotationMode
+        val fd = flightData // local copy to allow safe smart-cast
+
         // When mode changes to North-up, reset orientation once
-        if (mapState.mapRotationMode == 0 && map != null) {
+        if (rotationMode == 0) {
             try {
                 map.setMapOrientation(0f)
             } catch (_: Throwable) {}
         }
-        
-        // In HDG-up mode, collect heading updates with throttling
-        if (mapState.mapRotationMode == 1 && map != null) {
-            var lastRotationUpdate = 0L
-            val minUpdateIntervalMs = 100L // Limit rotation updates to max 10 Hz
-            
-            snapshotFlow { flightData?.heading }
-                .collect { heading ->
-                    if (heading != null) {
-                        val now = System.currentTimeMillis()
-                        if (now - lastRotationUpdate >= minUpdateIntervalMs) {
-                            try {
-                                map.setMapOrientation(-Math.toDegrees(heading).toFloat())
-                                lastRotationUpdate = now
-                            } catch (_: Throwable) {}
-                        }
-                    }
-                }
+
+        // In HDG-up mode, update rotation based on heading
+        if (rotationMode == 1) {
+            val heading = fd?.heading
+            if (heading != null) {
+                try {
+                    map.setMapOrientation(-Math.toDegrees(heading).toFloat())
+                } catch (_: Throwable) {}
+            }
         }
     }
 
