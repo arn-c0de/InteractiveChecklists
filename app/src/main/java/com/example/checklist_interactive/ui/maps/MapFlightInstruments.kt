@@ -50,6 +50,7 @@ import com.example.checklist_interactive.R
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.abs
+import kotlin.math.roundToInt
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.runtime.derivedStateOf
@@ -615,7 +616,8 @@ fun HUDAltitudeOverlay(
                     typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
                 }
 
-                val vsText = if (vsFpm >= 0) "+${vsFpm.toInt()}" else "${vsFpm.toInt()}"
+                val vsInt = vsFpm.roundToInt()
+                val vsText = if (vsInt > 0) "+$vsInt" else "$vsInt"
                 canvas.nativeCanvas.drawText(vsText, 8f, 20f, vsPaint)
             }
 
@@ -1199,7 +1201,8 @@ fun VerticalSpeedIndicator(
                 )
 
                 // Digital readout
-                val vsText = if (vsFpm >= 0) "+${vsFpm.toInt()}" else "${vsFpm.toInt()}"
+                val vsInt = vsFpm.roundToInt()
+                val vsText = if (vsInt > 0) "+$vsInt" else "$vsInt"
                 textPaint.color = when {
                     vsFpm > 100 -> android.graphics.Color.GREEN
                     vsFpm < -100 -> android.graphics.Color.RED
