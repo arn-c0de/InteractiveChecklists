@@ -242,8 +242,9 @@ fun MapViewer(
     // Debouncing for drawing saves (prevents blocking UI on rapid drawing)
     var saveDrawingsJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     
-    // Load drawings from database when DB is ready (ONCE only, no continuous Flow subscription)
-    LaunchedEffect(mapState.tacticalDb) {
+    // Load drawings from database - triggers on every composition (when re-entering map)
+    // This ensures drawings are always reloaded from DB when user returns to the map
+    LaunchedEffect(Unit) {
         mapState.tacticalDb?.let { db ->
             try {
                 // Use .first() to get initial data ONCE without subscribing to updates
@@ -255,6 +256,26 @@ fun MapViewer(
                 android.util.Log.d("MapViewer", "Loaded ${strokes.size} drawings from database (initial load)")
             } catch (e: Exception) {
                 android.util.Log.e("MapViewer", "Failed to load drawings", e)
+            }
+        } ?: run {
+            // If DB not ready yet, wait for it
+            snapshotFlow { mapState.tacticalDb }.collect { db ->
+                if (db != null) {
+                    try {
+                        val entities = db.mapDrawingDao().getAllDrawings().first()
+                        val strokes = entities.map { MapDrawingStroke.fromEntity(it) }
+                        mapDrawings.clear()
+                        mapDrawings.addAll(strokes)
+                        android.util.Log.d("MapViewer", "Loaded ${strokes.size} drawings from database (after DB ready)")
+                        strokes.forEach { stroke ->
+                            android.util.Log.d("MapViewer", "  Drawing: id=${stroke.id}, points=${stroke.geoPoints.size}, color=${stroke.color}")
+                            val samplePoints = stroke.geoPoints.take(3).map { "(lat=${it.latitude}, lon=${it.longitude})" }.joinToString(", ")
+                            android.util.Log.d("MapViewer", "    Sample points: $samplePoints")
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("MapViewer", "Failed to load drawings", e)
+                    }
+                }
             }
         }
     }
