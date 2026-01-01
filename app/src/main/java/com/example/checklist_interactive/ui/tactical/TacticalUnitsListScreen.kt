@@ -67,6 +67,7 @@ fun TacticalUnitsListScreen(
     val isEntityTrackingEnabled by dataPadManager.isEntityTrackingEnabled.collectAsState()
     val mapUpdateInterval by dataPadManager.tacticalUnitsMapUpdateInterval.collectAsState()
     val showTacticalUnitsOnMap by dataPadManager.showTacticalUnitsOnMap.collectAsState()
+    val tacticalAutoSort by dataPadManager.tacticalUnitsAutoSort.collectAsState()
 
     val units by viewModel.units.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
@@ -280,11 +281,16 @@ fun TacticalUnitsListScreen(
                     selectedCoalitions = uiState.selectedCoalitions,
                     onToggleCoalition = { viewModel.toggleCoalition(it) },
                     selectedCategories = uiState.selectedCategories,
-                    onToggleCategory = { viewModel.toggleCategory(it) }
+                    onToggleCategory = { viewModel.toggleCategory(it) },
+                    tacticalAutoSort = tacticalAutoSort,
+                    onToggleAutoSort = { dataPadManager.toggleTacticalUnitsAutoSort() }
                 )
                 
                 // Units list
-                if (units.isEmpty()) {
+                // Respect auto-sort preference: if disabled, show by insertion/id order (no auto-sorting by last-seen)
+                val displayUnits = if (tacticalAutoSort) units else units.sortedBy { it.id }
+
+                if (displayUnits.isEmpty()) {
                     EmptyState()
                 } else {
                     LazyVerticalGrid(
@@ -296,7 +302,7 @@ fun TacticalUnitsListScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(
-                            items = units,
+                            items = displayUnits,
                             key = { it.id }
                         ) { unit ->
                             UnitCard(
@@ -365,7 +371,9 @@ private fun StatsCard(
     selectedCoalitions: Set<Int> = emptySet(),
     onToggleCoalition: (Int) -> Unit = {},
     selectedCategories: Set<String> = emptySet(),
-    onToggleCategory: (String) -> Unit = {}
+    onToggleCategory: (String) -> Unit = {},
+    tacticalAutoSort: Boolean = true,
+    onToggleAutoSort: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier
@@ -477,6 +485,43 @@ private fun StatsCard(
                     }
                 )
             }
+            }
+
+            // Automatic list sorting (placement under map visibility)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onToggleAutoSort)
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Sort,
+                        contentDescription = null,
+                        tint = if (tacticalAutoSort) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = stringResource(R.string.tactical_auto_sort),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = stringResource(R.string.tactical_auto_sort_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Switch(
+                    checked = tacticalAutoSort,
+                    onCheckedChange = { onToggleAutoSort() }
+                )
             }
 
             // Map Update Interval Slider (only show when map visibility is enabled)
