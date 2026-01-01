@@ -89,14 +89,28 @@ DataPad is an experimental feature that receives real-time aircraft telemetry fr
 - **Timestamp validation** (5-minute window)
 - **Mutual authentication** (client ↔ server)
 
-**Quick Start (ECDH Mode):**
-```bash
-# Python: Enable handshake mode
-python forward_parsed_udp.py --interval 10 --host 192.168.178.132 --port 5010 --verbose --authorized-devices authorized_devices.json --bind-ip 192.168.178.100 
+**🔒 Server Key Pinning (TOFU)** - Trust-On-First-Use server key pinning to detect man-in-the-middle attacks after the first successful connection (auto-pins the server key on first contact).
 
-# Android: Settings → DataPad → Enable "ECDH Handshake Mode"
-# Add your device ID to authorized_devices.json on server
+**🔑 PSK Handshake Manager (optional)** - Optional pre-shared key (PSK) handshake manager for compatibility and scripted deployments. See the docs for guidance on generating a 32-byte (256-bit) key and secure distribution.
+
+**🛡️ Optional Proof-of-Work (PoW)** - Configurable anti-DoS protection for handshake requests; trade off handshake latency for robustness using `--enable-pow` and `--pow-difficulty`.
+
+**Quick Start (Handshake & PoW):**
+```bash
+# Python: Enable handshake mode (ECDH + TOFU)
+python forward_parsed_udp.py --interval 10 --host 192.168.178.132 --port 5010 --verbose --authorized-devices authorized_devices.json --bind-ip 192.168.178.100
+
+# Python: Enable Proof-of-Work (anti-DoS)
+python forward_parsed_udp.py --enable-pow --pow-difficulty 16 --interval 10 --host 192.168.178.132 --port 5010 --verbose --authorized-devices authorized_devices.json --bind-ip 192.168.178.100
+
+# Python: Same-PC testing with handshake port
+python forward_parsed_udp.py --repeat-last --interval 3 --host 127.0.0.1 --port 5010 --handshake-port 5011 --use-handshake --authorized-devices authorized_devices.json
+
+# Android: Settings → DataPad → Enable "ECDH Handshake Mode" (optional: enable Server Key Pinning / configure Pre-Shared Key)
+# Add your device ID to authorized_devices.json on the server
 ```
+
+See [docs/EN/technical/ECDH_USAGE_GUIDE.md](docs/EN/technical/ECDH_USAGE_GUIDE.md) and [docs/EN/technical/DATA_FLOW_ANALYSIS.md](docs/EN/technical/DATA_FLOW_ANALYSIS.md) for complete setup instructions, PSK guidance, and PoW tuning and troubleshooting.
 
 DataPad also supports receiving **entity contacts** (tactical units) exported from DCS. Enable **Entity Tracking** in the app to receive tactical units and display them as live markers (requires running the forwarder with entity tracking enabled). For details and setup instructions, see [scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md](scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md) and [docs/EN/features/TACTICAL_UNITS_TRACKING.md](docs/EN/features/TACTICAL_UNITS_TRACKING.md).
 
