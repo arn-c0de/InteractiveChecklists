@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import android.content.Context
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -661,7 +662,13 @@ fun HUDAltitudeOverlay(
                             label = { Text(stringResource(R.string.map_flight_instrument_ground_height_label)) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onFocusChanged { focusState ->
+                                    if (focusState.isFocused && groundHeightInput == groundHeight.toInt().toString()) {
+                                        groundHeightInput = ""
+                                    }
+                                }
                         )
 
                         OutlinedTextField(
@@ -670,7 +677,13 @@ fun HUDAltitudeOverlay(
                             label = { Text(stringResource(R.string.map_flight_instrument_warning_height_label)) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onFocusChanged { focusState ->
+                                    if (focusState.isFocused && warningHeightInput == warningHeight.toInt().toString()) {
+                                        warningHeightInput = ""
+                                    }
+                                }
                         )
 
                         Text(
