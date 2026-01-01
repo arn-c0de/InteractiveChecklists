@@ -15,19 +15,11 @@ This roadmap outlines the planned development phases and features for the app in
 ---
 
 
-
 ### Map View Nearest Airport List
 - Add a nearest airport list feature to the map view.
 - Display airports sorted by distance from the player's current position.
 - Include details such as airport name, ICAO code, distance, and bearing.
 - Make the list easily accessible (e.g., via sidebar or overlay toggle).
-
----
-
-### Map Database
-- Develop and integrate a dedicated map database.
-- Store geographical data (airports, waypoints, terrain, etc.) for fast offline/online access.
-- Optimize for quick queries and low memory usage on mobile devices.
 
 ---
 
