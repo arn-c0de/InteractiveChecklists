@@ -12,9 +12,6 @@ All relevant changes are summarized here by version.
 - **Docs & Planning:** Added dataflow docs/navigation, and a draft for Map 3D future plans; README and docs updated with demos and navigation improvements.
 - **Other:** New/finished HUD attitude instrument and various minor fixes, performance and logging improvements.
 
-### Thanks
-- Contributors: arn-c0de and others.
-
 ## [1.0.19] - 2025-12-29
 
 ### Summary
