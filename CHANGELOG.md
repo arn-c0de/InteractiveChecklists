@@ -3,8 +3,29 @@
 
 All relevant changes are summarized here by version.
 
+## [1.0.20] - 2026-01-01
+
+### Summary
+- **Map & Navigation:** Multiple fixes and improvements — map rotation persistence and OpenTopoMap tile loading fixes; fix for rotation effect blocking; auto-rotation for traffic pattern labels; reduced navigation popup bottom bar size; HUD improvements (persist HUD altitude settings, expand VSI range to 15,000 fpm, display airspeed in kt); map drawing coordinate corruption fixed by forcing Locale.US; clear altitude warning input UX; vertical-speed +0 flicker fixed; improved entity batch logging and error visibility.
+- **Tactical Units:** UI tweak — moved auto-sort toggle under visibility in the Stats card.
+- **Security & Telemetry:** Implemented server key pinning (TOFU), PSK handshake manager, and optional Proof-of-Work support; documentation updated.
+- **Docs & Planning:** Added dataflow docs/navigation, and a draft for Map 3D future plans; README and docs updated with demos and navigation improvements.
+- **Other:** New/finished HUD attitude instrument and various minor fixes, performance and logging improvements.
+
+### Thanks
+- Contributors: arn-c0de and others.
+
 ## [1.0.19] - 2025-12-29
 
+### Summary
+- **Tactical Units:** Full streaming implementation with live markers, improved lifecycle management, and performance improvements. Added **"Live Units Only"** filter, search, clickable category filters, pilot info in list items, **"Last seen"** timestamps in marker popups, auto-cleanup of old units (15 min), click-to-navigate to markers (includes traffic pattern and carrier auto-calculation), improved heading/rotation and collision detection, and batched tactical unit exports for higher live export capacity.
+- **Map & Navigation:** Added map filter UI, flight path tracking with persistent storage and overlay rendering, live-navigation UI improvements and fixes, two-finger rotation gesture toggle and persistence, radial/drawing menu enhancements, and drawing/performance fixes (debouncing, batch updates, redraw improvements).
+- **DataPad & Forwarder:** Improved real-time processing (heartbeat and packet interarrival tracking), handshake toggle for entity tracking, trimming/export performance improvements (asynchronous trimming, reduced max JSON lines), and security/handshake updates.
+- **Internationalization & Docs:** Added Simplified Chinese translations and documentation (`docs/ZH/*`), updated README (carrier demo video, contributors badge), and restructured translation folders.
+- **Fixes & Improvements:** Various bug fixes and refactors (map instruments, HUD/VSI persistence, marker rendering/performance, stability and logging improvements).
+
+### Thanks
+- Contributors: Dawn, 张晓行 (Zhang XiaoXing)
 
 ## [1.0.18] - 2025-12-26
 
@@ -16,7 +37,7 @@ All relevant changes are summarized here by version.
 - Fixes & Improvements: Marker heading/rotation and collision detection fixes, coalition mapping corrections, rendering performance improvements for tacmarkers, and miscellaneous UI and bug fixes.
 
 ### Thanks
-- Contributors: Dawn, 张晓行 (Zhang XiaoXing) and others for translations, docs, and testing.
+- Contributors: Dawn, 张晓行 (Zhang XiaoXing) 
 
 ## [1.0.17] - 2025-12-25
 
