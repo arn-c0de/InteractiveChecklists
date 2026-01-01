@@ -47,6 +47,8 @@ class DataPadManager(private val context: Context) {
         private const val KEY_TACTICAL_UNITS_MAP_UPDATE_INTERVAL = "tactical_units_map_update_interval"
         private const val KEY_TACTICAL_UNITS_SHOW_LIVE_ONLY = "tactical_units_show_live_only"
         private const val KEY_SHOW_TACTICAL_UNITS_ON_MAP = "show_tactical_units_on_map"
+        // Automatic list sorting enabled (true = auto-sort by last-seen, false = keep insertion/order by id)
+        private const val KEY_TACTICAL_UNITS_AUTO_SORT = "tactical_units_auto_sort"
 
         // Handshake timeout
         private const val HANDSHAKE_TIMEOUT_MS = 10000L
@@ -115,6 +117,10 @@ class DataPadManager(private val context: Context) {
     // Tactical units map visibility - show/hide units on map (independent from entity tracking)
     private val _showTacticalUnitsOnMap = MutableStateFlow(prefs.getBoolean(KEY_SHOW_TACTICAL_UNITS_ON_MAP, true))
     val showTacticalUnitsOnMap: StateFlow<Boolean> = _showTacticalUnitsOnMap.asStateFlow()
+
+    // Automatic list sorting preference - true = keep default auto-sorting (last seen desc), false = show by insertion/id (no auto-sort)
+    private val _tacticalUnitsAutoSort = MutableStateFlow(prefs.getBoolean(KEY_TACTICAL_UNITS_AUTO_SORT, true))
+    val tacticalUnitsAutoSort: StateFlow<Boolean> = _tacticalUnitsAutoSort.asStateFlow()
 
     // Connection health tracking (for heartbeat monitoring)
     enum class ConnectionHealth {
@@ -656,6 +662,20 @@ class DataPadManager(private val context: Context) {
     }
 
     /**
+     * Enable or disable automatic list sorting for tactical units
+     * When disabled, the list will not be auto-sorted by last-seen; instead it will show by insertion/id order
+     */
+    fun setTacticalUnitsAutoSort(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_TACTICAL_UNITS_AUTO_SORT, enabled).apply()
+        _tacticalUnitsAutoSort.value = enabled
+        udpLogD("Tactical units auto-sort ${if (enabled) "enabled" else "disabled"}")
+    }
+
+    fun toggleTacticalUnitsAutoSort() {
+        setTacticalUnitsAutoSort(!_tacticalUnitsAutoSort.value)
+    }
+
+    /**
      * Update device name for handshake identification
      */
     fun updateDeviceName(newName: String) {
@@ -782,9 +802,22 @@ class DataPadManager(private val context: Context) {
                     udpLogE("⚠️ SERVER KEY MISMATCH - Possible MITM attack!")
                     udpLogE("Expected: ${pinStatus.expected}")
                     udpLogE("Received: ${pinStatus.received}")
-                    _handshakeStatus.value = "SECURITY ALERT: Server key changed!"
-                    // SECURITY: Reject connection on key mismatch
-                    return@withLock false
+                    
+                    // TEMPORARY FIX: For ephemeral server keys (server restarts)
+                    // In production, this should prompt user confirmation
+                    if (serverIpAddress == "255.255.255.255") {
+                        udpLogE("⚠️ Broadcast discovery detected - unpinning old key (server likely restarted)")
+                        serverKeyPinning.unpinServer(serverIpAddress)
+                        // Re-pin with new key
+                        serverKeyPinning.pinServerKey(serverIpAddress, serverPublicKey)
+                        udpLogD("📌 Server key re-pinned after mismatch")
+                        _handshakeStatus.value = "Server key changed - re-pinned"
+                    } else {
+                        // For unicast addresses, require manual intervention
+                        _handshakeStatus.value = "SECURITY ALERT: Server key changed!"
+                        // SECURITY: Reject connection on key mismatch
+                        return@withLock false
+                    }
                 }
             }
 

@@ -1205,6 +1205,8 @@
     <string name="tactical_advanced_filters">Advanced Filters</string>
     <string name="tactical_entity_tracking">Entity Tracking</string>
     <string name="tactical_receiving">Receiving tactical units</string>
+    <string name="tactical_auto_sort">Automatic list sorting</string>
+    <string name="tactical_auto_sort_desc">When disabled, the list will not be auto-sorted; it will show by insertion order.</string>
     <string name="tactical_tracking_disabled">Tracking disabled</string>
     <string name="tactical_unit_visibility_on_map">Unit Visibility on Map</string>
     <string name="tactical_units_visible_on_map">Units visible on map</string>
