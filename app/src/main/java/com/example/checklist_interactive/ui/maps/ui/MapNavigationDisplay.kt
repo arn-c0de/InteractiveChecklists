@@ -2066,7 +2066,7 @@ fun MapNavigationDisplay(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.9f))
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                                .padding(horizontal = 12.dp, vertical = 4.dp)
                         ) {
                             Text(
                                 text = stringResource(R.string.map_nav_transparency),
@@ -2089,7 +2089,7 @@ fun MapNavigationDisplay(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(32.dp)
+                            .height(24.dp)
                             .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.9f))
                             .pointerInput(Unit) {
                                 detectDragGestures { change, dragAmount ->
