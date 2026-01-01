@@ -40,6 +40,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
+import android.content.Context
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -331,10 +333,12 @@ fun HUDAltitudeOverlay(
     verticalSpeed: Double?,
     modifier: Modifier = Modifier
 ) {
-    // Ground height and warning height settings
+    // Ground height and warning height settings (persisted in SharedPreferences)
+    val context = LocalContext.current
+    val prefs = context.getSharedPreferences("map_flight_instrument_prefs", Context.MODE_PRIVATE)
     var showSettingsDialog by remember { mutableStateOf(false) }
-    var groundHeight by remember { mutableStateOf(0.0) } // Ground elevation in feet
-    var warningHeight by remember { mutableStateOf(500.0) } // Warning threshold in feet AGL
+    var groundHeight by remember { mutableStateOf(prefs.getFloat("hud_ground_height", 0f).toDouble()) } // Ground elevation in feet
+    var warningHeight by remember { mutableStateOf(prefs.getFloat("hud_warning_height", 500f).toDouble()) } // Warning threshold in feet AGL
 
     // Convert meters to feet
     val altFeet by remember(altitude) {
@@ -354,7 +358,7 @@ fun HUDAltitudeOverlay(
 
     val vsFpm by remember(verticalSpeed) {
         derivedStateOf {
-            ((verticalSpeed ?: 0.0) * 196.85).coerceIn(-6000.0, 6000.0)
+            ((verticalSpeed ?: 0.0) * 196.85).coerceIn(-15000.0, 15000.0)
         }
     }
 
@@ -677,8 +681,13 @@ fun HUDAltitudeOverlay(
                 confirmButton = {
                     TextButton(
                         onClick = {
-                            groundHeight = groundHeightInput.toDoubleOrNull() ?: 0.0
-                            warningHeight = warningHeightInput.toDoubleOrNull() ?: 500.0
+                            groundHeight = groundHeightInput.toDoubleOrNull() ?: groundHeight
+                            warningHeight = warningHeightInput.toDoubleOrNull() ?: warningHeight
+                            // Persist to SharedPreferences
+                            prefs.edit()
+                                .putFloat("hud_ground_height", groundHeight.toFloat())
+                                .putFloat("hud_warning_height", warningHeight.toFloat())
+                                .apply()
                             showSettingsDialog = false
                         }
                     ) {
@@ -704,13 +713,14 @@ fun HUDSpeedOverlay(
     airspeed: Double, // in m/s
     modifier: Modifier = Modifier
 ) {
-    // Convert m/s to km/h and mph
+    // Convert m/s to km/h and knots
     val speedKmh by remember(airspeed) {
         derivedStateOf { (airspeed * 3.6).coerceIn(0.0, 999.0) }
     }
 
-    val speedMph by remember(airspeed) {
-        derivedStateOf { (airspeed * 2.23694).coerceIn(0.0, 999.0) }
+    // Show airspeed in knots rather than mph
+    val speedKts by remember(airspeed) {
+        derivedStateOf { (airspeed * 1.943844).coerceIn(0.0, 999.0) }
     }
 
     // Cached Paint objects
@@ -732,7 +742,7 @@ fun HUDSpeedOverlay(
         }
     }
 
-    val mphTextPaint = remember {
+    val ktsTextPaint = remember {
         android.graphics.Paint().apply {
             isAntiAlias = true
             color = android.graphics.Color.argb(0xFF, 0x00, 0xFF, 0xFF) // Cyan
@@ -760,7 +770,7 @@ fun HUDSpeedOverlay(
             val width = this.size.width
             val height = this.size.height
 
-            if (!speedKmh.isFinite() || !speedMph.isFinite()) return@Canvas
+            if (!speedKmh.isFinite() || !speedKts.isFinite()) return@Canvas
 
             // Draw background with rounded corners
             drawIntoCanvas { canvas ->
@@ -793,18 +803,18 @@ fun HUDSpeedOverlay(
                     labelPaint
                 )
 
-                // mph value (smaller, below)
-                val mphText = String.format("%03d", speedMph.toInt())
+                // kts value (smaller, below)
+                val ktsText = String.format("%03d", speedKts.toInt())
                 canvas.nativeCanvas.drawText(
-                    mphText,
+                    ktsText,
                     width / 2f,
                     height / 2f + 28f,
-                    mphTextPaint
+                    ktsTextPaint
                 )
 
-                // mph label
+                // kts label (knots)
                 canvas.nativeCanvas.drawText(
-                    "mph",
+                    "kts",
                     width / 2f,
                     height / 2f + 40f,
                     labelPaint
@@ -1113,7 +1123,7 @@ fun VerticalSpeedIndicator(
                 val radius = this.size.minDimension / 2
 
                 // Convert m/s to feet per minute (1 m/s = 196.85 ft/min)
-                val vsFpm = (verticalSpeed * 196.85).coerceIn(-6000.0, 6000.0)
+                val vsFpm = (verticalSpeed * 196.85).coerceIn(-15000.0, 15000.0) // expanded range to support higher climb/descent rates
 
                 // Draw background
                 drawCircle(
@@ -1123,11 +1133,11 @@ fun VerticalSpeedIndicator(
                 )
 
                 // Draw VSI scale
-                val scaleValues = listOf(-6000, -4000, -2000, -1000, 0, 1000, 2000, 4000, 6000)
+                val scaleValues = listOf(-15000, -10000, -5000, -2000, 0, 2000, 5000, 10000, 15000)
                 scaleValues.forEach { value ->
-                    val angle = (value / 6000.0) * 135.0 // -135° to +135°
+                    val angle = (value / 15000.0) * 135.0 // -135° to +135° (using ±15000 fpm)
                     val rad = Math.toRadians(angle + 90.0) // Rotate 90° so 0 is at top
-                    val tickLength = if (value == 0 || Math.abs(value) == 2000 || Math.abs(value) == 6000) 15f else 10f
+                    val tickLength = if (value == 0 || Math.abs(value) == 5000 || Math.abs(value) == 15000) 15f else 10f
                     val innerRadius = radius * 0.85f
                     val outerRadius = radius * 0.85f - tickLength
 
@@ -1145,7 +1155,7 @@ fun VerticalSpeedIndicator(
                 }
 
                 // Draw needle
-                val needleAngle = (vsFpm / 6000.0) * 135.0 + 90.0
+                val needleAngle = (vsFpm / 15000.0) * 135.0 + 90.0
                 val needleRad = Math.toRadians(needleAngle)
                 val needleLength = radius * 0.7f
                 val needleEndX = centerX + (needleLength * cos(needleRad)).toFloat()
@@ -1948,7 +1958,7 @@ fun EnhancedAltitudeIndicator(
 
     val vsFpm by remember(verticalSpeed) {
         derivedStateOf {
-            ((verticalSpeed ?: 0.0) * 196.85).coerceIn(-6000.0, 6000.0)
+            ((verticalSpeed ?: 0.0) * 196.85).coerceIn(-15000.0, 15000.0)
         }
     }
 
