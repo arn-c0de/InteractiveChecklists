@@ -979,11 +979,11 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                                         last_entity_data_batch2 = entity_parsed_2['nearbyUnits']
                                         entity_data_updated = True
                                         if lines_read > 1:
-                                            logger.info(f"📡 Batch 2: Skipped {lines_read-1} old lines, cached {len(last_entity_data_batch2)} units")
+                                            logger.info(f"📡 Batch 2: Skipped {lines_read-1} old lines, cached {len(last_entity_data_batch2)} units from latest")
                                         else:
                                             logger.debug(f"📡 Cached batch 2: {len(last_entity_data_batch2)} units")
                         except Exception as e:
-                            logger.debug(f"Failed to read entity batch 2: {e}")
+                            logger.warning(f"⚠️ Failed to read entity batch 2: {e}")
 
                     # Read batch 3 (units 500-750) - read LAST line only (most recent)
                     if f_entity_3 is not None:
@@ -1011,7 +1011,7 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                                         else:
                                             logger.debug(f"📡 Cached batch 3: {len(last_entity_data_batch3)} units")
                         except Exception as e:
-                            logger.debug(f"Failed to read entity batch 3: {e}")
+                            logger.warning(f"⚠️ Failed to read entity batch 3: {e}")
 
                     # Read batch 4 (units 750-1000) - read LAST line only (most recent)
                     if f_entity_4 is not None:
@@ -1039,7 +1039,7 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                                         else:
                                             logger.debug(f"📡 Cached batch 4: {len(last_entity_data_batch4)} units")
                         except Exception as e:
-                            logger.debug(f"Failed to read entity batch 4: {e}")
+                            logger.warning(f"⚠️ Failed to read entity batch 4: {e}")
 
             # Merge cached tactical data with player data whenever available (uses cached data)
             # ROTATION: Alternate between batch groups to fit all units in UDP packets

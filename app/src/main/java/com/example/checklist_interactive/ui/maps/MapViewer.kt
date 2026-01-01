@@ -379,6 +379,23 @@ fun MapViewer(
         flightPathRepository?.processFlightData(flightData)
     }
 
+    // Save map settings when they change
+    LaunchedEffect(mapState.autoCenter) {
+        prefsManager.setMapAutoCenter(mapState.autoCenter)
+    }
+    
+    LaunchedEffect(mapState.rotationGestureEnabled) {
+        prefsManager.setMapRotationGestureEnabled(mapState.rotationGestureEnabled)
+    }
+    
+    LaunchedEffect(mapState.flightInstrumentsEnabled) {
+        prefsManager.setMapOverlayFlightInstrumentsEnabled(mapState.flightInstrumentsEnabled)
+    }
+    
+    LaunchedEffect(mapState.flightPathEnabled) {
+        prefsManager.setFlightPathEnabled(mapState.flightPathEnabled)
+    }
+
 
     // Save navigation state when it changes (but only after initial restoration completes)
     LaunchedEffect(
@@ -2049,6 +2066,7 @@ fun MapViewer(
                 onLockScreen = onLockScreen,
                 onToggleMapRotation = {
                     mapState.mapRotationMode = (mapState.mapRotationMode + 1) % 2
+                    prefsManager.setMapRotationMode(mapState.mapRotationMode)
                     if (mapState.mapRotationMode == 0) {
                         try { mapState.mapView?.setMapOrientation(0f) } catch (_: Throwable) {}
                     } else {

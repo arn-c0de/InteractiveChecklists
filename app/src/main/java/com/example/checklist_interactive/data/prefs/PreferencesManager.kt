@@ -54,6 +54,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_FLIGHT_PATH_INTERVAL_SECONDS = "flight_path_interval_seconds"
         private const val KEY_FLIGHT_PATH_ENABLED = "flight_path_enabled"
         private const val KEY_MAP_ROTATION_GESTURE = "map_rotation_gesture"
+        private const val KEY_MAP_ROTATION_MODE = "map_rotation_mode"
         private const val KEY_SCREEN_LOCKED = "screen_locked"
 
         // Application language preference (ISO code, e.g., "en", "de")
@@ -436,6 +437,17 @@ class PreferencesManager(context: Context) {
 
     fun isMapRotationGestureEnabled(): Boolean {
         return prefs.getBoolean(KEY_MAP_ROTATION_GESTURE, true)
+    }
+
+    /**
+     * Map rotation mode: 0 = North-up, 1 = HDG-up (follow aircraft heading)
+     */
+    fun setMapRotationMode(mode: Int) {
+        prefs.edit().putInt(KEY_MAP_ROTATION_MODE, mode.coerceIn(0, 1)).apply()
+    }
+
+    fun getMapRotationMode(): Int {
+        return prefs.getInt(KEY_MAP_ROTATION_MODE, 0) // Default: North-up
     }
 
     /**
