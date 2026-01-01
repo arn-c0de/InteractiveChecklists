@@ -1315,11 +1315,23 @@ fun MapViewer(
         0, 18, 256, ".png",
         arrayOf("https://basemaps.cartocdn.com/dark_all/")
     )
+    
+    // OpenTopoMap tile source (online, not from assets)
+    val openTopoTile = org.osmdroid.tileprovider.tilesource.XYTileSource(
+        "OpenTopoMap",
+        0, 17, 256, ".png",
+        arrayOf(
+            "https://a.tile.opentopomap.org/",
+            "https://b.tile.opentopomap.org/",
+            "https://c.tile.opentopomap.org/"
+        )
+    )
+    
     // Restore tile source from prefs if present, otherwise follow system theme
     val savedTileId = remember { prefsManager.getMapTileSourceId() }
     fun tileSourceForId(id: String): org.osmdroid.tileprovider.tilesource.ITileSource {
         return when (id) {
-            "OpenTopo" -> TileSourceFactory.OpenTopo
+            "OpenTopo" -> openTopoTile
             "USGS_SAT" -> TileSourceFactory.USGS_SAT
             "MAPNIK" -> TileSourceFactory.MAPNIK
             "CartoDB.DarkMatter" -> darkTile
