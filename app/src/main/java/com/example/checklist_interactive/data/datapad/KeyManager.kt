@@ -16,6 +16,100 @@ import java.math.BigInteger
 import java.util.Base64
 
 /**
+ * Server Public Key Pinning Manager
+ * Implements Trust-On-First-Use (TOFU) pattern like SSH
+ */
+class ServerKeyPinningManager(private val context: Context) {
+    companion object {
+        private const val TAG = "ServerKeyPinning"
+        private const val PREFS_NAME = "server_key_pins"
+        private const val KEY_PREFIX = "pin_"
+    }
+    
+    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    
+    /**
+     * Get SHA-256 fingerprint of a public key
+     */
+    private fun getKeyFingerprint(publicKey: PublicKey): String {
+        val encoded = publicKey.encoded
+        val digest = MessageDigest.getInstance("SHA-256")
+        val hash = digest.digest(encoded)
+        return hash.joinToString(":") { "%02x".format(it) }
+    }
+    
+    /**
+     * Check if server key is pinned and matches expected fingerprint
+     */
+    fun verifyServerKey(serverIp: String, serverPublicKey: PublicKey): PinStatus {
+        val fingerprint = getKeyFingerprint(serverPublicKey)
+        val storedFingerprint = prefs.getString("$KEY_PREFIX$serverIp", null)
+        
+        return when {
+            storedFingerprint == null -> {
+                Log.i(TAG, "🆕 First connection to $serverIp (TOFU)")
+                PinStatus.FirstConnection(fingerprint)
+            }
+            storedFingerprint == fingerprint -> {
+                Log.i(TAG, "✅ Server key verified: $serverIp")
+                PinStatus.Verified
+            }
+            else -> {
+                Log.e(TAG, "⚠️ SERVER KEY MISMATCH for $serverIp!")
+                Log.e(TAG, "Expected: $storedFingerprint")
+                Log.e(TAG, "Received: $fingerprint")
+                PinStatus.Mismatch(storedFingerprint, fingerprint)
+            }
+        }
+    }
+    
+    /**
+     * Pin (trust) a server's public key
+     */
+    fun pinServerKey(serverIp: String, publicKey: PublicKey): Boolean {
+        return try {
+            val fingerprint = getKeyFingerprint(publicKey)
+            prefs.edit()
+                .putString("$KEY_PREFIX$serverIp", fingerprint)
+                .apply()
+            Log.i(TAG, "📌 Pinned server $serverIp: $fingerprint")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to pin server key: ${e.message}")
+            false
+        }
+    }
+    
+    /**
+     * Remove pinned key (for server change or testing)
+     */
+    fun unpinServer(serverIp: String) {
+        prefs.edit().remove("$KEY_PREFIX$serverIp").apply()
+        Log.i(TAG, "🗑️ Unpinned server: $serverIp")
+    }
+    
+    /**
+     * Get all pinned servers
+     */
+    fun getPinnedServers(): Map<String, String> {
+        return prefs.all.filterKeys { it.startsWith(KEY_PREFIX) }
+            .mapKeys { it.key.removePrefix(KEY_PREFIX) }
+            .mapValues { it.value.toString() }
+    }
+}
+
+sealed class PinStatus {
+    /** Server key verified against pinned fingerprint */
+    object Verified : PinStatus()
+    
+    /** First connection to this server (TOFU) - user should verify fingerprint */
+    data class FirstConnection(val fingerprint: String) : PinStatus()
+    
+    /** SECURITY ALERT: Server key changed unexpectedly */
+    data class Mismatch(val expected: String, val received: String) : PinStatus()
+}
+
+/**
  * Manages ECDH key pairs and session key derivation for secure DataPad communication
  * Uses Android KeyStore for secure key storage
  */

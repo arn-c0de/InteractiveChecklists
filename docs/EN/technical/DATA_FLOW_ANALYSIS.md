@@ -1,6 +1,8 @@
 # Data Flow Analysis: DCS to Android DataPad
-APP version 1.0.19
-Streamer version 1.0.10
+APP version 1.0.20 (with Security Enhancements)
+Streamer version 1.0.11 (with PoW Support)
+
+**Security Update**: This version includes Server Key Pinning (TOFU), optional Proof-of-Work DoS protection, and Pre-Shared Key support.
 
 
 ## System Overview
@@ -34,10 +36,12 @@ sequenceDiagram
     Android->>Python: 1. ClientHello (deviceId, pubKey)
     Python->>Python: Authorize deviceId & derive secret
     Python->>Android: 2. ServerHello (pubKey, salt)
-    Android->>Android: Derive Session Key (ECDH + HKDF)
-    Android->>Python: 3. KeyConfirm (HMAC proof)
+    Android->>Android: 3. Verify Server Key (TOFU/Pinning)
+    Note over Android: First connection: Pin server key<br/>Subsequent: Verify matches pinned<br/>Mismatch: REJECT (MITM detected)
+    Android->>Android: 4. Derive Session Key (ECDH + HKDF)
+    Android->>Python: 5. KeyConfirm (HMAC proof)
     Python->>Python: Verify HMAC
-    Python->>Android: 4. Ack (status: ready)
+    Python->>Android: 6. Ack (status: ready)
 
     Note over Python, Android: Encrypted Data Transmission (AES-GCM)
     loop Data Forwarding
@@ -129,7 +133,26 @@ sequenceDiagram
 │  │  └─────────────────────────────────────────────────────────────┘ │  │
 │  │                            │                                       │  │
 │  │  ┌─────────────────────────▼───────────────────────────────────┐ │  │
-│  │  │ Step 3: Both sides derive session key                       │ │  │
+│  │  │ Step 3: Android verifies server key (TOFU Protection)       │ │  │
+│  │  │   ServerKeyPinningManager (ALWAYS ENABLED):                 │ │  │
+│  │  │   • Compute SHA-256 fingerprint of server public key        │ │  │
+│  │  │   • Check if server IP has pinned key in SharedPreferences  │ │  │
+│  │  │                                                               │ │  │
+│  │  │   First Connection (TOFU):                                   │ │  │
+│  │  │   → No pinned key exists                                     │ │  │
+│  │  │   → Log fingerprint for user verification                    │ │  │
+│  │  │   → Auto-pin server key (Trust-On-First-Use)               │ │  │
+│  │  │   → ✅ PROCEED with handshake                               │ │  │
+│  │  │                                                               │ │  │
+│  │  │   Subsequent Connections:                                    │ │  │
+│  │  │   → Compare received fingerprint with pinned                │ │  │
+│  │  │   → Match: ✅ VERIFIED, proceed                             │ │  │
+│  │  │   → Mismatch: ⚠️ SECURITY ALERT - REJECT CONNECTION        │ │  │
+│  │  │      (Possible MITM attack detected!)                        │ │  │
+│  │  └─────────────────────────────────────────────────────────────┘ │  │
+│  │                            │                                       │  │
+│  │  ┌─────────────────────────▼───────────────────────────────────┐ │  │
+│  │  │ Step 4: Both sides derive session key                       │ │  │
 │  │  │   ECDH Computation:                                          │ │  │
 │  │  │   • sharedSecret = ECDH(myPrivate, peerPublic)              │ │  │
 │  │  │   • sessionKey = HKDF-SHA256(                                │ │  │
@@ -141,7 +164,7 @@ sequenceDiagram
 │  │  └─────────────────────────────────────────────────────────────┘ │  │
 │  │                            │                                       │  │
 │  │  ┌─────────────────────────▼───────────────────────────────────┐ │  │
-│  │  │ Step 4: Android → Python                                    │ │  │
+│  │  │ Step 5: Android → Python                                    │ │  │
 │  │  │   KeyConfirm (unencrypted JSON)                             │ │  │
 │  │  │   • sessionId: from ServerHello                              │ │  │
 │  │  │   • hmac: HMAC-SHA256(sessionKey, sessionId)                │ │  │
@@ -149,7 +172,7 @@ sequenceDiagram
 │  │  └─────────────────────────────────────────────────────────────┘ │  │
 │  │                            │                                       │  │
 │  │  ┌─────────────────────────▼───────────────────────────────────┐ │  │
-│  │  │ Step 5: Python → Android                                    │ │  │
+│  │  │ Step 6: Python → Android                                    │ │  │
 │  │  │   Ack (unencrypted JSON)                                    │ │  │
 │  │  │   • sessionId: confirmed                                     │ │  │
 │  │  │   • status: "ready"                                          │ │  │
@@ -311,27 +334,45 @@ sequenceDiagram
 **Strengths:**
 - ✅ **Perfect Forward Secrecy**: Each session uses ephemeral keys
 - ✅ **Mutual Authentication**: Both sides verify key derivation via HMAC
+- ✅ **Server Key Pinning (TOFU)**: Detects MITM attacks after first connection
 - ✅ **Curve Security**: secp256r1 (NIST P-256), 128-bit security level
 - ✅ **HKDF Key Derivation**: Cryptographically strong key expansion with salt
 - ✅ **Device Authorization**: Whitelist-based access control
+- ✅ **Optional Proof-of-Work**: DoS protection for handshake flooding
 
 **Implementation Details:**
 ```kotlin
-// Android (KeyManager.kt)
+// Android (KeyManager.kt + DataPadManager.kt)
 1. Generate/load EC key pair from Android KeyStore
 2. Export public key as Base64
 3. Send ClientHello with publicKey + deviceId
 4. Receive ServerHello with server's publicKey + salt
-5. Derive shared secret: ECDH(myPrivate, serverPublic)
-6. Derive session key: HKDF-SHA256(sharedSecret, salt, "DataPad-Session-Key", 32)
-7. Send KeyConfirm with HMAC(sessionKey, sessionId) to prove possession
-8. Receive Ack → session ready
+5. Verify server key (ServerKeyPinningManager - ALWAYS ENABLED):
+   a. Compute SHA-256 fingerprint of server public key
+   b. Check if server IP has pinned key
+   c. First connection: Auto-pin (TOFU)
+   d. Subsequent: Verify matches pinned key
+   e. Mismatch: REJECT connection (MITM detected)
+6. Derive shared secret: ECDH(myPrivate, serverPublic)
+7. Derive session key: HKDF-SHA256(sharedSecret, salt, "DataPad-Session-Key", 32)
+8. Send KeyConfirm with HMAC(sessionKey, sessionId) to prove possession
+9. Receive Ack → session ready
 ```
 
 **Curve Validation (KeyManager.kt:168-189):**
 - Validates peer's public key lies on the curve: y² ≡ x³ + ax + b (mod p)
 - Prevents invalid curve attacks
 - Ensures curve parameters match (order, cofactor, generator)
+
+**Server Key Pinning (KeyManager.kt:28-91, DataPadManager.kt:765-790):**
+- **ALWAYS ENABLED** - No opt-out for maximum security
+- Uses Trust-On-First-Use (TOFU) pattern (like SSH)
+- Stores SHA-256 fingerprint of server public key in SharedPreferences
+- First connection: Auto-pins server key after curve validation
+- Subsequent connections: Verifies fingerprint matches pinned value
+- Key mismatch: Rejects connection and logs security alert
+- Benefits: Prevents MITM attacks after initial connection
+- Location: `ServerKeyPinningManager` class in KeyManager.kt
 
 ### 2. Data Encryption (AES-256-GCM)
 
@@ -369,15 +410,18 @@ Example nonce:
 
 | Attack Vector | Mitigation | Implementation |
 |--------------|------------|----------------|
-| **Man-in-the-Middle** | ECDH prevents passive eavesdropping | Shared secret never transmitted |
+| **Man-in-the-Middle (Passive)** | ECDH prevents passive eavesdropping | Shared secret never transmitted |
+| **Man-in-the-Middle (Active)** | Server Key Pinning (TOFU) | `ServerKeyPinningManager` - detects after first connection |
 | **Replay Attacks** | Counter-based nonce validation | `GcmNonceGenerator.validateNonce()` |
 | **Device Spoofing** | Device authorization whitelist | `authorized_devices.json` in Python |
-| **DoS Attacks** | Rate limiting (global + per-IP) | 50 msg/sec global, 5 msg/10sec per IP |
+| **DoS Attacks (Flooding)** | Rate limiting (global + per-IP) | 50 msg/sec global, 5 msg/10sec per IP |
+| **DoS Attacks (Handshake)** | Proof-of-Work (optional) | `ProofOfWorkChallenge` (16-bit difficulty = 50-100ms) |
 | **Message Tampering** | GCM authentication tag | AES-GCM rejects invalid tags |
 | **Large Payload DoS** | Size limits | 8KB handshake, 65KB data max |
 | **Nonce Collision** | Monotonic counters + sender ID | Never repeats within session |
 | **Stale Data Injection** | Timestamp filtering | Python validates timestamps |
 | **Invalid Curve Attack** | Curve validation | `KeyManager.importPublicKey()` validates point on curve |
+| **Server Impersonation** | Server key fingerprint verification | Pinned keys stored in SharedPreferences |
 
 ### 4. Bind Address Security
 
@@ -588,6 +632,13 @@ _MAX_MESSAGES_PER_IP = 5            # Per-IP rate limit (10 sec window)
 _IP_BAN_DURATION = 300.0            # 5 minute ban for violators
 _MAX_HANDSHAKE_MESSAGE_SIZE = 8192  # 8KB max handshake
 _MAX_DATA_MESSAGE_SIZE = 65479      # UDP limit minus GCM overhead
+
+# Proof-of-Work DoS Protection (optional, disabled by default)
+ENABLE_POW = False                  # Enable with --enable-pow flag
+POW_DIFFICULTY = 16                 # 16 bits = ~50-100ms solve time
+                                     # 12 bits = ~5-20ms
+                                     # 20 bits = ~500-1000ms
+POW_CHALLENGE_TIMEOUT = 300.0       # 5 minute challenge expiry
 ```
 
 ### Android (DataPadManager.kt)
@@ -638,6 +689,91 @@ CLEANUP_INTERVAL_MS = 60000L        // 60 sec cleanup interval
 - [ ] **Clock Skew**: Test with Android clock offset by ±10 minutes
 - [ ] **Empty Data**: Send empty JSON, verify graceful handling
 - [ ] **Old Data**: Send old timestamp, verify rejection
+
+---
+
+## Security Features Summary
+
+### Implemented & Always Enabled
+
+| Feature | Status | Location | Description |
+|---------|--------|----------|-------------|
+| **ECDH Key Exchange** | ✅ Always Active | `KeyManager.kt`, `crypto_handshake.py` | Perfect forward secrecy, ephemeral keys |
+| **AES-256-GCM Encryption** | ✅ Always Active | `EncryptionProvider.kt`, `SessionData` | Authenticated encryption with counter nonces |
+| **Server Key Pinning (TOFU)** | ✅ Always Active | `ServerKeyPinningManager`, `DataPadManager` | Detects MITM after first connection |
+| **Device Whitelist** | ✅ Always Active | `authorized_devices.json` | Only authorized devices can connect |
+| **Rate Limiting** | ✅ Always Active | `forward_parsed_udp.py` | Global + per-IP limits, auto-ban |
+| **Replay Protection** | ✅ Always Active | `GcmNonceGenerator` | Sliding window nonce validation |
+| **Curve Validation** | ✅ Always Active | `KeyManager.importPublicKey()` | Validates public key on curve |
+
+### Implemented & Optional
+
+| Feature | Status | Activation | Location |
+|---------|--------|------------|----------|
+| **Proof-of-Work** | ⚪ Optional | `--enable-pow` flag | `ProofOfWorkChallenge`, `ProofOfWorkSolver` |
+| **Pre-Shared Key** | ⚪ Implemented | Requires QR code integration | `HandshakePskManager` |
+
+### How to Enable Optional Features
+
+**Proof-of-Work (DoS Protection):**
+```bash
+# On Python server
+python forward_parsed_udp.py --enable-pow --pow-difficulty 16 \
+    --host <android_ip> --port 5010 --verbose \
+    --authorized-devices authorized_devices.json
+
+# Difficulty levels:
+# 12 bits = ~5-20ms (light protection)
+# 16 bits = ~50-100ms (recommended, default)
+# 20 bits = ~500-1000ms (heavy protection, high latency)
+```
+
+**Pre-Shared Key (Handshake Encryption):**
+```bash
+# Not yet integrated into handshake flow
+# Requires:
+# 1. QR code generation in Python
+# 2. QR code scanner in Android app
+# 3. PSK integration in handshake messages
+# Status: Code ready, integration pending
+```
+
+### Security Recommendations
+
+1. **Always use localhost binding** (`--bind-ip 127.0.0.1`) when sender and receiver are on same PC
+2. **Enable Proof-of-Work** if exposed to internet or untrusted networks
+3. **Monitor security_audit.jsonl** for suspicious activity
+4. **Rotate authorized devices** periodically (remove unused devices)
+5. **Use 5 GHz WiFi** for lower latency and less congestion
+6. **Keep server public key pinned** - only reset if server key legitimately changed
+
+### Server Key Pinning Management
+
+**View pinned servers:**
+```kotlin
+// In Android app code
+val pinnedServers = serverKeyPinning.getPinnedServers()
+pinnedServers.forEach { (ip, fingerprint) ->
+    Log.i(TAG, "Pinned: $ip → $fingerprint")
+}
+```
+
+**Unpin server (if server key legitimately changed):**
+```kotlin
+// In Android app settings UI (to be implemented)
+serverKeyPinning.unpinServer("192.168.1.100")
+// Next connection will TOFU again
+```
+
+**Check pin status:**
+```kotlin
+val status = serverKeyPinning.verifyServerKey(serverIp, serverPublicKey)
+when (status) {
+    is PinStatus.Verified -> // ✅ Trusted server
+    is PinStatus.FirstConnection -> // 🆕 New server, auto-pinning
+    is PinStatus.Mismatch -> // ⚠️ SECURITY ALERT!
+}
+```
 
 ---
 

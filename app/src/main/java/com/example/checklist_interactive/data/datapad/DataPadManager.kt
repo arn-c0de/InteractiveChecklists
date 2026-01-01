@@ -163,6 +163,7 @@ class DataPadManager(private val context: Context) {
 
     // ECDH components
     private val keyManager = KeyManager(context)
+    private val serverKeyPinning = ServerKeyPinningManager(context)  // ALWAYS ENABLED for security
     private var encryptionProvider: EcdhEncryption? = null
     private var currentSession: SessionInfo? = null
     private val pendingHandshakeResponses = java.util.concurrent.ConcurrentHashMap<String, CompletableDeferred<HandshakeMessage>>()
@@ -761,8 +762,33 @@ class DataPadManager(private val context: Context) {
             
             udpLogD("📥 Received ServerHello, authorized: ${serverHello.authorized}")
 
-            // Step 3: Derive session key with server-provided salt
+            // Step 3: Verify server key (TOFU protection)
+            val serverIpAddress = serverAddress.hostAddress ?: "unknown"
             val serverPublicKey = keyManager.importPublicKey(serverHello.publicKey)
+            
+            val pinStatus = serverKeyPinning.verifyServerKey(serverIpAddress, serverPublicKey)
+            when (pinStatus) {
+                is PinStatus.Verified -> {
+                    udpLogD("✅ Server key verified (pinned)")
+                }
+                is PinStatus.FirstConnection -> {
+                    udpLogD("🆕 First connection to server: $serverIpAddress")
+                    udpLogD("📌 Server key fingerprint: ${pinStatus.fingerprint}")
+                    // Auto-pin on first connection (TOFU)
+                    serverKeyPinning.pinServerKey(serverIpAddress, serverPublicKey)
+                    _handshakeStatus.value = "First connection - server key pinned"
+                }
+                is PinStatus.Mismatch -> {
+                    udpLogE("⚠️ SERVER KEY MISMATCH - Possible MITM attack!")
+                    udpLogE("Expected: ${pinStatus.expected}")
+                    udpLogE("Received: ${pinStatus.received}")
+                    _handshakeStatus.value = "SECURITY ALERT: Server key changed!"
+                    // SECURITY: Reject connection on key mismatch
+                    return@withLock false
+                }
+            }
+
+            // Step 4: Derive session key with server-provided salt
             val salt = serverHello.salt?.let {
                 try {
                     Base64.getDecoder().decode(it)
@@ -807,7 +833,7 @@ class DataPadManager(private val context: Context) {
 
             udpLogD("🔑 Session key derived")
 
-            // Step 4: Send KeyConfirm with HMAC proof
+            // Step 5: Send KeyConfirm with HMAC proof
             val hmac = computeHmac(sessionKey.encoded, serverHello.sessionId.toByteArray())
             val keyConfirm = KeyConfirm(
                 sessionId = serverHello.sessionId,
@@ -817,7 +843,7 @@ class DataPadManager(private val context: Context) {
             sendHandshakeMessage(keyConfirm, serverAddress)
             udpLogD("📤 Sent KeyConfirm")
 
-            // Step 5: Wait for Ack (still encrypted with PSK)
+            // Step 6: Wait for Ack
             val ackDeferred = CompletableDeferred<HandshakeMessage>()
             pendingHandshakeResponses["Ack"] = ackDeferred
 
