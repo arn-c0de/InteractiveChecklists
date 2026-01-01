@@ -634,6 +634,9 @@ fun MapViewer(
         if (rotationMode == 0) {
             try {
                 map.setMapOrientation(0f)
+                // Update pattern labels to stay upright
+                mapState.trafficPatternLabelOverlay?.updateMapRotation(0f)
+                map.invalidate()
             } catch (_: Throwable) {}
         }
 
@@ -642,7 +645,11 @@ fun MapViewer(
             val heading = fd?.heading
             if (heading != null) {
                 try {
-                    map.setMapOrientation(-Math.toDegrees(heading).toFloat())
+                    val rotation = -Math.toDegrees(heading).toFloat()
+                    map.setMapOrientation(rotation)
+                    // Update pattern labels to stay upright
+                    mapState.trafficPatternLabelOverlay?.updateMapRotation(rotation)
+                    map.invalidate()
                 } catch (_: Throwable) {}
             }
         }
@@ -1046,7 +1053,9 @@ fun MapViewer(
                 runwayElevationFt = runwayElevationFt,
                 customAltitudeAglFt = mapState.customPatternAltitudeAglFt
             )
-            val labelOverlay = PatternLabelOverlay(labels)
+            // Pass current map rotation so labels stay upright when map rotates
+            val currentMapRotation = mv.mapOrientation
+            val labelOverlay = PatternLabelOverlay(labels, currentMapRotation)
             mv.overlays.add(labelOverlay)
             mapState.trafficPatternLabelOverlay = labelOverlay
             
@@ -1645,10 +1654,13 @@ fun MapViewer(
                                             val dy = ev.getY(0) - ev.getY(1)
                                             val currentAngle = Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat()
                                             val deltaAngle = currentAngle - lastAngle
-                                            
-                                            this@apply.mapOrientation = this@apply.mapOrientation + deltaAngle
+
+                                            val newOrientation = this@apply.mapOrientation + deltaAngle
+                                            this@apply.mapOrientation = newOrientation
+                                            // Update pattern labels to stay upright during manual rotation
+                                            mapState.trafficPatternLabelOverlay?.updateMapRotation(newOrientation)
                                             this@apply.invalidate()
-                                            
+
                                             lastAngle = currentAngle
                                         } else if (!inRotationGesture && ev.pointerCount == 1) {
                                             if (kotlin.math.hypot((ev.x - downX).toDouble(), (ev.y - downY).toDouble()) > moveThresholdPx) {
