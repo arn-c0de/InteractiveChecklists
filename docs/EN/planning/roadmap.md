@@ -6,6 +6,14 @@ This roadmap outlines the planned development phases and features for the app in
 
 ---
 
+### First-run Setup Popup (Initial Aircraft & Settings)
+- Add a first-start popup shown on initial app launch to set up aircraft and primary settings on a single page.
+- Allow users to select their default aircraft, loadout, and critical settings (units, map preferences, telemetry options) for a clearer first-time experience.
+- Provide a concise overview and confirm defaults with a prominent "Get started" button and an option to skip for experienced users.
+- Ensure the setup can be reopened from Settings and supports re-running to change defaults later.
+
+---
+
 
 
 ### Map View Nearest Airport List
