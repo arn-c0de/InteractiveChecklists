@@ -254,6 +254,9 @@
                 var bordersLayer = L.layerGroup().addTo(map);
                 var borderPolygons = {};
                 var mgrsGridLayer = null;
+
+                // Layer for drawing selected marker runway centerlines
+                var runwayLinesLayer = L.layerGroup().addTo(map);
                 
                 // Border drawing state
                 var isDrawingBorder = false;
@@ -391,12 +394,77 @@
                                 marker.bindPopup(popupContent);
                                 
                                 markersLayer.addLayer(marker);
+                                // Attach runway headings data (if any) to marker for later visualization
+                                try { marker.runway_headings = m.runway_headings || []; marker.options.runway_headings = m.runway_headings || []; } catch (e) {}
                                 locationMarkers[m.id] = marker;
                                 
                             } catch (e) {
                                 console.error('Error adding marker:', e, m);
                             }
                         });
+
+                        // Function to compute destination point given bearing and distance (meters)
+                        function destinationPoint(lat, lon, bearing, distance_m) {
+                            var R = 6371000; // Earth radius in meters
+                            var br = bearing * Math.PI / 180;
+                            var lat1 = lat * Math.PI / 180;
+                            var lon1 = lon * Math.PI / 180;
+                            var d = distance_m / R;
+                            var lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(br));
+                            var lon2 = lon1 + Math.atan2(Math.sin(br) * Math.sin(d) * Math.cos(lat1), Math.cos(d) - Math.sin(lat1) * Math.sin(lat2));
+                            return [lat2 * 180 / Math.PI, lon2 * 180 / Math.PI];
+                        }
+
+                        // Clear existing runway lines
+                        window.clearRunwayLines = function() {
+                            try {
+                                runwayLinesLayer.clearLayers();
+                            } catch (e) { console.error('clearRunwayLines', e); }
+                        };
+
+                        // Draw runway centerlines for a given marker id using supplied runway_headings in marker data
+                        window.showRunwayHeadings = function(markerId) {
+                            try {
+                                runwayLinesLayer.clearLayers();
+                                if (!locationMarkers[markerId]) return;
+                                var marker = locationMarkers[markerId];
+                                var lat = marker.getLatLng().lat;
+                                var lon = marker.getLatLng().lng;
+                                var mdata = null;
+                                // Try to find the original data object; it's not stored directly, so
+                                // we rely on markers array closure in updateMarkers - workaround: markersLayer.eachLayer
+                                markersLayer.eachLayer(function(layer) {
+                                    if (layer && layer.getLatLng && layer.getLatLng().lat === lat && layer.getLatLng().lng === lon) {
+                                        // try to get stored marker options or bind to popup content hint
+                                    }
+                                });
+                                // Instead, request runway headings from window._lastMarkerRunways if available
+                                // To keep things simple, we also store runway data on the marker object itself in updateMarkers
+                                var runways = marker.options.runway_headings || marker.runway_headings || [];
+
+                                if (!runways || runways.length === 0) {
+                                    // Nothing to draw
+                                    return;
+                                }
+
+                                runways.forEach(function(r) {
+                                    var heading = Number(r.heading) || 0;
+                                    var length_m = r.length_m && Number(r.length_m) > 0 ? Number(r.length_m) : 1000; // default 1 km
+                                    var half = length_m / 2.0;
+
+                                    var pt1 = destinationPoint(lat, lon, heading, half);
+                                    var pt2 = destinationPoint(lat, lon, (heading + 180) % 360, half);
+
+                                    var line = L.polyline([pt1, pt2], { color: '#FF8800', weight: 3, opacity: 0.9, dashArray: '8,6' });
+                                    line.addTo(runwayLinesLayer);
+                                });
+
+                                // Optionally zoom slightly to show the lines
+                                // Here we pan to marker to ensure visibility
+                                map.panTo([lat, lon]);
+
+                            } catch (e) { console.error('showRunwayHeadings error', e); }
+                        };
 
                         // Provide getters for Python to poll for marker interactions
                         window.getClickedMarker = function() {

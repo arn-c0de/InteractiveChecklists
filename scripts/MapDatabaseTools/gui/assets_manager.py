@@ -91,12 +91,44 @@ class AssetsManagerWidget(QWidget):
         markers_header.setForeground(QColor("#666"))
         self.list_widget.addItem(markers_header)
 
-        markers = self.db.get_all_locations()
-        for m in markers:
-            if cat in ("All", "Markers") and (not q or q in (m.name or "").lower()):
-                item = QListWidgetItem(f"📍 {m.name} ({m.latitude:.4f}, {m.longitude:.4f})")
-                item.setData(Qt.ItemDataRole.UserRole, ("marker", m.id))
+        # Group markers by DCS map (show subheaders per map)
+        if cat in ("All", "Markers"):
+            markers = self.db.get_all_locations()
+            groups: dict = {}
+            for m in markers:
+                # Apply name filter
+                if q and q not in (m.name or "").lower():
+                    continue
+                map_name = (m.map or "").strip()
+                if not map_name:
+                    map_key = "No Map"
+                else:
+                    map_key = map_name
+                groups.setdefault(map_key, []).append(m)
+
+            if not groups:
+                item = QListWidgetItem("No markers found")
+                item.setFlags(Qt.ItemFlag.NoItemFlags)
+                item.setForeground(QColor("gray"))
                 self.list_widget.addItem(item)
+            else:
+                # Sort maps alphabetically but put "No Map" last
+                def map_sort_key(s):
+                    return (s == "No Map", s.lower())
+
+                for map_key in sorted(groups.keys(), key=map_sort_key):
+                    # Subheader for this map
+                    sub_label = f"  — {map_key} —"
+                    sub_item = QListWidgetItem(sub_label)
+                    sub_item.setFlags(Qt.ItemFlag.NoItemFlags)
+                    sub_item.setForeground(QColor("#888"))
+                    self.list_widget.addItem(sub_item)
+
+                    # Add markers in this map (sorted by name)
+                    for m in sorted(groups[map_key], key=lambda x: (x.name or "").lower()):
+                        item = QListWidgetItem(f"    📍 {m.name} ({m.latitude:.4f}, {m.longitude:.4f})")
+                        item.setData(Qt.ItemDataRole.UserRole, ("marker", m.id))
+                        self.list_widget.addItem(item)
 
         # Borders
         borders_header = QListWidgetItem("— BORDERS —")
