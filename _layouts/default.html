@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if page.title %}{{ page.title }} - {% endif %}{{ site.title }}</title>
+    <meta name="description" content="{{ site.description }}">
+    <link rel="stylesheet" href="{{ '/assets/css/style.css' | relative_url }}">
+    {% seo %}
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <a href="{{ '/' | relative_url }}">
+                    <span class="logo-icon">✓</span>
+                    {{ site.title }}
+                </a>
+            </div>
+            <div class="nav-links">
+                <a href="{{ '/' | relative_url }}">Home</a>
+                <a href="{{ '/docs/EN/docnavigation.html' | relative_url }}">Docs</a>
+                <a href="{{ '/CHANGELOG.html' | relative_url }}">Changelog</a>
+                <a href="https://github.com/arn-c0de/InteractiveChecklists">GitHub</a>
+                <button id="theme-toggle" class="theme-toggle" aria-label="Toggle dark mode">
+                    <svg class="sun-icon" viewBox="0 0 24 24" width="20" height="20">
+                        <circle cx="12" cy="12" r="5" fill="currentColor"/>
+                        <line x1="12" y1="1" x2="12" y2="3" stroke="currentColor" stroke-width="2"/>
+                        <line x1="12" y1="21" x2="12" y2="23" stroke="currentColor" stroke-width="2"/>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke="currentColor" stroke-width="2"/>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke="currentColor" stroke-width="2"/>
+                        <line x1="1" y1="12" x2="3" y2="12" stroke="currentColor" stroke-width="2"/>
+                        <line x1="21" y1="12" x2="23" y2="12" stroke="currentColor" stroke-width="2"/>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke="currentColor" stroke-width="2"/>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                    <svg class="moon-icon" viewBox="0 0 24 24" width="20" height="20">
+                        <path fill="currentColor" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        {{ content }}
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; {{ 'now' | date: "%Y" }} Interactive Checklists. Licensed under CC BY-NC-SA 4.0.</p>
+            <p>
+                <a href="{{ '/LICENSE' | relative_url }}">License</a> •
+                <a href="{{ '/SECURITY.html' | relative_url }}">Security</a> •
+                <a href="{{ '/THIRD_PARTY_LICENSES.html' | relative_url }}">Third-Party Licenses</a>
+            </p>
+        </div>
+    </footer>
+
+    <script src="{{ '/assets/js/theme.js' | relative_url }}"></script>
+</body>
+</html>
