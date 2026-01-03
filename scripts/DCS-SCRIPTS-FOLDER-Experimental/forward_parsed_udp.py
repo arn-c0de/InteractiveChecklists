@@ -198,6 +198,41 @@ _AES_GCM_OVERHEAD = 12 + 16  # nonce + tag
 # Conservative plaintext maximum so encrypted packet stays under UDP limit
 _MAX_DATA_MESSAGE_SIZE = _UDP_MAX_PAYLOAD - _AES_GCM_OVERHEAD
 
+# Statistics tracking (to reduce log spam)
+_stats_lock = __import__('threading').Lock()
+_stats = {
+    'messages_sent': 0,
+    'messages_rejected_old': 0,
+    'entity_batches_loaded': 0,
+    'entity_units_cached': 0,
+    'last_print_time': 0
+}
+_STATS_PRINT_INTERVAL = 10.0  # Print statistics every 10 seconds
+
+
+def print_statistics(force: bool = False):
+    """Print statistics summary if enough time has passed (reduces log spam)."""
+    global _stats
+    with _stats_lock:
+        current_time = time.time()
+        if not force and (current_time - _stats['last_print_time']) < _STATS_PRINT_INTERVAL:
+            return
+        
+        # Print summary
+        if _stats['messages_sent'] > 0 or _stats['messages_rejected_old'] > 0 or _stats['entity_batches_loaded'] > 0:
+            logger.info(f"📊 STATS (last {_STATS_PRINT_INTERVAL}s): "
+                       f"Sent={_stats['messages_sent']} | "
+                       f"Rejected={_stats['messages_rejected_old']} | "
+                       f"EntityBatches={_stats['entity_batches_loaded']} | "
+                       f"EntityUnits={_stats['entity_units_cached']}")
+        
+        # Reset counters
+        _stats['messages_sent'] = 0
+        _stats['messages_rejected_old'] = 0
+        _stats['entity_batches_loaded'] = 0
+        _stats['entity_units_cached'] = 0
+        _stats['last_print_time'] = current_time
+
 
 def validate_data_message(data: bytes, encrypt: bool = True) -> bool:
     """Validate data message size before sending.
@@ -905,7 +940,8 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
 
             # Check if timestamp is newer than last processed
             if not _timestamp_is_newer(cur_ts, _last_processed_timestamp):
-                logger.warning(f"⚠️ REJECTED OLD: ts={cur_ts} (last={_last_processed_timestamp})")
+                with _stats_lock:
+                    _stats['messages_rejected_old'] += 1
                 continue
 
             # Accept and record clean timestamp
@@ -950,10 +986,10 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                                     if entity_parsed and 'nearbyUnits' in entity_parsed:
                                         last_entity_data_batch1 = entity_parsed['nearbyUnits']
                                         entity_data_updated = True
-                                        if lines_read > 1:
-                                            logger.info(f"📡 Batch 1: Skipped {lines_read-1} old lines, cached {len(last_entity_data_batch1)} units from latest")
-                                        else:
-                                            logger.debug(f"📡 Cached batch 1: {len(last_entity_data_batch1)} units")
+                                        with _stats_lock:
+                                            _stats['entity_batches_loaded'] += 1
+                                            _stats['entity_units_cached'] += len(last_entity_data_batch1)
+                                        logger.debug(f"📡 Cached batch 1: {len(last_entity_data_batch1)} units")
                         except Exception as e:
                             logger.debug(f"Failed to read entity batch 1: {e}")
                     
@@ -978,10 +1014,10 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                                     if entity_parsed_2 and 'nearbyUnits' in entity_parsed_2:
                                         last_entity_data_batch2 = entity_parsed_2['nearbyUnits']
                                         entity_data_updated = True
-                                        if lines_read > 1:
-                                            logger.info(f"📡 Batch 2: Skipped {lines_read-1} old lines, cached {len(last_entity_data_batch2)} units from latest")
-                                        else:
-                                            logger.debug(f"📡 Cached batch 2: {len(last_entity_data_batch2)} units")
+                                        with _stats_lock:
+                                            _stats['entity_batches_loaded'] += 1
+                                            _stats['entity_units_cached'] += len(last_entity_data_batch2)
+                                        logger.debug(f"📡 Cached batch 2: {len(last_entity_data_batch2)} units")
                         except Exception as e:
                             logger.warning(f"⚠️ Failed to read entity batch 2: {e}")
 
@@ -1006,10 +1042,10 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                                     if entity_parsed_3 and 'nearbyUnits' in entity_parsed_3:
                                         last_entity_data_batch3 = entity_parsed_3['nearbyUnits']
                                         entity_data_updated = True
-                                        if lines_read > 1:
-                                            logger.info(f"📡 Batch 3: Skipped {lines_read-1} old lines, cached {len(last_entity_data_batch3)} units")
-                                        else:
-                                            logger.debug(f"📡 Cached batch 3: {len(last_entity_data_batch3)} units")
+                                        with _stats_lock:
+                                            _stats['entity_batches_loaded'] += 1
+                                            _stats['entity_units_cached'] += len(last_entity_data_batch3)
+                                        logger.debug(f"📡 Cached batch 3: {len(last_entity_data_batch3)} units")
                         except Exception as e:
                             logger.warning(f"⚠️ Failed to read entity batch 3: {e}")
 
@@ -1034,10 +1070,10 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                                     if entity_parsed_4 and 'nearbyUnits' in entity_parsed_4:
                                         last_entity_data_batch4 = entity_parsed_4['nearbyUnits']
                                         entity_data_updated = True
-                                        if lines_read > 1:
-                                            logger.info(f"📡 Batch 4: Skipped {lines_read-1} old lines, cached {len(last_entity_data_batch4)} units")
-                                        else:
-                                            logger.debug(f"📡 Cached batch 4: {len(last_entity_data_batch4)} units")
+                                        with _stats_lock:
+                                            _stats['entity_batches_loaded'] += 1
+                                            _stats['entity_units_cached'] += len(last_entity_data_batch4)
+                                        logger.debug(f"📡 Cached batch 4: {len(last_entity_data_batch4)} units")
                         except Exception as e:
                             logger.warning(f"⚠️ Failed to read entity batch 4: {e}")
 
@@ -1120,29 +1156,28 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
             # Update last data sent time on successful send
             if sent:
                 last_data_sent_time = time.time()
+                with _stats_lock:
+                    _stats['messages_sent'] += 1
             
-            if verbose or show_env:
+            # Print statistics periodically instead of spamming individual messages
+            print_statistics()
+            
+            # Only print individual messages if explicitly verbose AND show_env is enabled
+            if verbose and show_env:
                 ts = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
                 if sent:
-                    if show_env:
-                        try:
-                            parsed = safe_json_parse(jsonpart, max_size=_MAX_DATA_MESSAGE_SIZE)
-                            if parsed is not None:
-                                env = parsed.get('environment', {})
-                                temp = parsed.get('temperature', env.get('temperature'))
-                                pres = parsed.get('pressure', env.get('pressure'))
-                                wind = env.get('wind') or {'speed': env.get('windSpeed'), 'direction': env.get('windDirection')}
-                                wspeed = wind.get('speed')
-                                wdir = wind.get('direction')
-                                print(f"{ts} SENT {host}:{port} temp={temp}C pres={pres} wind={wspeed}@{wdir}")
-                            else:
-                                print(f"{ts} SENT {host}:{port} {jsonpart}")
-                        except Exception:
-                            print(f"{ts} SENT {host}:{port} {jsonpart}")
-                    else:
-                        print(f"{ts} SENT {host}:{port} {jsonpart}")
-                else:
-                    print(f"{ts} ERROR {host}:{port} {jsonpart}")
+                    try:
+                        parsed = safe_json_parse(jsonpart, max_size=_MAX_DATA_MESSAGE_SIZE)
+                        if parsed is not None:
+                            env = parsed.get('environment', {})
+                            temp = parsed.get('temperature', env.get('temperature'))
+                            pres = parsed.get('pressure', env.get('pressure'))
+                            wind = env.get('wind') or {'speed': env.get('windSpeed'), 'direction': env.get('windDirection')}
+                            wspeed = wind.get('speed')
+                            wdir = wind.get('direction')
+                            print(f"{ts} SENT {host}:{port} temp={temp}C pres={pres} wind={wspeed}@{wdir}")
+                    except Exception:
+                        pass
 
             # Entity file handling moved to periodic reading (every N player updates) above
             # This ensures fast player updates without massive JSON payloads every frame
@@ -1412,14 +1447,15 @@ def repeat_last_line(path: str, host: str, port: int, session_mgr: 'SessionManag
                     _last_timestamp_update_time = 0
 
                 if not _timestamp_is_newer(cur_ts, _last_processed_timestamp):
-                    logger.warning(f"⚠️ REJECTED OLD DATA: timestamp={cur_ts} (last={_last_processed_timestamp}) - preventing position reset!")
+                    with _stats_lock:
+                        _stats['messages_rejected_old'] += 1
                     continue
 
                 # Accept and record timestamp
                 if cur_ts is not None:
-                    logger.info(f"✅ Accepted data with timestamp={cur_ts}")
                     _last_processed_timestamp = cur_ts
                     _last_timestamp_update_time = current_time
+                    logger.debug(f"✅ Accepted data with timestamp={cur_ts}")
 
                 # Send to all devices with active sessions (ECDH mode)
                 sent_count = 0
@@ -1438,30 +1474,30 @@ def repeat_last_line(path: str, host: str, port: int, session_mgr: 'SessionManag
                 # Update last data sent time on successful send
                 if sent:
                     last_data_sent_time = current_time
+                    with _stats_lock:
+                        _stats['messages_sent'] += 1
                 
                 last_send_time = current_time
-                if verbose or show_env:
+                
+                # Print statistics periodically instead of spamming
+                print_statistics()
+                
+                # Only print individual messages if explicitly verbose AND show_env is enabled
+                if verbose and show_env:
                     ts = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
                     if sent:
-                        if show_env:
-                            try:
-                                parsed = safe_json_parse(jsonpart, max_size=_MAX_DATA_MESSAGE_SIZE)
-                                if parsed is not None:
-                                    env = parsed.get('environment', {})
-                                    temp = parsed.get('temperature', env.get('temperature'))
-                                    pres = parsed.get('pressure', env.get('pressure'))
-                                    wind = parsed.get('wind') or {'speed': env.get('windSpeed'), 'direction': env.get('windDirection')}
-                                    wspeed = wind.get('speed')
-                                    wdir = wind.get('direction')
-                                    print(f"{ts} REPEAT {host}:{port} temp={temp}C pres={pres} wind={wspeed}@{wdir}")
-                                else:
-                                    print(f"{ts} REPEAT {host}:{port} {jsonpart}")
-                            except Exception:
-                                print(f"{ts} REPEAT {host}:{port} {jsonpart}")
-                        else:
-                            print(f"{ts} REPEAT {host}:{port} {jsonpart}")
-                    else:
-                        print(f"{ts} ERROR {host}:{port} {jsonpart}")
+                        try:
+                            parsed = safe_json_parse(jsonpart, max_size=_MAX_DATA_MESSAGE_SIZE)
+                            if parsed is not None:
+                                env = parsed.get('environment', {})
+                                temp = parsed.get('temperature', env.get('temperature'))
+                                pres = parsed.get('pressure', env.get('pressure'))
+                                wind = parsed.get('wind') or {'speed': env.get('windSpeed'), 'direction': env.get('windDirection')}
+                                wspeed = wind.get('speed')
+                                wdir = wind.get('direction')
+                                print(f"{ts} REPEAT {host}:{port} temp={temp}C pres={pres} wind={wspeed}@{wdir}")
+                        except Exception:
+                            pass
             except Exception as e:
                 print(f"Error reading/sending: {e}", file=sys.stderr)
     finally:
