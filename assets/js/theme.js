@@ -6,7 +6,7 @@
     const THEME_LIGHT = 'light';
     const THEME_DARK = 'dark';
     
-    // Get theme preference from localStorage or system preference
+    // Get theme preference - default to dark
     function getPreferredTheme() {
         const storedTheme = localStorage.getItem(STORAGE_KEY);
         
@@ -14,12 +14,8 @@
             return storedTheme;
         }
         
-        // Check system preference
-        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            return THEME_DARK;
-        }
-        
-        return THEME_LIGHT;
+        // Default to dark mode
+        return THEME_DARK;
     }
     
     // Set theme on document
@@ -31,19 +27,19 @@
         const metaThemeColor = document.querySelector('meta[name="theme-color"]');
         if (metaThemeColor) {
             metaThemeColor.setAttribute('content', 
-                theme === THEME_DARK ? '#1a1a1a' : '#ffffff'
+                theme === THEME_DARK ? '#0d1117' : '#ffffff'
             );
         } else {
             const meta = document.createElement('meta');
             meta.name = 'theme-color';
-            meta.content = theme === THEME_DARK ? '#1a1a1a' : '#ffffff';
+            meta.content = theme === THEME_DARK ? '#0d1117' : '#ffffff';
             document.head.appendChild(meta);
         }
     }
     
     // Toggle between themes
     function toggleTheme() {
-        const currentTheme = document.documentElement.getAttribute('data-theme') || THEME_LIGHT;
+        const currentTheme = document.documentElement.getAttribute('data-theme') || THEME_DARK;
         const newTheme = currentTheme === THEME_LIGHT ? THEME_DARK : THEME_LIGHT;
         
         // Add smooth transition
@@ -78,62 +74,6 @@
                 }
             });
         }
-        
-        // Listen for system theme changes
-        if (window.matchMedia) {
-            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
-                // Only auto-update if user hasn't manually set a preference
-                if (!localStorage.getItem(STORAGE_KEY)) {
-                    setTheme(e.matches ? THEME_DARK : THEME_LIGHT);
-                }
-            });
-        }
-    });
-    
-    // Add smooth scrolling for anchor links
-    document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function(e) {
-                const href = this.getAttribute('href');
-                if (href === '#') return;
-                
-                e.preventDefault();
-                const target = document.querySelector(href);
-                
-                if (target) {
-                    const offsetTop = target.offsetTop - 80; // Account for fixed navbar
-                    window.scrollTo({
-                        top: offsetTop,
-                        behavior: 'smooth'
-                    });
-                    
-                    // Update URL without jumping
-                    history.pushState(null, null, href);
-                }
-            });
-        });
-    });
-    
-    // Add animation on scroll for cards
-    document.addEventListener('DOMContentLoaded', function() {
-        const observerOptions = {
-            threshold: 0.1,
-            rootMargin: '0px 0px -50px 0px'
-        };
-        
-        const observer = new IntersectionObserver(function(entries) {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.style.animation = 'fadeInUp 0.6s ease forwards';
-                    observer.unobserve(entry.target);
-                }
-            });
-        }, observerOptions);
-        
-        document.querySelectorAll('.card, .feature-list li, .doc-card').forEach(el => {
-            el.style.opacity = '0';
-            observer.observe(el);
-        });
     });
     
 })();

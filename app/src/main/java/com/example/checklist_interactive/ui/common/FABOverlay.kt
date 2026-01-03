@@ -280,8 +280,8 @@ object MapViewerFABs {
             containerColor = containerColorTertiary,
             defaultX = 0.95f,
             defaultY = 0.80f,
-            defaultLandscapeX = 0.05f,
-            defaultLandscapeY = 0.85f,
+            defaultLandscapeX = 0.95f,
+            defaultLandscapeY = 0.05f,
             scope = "map"
         ),
         FABConfig(
@@ -292,7 +292,7 @@ object MapViewerFABs {
             containerColor = containerColorPrimary,
             defaultX = 0.95f,
             defaultY = 0.85f,
-            defaultLandscapeX = 0.05f,
+            defaultLandscapeX = 0.95f,
             defaultLandscapeY = 0.95f,
             scope = "map"
         )
@@ -450,8 +450,8 @@ object PdfViewerFABs {
                 containerColor = containerColorTertiary,
                 defaultX = 0.95f,
                 defaultY = 0.80f,
-                defaultLandscapeX = 0.05f,
-                defaultLandscapeY = 0.85f,
+                defaultLandscapeX = 0.95f,
+                defaultLandscapeY = 0.80f,
                 scope = "pdf"
             )
         )
@@ -466,8 +466,8 @@ object PdfViewerFABs {
                 containerColor = containerColorPrimary,
                 defaultX = 0.95f,
                 defaultY = 0.85f,
-                defaultLandscapeX = 0.05f,
-                defaultLandscapeY = 0.95f,
+                defaultLandscapeX = 0.95f,
+                defaultLandscapeY = 0.90f,
                 scope = "pdf"
             )
         )
@@ -514,8 +514,8 @@ object MarkdownViewerFABs {
                 containerColor = containerColorTertiary,
                 defaultX = 0.95f,
                 defaultY = 0.80f,
-                defaultLandscapeX = 0.05f,
-                defaultLandscapeY = 0.85f,
+                defaultLandscapeX = 0.95f,
+                defaultLandscapeY = 0.80f,
                 scope = "markdown"
             )
         )
@@ -530,8 +530,8 @@ object MarkdownViewerFABs {
                 containerColor = containerColorPrimary,
                 defaultX = 0.95f,
                 defaultY = 0.85f,
-                defaultLandscapeX = 0.05f,
-                defaultLandscapeY = 0.95f,
+                defaultLandscapeX = 0.95f,
+                defaultLandscapeY = 0.90f,
                 scope = "markdown"
             )
         )
@@ -570,8 +570,8 @@ object InternalFileViewerFABs {
             containerColor = containerColorTertiary,
             defaultX = 0.95f,
             defaultY = 0.80f,
-            defaultLandscapeX = 0.05f,
-            defaultLandscapeY = 0.85f,
+            defaultLandscapeX = 0.95f,
+            defaultLandscapeY = 0.80f,
             scope = "internal_file_viewer"
         ),
         FABConfig(
@@ -582,8 +582,8 @@ object InternalFileViewerFABs {
             containerColor = containerColorPrimary,
             defaultX = 0.95f,
             defaultY = 0.85f,
-            defaultLandscapeX = 0.05f,
-            defaultLandscapeY = 0.95f
+            defaultLandscapeX = 0.95f,
+            defaultLandscapeY = 0.90f
         )
     )
 }
@@ -609,8 +609,8 @@ object InternalFilesScreenFABs {
             containerColor = containerColorTertiary,
             defaultX = 0.95f,
             defaultY = 0.80f,
-            defaultLandscapeX = 0.05f,
-            defaultLandscapeY = 0.85f,
+            defaultLandscapeX = 0.95f,
+            defaultLandscapeY = 0.80f,
             scope = "internal_files"
         ),
         FABConfig(
@@ -621,8 +621,8 @@ object InternalFilesScreenFABs {
             containerColor = containerColorPrimary,
             defaultX = 0.95f,
             defaultY = 0.85f,
-            defaultLandscapeX = 0.05f,
-            defaultLandscapeY = 0.95f,
+            defaultLandscapeX = 0.95f,
+            defaultLandscapeY = 0.90f,
             scope = "internal_files"
         )
     )
