@@ -51,7 +51,7 @@ class SettingsViewModel(
             val imported = withContext(Dispatchers.IO) {
                 fileManager.importAllBundledAssets("")
             }
-            _snackbarMessages.tryEmit(app.getString(com.example.checklist_interactive.R.plurals.imported_files, imported, imported))
+            _snackbarMessages.tryEmit(app.resources.getQuantityString(com.example.checklist_interactive.R.plurals.imported_files, imported, imported))
         } catch (e: Exception) {
             _snackbarMessages.tryEmit(app.getString(com.example.checklist_interactive.R.string.import_failed, e.message ?: ""))
         } finally {
@@ -66,7 +66,7 @@ class SettingsViewModel(
                 fileManager.wipeInternalRoot()
                 fileManager.importAllBundledAssets("")
             }
-            _snackbarMessages.tryEmit(app.getString(com.example.checklist_interactive.R.plurals.wiped_imported_files, imported, imported))
+            _snackbarMessages.tryEmit(app.resources.getQuantityString(com.example.checklist_interactive.R.plurals.wiped_imported_files, imported, imported))
         } catch (e: Exception) {
             _snackbarMessages.tryEmit(app.getString(com.example.checklist_interactive.R.string.wipe_import_failed, e.message ?: ""))
         } finally {

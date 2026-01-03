@@ -770,9 +770,15 @@ class DataPadGUI(QMainWindow):
         except Exception as e:
             print(f"Error handling asset delete: {e}")
 
-    def on_location_changed(self, *args):
-        """Handle location add/update/delete - refresh markers"""
+    def on_location_changed(self, location):
+        """Handle location updated in database - refresh map markers immediately"""
+        # Refresh the entire marker list on the map
         self.refresh_map_markers()
+        # Re-select the updated location to show it at new position
+        if location and hasattr(location, 'id'):
+            # Small delay to ensure map has updated
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(100, lambda: self.location_manager.select_location_by_id(location.id))
     
     def on_border_selected(self, border: Border):
         """Handle border selection - zoom to border on map"""
