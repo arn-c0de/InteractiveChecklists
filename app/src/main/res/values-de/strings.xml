@@ -755,6 +755,12 @@
     <string name="dialog_import_files_message">Es wurden keine Dateien automatisch importiert. Möchten Sie Dateien oder einen Ordner zum Importieren auswählen?\n(Empfohlen für PDFs und Markdown-Dateien)</string>
     <string name="dialog_pick_files">Dateien auswählen</string>
     <string name="dialog_pick_folder">Ordner auswählen</string>
+    <string name="create_new_folder">Neuen Ordner erstellen</string>
+    <string name="dialog_create_folder">Ordner erstellen</string>
+    <string name="dialog_enter_folder_name">Ordnername eingeben</string>
+    <string name="folder_name_empty">Ordnername darf nicht leer sein</string>
+    <string name="folder_already_exists">Ein Ordner mit diesem Namen existiert bereits</string>
+    <string name="folder_created">Ordner erfolgreich erstellt</string>
     <string name="msg_no_matching_files">Keine passenden Dateien gefunden</string>
     <string name="msg_file_already_in_category">Datei ist bereits in dieser Kategorie</string>
     <string name="msg_fab_positions_restored">FAB-Positionen wiederhergestellt</string>

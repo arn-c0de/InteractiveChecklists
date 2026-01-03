@@ -729,6 +729,12 @@
     <string name="dialog_import_files_message">No files were imported automatically. Would you like to pick files or a folder to import?\n(Recommended for PDFs and markdown files)</string>
     <string name="dialog_pick_files">Pick files</string>
     <string name="dialog_pick_folder">Pick folder</string>
+    <string name="create_new_folder">Create new folder</string>
+    <string name="dialog_create_folder">Create folder</string>
+    <string name="dialog_enter_folder_name">Enter folder name</string>
+    <string name="folder_name_empty">Folder name cannot be empty</string>
+    <string name="folder_already_exists">A folder with this name already exists</string>
+    <string name="folder_created">Folder created successfully</string>
     <string name="msg_no_matching_files">No matching files found</string>
     <string name="msg_file_already_in_category">File is already in this category</string>
     <string name="msg_fab_positions_restored">FAB positions restored</string>

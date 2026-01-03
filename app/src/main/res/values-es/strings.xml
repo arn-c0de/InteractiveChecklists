@@ -808,6 +808,12 @@
     <string name="dialog_import_files_message">No se importaron archivos automáticamente. ¿Quieres elegir archivos o una carpeta para importar?\n(Recomendado para PDFs y archivos markdown)</string>
     <string name="dialog_pick_files">Elegir archivos</string>
     <string name="dialog_pick_folder">Elegir carpeta</string>
+    <string name="create_new_folder">Crear nueva carpeta</string>
+    <string name="dialog_create_folder">Crear carpeta</string>
+    <string name="dialog_enter_folder_name">Ingresar nombre de carpeta</string>
+    <string name="folder_name_empty">El nombre de la carpeta no puede estar vacío</string>
+    <string name="folder_already_exists">Ya existe una carpeta con este nombre</string>
+    <string name="folder_created">Carpeta creada exitosamente</string>
     <string name="msg_no_matching_files">No se encontraron archivos coincidentes</string>
     <string name="msg_file_already_in_category">El archivo ya está en esta categoría</string>
     <string name="msg_fab_positions_restored">Posiciones FAB restauradas</string>
