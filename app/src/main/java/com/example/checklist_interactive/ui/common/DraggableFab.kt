@@ -61,50 +61,54 @@ fun DraggableFab(
     val availableWidth = (screenWidthPx - fabSizePx - marginPx * 2).coerceAtLeast(1)
     val availableHeight = (screenHeightPx - fabSizePx - marginPx * 2).coerceAtLeast(1)
 
-    // Add orientation suffix to position key for separate landscape/portrait positions
-    val orientationSuffix = if (isLandscape) "_landscape" else "_portrait"
-    val positionKey = name + orientationSuffix
+    // Track last orientation to detect changes
+    var lastWasLandscape by remember { mutableStateOf(isLandscape) }
 
-    // Load and calculate position - recalculate when orientation changes
-    val (offsetX, offsetY) = remember(isLandscape, availableWidth, availableHeight, name, scope, defaultX, defaultY) {
-        // Load saved position or use defaults for current orientation
-        val (savedXPercent, savedYPercent) = prefsManager.getFabPosition(
-            if (scope.isBlank()) null else scope,
-            positionKey,
-            defaultX,
-            defaultY
-        )
-
-        // Calculate pixel position from percentage
-        val x = (marginPx + (savedXPercent * availableWidth)).coerceIn(marginPx.toFloat(), (marginPx + availableWidth).toFloat())
-        val y = (marginPx + (savedYPercent * availableHeight)).coerceIn(marginPx.toFloat(), (marginPx + availableHeight).toFloat())
-
-        mutableFloatStateOf(x) to mutableFloatStateOf(y)
+    // Load saved position or use defaults (normalized to the available area excluding margins)
+    val (savedXPercent, savedYPercent) = remember(name, scope) {
+        prefsManager.getFabPosition(if (scope.isBlank()) null else scope, name, defaultX, defaultY)
     }
 
-    // Convert to var for dragging
-    var currentOffsetX by offsetX
-    var currentOffsetY by offsetY
+    // Convert percentage to pixels and offset by left margin
+    var offsetX by remember(savedXPercent, availableWidth) {
+        mutableStateOf((marginPx + (savedXPercent * availableWidth)).coerceIn(marginPx.toFloat(), (marginPx + availableWidth).toFloat()))
+    }
+    var offsetY by remember(savedYPercent, availableHeight) {
+        mutableStateOf((marginPx + (savedYPercent * availableHeight)).coerceIn(marginPx.toFloat(), (marginPx + availableHeight).toFloat()))
+    }
+
+    // When orientation changes, reset to default position for that orientation
+    LaunchedEffect(isLandscape) {
+        android.util.Log.d("DraggableFAB", "$name: LaunchedEffect triggered - isLandscape=$isLandscape, lastWas=$lastWasLandscape")
+        if (isLandscape != lastWasLandscape) {
+            android.util.Log.d("DraggableFAB", "$name: ORIENTATION CHANGED! Resetting to defaults X=$defaultX Y=$defaultY")
+            lastWasLandscape = isLandscape
+            // Reset to default position for new orientation
+            offsetX = (marginPx + (defaultX * availableWidth)).coerceIn(marginPx.toFloat(), (marginPx + availableWidth).toFloat())
+            offsetY = (marginPx + (defaultY * availableHeight)).coerceIn(marginPx.toFloat(), (marginPx + availableHeight).toFloat())
+            android.util.Log.d("DraggableFAB", "$name: New position: offsetX=$offsetX, offsetY=$offsetY")
+        }
+    }
 
     // Clamp any positions that might be outside the available area (e.g., due to layout/padding changes)
     // and persist corrected values so old off-screen positions are fixed automatically.
-    LaunchedEffect(positionKey, availableWidth, availableHeight) {
+    LaunchedEffect(name, availableWidth, availableHeight) {
         val minX = marginPx.toFloat()
         val maxX = (marginPx + availableWidth).toFloat()
         val minY = marginPx.toFloat()
         val maxY = (marginPx + availableHeight).toFloat()
 
-        val clampedX = currentOffsetX.coerceIn(minX, maxX)
-        val clampedY = currentOffsetY.coerceIn(minY, maxY)
-        if (clampedX != currentOffsetX || clampedY != currentOffsetY) {
-            currentOffsetX = clampedX
-            currentOffsetY = clampedY
+        val clampedX = offsetX.coerceIn(minX, maxX)
+        val clampedY = offsetY.coerceIn(minY, maxY)
+        if (clampedX != offsetX || clampedY != offsetY) {
+            offsetX = clampedX
+            offsetY = clampedY
             // Save corrected normalized values (relative to available area)
-            val xPercent = if (availableWidth > 0) ((currentOffsetX - marginPx) / availableWidth) else 0f
-            val yPercent = if (availableHeight > 0) ((currentOffsetY - marginPx) / availableHeight) else 0f
+            val xPercent = if (availableWidth > 0) ((offsetX - marginPx) / availableWidth) else 0f
+            val yPercent = if (availableHeight > 0) ((offsetY - marginPx) / availableHeight) else 0f
             coroutineScope.launch {
                 try {
-                    prefsManager.setFabPosition(if (scope.isBlank()) null else scope, positionKey, xPercent, yPercent)
+                    prefsManager.setFabPosition(if (scope.isBlank()) null else scope, name, xPercent, yPercent)
                 } catch (e: Exception) {
                     android.util.Log.w("DraggableFab", "Failed to persist clamped FAB position: ${e.message}")
                 }
@@ -128,7 +132,7 @@ fun DraggableFab(
                 longPressTriggered = false
             },
             modifier = Modifier
-                .offset { IntOffset(currentOffsetX.roundToInt(), currentOffsetY.roundToInt()) }
+                .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
                 .zIndex(10f)
                 .pointerInput(Unit) {
                     detectDragGesturesAfterLongPress(
@@ -143,17 +147,17 @@ fun DraggableFab(
                             val maxX = (marginPx + availableWidth).toFloat()
                             val minY = marginPx.toFloat()
                             val maxY = (marginPx + availableHeight).toFloat()
-                            currentOffsetX = (currentOffsetX + dragAmount.x).coerceIn(minX, maxX)
-                            currentOffsetY = (currentOffsetY + dragAmount.y).coerceIn(minY, maxY)
+                            offsetX = (offsetX + dragAmount.x).coerceIn(minX, maxX)
+                            offsetY = (offsetY + dragAmount.y).coerceIn(minY, maxY)
                         },
                         onDragEnd = {
                             if (isDragging) {
                                 // Save position as percentage (normalized to available area excluding margins)
-                                val xPercent = if (availableWidth > 0) ((currentOffsetX - marginPx) / availableWidth) else 0f
-                                val yPercent = if (availableHeight > 0) ((currentOffsetY - marginPx) / availableHeight) else 0f
+                                val xPercent = if (availableWidth > 0) ((offsetX - marginPx) / availableWidth) else 0f
+                                val yPercent = if (availableHeight > 0) ((offsetY - marginPx) / availableHeight) else 0f
 
                                 coroutineScope.launch {
-                                    prefsManager.setFabPosition(if (scope.isBlank()) null else scope, positionKey, xPercent, yPercent)
+                                    prefsManager.setFabPosition(if (scope.isBlank()) null else scope, name, xPercent, yPercent)
                                 }
                             }
                             isDragging = false
@@ -177,7 +181,7 @@ fun DraggableFab(
                 longPressTriggered = false
             },
             modifier = Modifier
-                .offset { IntOffset(currentOffsetX.roundToInt(), currentOffsetY.roundToInt()) }
+                .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
                 .size(fabSizeDp.dp)
                 .zIndex(10f)
                 .pointerInput(Unit) {
@@ -193,17 +197,17 @@ fun DraggableFab(
                             val maxX = (marginPx + availableWidth).toFloat()
                             val minY = marginPx.toFloat()
                             val maxY = (marginPx + availableHeight).toFloat()
-                            currentOffsetX = (currentOffsetX + dragAmount.x).coerceIn(minX, maxX)
-                            currentOffsetY = (currentOffsetY + dragAmount.y).coerceIn(minY, maxY)
+                            offsetX = (offsetX + dragAmount.x).coerceIn(minX, maxX)
+                            offsetY = (offsetY + dragAmount.y).coerceIn(minY, maxY)
                         },
                         onDragEnd = {
                             if (isDragging) {
                                 // Save position as percentage (normalized to available area excluding margins)
-                                val xPercent = if (availableWidth > 0) ((currentOffsetX - marginPx) / availableWidth) else 0f
-                                val yPercent = if (availableHeight > 0) ((currentOffsetY - marginPx) / availableHeight) else 0f
+                                val xPercent = if (availableWidth > 0) ((offsetX - marginPx) / availableWidth) else 0f
+                                val yPercent = if (availableHeight > 0) ((offsetY - marginPx) / availableHeight) else 0f
 
                                 coroutineScope.launch {
-                                    prefsManager.setFabPosition(if (scope.isBlank()) null else scope, positionKey, xPercent, yPercent)
+                                    prefsManager.setFabPosition(if (scope.isBlank()) null else scope, name, xPercent, yPercent)
                                 }
                             }
                             isDragging = false
