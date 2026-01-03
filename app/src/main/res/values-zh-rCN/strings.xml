@@ -722,6 +722,12 @@
     <string name="dialog_import_files_message">未自动导入任何文件。是否选择文件或文件夹进行导入吗？\n（推荐用于PDF和Markdown文件）</string>
     <string name="dialog_pick_files">选择文件</string>
     <string name="dialog_pick_folder">选择文件夹</string>
+    <string name="create_new_folder">创建新文件夹</string>
+    <string name="dialog_create_folder">创建文件夹</string>
+    <string name="dialog_enter_folder_name">输入文件夹名称</string>
+    <string name="folder_name_empty">文件夹名称不能为空</string>
+    <string name="folder_already_exists">已存在同名文件夹</string>
+    <string name="folder_created">文件夹创建成功</string>
     <string name="msg_no_matching_files">未找到匹配的文件</string>
     <string name="msg_file_already_in_category">文件已在此类别中</string>
     <string name="msg_fab_positions_restored">FAB 位置已恢复</string>

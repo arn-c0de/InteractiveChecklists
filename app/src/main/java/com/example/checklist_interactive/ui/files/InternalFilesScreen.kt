@@ -155,6 +155,7 @@ fun InternalFilesScreen(
     var fileToEditTags by remember { mutableStateOf<FileInfo?>(null) }
     var showTagEditor by remember { mutableStateOf(false) }
     var showMoveDialog by remember { mutableStateOf(false) }
+    var showCreateFolderDialog by remember { mutableStateOf(false) }
     var showTagFilter by remember { mutableStateOf(false) }
     var selectedTagFilters by remember { mutableStateOf(prefsManager.getActiveTagFilters()) }
     var tagFilterMode by remember { mutableStateOf(prefsManager.getTagFilterMode()) }
@@ -780,6 +781,10 @@ fun InternalFilesScreen(
             onDismiss = {
                 showImportDialog = false
                 selectedCategory = null
+            },
+            onCreateNewFolder = {
+                showImportDialog = false
+                showCreateFolderDialog = true
             }
         )
     }
@@ -986,7 +991,55 @@ fun InternalFilesScreen(
                     showMoveDialog = false
                 }
             },
-            onDismiss = { showMoveDialog = false }
+            onDismiss = { showMoveDialog = false },
+            onCreateNewFolder = {
+                showMoveDialog = false
+                showCreateFolderDialog = true
+            }
+        )
+    }
+
+    // Create Folder Dialog
+    if (showCreateFolderDialog) {
+        CreateFolderDialog(
+            onDismiss = {
+                showCreateFolderDialog = false
+            },
+            onCreateFolder = { folderName ->
+                val categories = fileManager.getAllCategoryPaths()
+                if (categories.any { it.equals(folderName, ignoreCase = true) }) {
+                    android.widget.Toast.makeText(
+                        context,
+                        context.getString(R.string.folder_already_exists),
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                } else {
+                    val success = fileManager.createCategory(folderName)
+                    if (success) {
+                        android.widget.Toast.makeText(
+                            context,
+                            context.getString(R.string.folder_created),
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                        showCreateFolderDialog = false
+                        // Refresh file list to show new folder
+                        coroutineScope.launch {
+                            isLoadingFiles = true
+                            refreshFilesWithTags()
+                            onRefresh()
+                            isLoadingFiles = false
+                        }
+                        // If we came from import dialog, show it again with new folder
+                        showImportDialog = true
+                    } else {
+                        android.widget.Toast.makeText(
+                            context,
+                            "Failed to create folder",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            }
         )
     }
 
@@ -1722,13 +1775,34 @@ private fun CategorySelectionDialog(
     categories: List<String>,
     selectedCategory: String?,
     onCategorySelected: (String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onCreateNewFolder: (() -> Unit)? = null
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.dialog_select_category)) },
             text = {
             LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
+                // Option to create new folder
+                if (onCreateNewFolder != null) {
+                    item {
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.create_new_folder)) },
+                            leadingContent = {
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            },
+                            modifier = Modifier.clickable {
+                                onCreateNewFolder()
+                            }
+                        )
+                        HorizontalDivider()
+                    }
+                }
+
                 items(categories) { category ->
                     val displayName = category.replace('/', ' ').replace('_', ' ')
                     ListItem(
@@ -1753,5 +1827,66 @@ private fun CategorySelectionDialog(
                     Text(stringResource(R.string.action_cancel))
                 }
             }
+    )
+}
+
+@Composable
+private fun CreateFolderDialog(
+    onDismiss: () -> Unit,
+    onCreateFolder: (String) -> Unit
+) {
+    var folderName by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val context = LocalContext.current
+    val emptyNameError = context.getString(R.string.folder_name_empty)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.dialog_create_folder)) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = folderName,
+                    onValueChange = {
+                        folderName = it
+                        errorMessage = null
+                    },
+                    label = { Text(stringResource(R.string.dialog_enter_folder_name)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = errorMessage != null,
+                    singleLine = true
+                )
+                if (errorMessage != null) {
+                    Text(
+                        text = errorMessage!!,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    when {
+                        folderName.isBlank() -> {
+                            errorMessage = emptyNameError
+                        }
+                        else -> {
+                            onCreateFolder(folderName.trim())
+                        }
+                    }
+                }
+            ) {
+                Text(stringResource(R.string.action_create))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        }
     )
 }
