@@ -1782,7 +1782,9 @@ private fun CategorySelectionDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.dialog_select_category)) },
             text = {
-            LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
+            LazyColumn(modifier = Modifier
+                .heightIn(max = 500.dp)
+                .fillMaxWidth()) {
                 // Option to create new folder
                 if (onCreateNewFolder != null) {
                     item {
