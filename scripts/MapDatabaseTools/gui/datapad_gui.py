@@ -722,6 +722,12 @@ class DataPadGUI(QMainWindow):
             js = f"centerMap({location.latitude:.6f}, {location.longitude:.6f});"
             try:
                 self._call_js_when_ready('centerMap', js)
+                # Also draw runway headings if present for this location
+                try:
+                    self._call_js_when_ready('clearRunwayLines', "clearRunwayLines();")
+                    self._call_js_when_ready('showRunwayHeadings', f"showRunwayHeadings({location.id});")
+                except Exception:
+                    pass
             except Exception:
                 pass
 
@@ -731,7 +737,16 @@ class DataPadGUI(QMainWindow):
             return
         typ, obj = asset_tuple
         if typ == "marker":
+            # Center on selected location and show runway heading lines (if available)
             self.on_location_selected(obj)
+            try:
+                # Clear previous runway lines
+                if self.webview:
+                    self._call_js_when_ready('clearRunwayLines', "clearRunwayLines();")
+                    # Draw for this marker id
+                    self._call_js_when_ready('showRunwayHeadings', f"showRunwayHeadings({obj.id});")
+            except Exception:
+                pass
         elif typ == "border":
             self.on_border_selected(obj)
 
@@ -783,6 +798,12 @@ class DataPadGUI(QMainWindow):
     def on_border_selected(self, border: Border):
         """Handle border selection - zoom to border on map"""
         if self.webview and border and border.points:
+            # Clear any runway lines (we are switching to border)
+            try:
+                self._call_js_when_ready('clearRunwayLines', "clearRunwayLines();")
+            except Exception:
+                pass
+
             # Calculate center of border
             lats = [p[0] for p in border.points]
             lons = [p[1] for p in border.points]
@@ -1286,6 +1307,14 @@ class DataPadGUI(QMainWindow):
                     marker_info['icao'] = loc.icao
                 if loc.runways:
                     marker_info['runways'] = len(loc.runways)
+                    # Add runway heading details for visualization (heading in degrees, length in meters)
+                    try:
+                        marker_info['runway_headings'] = [
+                            { 'heading': float(rw.heading), 'length_m': float(rw.length_m) if rw.length_m else None }
+                            for rw in loc.runways
+                        ]
+                    except Exception:
+                        marker_info['runway_headings'] = []
                 if loc.threat_level:
                     marker_info['threat'] = loc.threat_level
                 

@@ -48,8 +48,8 @@ def marianas_samples():
             iata="GUM",
             elevation_m=91.0,
             runways=[
-                Runway(name="06L/24R", length_m=3255, width_m=45, heading=63.0, surface="asphalt", ils=True),
-                Runway(name="06R/24L", length_m=2743, width_m=45, heading=63.0, surface="asphalt", ils=False)
+                Runway(name="06L/24R", length_m=3255, width_m=45, heading=65.0, surface="asphalt", ils=True),
+                Runway(name="06R/24L", length_m=2743, width_m=45, heading=65.0, surface="asphalt", ils=False)
             ],
             frequencies={"tower": 110.30, "ground": 121.9, "approach": 118.7, "atis": 127.25},
             country="United States (Guam)",
@@ -66,8 +66,8 @@ def marianas_samples():
             iata="UAM",
             elevation_m=184.0,
             runways=[
-                Runway(name="06L/24R", length_m=3399, width_m=61, heading=63.0, surface="concrete", ils=True),
-                Runway(name="06R/24L", length_m=3048, width_m=46, heading=63.0, surface="concrete", ils=False)
+                Runway(name="06L/24R", length_m=3399, width_m=61, heading=65.0, surface="concrete", ils=True),
+                Runway(name="06R/24L", length_m=3048, width_m=46, heading=65.0, surface="concrete", ils=False)
             ],
             frequencies={"tower": 126.2, "ground": 275.8, "approach": 327.0, "departure": 363.275},
             country="United States (Guam)",
@@ -77,8 +77,8 @@ def marianas_samples():
         ),
         Location(
             name="OLF Orote (Naval Base Guam)",
-            latitude=13.447222,
-            longitude=144.637778,
+            latitude=13.438336,
+            longitude=144.642391,
             marker_type=MarkerType.AIRPORT.value,
             icao="PGRO",
             elevation_m=116.0,
@@ -92,7 +92,7 @@ def marianas_samples():
             map="Marianas"
         ),
         
-        # Northern Mariana Islands (US Commonwealth)
+        # Northern Mariana Islands (US Commonwealth)                
         Location(
             name="Saipan International Airport",
             latitude=15.119444,
@@ -129,13 +129,13 @@ def marianas_samples():
         ),
         Location(
             name="North West Field (Tinian)",
-            latitude=15.087778,
-            longitude=145.641389,
+            latitude=15.077842,
+            longitude=145.639744,
             marker_type=MarkerType.AIRPORT.value,
             icao="TN01",
             elevation_m=187.0,
             runways=[
-                Runway(name="08/26", length_m=2438, width_m=46, heading=80.0, surface="asphalt", ils=False)
+                Runway(name="06/24", length_m=2438, width_m=46, heading=62.0, surface="asphalt", ils=False)
             ],
             frequencies={"tower": 118.5},
             country="United States (Northern Mariana Islands)",
@@ -162,13 +162,13 @@ def marianas_samples():
         ),
         Location(
             name="Pagan Airstrip",
-            latitude=18.139722,
-            longitude=145.774167,
+            latitude=18.123207,
+            longitude=145.763147,
             marker_type=MarkerType.AIRPORT.value,
             icao="PGPA",
             elevation_m=167.0,
             runways=[
-                Runway(name="03/21", length_m=914, width_m=18, heading=30.0, surface="coral", ils=False)
+                Runway(name="12/30", length_m=914, width_m=18, heading=119.0, surface="coral", ils=False)
             ],
             frequencies={},
             country="United States (Northern Mariana Islands)",
