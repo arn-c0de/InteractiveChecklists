@@ -41,8 +41,6 @@ InteractiveChecklists is an Android application for viewing and interacting with
 
 > **Note:** A preview APK for version 1.1 is planned. If you are not familiar with Android Studio or building apps from source, please wait for the official preview release to test the app.
 
-> **Current Development Focus (December 2025)**  
-> I am currently primarily working on the core infrastructure to enable secure data transfer between devices and DCS World. This includes finalizing the ECDH handshake implementation, preparing the groundwork for future squad mode (secure data sharing between multiple devices), and completing database integration and data formatting. These foundational changes are complex and time-intensive, which means progress on other areas—such as UI performance improvements, visual enhancements, and smaller features—is happening only on the side and at a slower pace. Thank you for your patience!
 
 **Table of Contents**
 
@@ -74,6 +72,14 @@ InteractiveChecklists is an Android application for viewing and interacting with
 - **Tactical Units Tracking (experimental):** Live tactical unit markers (aircraft, helicopter, ground, ship) on the map with real-time updates. Marker popups include **"Last seen"** timestamps and refresh snippets with speed/altitude. A **"Live Units Only"** filter (shows units seen in the last 10s) is synchronized between the list and the map. See [docs/EN/features/TACTICAL_UNITS_TRACKING.md](docs/EN/features/TACTICAL_UNITS_TRACKING.md) and [scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md](scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md) for setup and details.
 - **Aviation Map (experimental):** OpenStreetMap-based map viewer with live aircraft position tracking from the DataPad stream. Adds a `MapViewer` tab showing aircraft position, heading, altitude and basic overlays — see [docs/EN/features/AVIATION_MAP_FEATURE.md](docs/EN/features/AVIATION_MAP_FEATURE.md) for details and configuration.
 - **MapDatabaseTools (Python):** A collection of Python utilities for receiving, decrypting (AES-GCM), and visualizing DCS flight telemetry. Includes a PySide6 GUI with an embedded OpenStreetMap/Leaflet map for live aircraft tracking, a marker database, and helper scripts to manage map assets. See `scripts/MapDatabaseTools/README.md` for usage and configuration.
+
+- **Supported maps (marker DB):**
+
+| Map | Status | Notes |
+| --- | --- | --- |
+| Caucasus | Supported | Marker set available in DB |
+| Marianas | Supported | Marker set available in DB |
+| Germany (CW) | In progress | Marker addition in progress |
 
 ## Experimental: DataPad (Live Flight Telemetry)
 
