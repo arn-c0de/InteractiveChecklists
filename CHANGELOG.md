@@ -3,6 +3,8 @@
 
 All relevant changes are summarized here by version.
 
+## [1.0.21] - 2026-01-03
+
 ## [1.0.20] - 2026-01-01
 
 ### Summary
@@ -11,6 +13,12 @@ All relevant changes are summarized here by version.
 - **Security & Telemetry:** Implemented server key pinning (TOFU), PSK handshake manager, and optional Proof-of-Work support; documentation updated.
 - **Docs & Planning:** Added dataflow docs/navigation, and a draft for Map 3D future plans; README and docs updated with demos and navigation improvements.
 - **Other:** New/finished HUD attitude instrument and various minor fixes, performance and logging improvements.
+  - Added and finalized Marianas map markers.
+  - Site/docs: added a Jekyll site, enforced dark mode, simplified site pages, and added a GitHub Actions workflow for deployment.
+  - UI: increased the "My Files" popup size and added support for user-addable custom folders.
+  - Telemetry/Forwarder: aggregate and print summary statistics every 10s to reduce log spam.
+  - Settings: use quantity resources for plural strings to fix pluralization in settings.
+  - Tools: small Python MapDatabaseTools fixes; added Google Analytics file.
 
 ## [1.0.19] - 2025-12-29
 
