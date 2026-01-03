@@ -12,8 +12,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import android.content.res.Configuration
 import com.example.checklist_interactive.R
 import com.example.checklist_interactive.data.prefs.PreferencesManager
 
@@ -30,6 +32,8 @@ data class FABConfig(
     val contentColor: Color? = null,
     val defaultX: Float = 1.0f,
     val defaultY: Float = 0.9f,
+    val defaultLandscapeX: Float? = null, // Optional landscape position
+    val defaultLandscapeY: Float? = null, // Optional landscape position
     val enabled: Boolean = true,
     // Optional namespace to keep positions per-screen (e.g., "map", "pdf", "markdown")
     val scope: String = ""
@@ -59,8 +63,24 @@ fun FABOverlay(
     val density = LocalDensity.current
     val fabSizePx = with(density) { fabSizeDp.dp.toPx().toInt() }
 
+    // Detect orientation
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
     Box(modifier = modifier.fillMaxSize()) {
         fabs.filter { it.visible }.forEach { fabConfig ->
+            // Use landscape positions if available and device is in landscape
+            val effectiveDefaultX = if (isLandscape && fabConfig.defaultLandscapeX != null) {
+                fabConfig.defaultLandscapeX
+            } else {
+                fabConfig.defaultX
+            }
+            val effectiveDefaultY = if (isLandscape && fabConfig.defaultLandscapeY != null) {
+                fabConfig.defaultLandscapeY
+            } else {
+                fabConfig.defaultY
+            }
+
             DraggableFab(
                 name = fabConfig.id,
                 prefsManager = prefsManager,
@@ -68,8 +88,9 @@ fun FABOverlay(
                 screenHeightPx = screenHeightPx,
                 fabSizeDp = fabSizeDp,
                 scope = fabConfig.scope,
-                defaultX = fabConfig.defaultX,
-                defaultY = fabConfig.defaultY,
+                defaultX = effectiveDefaultX,
+                defaultY = effectiveDefaultY,
+                isLandscape = isLandscape,
                 visible = fabConfig.visible,
                 onClick = fabConfig.onClick,
                 containerColor = fabConfig.containerColor,
@@ -133,6 +154,8 @@ object MapViewerFABs {
             containerColor = if (isConnected) containerColorConnected else containerColorDisconnected,
             defaultX = 0.95f,
             defaultY = 0.05f,
+            defaultLandscapeX = 0.95f,
+            defaultLandscapeY = 0.05f,
             scope = "map"
         ),
         FABConfig(
@@ -143,6 +166,8 @@ object MapViewerFABs {
             containerColor = containerColorSecondary,
             defaultX = 0.95f,
             defaultY = 0.10f,
+            defaultLandscapeX = 0.95f,
+            defaultLandscapeY = 0.15f,
             scope = "map"
         ),
         FABConfig(
@@ -153,6 +178,8 @@ object MapViewerFABs {
             containerColor = containerColorSecondary,
             defaultX = 0.95f,
             defaultY = 0.15f,
+            defaultLandscapeX = 0.95f,
+            defaultLandscapeY = 0.25f,
             scope = "map"
         ),
         FABConfig(
@@ -164,6 +191,8 @@ object MapViewerFABs {
             containerColor = if (isConnected) containerColorConnected else containerColorTertiary,
             defaultX = 0.95f,
             defaultY = 0.20f,
+            defaultLandscapeX = 0.95f,
+            defaultLandscapeY = 0.35f,
             scope = "map"
         ),
         FABConfig(
@@ -171,12 +200,14 @@ object MapViewerFABs {
             icon = Icons.Default.Add,
             contentDescription = stringResource(R.string.fab_cd_add_military_symbol),
             onClick = onAddMilitarySymbol,
-            containerColor = if (pendingSymbolPlacement != null) containerColorPrimary 
-                         else if (repositoriesReady) containerColorTertiary 
+            containerColor = if (pendingSymbolPlacement != null) containerColorPrimary
+                         else if (repositoriesReady) containerColorTertiary
                          else containerColorSurface,
             enabled = repositoriesReady,
             defaultX = 0.95f,
             defaultY = 0.25f,
+            defaultLandscapeX = 0.95f,
+            defaultLandscapeY = 0.45f,
             scope = "map"
         ),
         FABConfig(
@@ -188,6 +219,8 @@ object MapViewerFABs {
             enabled = repositoriesReady,
             defaultX = 0.95f,
             defaultY = 0.30f,
+            defaultLandscapeX = 0.95f,
+            defaultLandscapeY = 0.55f,
             scope = "map"
         ),
         FABConfig(
@@ -198,6 +231,8 @@ object MapViewerFABs {
             containerColor = if (isScreenLocked) containerColorPrimary else containerColorSurface,
             defaultX = 0.95f,
             defaultY = 0.35f,
+            defaultLandscapeX = 0.95f,
+            defaultLandscapeY = 0.65f,
             scope = "map"
         ),
         FABConfig(
@@ -208,6 +243,8 @@ object MapViewerFABs {
             containerColor = if (mapRotationMode == 1) containerColorPrimary else containerColorSurface,
             defaultX = 0.95f,
             defaultY = 0.40f,
+            defaultLandscapeX = 0.95f,
+            defaultLandscapeY = 0.75f,
             scope = "map"
         ),
         FABConfig(
@@ -218,6 +255,8 @@ object MapViewerFABs {
             containerColor = if (rotationGestureEnabled) containerColorPrimary else containerColorSurface,
             defaultX = 0.95f,
             defaultY = 0.45f,
+            defaultLandscapeX = 0.95f,
+            defaultLandscapeY = 0.85f,
             scope = "map"
         ),
         FABConfig(
@@ -228,6 +267,8 @@ object MapViewerFABs {
             containerColor = if (isDrawingMode) containerColorPrimary else containerColorTertiary,
             defaultX = 0.95f,
             defaultY = 0.50f,
+            defaultLandscapeX = 0.95f,
+            defaultLandscapeY = 0.95f,
             scope = "map"
         ),
         FABConfig(
@@ -239,6 +280,8 @@ object MapViewerFABs {
             containerColor = containerColorTertiary,
             defaultX = 0.95f,
             defaultY = 0.80f,
+            defaultLandscapeX = 0.05f,
+            defaultLandscapeY = 0.85f,
             scope = "map"
         ),
         FABConfig(
@@ -249,6 +292,8 @@ object MapViewerFABs {
             containerColor = containerColorPrimary,
             defaultX = 0.95f,
             defaultY = 0.85f,
+            defaultLandscapeX = 0.05f,
+            defaultLandscapeY = 0.95f,
             scope = "map"
         )
     )
@@ -270,7 +315,9 @@ object QuickTabSwitcherFABs {
             onClick = onQuickTabSwitch,
             containerColor = containerColor,
             defaultX = 0.9f,
-            defaultY = 0.85f
+            defaultY = 0.85f,
+            defaultLandscapeX = 0.95f,
+            defaultLandscapeY = 0.90f
         )
     )
 }
@@ -291,7 +338,9 @@ object MenuFABs {
             onClick = onMenuOpen,
             containerColor = containerColor,
             defaultX = 0.05f,
-            defaultY = 0.1f
+            defaultY = 0.1f,
+            defaultLandscapeX = 0.03f,
+            defaultLandscapeY = 0.05f
         )
     )
 }
@@ -312,7 +361,9 @@ object QuickAccessFABs {
             onClick = onQuickAccessOpen,
             containerColor = containerColor,
             defaultX = 0.9f,
-            defaultY = 0.9f
+            defaultY = 0.9f,
+            defaultLandscapeX = 0.95f,
+            defaultLandscapeY = 0.92f
         )
     )
 }
@@ -335,7 +386,9 @@ object DataPadFABs {
             containerColor = containerColor,
             visible = visible,
             defaultX = 0.05f,
-            defaultY = 0.9f
+            defaultY = 0.9f,
+            defaultLandscapeX = 0.03f,
+            defaultLandscapeY = 0.90f
         )
     )
 }
@@ -364,7 +417,9 @@ object PdfViewerFABs {
                 onClick = onZoomReset,
                 visible = zoomResetVisible,
                 defaultX = 0.95f,
-                defaultY = 0.05f
+                defaultY = 0.05f,
+                defaultLandscapeX = 0.95f,
+                defaultLandscapeY = 0.05f
             )
         )
 
@@ -377,7 +432,9 @@ object PdfViewerFABs {
                     contentDescription = stringResource(R.string.fab_cd_file_list),
                     onClick = onMenuOpen,
                     defaultX = 0.95f,
-                    defaultY = 0.10f
+                    defaultY = 0.10f,
+                    defaultLandscapeX = 0.95f,
+                    defaultLandscapeY = 0.15f
                 )
             )
         }
@@ -393,6 +450,8 @@ object PdfViewerFABs {
                 containerColor = containerColorTertiary,
                 defaultX = 0.95f,
                 defaultY = 0.80f,
+                defaultLandscapeX = 0.05f,
+                defaultLandscapeY = 0.85f,
                 scope = "pdf"
             )
         )
@@ -407,6 +466,8 @@ object PdfViewerFABs {
                 containerColor = containerColorPrimary,
                 defaultX = 0.95f,
                 defaultY = 0.85f,
+                defaultLandscapeX = 0.05f,
+                defaultLandscapeY = 0.95f,
                 scope = "pdf"
             )
         )
@@ -435,7 +496,9 @@ object MarkdownViewerFABs {
                     contentDescription = stringResource(R.string.fab_cd_menu),
                     onClick = onMenuOpen,
                     defaultX = 0.95f,
-                    defaultY = 0.05f
+                    defaultY = 0.05f,
+                    defaultLandscapeX = 0.95f,
+                    defaultLandscapeY = 0.05f
                 )
             )
         }
@@ -451,6 +514,8 @@ object MarkdownViewerFABs {
                 containerColor = containerColorTertiary,
                 defaultX = 0.95f,
                 defaultY = 0.80f,
+                defaultLandscapeX = 0.05f,
+                defaultLandscapeY = 0.85f,
                 scope = "markdown"
             )
         )
@@ -465,6 +530,8 @@ object MarkdownViewerFABs {
                 containerColor = containerColorPrimary,
                 defaultX = 0.95f,
                 defaultY = 0.85f,
+                defaultLandscapeX = 0.05f,
+                defaultLandscapeY = 0.95f,
                 scope = "markdown"
             )
         )
@@ -490,7 +557,9 @@ object InternalFileViewerFABs {
             contentDescription = stringResource(R.string.fab_cd_file_list),
             onClick = onMenuOpen,
             defaultX = 0.95f,
-            defaultY = 0.05f
+            defaultY = 0.05f,
+            defaultLandscapeX = 0.95f,
+            defaultLandscapeY = 0.05f
         ),
         FABConfig(
             id = "datapad",
@@ -501,6 +570,8 @@ object InternalFileViewerFABs {
             containerColor = containerColorTertiary,
             defaultX = 0.95f,
             defaultY = 0.80f,
+            defaultLandscapeX = 0.05f,
+            defaultLandscapeY = 0.85f,
             scope = "internal_file_viewer"
         ),
         FABConfig(
@@ -510,7 +581,9 @@ object InternalFileViewerFABs {
             onClick = onQuickAccessOpen,
             containerColor = containerColorPrimary,
             defaultX = 0.95f,
-            defaultY = 0.85f
+            defaultY = 0.85f,
+            defaultLandscapeX = 0.05f,
+            defaultLandscapeY = 0.95f
         )
     )
 }
@@ -536,6 +609,8 @@ object InternalFilesScreenFABs {
             containerColor = containerColorTertiary,
             defaultX = 0.95f,
             defaultY = 0.80f,
+            defaultLandscapeX = 0.05f,
+            defaultLandscapeY = 0.85f,
             scope = "internal_files"
         ),
         FABConfig(
@@ -546,6 +621,8 @@ object InternalFilesScreenFABs {
             containerColor = containerColorPrimary,
             defaultX = 0.95f,
             defaultY = 0.85f,
+            defaultLandscapeX = 0.05f,
+            defaultLandscapeY = 0.95f,
             scope = "internal_files"
         )
     )

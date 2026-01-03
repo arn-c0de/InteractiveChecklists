@@ -42,6 +42,7 @@ fun DraggableFab(
     scope: String = "",
     defaultX: Float = 1.0f,
     defaultY: Float = 0.9f,
+    isLandscape: Boolean = false,
     visible: Boolean = true,
     onClick: () -> Unit,
     containerColor: Color? = null,
@@ -52,10 +53,14 @@ fun DraggableFab(
     if (!visible) return
 
     val coroutineScope = rememberCoroutineScope()
-    
+
+    // Add orientation suffix to position key for separate landscape/portrait positions
+    val orientationSuffix = if (isLandscape) "_landscape" else "_portrait"
+    val positionKey = name + orientationSuffix
+
     // Load saved position or use defaults (normalized to the available area excluding margins)
-    val (savedXPercent, savedYPercent) = remember(name, scope) {
-        prefsManager.getFabPosition(if (scope.isBlank()) null else scope, name, defaultX, defaultY)
+    val (savedXPercent, savedYPercent) = remember(positionKey, scope) {
+        prefsManager.getFabPosition(if (scope.isBlank()) null else scope, positionKey, defaultX, defaultY)
     }
     
     val density = LocalDensity.current
@@ -75,7 +80,7 @@ fun DraggableFab(
 
     // Clamp any positions that might be outside the available area (e.g., due to layout/padding changes)
     // and persist corrected values so old off-screen positions are fixed automatically.
-    LaunchedEffect(name, availableWidth, availableHeight) {
+    LaunchedEffect(positionKey, availableWidth, availableHeight) {
         val minX = marginPx.toFloat()
         val maxX = (marginPx + availableWidth).toFloat()
         val minY = marginPx.toFloat()
@@ -91,7 +96,7 @@ fun DraggableFab(
             val yPercent = if (availableHeight > 0) ((offsetY - marginPx) / availableHeight) else 0f
             coroutineScope.launch {
                 try {
-                    prefsManager.setPdfViewerFabPosition(name, xPercent, yPercent)
+                    prefsManager.setFabPosition(if (scope.isBlank()) null else scope, positionKey, xPercent, yPercent)
                 } catch (e: Exception) {
                     android.util.Log.w("DraggableFab", "Failed to persist clamped FAB position: ${e.message}")
                 }
@@ -140,7 +145,7 @@ fun DraggableFab(
                                 val yPercent = if (availableHeight > 0) ((offsetY - marginPx) / availableHeight) else 0f
 
                                 coroutineScope.launch {
-                                    prefsManager.setPdfViewerFabPosition(name, xPercent, yPercent)
+                                    prefsManager.setFabPosition(if (scope.isBlank()) null else scope, positionKey, xPercent, yPercent)
                                 }
                             }
                             isDragging = false

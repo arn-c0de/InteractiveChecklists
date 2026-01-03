@@ -1,0 +1,35 @@
+# Site settings
+title: Interactive Checklists
+description: Android application for viewing and interacting with Markdown and PDF checklists
+baseurl: "" # the subpath of your site, e.g. /blog
+url: "" # the base hostname & protocol for your site
+
+# Build settings
+markdown: kramdown
+theme: minima
+plugins:
+  - jekyll-feed
+  - jekyll-seo-tag
+
+# Exclude from processing
+exclude:
+  - .gradle/
+  - .idea/
+  - .git/
+  - .github/
+  - app/
+  - build/
+  - gradle/
+  - scripts/
+  - .gitignore
+  - build.gradle.kts
+  - gradle.properties
+  - gradlew
+  - gradlew.bat
+  - settings.gradle.kts
+  - local.properties
+  - "*.json"
+  - "*.sarif"
+  - "*.key"
+  - codeql-db/
+  - codeql-db-py/
