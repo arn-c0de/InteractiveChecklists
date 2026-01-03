@@ -167,6 +167,12 @@ class LocationEditDialog(QDialog):
             self.desc_edit.setPlainText(self.location.description)
         basic_layout.addRow("Description:", self.desc_edit)
         
+        # DCS Map selection
+        self.map_combo = QComboBox()
+        self.map_combo.addItems(["", "Caucasus", "Syria", "Persian Gulf", "Nevada", "Marianas", "Normandy", "The Channel", "South Atlantic", "Sinai"])
+        self.map_combo.setCurrentText(self.location.map or "")
+        basic_layout.addRow("DCS Map:", self.map_combo)
+        
         # Static marker checkbox
         self.is_static_check = QCheckBox("Static Marker (Airport, Installation, etc.)")
         self.is_static_check.setChecked(self.location.is_static == 1)
@@ -584,6 +590,22 @@ class LocationManagerWidget(QWidget):
         self.filter_combo.currentIndexChanged.connect(self.refresh_list)
         header.addWidget(self.filter_combo)
         
+        # Map filter combo
+        self.map_filter_combo = QComboBox()
+        self.map_filter_combo.addItem("All Maps", None)
+        self.map_filter_combo.addItem("Caucasus", "Caucasus")
+        self.map_filter_combo.addItem("Syria", "Syria")
+        self.map_filter_combo.addItem("Persian Gulf", "Persian Gulf")
+        self.map_filter_combo.addItem("Nevada", "Nevada")
+        self.map_filter_combo.addItem("Marianas", "Marianas")
+        self.map_filter_combo.addItem("Normandy", "Normandy")
+        self.map_filter_combo.addItem("The Channel", "The Channel")
+        self.map_filter_combo.addItem("South Atlantic", "South Atlantic")
+        self.map_filter_combo.addItem("Sinai", "Sinai")
+        self.map_filter_combo.addItem("(No Map)", "__NONE__")
+        self.map_filter_combo.currentIndexChanged.connect(self.refresh_list)
+        header.addWidget(self.map_filter_combo)
+        
         layout.addLayout(header)
         
         # Search bar
@@ -642,6 +664,7 @@ class LocationManagerWidget(QWidget):
         
         # Get filter
         filter_type = self.filter_combo.currentData()
+        map_filter = self.map_filter_combo.currentData()
         search_query = self.search_edit.text().strip()
         
         # Get locations
@@ -652,8 +675,33 @@ class LocationManagerWidget(QWidget):
         else:
             locations = self.db.get_all_locations(marker_type=filter_type)
         
+        # Apply map filter
+        if map_filter:
+            if map_filter == "__NONE__":
+                locations = [loc for loc in locations if not loc.map]
+            else:
+                locations = [loc for loc in locations if loc.map == map_filter]
+        
+        # Sort by map (None first), then by name
+        locations.sort(key=lambda loc: (loc.map or "", loc.name.lower()))
+        
+        # Track current map for grouping headers
+        current_map = None
+        
         # Populate list
         for loc in locations:
+            # Add map group header if map changed
+            loc_map = loc.map or "(No Map)"
+            if loc_map != current_map:
+                current_map = loc_map
+                header_item = QListWidgetItem(f"━━━━━ {loc_map.upper()} ━━━━━")
+                header_item.setFlags(Qt.ItemFlag.NoItemFlags)  # Non-selectable
+                header_item.setForeground(QColor("#42A5F5"))
+                header_font = QFont()
+                header_font.setBold(True)
+                header_item.setFont(header_font)
+                self.location_list.addItem(header_item)
+            
             # Check if location has Android drawable symbol
             if hasattr(loc, 'symbol_entity') and loc.symbol_entity and is_valid_symbol(loc.symbol_entity):
                 # Use Android symbol
@@ -670,7 +718,7 @@ class LocationManagerWidget(QWidget):
                 color = "#808080"
             
             # Create item text with icon
-            item_text = f"[{symbol_display}]  {loc.name}"
+            item_text = f"  [{symbol_display}]  {loc.name}"
             if loc.icao:
                 item_text += f" ({loc.icao})"
             elif hasattr(loc, 'symbol_affiliation') and loc.symbol_affiliation:
