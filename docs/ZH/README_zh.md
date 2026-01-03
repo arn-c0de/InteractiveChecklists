@@ -74,7 +74,7 @@ InteractiveChecklists 是一款用于查看与操作 Markdown 及 PDF 清单的 
 - **战术单位追踪 (实验性):** 在地图上实时更新显示战术单位标记（飞机、直升机、地面单位、舰船）。 标记弹窗包含 **"最后出现"** 时间戳以及刷新摘要（速度/高度）。**"仅显示活动单位"** 筛选器（显示最近 10 秒内出现的单位）在列表和地图间同步。设置和详情请参见 `../EN/features/TACTICAL_UNITS_TRACKING.md` 和 `../../scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md` 
 - **航空地图 (实验性):** 基于 OpenStreetMap 的地图查看器，通过 DataPad 数据流实现实时飞机位置追踪。添加 `MapViewer` 标签页，显示飞机位置、航向、高度和基本覆盖层——详情和配置请参见 `../EN/features/AVIATION_MAP_FEATURE.md`。
 - **MapDatabaseTools (Python):** 一组用于接收、解密（AES-GCM）和可视化 DCS 飞行遥测数据的 Python 工具。包含一个带有嵌入式 OpenStreetMap/Leaflet 地图的 PySide6 GUI，用于实时飞机追踪、标记数据库以及管理地图资源的辅助脚本。使用和配置说明请参见 `scripts/MapDatabaseTools/README.md` 。
-
+  新增：用于快速创建新地图的模板脚本 `scripts/MapDatabaseTools/add_new_map_template.py`。复制并重命名（例如 `add_syria_markers.py`），替换 `MAP_NAME` 和占位符并填入位置数据，然后运行 `python add_<map>_markers.py [--replace]` 将样本数据插入本地 `map_data.db`（`--replace` 会先清除现有位置数据）。
 ## 实验性功能: DataPad (实时飞行遥测)
 
 DataPad 是一项实验性功能，通过 UDP（默认端口 **5010**）从 DCS World 接收实时飞机遥测数据。它面向高级用户，需要运行 `forward_parsed_udp.py` 脚本来将遥测数据转发到您的设备。
@@ -82,20 +82,30 @@ DataPad 是一项实验性功能，通过 UDP（默认端口 **5010**）从 DCS 
 ### 安全特性 (新增 - 2025.12)
 
 **✅ ECDH 握手模式** - 可用于生产环境的安全通信：
-- **端到端加密**，使用每个会话独立的 AES-256-GCM 密钥
-- **设备认证**，通过白名单 (`authorized_devices.json`)
-- **前向安全性** 泄露一个会话不会影响其他会话
-- **重放攻击防护**使用基于计数器的随机数
+- **端到端加密**：使用每个会话独立的 AES-256-GCM 密钥
+- **设备认证**：通过白名单 (`authorized_devices.json`)
+- **前向安全性**：泄露一个会话不会影响其他会话
+- **重放攻击防护**：使用计数器/随机数机制防止重放
 - **时间戳验证**（5 分钟窗口）
 - **双向认证**（客户端 ↔ 服务器）
 
-**快速开始 (ECDH 模式):**
-```bash
-# Python：启用手握手模式
-python forward_parsed_udp.py --interval 10 --host 192.168.178.132 --port 5010 --verbose --authorized-devices authorized_devices.json --bind-ip 192.168.178.100 
+**🔒 服务器密钥固定（TOFU）** - 信任首次使用（Trust-On-First-Use），在首次成功连接后自动固定服务器密钥以便检测中间人攻击。
 
-# Android：设置 → DataPad → 启用“ECDH 握手模式”
-# 将您的设备 ID 添加到服务器上的 authorized_devices.json 文件中
+**🔑 预共享密钥（PSK）握手管理器（可选）** - 提供与 PSK 兼容的替代握手方案；请参阅文档了解如何安全生成和分发 32 字节（256 位）PSK 的建议。
+
+**🛡️ 可选工作量证明（PoW）** - 可配置的抗 DoS 保护：在握手阶段要求客户端完成可调难度的 PoW（使用 `--enable-pow` 与 `--pow-difficulty`）。
+
+**快速开始（示例）**
+
+```bash
+# 启用握手模式（ECDH + TOFU）
+python forward_parsed_udp.py --interval 10 --host 192.168.178.132 --port 5010 --verbose --authorized-devices authorized_devices.json --bind-ip 192.168.178.100
+
+# 启用工作量证明（PoW）
+python forward_parsed_udp.py --enable-pow --pow-difficulty 16 --interval 10 --host 192.168.178.132 --port 5010 --verbose --authorized-devices authorized_devices.json --bind-ip 192.168.178.100
+
+# 同机测试（带握手端口）
+python forward_parsed_udp.py --repeat-last --interval 3 --host 127.0.0.1 --port 5010 --handshake-port 5011 --use-handshake --authorized-devices authorized_devices.json
 ```
 
 DataPad 还支持接收从 DCS 导出的**实体接触信息**（战术单位）。在应用中启用**实体追踪**以接收战术单位并将其显示为实时标记（需要运行启用了实体追踪的转发器）。设置和详情说明请参见`../../scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md` 和 `../EN/features/TACTICAL_UNITS_TRACKING.md`。
