@@ -63,9 +63,13 @@ fun FABOverlay(
     val density = LocalDensity.current
     val fabSizePx = with(density) { fabSizeDp.dp.toPx().toInt() }
 
-    // Detect orientation
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    // Detect orientation from actual screen dimensions (more reliable)
+    val isLandscape = screenWidthPx > screenHeightPx
+
+    // Log orientation change
+    LaunchedEffect(screenWidthPx, screenHeightPx, isLandscape) {
+        android.util.Log.d("FABOverlay", "Screen size changed: isLandscape=$isLandscape, screenWidth=$screenWidthPx, screenHeight=$screenHeightPx")
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         fabs.filter { it.visible }.forEach { fabConfig ->
