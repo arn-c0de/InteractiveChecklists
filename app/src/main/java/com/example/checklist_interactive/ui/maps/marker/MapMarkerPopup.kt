@@ -160,22 +160,11 @@ fun MapMarkerPopup(
             // Also try to hide for the current view's window (covers dialog window from ModalBottomSheet)
             try {
                 val viewWindow = (view.context as? android.app.Activity)?.window
-                if (viewWindow != null) {
-                    val controller = WindowCompat.getInsetsController(viewWindow, view)
-                    controller.hide(WindowInsetsCompat.Type.systemBars())
-                    controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                }
             } catch (_: Throwable) {
             }
 
             // Try rootView as well in case the modal sheet uses a different attach point
             try {
-                val rootWindow = (view.rootView.context as? android.app.Activity)?.window
-                if (rootWindow != null) {
-                    val controller = WindowCompat.getInsetsController(rootWindow, view.rootView)
-                    controller.hide(WindowInsetsCompat.Type.systemBars())
-                    controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                }
             } catch (_: Throwable) {
             }
         }
