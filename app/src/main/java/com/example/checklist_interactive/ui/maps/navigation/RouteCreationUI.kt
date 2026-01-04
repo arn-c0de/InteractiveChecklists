@@ -38,7 +38,6 @@ import androidx.core.view.WindowInsetsCompat
 import android.view.View
 import androidx.compose.ui.res.stringResource
 import com.example.checklist_interactive.R
-import com.example.checklist_interactive.ui.common.ModalBottomSheetImmersiveMode
 import kotlinx.coroutines.isActive
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -111,8 +110,40 @@ fun RouteCreationSheet(
     val density = androidx.compose.ui.platform.LocalDensity.current
     val sheetHeightDp = (configuration.screenHeightDp.toFloat() * sheetFraction).dp
 
-    // Apply immersive mode (consolidated helper)
-    ModalBottomSheetImmersiveMode(isVisible = sheetState.isVisible)
+    // Force immersive fullscreen mode continuously while bottom sheet is shown
+    LaunchedEffect(sheetState.currentValue) {
+        val activity = view.context as? android.app.Activity
+        val window = activity?.window
+
+        val hideSystemUI = {
+            // Hide for activity window (if available)
+            window?.let {
+                WindowCompat.setDecorFitsSystemWindows(it, false)
+                val controller = WindowInsetsControllerCompat(it, it.decorView)
+                controller.hide(WindowInsetsCompat.Type.systemBars())
+                controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+
+            // Also try to hide for the current view's window (covers dialog window from ModalBottomSheet)
+            try {
+                val viewWindow = (view.context as? android.app.Activity)?.window
+            } catch (_: Throwable) {
+            }
+
+            // Try rootView as well in case the modal sheet uses a different attach point
+            try {
+            } catch (_: Throwable) {
+            }
+        }
+
+        // Keep applying occasionally to override ModalBottomSheet's behavior only while the sheet is visible
+        if (sheetState.isVisible) {
+            while (isActive && sheetState.isVisible) {
+                hideSystemUI()
+                kotlinx.coroutines.delay(750L)
+            }
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = {
@@ -127,6 +158,73 @@ fun RouteCreationSheet(
         containerColor = MaterialTheme.colorScheme.surface.copy(alpha = sheetOpacity),
         dragHandle = null // Disable default drag handle, use custom one only
     ) {
+        // Try to hide the system UI inside the dialog window that hosts the sheet.
+        val dialogView = LocalView.current
+
+        // Immediately attempt to hide system UI before first draw to avoid flash.
+        DisposableEffect(dialogView) {
+            val dialogWindow = (dialogView.context as? android.app.Activity)?.window
+            val controller = dialogWindow?.let { WindowCompat.getInsetsController(it, dialogView) }
+            // Also set old-style flags for older API's
+            @Suppress("DEPRECATION")
+            dialogView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_FULLSCREEN
+                    or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            )
+
+            val preDrawListener = object : android.view.ViewTreeObserver.OnPreDrawListener {
+                override fun onPreDraw(): Boolean {
+                    controller?.hide(WindowInsetsCompat.Type.systemBars())
+                    try {
+                        controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    } catch (_: Throwable) {
+                    }
+                    dialogView.viewTreeObserver.removeOnPreDrawListener(this)
+                    return true
+                }
+            }
+            dialogView.viewTreeObserver.addOnPreDrawListener(preDrawListener)
+            val attachListener = object : View.OnAttachStateChangeListener {
+                override fun onViewAttachedToWindow(v: View) {
+                    val vWindow = (v.context as? android.app.Activity)?.window
+                    val c = vWindow?.let { WindowCompat.getInsetsController(it, v) }
+                    c?.hide(WindowInsetsCompat.Type.systemBars())
+                    try {
+                        c?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    } catch (_: Throwable) {
+                    }
+                    @Suppress("DEPRECATION")
+                    v.systemUiVisibility = (
+                        View.SYSTEM_UI_FLAG_FULLSCREEN
+                            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                            or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    )
+                }
+
+                override fun onViewDetachedFromWindow(v: View) {}
+            }
+            dialogView.addOnAttachStateChangeListener(attachListener)
+            onDispose {
+                try {
+                    dialogView.viewTreeObserver.removeOnPreDrawListener(preDrawListener)
+                    dialogView.removeOnAttachStateChangeListener(attachListener)
+                } catch (_: Throwable) {
+                }
+            }
+        }
+
+        // Also keep ensuring hide while it's visible (loop for resilience).
+        LaunchedEffect(dialogView, sheetState.isVisible) {
+            if (sheetState.isVisible) {
+                val dialogWindow = (dialogView.context as? android.app.Activity)?.window
+                val dialogController = dialogWindow?.let { WindowCompat.getInsetsController(it, dialogView) }
+                while (isActive && sheetState.isVisible) {
+                    dialogController?.hide(WindowInsetsCompat.Type.systemBars())
+                    kotlinx.coroutines.delay(750L)
+                }
+            }
+        }
 
         Box(modifier = Modifier
             .fillMaxWidth()
