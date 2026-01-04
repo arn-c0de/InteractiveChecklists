@@ -210,15 +210,33 @@ fun MarkerRouteManagementSheet(
     selectedMarker: LocationEntity? = null,
     selectedRunways: List<RunwayEntity> = emptyList(),
     onSetActiveRoute: (LocationEntity) -> Unit,
-    onEditRouteWaypoints: (Int) -> Unit = {}
+    onEditRouteWaypoints: (Int) -> Unit = {},
+    initialTab: Int? = null,
+    onCenterOnMap: ((latitude: Double, longitude: Double) -> Unit)? = null
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val markerGroups by viewModel.markerGroups.collectAsState()
     val expandedGroups by viewModel.expandedGroups.collectAsState()
     val allRoutes by viewModel.allRoutes.collectAsState()
     val visibleRouteIds by viewModel.visibleRouteIds.collectAsState()
-    // New tab order: 0=Details, 1=Markers (default), 2=Routes
-    var selectedTab by remember { mutableStateOf(if (selectedMarker != null) 0 else 1) }
+
+    // New tab order: 0=Details, 1=Markers (default), 2=Routes, 3=Tactical Units
+    var selectedTab by remember {
+        mutableStateOf(
+            initialTab ?: if (selectedMarker != null) 0 else 1
+        )
+    }
+
+    // Create tactical units viewModel
+    val tacticalRepository = remember { com.example.checklist_interactive.data.tactical.TacticalUnitsRepository(context) }
+    val dataPadManager = com.example.checklist_interactive.ui.datapad.LocalDataPadManager.current
+    val tacticalViewModel: com.example.checklist_interactive.ui.tactical.TacticalUnitsViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+        factory = com.example.checklist_interactive.ui.tactical.TacticalUnitsViewModelFactory(
+            context.applicationContext as android.app.Application,
+            tacticalRepository,
+            dataPadManager
+        )
+    )
     val view = LocalView.current
     // Live search text for filtering markers
     var markerSearch by rememberSaveable { mutableStateOf("") }
@@ -359,7 +377,7 @@ fun MarkerRouteManagementSheet(
 
                 Spacer(modifier = Modifier.height(8.dp))
             
-            // Tabs (reordered: Details | Markers | Routes)
+            // Tabs (reordered: Details | Markers | Routes | Tactical Units)
             TabRow(selectedTabIndex = selectedTab) {
                 Tab(
                     selected = selectedTab == 0,
@@ -378,6 +396,12 @@ fun MarkerRouteManagementSheet(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
                     text = { Text(stringResource(R.string.tab_map_routes_count, allRoutes.size)) }
+                )
+
+                Tab(
+                    selected = selectedTab == 3,
+                    onClick = { selectedTab = 3 },
+                    text = { Text(stringResource(R.string.tactical_title)) }
                 )
             }
             
@@ -504,6 +528,13 @@ fun MarkerRouteManagementSheet(
                     onCreateRoute = onCreateRoute,
                     onEditRoute = { viewModel.updateRoute(it) },
                     onEditWaypoints = onEditRouteWaypoints
+                )
+
+                3 -> com.example.checklist_interactive.ui.tactical.TacticalUnitsContent(
+                    viewModel = tacticalViewModel,
+                    onUnitClick = null,
+                    onCenterOnMap = onCenterOnMap,
+                    modifier = Modifier.fillMaxSize()
                 )
             }
         }

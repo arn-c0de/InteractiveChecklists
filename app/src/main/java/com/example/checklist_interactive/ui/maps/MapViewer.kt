@@ -2118,7 +2118,11 @@ fun MapViewer(
 
                 onDataPadOpen = { if (datapadEnabled) mapState.showDataPad = true },
                 onQuickAccessOpen = { mapState.showQuickAccess = true },
-                onTacticalUnitsOpen = onTacticalUnitsOpen,
+                onTacticalUnitsOpen = {
+                    // Open MarkerRouteManagementSheet with Tactical Units tab (tab 3) selected
+                    mapState.markerRouteManagementInitialTab = 3
+                    mapState.showMarkerRouteManagement = true
+                },
                 isConnected = isConnected,
                 isScreenLocked = isScreenLocked,
                 mapRotationMode = mapState.mapRotationMode,
@@ -2785,13 +2789,21 @@ fun MapViewer(
         markerRouteViewModel?.let { vm ->
             MarkerRouteManagementSheet(
                 viewModel = vm,
-                onDismiss = { 
+                onDismiss = {
                     mapState.showMarkerRouteManagement = false
                     mapState.selectedLocation = null
+                    mapState.markerRouteManagementInitialTab = null
                 },
                 onMarkerClick = { marker ->
                     // Update selected location to show details in tab
                     mapState.selectedLocation = marker
+                },
+                initialTab = mapState.markerRouteManagementInitialTab,
+                onCenterOnMap = { lat, lon ->
+                    // Center map on the provided coordinates
+                    mapState.mapView?.let { mv ->
+                        mv.controller.animateTo(GeoPoint(lat, lon))
+                    }
                 },
                 onRouteClick = { route ->
                     // Load and display route on map

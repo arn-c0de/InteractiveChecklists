@@ -51,6 +51,7 @@ class MapViewerState(
     var showQuickAccess by mutableStateOf(false)
     var showDataPad by mutableStateOf(false)
     var showMarkerRouteManagement by mutableStateOf(false)
+    var markerRouteManagementInitialTab by mutableStateOf<Int?>(null)
     var showRouteCreation by mutableStateOf(false)
     var showMilitarySymbolPicker by mutableStateOf(false)
     
