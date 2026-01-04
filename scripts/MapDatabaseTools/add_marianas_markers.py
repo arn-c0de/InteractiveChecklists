@@ -76,6 +76,22 @@ def marianas_samples():
             map="Marianas"
         ),
         Location(
+            name="North West Field",
+            latitude=13.624386,
+            longitude=144.855918,
+            marker_type=MarkerType.AIRPORT.value,
+            icao="",
+            elevation_m=187.0,
+            runways=[
+                Runway(name="06/24", length_m=2438, width_m=46, heading=64.0, surface="gravel", ils=False)
+            ],
+            frequencies={"tower": 000.0},
+            country="United States (Northern Mariana Islands)",
+            tags=["military", "historical", "ww2"],
+            source="OurAirports / DCS-World MAP",
+            map="Marianas"
+        ),
+        Location(
             name="OLF Orote (Naval Base Guam)",
             latitude=13.438336,
             longitude=144.642391,
@@ -160,6 +176,7 @@ def marianas_samples():
             source="OurAirports / DCS-World MAP",
             map="Marianas"
         ),
+        
         Location(
             name="Pagan Airstrip",
             latitude=18.123207,

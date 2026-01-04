@@ -549,9 +549,9 @@ class MarkersDatabase:
         cursor.execute("INSERT OR IGNORE INTO tags (name) VALUES ('refuel_point')")
         cursor.execute("INSERT OR IGNORE INTO tags (name) VALUES ('training_area')")
         
-        # Set database version to 4 (matches Android Room database version)
-        # Version 4 includes: military symbols, is_static flag, all extended tables
-        cursor.execute("PRAGMA user_version = 4")
+        # Set database version to 1 (keep asset DB compatible with rebased app)
+        # Historically this was 4. After rebasing the Android app we prefer asset DB user_version = 1
+        cursor.execute("PRAGMA user_version = 1")
         
         self.conn.commit()
     
