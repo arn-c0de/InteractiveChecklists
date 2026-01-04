@@ -51,8 +51,8 @@ import org.json.JSONObject
 private fun formatLatLon(lat: Double, lon: Double): String {
     val latPrefix = if (lat >= 0) "N" else "S"
     val lonPrefix = if (lon >= 0) "E" else "W"
-    val latAbs = String.format(java.util.Locale.getDefault(), "%.4f", kotlin.math.abs(lat))
-    val lonAbs = String.format(java.util.Locale.getDefault(), "%.4f", kotlin.math.abs(lon))
+    val latAbs = String.format(java.util.Locale.getDefault(), "%.6f", kotlin.math.abs(lat))
+    val lonAbs = String.format(java.util.Locale.getDefault(), "%.6f", kotlin.math.abs(lon))
     return "$latPrefix $latAbs, $lonPrefix $lonAbs"
 }
 

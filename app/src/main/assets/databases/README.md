@@ -1,3 +1,6 @@
+**Important — Fresh install required (v1.0.21)** ⚠️  
+The pre-packaged map database (`assets/databases/map_data.db`) was reset to **version 1** in **v1.0.21**. If you are upgrading from an earlier build, you **must fully uninstall the app (including app data)** and then install the new APK to avoid schema mismatch errors and potential data loss. Back up any local database files if you need to preserve custom markers.
+
 This folder stores the shared database used by the Android app and Python tools.
 
 This folder stores the shared marker database used by the Android app and Python tools.
