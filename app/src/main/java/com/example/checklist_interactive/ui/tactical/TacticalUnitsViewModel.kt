@@ -35,6 +35,9 @@ class TacticalUnitsViewModel(
         val sourceUnits = if (state.showLiveOnly) liveUnits else allUnits
         
         sourceUnits.filter { unit ->
+            // Filter by hidden status
+            if (!state.showHiddenUnits && unit.isHidden == 1) return@filter false
+            
             // Filter by active status
             if (state.showActiveOnly && unit.isActive != 1) return@filter false
             
@@ -131,6 +134,14 @@ class TacticalUnitsViewModel(
         setShowLiveOnly(!_uiState.value.showLiveOnly)
     }
     
+    fun setShowHiddenUnits(showHidden: Boolean) {
+        _uiState.update { it.copy(showHiddenUnits = showHidden) }
+    }
+    
+    fun toggleShowHiddenUnits() {
+        setShowHiddenUnits(!_uiState.value.showHiddenUnits)
+    }
+    
     fun clearFilters() {
         _uiState.update {
             TacticalUnitsUiState(
@@ -147,6 +158,30 @@ class TacticalUnitsViewModel(
     }
     
     // --- Cleanup Actions ---
+
+    fun hideInactiveUnits() {
+        viewModelScope.launch {
+            repository.hideInactiveUnits()
+        }
+    }
+
+    fun hideOldUnits(seconds: Int) {
+        viewModelScope.launch {
+            repository.hideOldUnits(seconds)
+        }
+    }
+
+    fun hideOldInactiveUnits(daysOld: Int = 7) {
+        viewModelScope.launch {
+            repository.hideOldInactiveUnits(daysOld)
+        }
+    }
+
+    fun unhideAllUnits() {
+        viewModelScope.launch {
+            repository.unhideAllUnits()
+        }
+    }
 
     fun deleteInactiveUnits() {
         viewModelScope.launch {
@@ -198,6 +233,7 @@ data class TacticalUnitsUiState(
     val selectedCoalitions: Set<Int> = emptySet(),
     val showActiveOnly: Boolean = true,
     val showLiveOnly: Boolean = false,  // Filter: only show units seen in last 10 seconds
+    val showHiddenUnits: Boolean = false,  // Show hidden units (units marked as hidden from old missions)
     val showFilterDialog: Boolean = false
 )
 

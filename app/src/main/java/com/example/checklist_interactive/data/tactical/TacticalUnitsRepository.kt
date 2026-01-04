@@ -20,8 +20,24 @@ class TacticalUnitsRepository(private val context: Context) {
         return unitsDao.getAllUnits()
     }
     
+    fun getAllUnits(showHidden: Boolean): Flow<List<TacticalUnitEntity>> {
+        return if (showHidden) {
+            unitsDao.getAllUnits()
+        } else {
+            unitsDao.getAllVisibleUnits()
+        }
+    }
+    
     fun getAllActiveUnits(): Flow<List<TacticalUnitEntity>> {
         return unitsDao.getAllActiveUnits()
+    }
+    
+    fun getAllActiveUnits(showHidden: Boolean): Flow<List<TacticalUnitEntity>> {
+        return if (showHidden) {
+            unitsDao.getAllActiveUnits()
+        } else {
+            unitsDao.getAllActiveVisibleUnits()
+        }
     }
     
     fun getLiveUnits(): Flow<List<TacticalUnitEntity>> {
@@ -143,15 +159,50 @@ class TacticalUnitsRepository(private val context: Context) {
     // --- Cleanup functions ---
 
     /**
-     * Delete all inactive units regardless of age
+     * Mark all inactive units as hidden (instead of deleting)
      */
+    suspend fun hideInactiveUnits() {
+        val cutoffTime = Instant.now().minusSeconds(1).toString() // Hide all inactive units
+        unitsDao.markInactiveUnitsHiddenOlderThan(cutoffTime)
+    }
+
+    /**
+     * Mark inactive units older than specified days as hidden
+     */
+    suspend fun hideOldInactiveUnits(daysOld: Int = 7) {
+        val cutoffTime = Instant.now().minus(daysOld.toLong(), ChronoUnit.DAYS).toString()
+        unitsDao.markInactiveUnitsHiddenOlderThan(cutoffTime)
+    }
+
+    /**
+     * Mark units (both active and inactive) older than specified seconds as hidden
+     */
+    suspend fun hideOldUnits(seconds: Int) {
+        val cutoffTime = Instant.now().minusSeconds(seconds.toLong()).toString()
+        unitsDao.markUnitsHiddenOlderThan(cutoffTime)
+    }
+
+    /**
+     * Unhide all units (restore visibility to all hidden units)
+     */
+    suspend fun unhideAllUnits() {
+        unitsDao.unhideAllUnits()
+    }
+
+    /**
+     * Delete all inactive units regardless of age
+     * DEPRECATED: Use hideInactiveUnits() instead
+     */
+    @Deprecated("Use hideInactiveUnits() to preserve data", ReplaceWith("hideInactiveUnits()"))
     suspend fun deleteInactiveUnits() {
         unitsDao.deleteAllInactiveUnits()
     }
 
     /**
      * Delete inactive units older than specified days
+     * DEPRECATED: Use hideOldInactiveUnits() instead
      */
+    @Deprecated("Use hideOldInactiveUnits() to preserve data", ReplaceWith("hideOldInactiveUnits(daysOld)"))
     suspend fun deleteOldInactiveUnits(daysOld: Int = 7) {
         val cutoffTime = Instant.now().minus(daysOld.toLong(), ChronoUnit.DAYS).toString()
         unitsDao.deleteInactiveUnitsOlderThan(cutoffTime)
@@ -159,7 +210,9 @@ class TacticalUnitsRepository(private val context: Context) {
 
     /**
      * Delete units (both active and inactive) older than specified seconds
+     * DEPRECATED: Use hideOldUnits() instead
      */
+    @Deprecated("Use hideOldUnits() to preserve data", ReplaceWith("hideOldUnits(seconds)"))
     suspend fun deleteOldUnits(seconds: Int) {
         val cutoffTime = Instant.now().minusSeconds(seconds.toLong()).toString()
         unitsDao.deleteUnitsOlderThan(cutoffTime)

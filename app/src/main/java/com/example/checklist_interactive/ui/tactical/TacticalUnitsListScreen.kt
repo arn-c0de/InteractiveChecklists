@@ -154,6 +154,15 @@ fun TacticalUnitsListScreen(
                                 onDismissRequest = { showCleanupMenu = false }
                             ) {
                                 DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.tactical_unhide_all_units)) },
+                                    onClick = {
+                                        showCleanupMenu = false
+                                        viewModel.unhideAllUnits()
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.Visibility, null) }
+                                )
+                                HorizontalDivider()
+                                DropdownMenuItem(
                                     text = { Text(stringResource(R.string.tactical_delete_inactive)) },
                                     onClick = {
                                         showCleanupMenu = false
@@ -283,7 +292,9 @@ fun TacticalUnitsListScreen(
                     selectedCategories = uiState.selectedCategories,
                     onToggleCategory = { viewModel.toggleCategory(it) },
                     tacticalAutoSort = tacticalAutoSort,
-                    onToggleAutoSort = { dataPadManager.toggleTacticalUnitsAutoSort() }
+                    onToggleAutoSort = { dataPadManager.toggleTacticalUnitsAutoSort() },
+                    showHiddenUnits = uiState.showHiddenUnits,
+                    onToggleShowHiddenUnits = { viewModel.toggleShowHiddenUnits() }
                 )
                 
                 // Units list
@@ -373,7 +384,9 @@ private fun StatsCard(
     selectedCategories: Set<String> = emptySet(),
     onToggleCategory: (String) -> Unit = {},
     tacticalAutoSort: Boolean = true,
-    onToggleAutoSort: () -> Unit = {}
+    onToggleAutoSort: () -> Unit = {},
+    showHiddenUnits: Boolean = false,
+    onToggleShowHiddenUnits: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier
@@ -499,7 +512,7 @@ private fun StatsCard(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = Icons.Default.Sort,
+                        imageVector = if (tacticalAutoSort) Icons.Default.Sort else Icons.Default.SortByAlpha,
                         contentDescription = null,
                         tint = if (tacticalAutoSort) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
@@ -512,7 +525,7 @@ private fun StatsCard(
                             fontWeight = FontWeight.Medium
                         )
                         Text(
-                            text = stringResource(R.string.tactical_auto_sort_desc),
+                            text = if (tacticalAutoSort) stringResource(R.string.tactical_auto_sort_enabled) else stringResource(R.string.tactical_auto_sort_disabled),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -521,6 +534,43 @@ private fun StatsCard(
                 Switch(
                     checked = tacticalAutoSort,
                     onCheckedChange = { onToggleAutoSort() }
+                )
+            }
+
+            // Show Hidden Units Toggle
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onToggleShowHiddenUnits)
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (showHiddenUnits) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                        contentDescription = null,
+                        tint = if (showHiddenUnits) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = stringResource(R.string.tactical_show_hidden_units),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = if (showHiddenUnits) stringResource(R.string.tactical_hidden_units_visible) else stringResource(R.string.tactical_hidden_units_hidden),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Switch(
+                    checked = showHiddenUnits,
+                    onCheckedChange = { onToggleShowHiddenUnits() }
                 )
             }
 

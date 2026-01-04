@@ -364,10 +364,16 @@ interface TacticalUnitsDao {
     @Query("SELECT * FROM tactical_units ORDER BY last_seen_at DESC")
     fun getAllUnits(): Flow<List<TacticalUnitEntity>>
     
+    @Query("SELECT * FROM tactical_units WHERE is_hidden = 0 ORDER BY last_seen_at DESC")
+    fun getAllVisibleUnits(): Flow<List<TacticalUnitEntity>>
+    
     @Query("SELECT * FROM tactical_units WHERE is_active = 1 ORDER BY last_seen_at DESC")
     fun getAllActiveUnits(): Flow<List<TacticalUnitEntity>>
     
-    @Query("SELECT * FROM tactical_units WHERE is_active = 1 AND datetime(last_seen_at) > datetime('now', '-10 seconds') ORDER BY last_seen_at DESC")
+    @Query("SELECT * FROM tactical_units WHERE is_active = 1 AND is_hidden = 0 ORDER BY last_seen_at DESC")
+    fun getAllActiveVisibleUnits(): Flow<List<TacticalUnitEntity>>
+    
+    @Query("SELECT * FROM tactical_units WHERE is_active = 1 AND is_hidden = 0 AND datetime(last_seen_at) > datetime('now', '-10 seconds') ORDER BY last_seen_at DESC")
     fun getLiveUnits(): Flow<List<TacticalUnitEntity>>
     
     @Query("SELECT * FROM tactical_units WHERE is_active = 0 ORDER BY last_seen_at DESC")
@@ -452,6 +458,18 @@ interface TacticalUnitsDao {
     
     @Query("UPDATE tactical_units SET is_active = 0 WHERE is_active = 1")
     suspend fun markAllUnitsInactive()
+    
+    @Query("UPDATE tactical_units SET is_hidden = 1 WHERE dcs_id = :dcsId")
+    suspend fun markUnitHidden(dcsId: String)
+    
+    @Query("UPDATE tactical_units SET is_hidden = 1 WHERE is_active = 0 AND last_seen_at < :cutoffTime")
+    suspend fun markInactiveUnitsHiddenOlderThan(cutoffTime: String): Int
+    
+    @Query("UPDATE tactical_units SET is_hidden = 1 WHERE last_seen_at < :cutoffTime")
+    suspend fun markUnitsHiddenOlderThan(cutoffTime: String): Int
+    
+    @Query("UPDATE tactical_units SET is_hidden = 0")
+    suspend fun unhideAllUnits()
     
     // --- DELETE ---
     

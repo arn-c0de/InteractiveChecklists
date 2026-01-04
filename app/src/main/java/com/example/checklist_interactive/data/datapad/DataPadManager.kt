@@ -1184,14 +1184,14 @@ class DataPadManager(private val context: Context) {
             // For now, we'll mark ALL active units that aren't in the update as inactive
             // A more sophisticated approach would track "last seen" time and only mark as inactive after a timeout
 
-            // AUTO-CLEANUP: Delete units not seen for 15+ minutes (likely destroyed)
+            // AUTO-HIDE: Hide units not seen for 15+ minutes (instead of deleting for post-mission review)
             val currentTime = System.currentTimeMillis()
             if (currentTime - lastCleanupTime >= CLEANUP_INTERVAL_MS) {
                 lastCleanupTime = currentTime
                 try {
                     val repository = com.example.checklist_interactive.data.tactical.TacticalUnitsRepository(context)
-                    repository.deleteOldUnits(TACTICAL_UNIT_TIMEOUT_SECONDS)
-                    udpLogD("Auto-cleanup: Deleted units not seen for 15+ minutes")
+                    repository.hideOldUnits(TACTICAL_UNIT_TIMEOUT_SECONDS)
+                    udpLogD("Auto-cleanup: Hidden units not seen for 15+ minutes (preserves for post-mission review)")
                 } catch (e: Exception) {
                     udpLogE("Auto-cleanup failed: ${e.message}", e)
                 }
