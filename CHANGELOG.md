@@ -5,6 +5,10 @@ All relevant changes are summarized here by version.
 
 ## [1.0.21] - 2026-01-03
 
+### Important ⚠️
+- **Database reset:** The bundled map database (`assets/databases/map_data.db`) has been reset to **version 1** and the schema has been updated. If you are upgrading from an earlier build, you **must fully uninstall the app (including app data)** and perform a **fresh install** of the new version to avoid schema mismatch errors and potential data loss. See `README.md` → Installation for backup and migration guidance.
+
+
 ## [1.0.20] - 2026-01-01
 
 ### Summary
