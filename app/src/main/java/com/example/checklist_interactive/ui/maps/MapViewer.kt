@@ -1329,12 +1329,29 @@ fun MapViewer(
         )
     )
     
+    // Esri World Imagery - reliable satellite imagery with correct tile ordering
+    // Esri uses z/y/x format (not z/x/y like standard TMS)
+    val esriSatellite = object : org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase(
+        "EsriWorldImagery",
+        0, 19, 256, ".jpg",
+        arrayOf("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/")
+    ) {
+        override fun getTileURLString(pMapTileIndex: Long): String {
+            val zoom = org.osmdroid.util.MapTileIndex.getZoom(pMapTileIndex)
+            val x = org.osmdroid.util.MapTileIndex.getX(pMapTileIndex)
+            val y = org.osmdroid.util.MapTileIndex.getY(pMapTileIndex)
+            // Esri format: baseUrl + z/y/x + extension
+            return baseUrl + zoom + "/" + y + "/" + x + mImageFilenameEnding
+        }
+    }
+    
     // Restore tile source from prefs if present, otherwise follow system theme
     val savedTileId = remember { prefsManager.getMapTileSourceId() }
     fun tileSourceForId(id: String): org.osmdroid.tileprovider.tilesource.ITileSource {
         return when (id) {
             "OpenTopo" -> openTopoTile
-            "USGS_SAT" -> TileSourceFactory.USGS_SAT
+            "USGS_SAT" -> esriSatellite // Redirect old USGS_SAT to Esri (better reliability)
+            "EsriSat" -> esriSatellite
             "MAPNIK" -> TileSourceFactory.MAPNIK
             "CartoDB.DarkMatter" -> darkTile
             else -> TileSourceFactory.MAPNIK
@@ -3034,9 +3051,9 @@ private fun LayerSelectionDialog(
                     Text(stringResource(R.string.map_topographic))
                 }
                 
-                // Satellite (if available)
+                // Satellite - Esri World Imagery (reliable, fast)
                 OutlinedButton(
-                    onClick = { onLayerSelected("USGS_SAT") },
+                    onClick = { onLayerSelected("EsriSat") },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(stringResource(R.string.map_satellite))
