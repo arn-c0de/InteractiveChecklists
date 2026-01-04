@@ -711,7 +711,7 @@ fun MarkerListItem(
                     fontWeight = FontWeight.Medium
                 )
                 Text(
-                    text = "${String.format("%.4f", marker.latitude)}, ${String.format("%.4f", marker.longitude)}",
+                    text = "${String.format("%.6f", marker.latitude)}, ${String.format("%.6f", marker.longitude)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
