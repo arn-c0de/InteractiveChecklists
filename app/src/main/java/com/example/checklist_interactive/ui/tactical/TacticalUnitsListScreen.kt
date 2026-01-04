@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -43,26 +44,19 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+/**
+ * Reusable Tactical Units content (without the overlay wrapper)
+ * This can be used both in standalone popup and as a tab in MapObjects sheet
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun TacticalUnitsListScreen(
-    onNavigateBack: () -> Unit,
+fun TacticalUnitsContent(
+    viewModel: TacticalUnitsViewModel,
     onUnitClick: ((TacticalUnitEntity) -> Unit)? = null,
-    onCenterOnMap: ((latitude: Double, longitude: Double) -> Unit)? = null
+    onCenterOnMap: ((latitude: Double, longitude: Double) -> Unit)? = null,
+    modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    val repository = remember { TacticalUnitsRepository(context) }
-    
-    // Use the same DataPadManager instance from CompositionLocal (shared with MapViewer)
     val dataPadManager = LocalDataPadManager.current
-    
-    val viewModel: TacticalUnitsViewModel = viewModel(
-        factory = TacticalUnitsViewModelFactory(
-            context.applicationContext as Application,
-            repository,
-            dataPadManager
-        )
-    )
 
     val isEntityTrackingEnabled by dataPadManager.isEntityTrackingEnabled.collectAsState()
     val mapUpdateInterval by dataPadManager.tacticalUnitsMapUpdateInterval.collectAsState()
@@ -72,10 +66,210 @@ fun TacticalUnitsListScreen(
     val units by viewModel.units.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
     val stats by viewModel.stats.collectAsState()
-    
+
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showCleanupMenu by remember { mutableStateOf(false) }
-    
+
+    Column(
+        modifier = modifier.fillMaxSize()
+    ) {
+        // Compact header with search and controls
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 2.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Search bar (compact)
+            OutlinedTextField(
+                value = uiState.searchQuery,
+                onValueChange = { viewModel.setSearchQuery(it) },
+                modifier = Modifier
+                    .weight(1f)
+                    .height(32.dp),
+                textStyle = MaterialTheme.typography.labelSmall,
+                placeholder = { Text("Search", style = MaterialTheme.typography.labelSmall) },
+                leadingIcon = { Icon(Icons.Default.Search, null, modifier = Modifier.size(14.dp)) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                ),
+                trailingIcon = {
+                    if (uiState.searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.setSearchQuery("") }, modifier = Modifier.size(20.dp)) {
+                            Icon(Icons.Default.Clear, null, modifier = Modifier.size(12.dp))
+                        }
+                    }
+                },
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.width(4.dp))
+
+            // Filter button
+            IconButton(onClick = { viewModel.toggleFilterDialog() }, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Default.Tune, null, modifier = Modifier.size(16.dp))
+            }
+
+            // Cleanup menu
+            Box {
+                IconButton(onClick = { showCleanupMenu = true }, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.MoreVert, null, modifier = Modifier.size(16.dp))
+                }
+                DropdownMenu(
+                    expanded = showCleanupMenu,
+                    onDismissRequest = { showCleanupMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.tactical_unhide_all_units), style = MaterialTheme.typography.bodySmall) },
+                        onClick = {
+                            showCleanupMenu = false
+                            viewModel.unhideAllUnits()
+                        },
+                        leadingIcon = { Icon(Icons.Default.Visibility, null, modifier = Modifier.size(16.dp)) }
+                    )
+                    HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.tactical_delete_inactive), style = MaterialTheme.typography.bodySmall) },
+                        onClick = {
+                            showCleanupMenu = false
+                            viewModel.deleteInactiveUnits()
+                        },
+                        leadingIcon = { Icon(Icons.Default.Delete, null, modifier = Modifier.size(16.dp)) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.tactical_delete_old), style = MaterialTheme.typography.bodySmall) },
+                        onClick = {
+                            showCleanupMenu = false
+                            viewModel.deleteOldUnits(3600)
+                        },
+                        leadingIcon = { Icon(Icons.Default.Delete, null, modifier = Modifier.size(16.dp)) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.tactical_delete_all), style = MaterialTheme.typography.bodySmall) },
+                        onClick = {
+                            showCleanupMenu = false
+                            showDeleteConfirm = true
+                        },
+                        leadingIcon = { Icon(Icons.Default.DeleteForever, null, modifier = Modifier.size(16.dp)) }
+                    )
+                }
+            }
+        }
+
+        // Compact settings grid
+        CompactSettingsGrid(
+            stats = stats,
+            isEntityTrackingEnabled = isEntityTrackingEnabled,
+            onToggleEntityTracking = { dataPadManager.toggleEntityTracking() },
+            showTacticalUnitsOnMap = showTacticalUnitsOnMap,
+            onToggleMapVisibility = { dataPadManager.toggleTacticalUnitsOnMap() },
+            mapUpdateInterval = mapUpdateInterval,
+            onMapUpdateIntervalChange = { dataPadManager.setTacticalUnitsMapUpdateInterval(it) },
+            selectedCoalitions = uiState.selectedCoalitions,
+            onToggleCoalition = { viewModel.toggleCoalition(it) },
+            selectedCategories = uiState.selectedCategories,
+            onToggleCategory = { viewModel.toggleCategory(it) },
+            tacticalAutoSort = tacticalAutoSort,
+            onToggleAutoSort = { dataPadManager.toggleTacticalUnitsAutoSort() },
+            showHiddenUnits = uiState.showHiddenUnits,
+            onToggleShowHiddenUnits = { viewModel.toggleShowHiddenUnits() },
+            showLiveOnly = uiState.showLiveOnly,
+            onToggleLiveOnly = { viewModel.setShowLiveOnly(!uiState.showLiveOnly) }
+        )
+
+        // Units list
+        val displayUnits = if (tacticalAutoSort) units else units.sortedBy { it.id }
+
+        if (displayUnits.isEmpty()) {
+            EmptyState()
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(
+                    items = displayUnits,
+                    key = { it.id }
+                ) { unit ->
+                    UnitCard(
+                        unit = unit,
+                        onClick = { onUnitClick?.invoke(unit) },
+                        onCenterOnMap = onCenterOnMap,
+                        getCoalitionName = { viewModel.getCoalitionName(it) },
+                        getCategoryDisplayName = { viewModel.getCategoryDisplayName(it) }
+                    )
+                }
+            }
+        }
+
+        // Filter Dialog
+        if (uiState.showFilterDialog) {
+            FilterDialog(
+                uiState = uiState,
+                onDismiss = { viewModel.toggleFilterDialog() },
+                onToggleCategory = { viewModel.toggleCategory(it) },
+                onToggleCoalition = { viewModel.toggleCoalition(it) },
+                onToggleActiveOnly = { viewModel.setShowActiveOnly(it) },
+                onClearFilters = { viewModel.clearFilters() }
+            )
+        }
+
+        // Delete confirmation dialog
+        if (showDeleteConfirm) {
+            AlertDialog(
+                onDismissRequest = { showDeleteConfirm = false },
+                title = { Text(stringResource(R.string.tactical_delete_all_confirm_title)) },
+                text = { Text(stringResource(R.string.tactical_delete_all_confirm_message)) },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            viewModel.deleteAllUnits()
+                            showDeleteConfirm = false
+                        },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Text(stringResource(R.string.action_delete))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteConfirm = false }) {
+                        Text(stringResource(R.string.action_cancel))
+                    }
+                }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+fun TacticalUnitsListScreen(
+    onNavigateBack: () -> Unit,
+    onUnitClick: ((TacticalUnitEntity) -> Unit)? = null,
+    onCenterOnMap: ((latitude: Double, longitude: Double) -> Unit)? = null
+) {
+    val context = LocalContext.current
+    val repository = remember { TacticalUnitsRepository(context) }
+
+    // Use the same DataPadManager instance from CompositionLocal (shared with MapViewer)
+    val dataPadManager = LocalDataPadManager.current
+
+    val viewModel: TacticalUnitsViewModel = viewModel(
+        factory = TacticalUnitsViewModelFactory(
+            context.applicationContext as Application,
+            repository,
+            dataPadManager
+        )
+    )
+
     // Opacity control (persistent)
     val prefs = context.getSharedPreferences("tactical_units_prefs", android.content.Context.MODE_PRIVATE)
     val KEY_OPACITY = "tactical_units_opacity"
@@ -83,11 +277,16 @@ fun TacticalUnitsListScreen(
     var dialogOpacity by rememberSaveable { mutableStateOf(savedOpacity.coerceIn(0.25f, 1.0f)) }
     var showOpacitySlider by remember { mutableStateOf(false) }
 
+    // State variables for dialogs
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showCleanupMenu by remember { mutableStateOf(false) }
+    val uiState by viewModel.uiState.collectAsState()
+
     // Persist opacity when changed
     LaunchedEffect(dialogOpacity) {
         prefs.edit().putFloat(KEY_OPACITY, dialogOpacity).apply()
     }
-    
+
     // Box overlay instead of Dialog so map remains visible and active in background
     // Clicking outside the popup closes it
     Box(
@@ -220,112 +419,14 @@ fun TacticalUnitsListScreen(
                 }
 
                 Spacer(modifier = Modifier.height(4.dp))
-                
-                // Live filter toggle
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.FilterList,
-                            contentDescription = null,
-                            tint = if (uiState.showLiveOnly) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = stringResource(R.string.tactical_live_only),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        IconButton(onClick = { viewModel.toggleFilterDialog() }) {
-                            Icon(Icons.Default.Tune, contentDescription = stringResource(R.string.tactical_advanced_filters))
-                        }
-                    }
-                    Switch(
-                        checked = uiState.showLiveOnly,
-                        onCheckedChange = { viewModel.setShowLiveOnly(it) }
-                    )
-                }
-                
-                // Search bar (compact)
-                OutlinedTextField(
-                    value = uiState.searchQuery,
-                    onValueChange = { viewModel.setSearchQuery(it) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(40.dp)
-                        .padding(vertical = 4.dp),
-                    textStyle = MaterialTheme.typography.bodySmall,
-                    placeholder = { Text(stringResource(R.string.tactical_search_placeholder), style = MaterialTheme.typography.bodySmall) },
-                    leadingIcon = { Icon(Icons.Default.Search, null, modifier = Modifier.size(16.dp)) },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                    ),
-                    trailingIcon = {
-                        if (uiState.searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { viewModel.setSearchQuery("") }) {
-                                Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.action_clear), modifier = Modifier.size(16.dp))
-                            }
-                        }
-                    },
-                    singleLine = true
-                )
-                
-                // Statistics card with entity tracking toggle and map update interval
-                StatsCard(
-                    stats = stats,
-                    isEntityTrackingEnabled = isEntityTrackingEnabled,
-                    onToggleEntityTracking = { dataPadManager.toggleEntityTracking() },
-                    showTacticalUnitsOnMap = showTacticalUnitsOnMap,
-                    onToggleMapVisibility = { dataPadManager.toggleTacticalUnitsOnMap() },
-                    mapUpdateInterval = mapUpdateInterval,
-                    onMapUpdateIntervalChange = { dataPadManager.setTacticalUnitsMapUpdateInterval(it) },
-                    selectedCoalitions = uiState.selectedCoalitions,
-                    onToggleCoalition = { viewModel.toggleCoalition(it) },
-                    selectedCategories = uiState.selectedCategories,
-                    onToggleCategory = { viewModel.toggleCategory(it) },
-                    tacticalAutoSort = tacticalAutoSort,
-                    onToggleAutoSort = { dataPadManager.toggleTacticalUnitsAutoSort() },
-                    showHiddenUnits = uiState.showHiddenUnits,
-                    onToggleShowHiddenUnits = { viewModel.toggleShowHiddenUnits() }
-                )
-                
-                // Units list
-                // Respect auto-sort preference: if disabled, show by insertion/id order (no auto-sorting by last-seen)
-                val displayUnits = if (tacticalAutoSort) units else units.sortedBy { it.id }
 
-                if (displayUnits.isEmpty()) {
-                    EmptyState()
-                } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(
-                            items = displayUnits,
-                            key = { it.id }
-                        ) { unit ->
-                            UnitCard(
-                                unit = unit,
-                                onClick = { onUnitClick?.invoke(unit) },
-                                onCenterOnMap = onCenterOnMap,
-                                getCoalitionName = { viewModel.getCoalitionName(it) },
-                                getCategoryDisplayName = { viewModel.getCategoryDisplayName(it) }
-                            )
-                        }
-                    }
-                }
+                // Use the reusable TacticalUnitsContent composable
+                TacticalUnitsContent(
+                    viewModel = viewModel,
+                    onUnitClick = onUnitClick,
+                    onCenterOnMap = onCenterOnMap,
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
 
@@ -367,6 +468,251 @@ fun TacticalUnitsListScreen(
                 }
             )
         }
+    }
+}
+
+/**
+ * Compact settings grid with toggle buttons
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CompactSettingsGrid(
+    stats: UnitStatistics,
+    isEntityTrackingEnabled: Boolean,
+    onToggleEntityTracking: () -> Unit,
+    showTacticalUnitsOnMap: Boolean,
+    onToggleMapVisibility: () -> Unit,
+    mapUpdateInterval: Float,
+    onMapUpdateIntervalChange: (Float) -> Unit,
+    selectedCoalitions: Set<Int>,
+    onToggleCoalition: (Int) -> Unit,
+    selectedCategories: Set<String>,
+    onToggleCategory: (String) -> Unit,
+    tacticalAutoSort: Boolean,
+    onToggleAutoSort: () -> Unit,
+    showHiddenUnits: Boolean,
+    onToggleShowHiddenUnits: () -> Unit,
+    showLiveOnly: Boolean,
+    onToggleLiveOnly: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            // Main toggles in a grid (2 columns)
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                maxItemsInEachRow = 2
+            ) {
+                CompactToggleChip(
+                    label = "Track",
+                    icon = if (isEntityTrackingEnabled) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                    checked = isEntityTrackingEnabled,
+                    onClick = onToggleEntityTracking,
+                    modifier = Modifier.weight(1f)
+                )
+                CompactToggleChip(
+                    label = "Map",
+                    icon = if (showTacticalUnitsOnMap) Icons.Default.Map else Icons.Default.LocationOff,
+                    checked = showTacticalUnitsOnMap,
+                    onClick = onToggleMapVisibility,
+                    modifier = Modifier.weight(1f)
+                )
+                CompactToggleChip(
+                    label = "Live",
+                    icon = Icons.Default.FilterList,
+                    checked = showLiveOnly,
+                    onClick = onToggleLiveOnly,
+                    modifier = Modifier.weight(1f)
+                )
+                CompactToggleChip(
+                    label = "Sort",
+                    icon = if (tacticalAutoSort) Icons.Default.Sort else Icons.Default.SortByAlpha,
+                    checked = tacticalAutoSort,
+                    onClick = onToggleAutoSort,
+                    modifier = Modifier.weight(1f)
+                )
+                CompactToggleChip(
+                    label = "Hidden",
+                    icon = if (showHiddenUnits) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                    checked = showHiddenUnits,
+                    onClick = onToggleShowHiddenUnits,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            // Map update interval (only if map is visible)
+            if (showTacticalUnitsOnMap) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Interval",
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                    Text(
+                        text = String.format("%.1fs", mapUpdateInterval),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Slider(
+                    value = mapUpdateInterval,
+                    onValueChange = onMapUpdateIntervalChange,
+                    valueRange = 0.5f..10.0f,
+                    steps = 18,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+            // Coalition stats (compact)
+            Text(
+                text = "${stats.totalActive} units",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Medium
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Coalition badges (compact, 3 in a row)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                CoalitionBadge(
+                    name = "N",
+                    count = stats.neutralCount,
+                    color = Color(0xFF999999),
+                    coalitionId = 0,
+                    isSelected = selectedCoalitions.contains(0),
+                    onClick = { onToggleCoalition(0) }
+                )
+                CoalitionBadge(
+                    name = "R",
+                    count = stats.redCount,
+                    color = Color(0xFFE53935),
+                    coalitionId = 1,
+                    isSelected = selectedCoalitions.contains(1),
+                    onClick = { onToggleCoalition(1) }
+                )
+                CoalitionBadge(
+                    name = "B",
+                    count = stats.blueCount,
+                    color = Color(0xFF1E88E5),
+                    coalitionId = 2,
+                    isSelected = selectedCoalitions.contains(2),
+                    onClick = { onToggleCoalition(2) }
+                )
+            }
+
+            // Category chips (compact, horizontal scroll)
+            Spacer(modifier = Modifier.height(4.dp))
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                if (stats.aircraftCount > 0) CompactCategoryChip(
+                    label = "Air: ${stats.aircraftCount}",
+                    isSelected = selectedCategories.contains("aircraft"),
+                    onClick = { onToggleCategory("aircraft") }
+                )
+                if (stats.helicopterCount > 0) CompactCategoryChip(
+                    label = "Heli: ${stats.helicopterCount}",
+                    isSelected = selectedCategories.contains("helicopter"),
+                    onClick = { onToggleCategory("helicopter") }
+                )
+                if (stats.groundCount > 0) CompactCategoryChip(
+                    label = "Gnd: ${stats.groundCount}",
+                    isSelected = selectedCategories.contains("ground"),
+                    onClick = { onToggleCategory("ground") }
+                )
+                if (stats.shipCount > 0) CompactCategoryChip(
+                    label = "Ship: ${stats.shipCount}",
+                    isSelected = selectedCategories.contains("ship"),
+                    onClick = { onToggleCategory("ship") }
+                )
+                if (stats.structureCount > 0) CompactCategoryChip(
+                    label = "Str: ${stats.structureCount}",
+                    isSelected = selectedCategories.contains("structure"),
+                    onClick = { onToggleCategory("structure") }
+                )
+                if (stats.weaponCount > 0) CompactCategoryChip(
+                    label = "Wpn: ${stats.weaponCount}",
+                    isSelected = selectedCategories.contains("weapon"),
+                    onClick = { onToggleCategory("weapon") }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompactToggleChip(
+    label: String,
+    icon: ImageVector,
+    checked: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .height(32.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = if (checked) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
+                tint = if (checked) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (checked) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = if (checked) FontWeight.Bold else FontWeight.Normal
+            )
+        }
+    }
+}
+
+@Composable
+private fun CompactCategoryChip(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
+        modifier = Modifier.clickable(onClick = onClick)
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+        )
     }
 }
 
@@ -718,7 +1064,7 @@ private fun CoalitionBadge(
     ) {
         Box(
             modifier = Modifier
-                .size(40.dp)
+                .size(28.dp)
                 .clip(CircleShape)
                 .background(color.copy(alpha = if (isSelected) 1f else 0.4f)),
             contentAlignment = Alignment.Center
@@ -726,12 +1072,13 @@ private fun CoalitionBadge(
             Text(
                 text = count.toString(),
                 color = Color.White,
+                style = MaterialTheme.typography.labelSmall,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
             )
         }
         Text(
             text = name,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.labelSmall,
             color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
         )
