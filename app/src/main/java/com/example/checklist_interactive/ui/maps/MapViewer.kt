@@ -1947,6 +1947,7 @@ fun MapViewer(
                     context = context,
                     repository = repo,
                     showLiveOnlyFlow = dataPadManager.tacticalUnitsShowLiveOnly,
+                    showHiddenUnitsFlow = dataPadManager.tacticalUnitsShowHidden,
                     isEntityTrackingEnabledFlow = dataPadManager.isEntityTrackingEnabled,
                     updateIntervalSecondsFlow = dataPadManager.tacticalUnitsMapUpdateInterval,
                     getMapView = { mapState.mapView },
@@ -1972,6 +1973,7 @@ fun MapViewer(
                             },
                             isStatic = 1,
                             source = "tactical_tracking",
+                            updatedAt = tacticalUnit.lastSeenAt, // Add last seen timestamp
                             metadata = org.json.JSONObject().apply {
                                 // Store tactical unit DB ID for live tracking
                                 put("tactical_unit_id", tacticalUnit.id)

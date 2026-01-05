@@ -47,6 +47,9 @@ import kotlinx.coroutines.isActive
 import com.example.checklist_interactive.data.tactical.LocationEntity
 import com.example.checklist_interactive.data.tactical.RunwayEntity
 import org.json.JSONObject
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 private fun formatLatLon(lat: Double, lon: Double): String {
     val latPrefix = if (lat >= 0) "N" else "S"
@@ -449,6 +452,94 @@ fun MapMarkerPopup(
                                 if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
                             }
                             Spacer(modifier = Modifier.height(6.dp))
+                        }
+                    }
+                }
+
+                // Last Seen display for tactical markers with live updates
+                location.updatedAt?.let { lastSeenStr ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // Update current time every second for live timer
+                    var currentTime by remember { mutableStateOf(Instant.now()) }
+                    
+                    LaunchedEffect(Unit) {
+                        while (isActive) {
+                            currentTime = Instant.now()
+                            kotlinx.coroutines.delay(1000L)
+                        }
+                    }
+                    
+                    // Load string resources
+                    val strLastSeen = stringResource(R.string.last_seen_label)
+                    val strSecondsFormat = stringResource(R.string.tactical_time_seconds)
+                    val strMinutesFormat = stringResource(R.string.tactical_time_minutes)
+                    val strHoursFormat = stringResource(R.string.tactical_time_hours)
+                    val strUnknown = stringResource(R.string.tactical_time_unknown)
+                    val strActive = stringResource(R.string.status_active)
+                    val strStale = stringResource(R.string.status_lost_contact)
+                    
+                    val (timeAgoText, secondsAgo) = try {
+                        val lastSeenTime = Instant.parse(lastSeenStr)
+                        val seconds = (currentTime.epochSecond - lastSeenTime.epochSecond)
+                        val text = when {
+                            seconds < 60 -> String.format(java.util.Locale.getDefault(), strSecondsFormat, seconds)
+                            seconds < 3600 -> String.format(java.util.Locale.getDefault(), strMinutesFormat, seconds / 60)
+                            else -> String.format(java.util.Locale.getDefault(), strHoursFormat, seconds / 3600)
+                        }
+                        Pair(text, seconds)
+                    } catch (_: Exception) {
+                        Pair(strUnknown, Long.MAX_VALUE)
+                    }
+                    
+                    // Determine status color based on age
+                    val statusColor = when {
+                        secondsAgo < 30 -> MaterialTheme.colorScheme.primary // Active (< 30 seconds)
+                        secondsAgo < 300 -> MaterialTheme.colorScheme.tertiary // Recent (< 5 minutes)
+                        else -> MaterialTheme.colorScheme.error // Stale (> 5 minutes)
+                    }
+                    
+                    val statusText = if (secondsAgo < 300) strActive else strStale
+                    
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = statusColor.copy(alpha = 0.1f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = strLastSeen,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = timeAgoText,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = statusColor
+                                )
+                            }
+                            
+                            Surface(
+                                shape = MaterialTheme.shapes.small,
+                                color = statusColor
+                            ) {
+                                Text(
+                                    text = statusText,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.surface,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 }

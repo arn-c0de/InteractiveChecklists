@@ -25,6 +25,8 @@ import com.example.checklist_interactive.data.tactical.TacticalDatabase
 import com.example.checklist_interactive.ui.maps.MapActionBus
 import com.example.checklist_interactive.ui.maps.marker.LocationEditDialog
 import org.json.JSONObject
+import java.time.Instant
+import kotlinx.coroutines.isActive
 
 private fun formatLatLon(lat: Double, lon: Double): String {
     val latPrefix = if (lat >= 0) "N" else "S"
@@ -173,6 +175,57 @@ private fun MarkerDetailsHeader(location: LocationEntity) {
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
         )
+        
+        // Last Seen display for tactical units (directly under name)
+        location.updatedAt?.let { lastSeenStr ->
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            // Update current time every second for live timer
+            var currentTime by remember { mutableStateOf(Instant.now()) }
+            
+            LaunchedEffect(Unit) {
+                while (isActive) {
+                    currentTime = Instant.now()
+                    kotlinx.coroutines.delay(1000L)
+                }
+            }
+            
+            // Load string resources
+            val strLastSeen = stringResource(R.string.last_seen_label)
+            val strSecondsFormat = stringResource(R.string.tactical_time_seconds)
+            val strMinutesFormat = stringResource(R.string.tactical_time_minutes)
+            val strHoursFormat = stringResource(R.string.tactical_time_hours)
+            val strUnknown = stringResource(R.string.tactical_time_unknown)
+            val strNA = stringResource(R.string.na_label)
+            
+            val (timeAgoText, secondsAgo) = try {
+                val lastSeenTime = Instant.parse(lastSeenStr)
+                val seconds = (currentTime.epochSecond - lastSeenTime.epochSecond)
+                val text = when {
+                    seconds < 60 -> String.format(java.util.Locale.getDefault(), strSecondsFormat, seconds)
+                    seconds < 3600 -> String.format(java.util.Locale.getDefault(), strMinutesFormat, seconds / 60)
+                    else -> String.format(java.util.Locale.getDefault(), strHoursFormat, seconds / 3600)
+                }
+                Pair(text, seconds)
+            } catch (_: Exception) {
+                Pair(strNA, Long.MAX_VALUE)
+            }
+            
+            // Color coding based on age
+            val textColor = when {
+                secondsAgo < 30 -> MaterialTheme.colorScheme.primary
+                secondsAgo < 300 -> MaterialTheme.colorScheme.tertiary
+                else -> MaterialTheme.colorScheme.error
+            }
+            
+            Text(
+                text = "$strLastSeen $timeAgoText",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = textColor
+            )
+        }
+        
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = formatLatLon(location.latitude, location.longitude),

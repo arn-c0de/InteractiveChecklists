@@ -29,6 +29,7 @@ class TacticalUnitsMapOverlay(
     private val context: Context,
     private val repository: TacticalUnitsRepository,
     private val showLiveOnlyFlow: StateFlow<Boolean>,
+    private val showHiddenUnitsFlow: StateFlow<Boolean>,
     private val isEntityTrackingEnabledFlow: StateFlow<Boolean>,
     private val updateIntervalSecondsFlow: StateFlow<Float>,
     private val getMapView: () -> MapView?,
@@ -94,13 +95,26 @@ class TacticalUnitsMapOverlay(
         dataCollectorJob = scope.launch {
             combine(
                 showLiveOnlyFlow,
+                showHiddenUnitsFlow,
                 isEntityTrackingEnabledFlow,
                 repository.getAllActiveUnits(),
+                repository.getAllActiveUnitsNoTimeFilter(),
                 repository.getLiveUnits()
-            ) { showLiveOnly: Boolean, isTrackingEnabled: Boolean, allUnits: List<TacticalUnitEntity>, liveUnits: List<TacticalUnitEntity> ->
-                if (!isTrackingEnabled) allUnits
-                else if (showLiveOnly) liveUnits
-                else allUnits
+            ) { values ->
+                val showLiveOnly = values[0] as Boolean
+                val showHidden = values[1] as Boolean
+                val isTrackingEnabled = values[2] as Boolean
+                val activeUnits = values[3] as List<TacticalUnitEntity>
+                val allActiveUnits = values[4] as List<TacticalUnitEntity>
+                val liveUnits = values[5] as List<TacticalUnitEntity>
+                
+                if (!isTrackingEnabled) {
+                    if (showHidden) allActiveUnits else activeUnits
+                } else if (showLiveOnly) {
+                    liveUnits
+                } else {
+                    if (showHidden) allActiveUnits else activeUnits
+                }
             }.collect { newUnits: List<TacticalUnitEntity> ->
                 // Increment counter instead of logging each update
                 dbUpdateCount++

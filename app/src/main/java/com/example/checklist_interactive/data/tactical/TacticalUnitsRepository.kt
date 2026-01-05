@@ -32,6 +32,10 @@ class TacticalUnitsRepository(private val context: Context) {
         return unitsDao.getAllActiveUnits()
     }
     
+    fun getAllActiveUnitsNoTimeFilter(): Flow<List<TacticalUnitEntity>> {
+        return unitsDao.getAllActiveUnitsNoTimeFilter()
+    }
+    
     fun getAllActiveUnits(showHidden: Boolean): Flow<List<TacticalUnitEntity>> {
         return if (showHidden) {
             unitsDao.getAllActiveUnits()
