@@ -306,6 +306,9 @@
     <string name="tactical_unit_visibility_on_map_history_tooltip">Cuando el seguimiento de entidades está desactivado, el mapa aún puede mostrar posiciones históricas/últimas conocidas.</string>
     <string name="tactical_map_update_interval">Intervalo actualización mapa</string>
     <string name="tactical_map_update_explain">Menor = movimiento más suave, mayor = mejor rendimiento</string>
+    <string name="tactical_interval">Intervalo</string>
+    <string name="tactical_hide_after">Ocultar después</string>
+    <string name="tactical_hide_after_format">%1$.0f min</string>
     <string name="tactical_active_units_label">Unidades activas: %1$d</string>
     <string name="tactical_coalition_neutral">Neutral</string>
     <string name="tactical_coalition_red">Rojo</string>

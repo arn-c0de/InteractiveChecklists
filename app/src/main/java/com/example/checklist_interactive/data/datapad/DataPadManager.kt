@@ -52,6 +52,9 @@ class DataPadManager(private val context: Context) {
         
         // Show hidden units (units older than 15 minutes) on map
         private const val KEY_TACTICAL_UNITS_SHOW_HIDDEN = "tactical_units_show_hidden"
+        
+        // Hide units timeout (in minutes) - how long after last contact units should be auto-hidden
+        private const val KEY_TACTICAL_UNITS_HIDE_TIMEOUT_MINUTES = "tactical_units_hide_timeout_minutes"
 
         // Handshake timeout
         private const val HANDSHAKE_TIMEOUT_MS = 10000L
@@ -128,6 +131,10 @@ class DataPadManager(private val context: Context) {
     // Automatic list sorting preference - true = keep default auto-sorting (last seen desc), false = show by insertion/id (no auto-sort)
     private val _tacticalUnitsAutoSort = MutableStateFlow(prefs.getBoolean(KEY_TACTICAL_UNITS_AUTO_SORT, true))
     val tacticalUnitsAutoSort: StateFlow<Boolean> = _tacticalUnitsAutoSort.asStateFlow()
+    
+    // Tactical units hide timeout (minutes) - how long after last contact units should be auto-hidden
+    private val _tacticalUnitsHideTimeoutMinutes = MutableStateFlow(prefs.getFloat(KEY_TACTICAL_UNITS_HIDE_TIMEOUT_MINUTES, 15.0f))
+    val tacticalUnitsHideTimeoutMinutes: StateFlow<Float> = _tacticalUnitsHideTimeoutMinutes.asStateFlow()
 
     // Connection health tracking (for heartbeat monitoring)
     enum class ConnectionHealth {
@@ -690,6 +697,18 @@ class DataPadManager(private val context: Context) {
     fun toggleTacticalUnitsAutoSort() {
         setTacticalUnitsAutoSort(!_tacticalUnitsAutoSort.value)
     }
+    
+    /**
+     * Set tactical units hide timeout (in minutes)
+     * Units not seen for longer than this will be auto-hidden
+     * @param minutes Timeout in minutes (1.0 to 120.0)
+     */
+    fun setTacticalUnitsHideTimeoutMinutes(minutes: Float) {
+        val clamped = minutes.coerceIn(1.0f, 120.0f)
+        prefs.edit().putFloat(KEY_TACTICAL_UNITS_HIDE_TIMEOUT_MINUTES, clamped).apply()
+        _tacticalUnitsHideTimeoutMinutes.value = clamped
+        udpLogD("Tactical units hide timeout set to ${clamped} minutes")
+    }
 
     /**
      * Update device name for handshake identification
@@ -1200,14 +1219,15 @@ class DataPadManager(private val context: Context) {
             // For now, we'll mark ALL active units that aren't in the update as inactive
             // A more sophisticated approach would track "last seen" time and only mark as inactive after a timeout
 
-            // AUTO-HIDE: Hide units not seen for 15+ minutes (instead of deleting for post-mission review)
+            // AUTO-HIDE: Hide units not seen for configured timeout (instead of deleting for post-mission review)
             val currentTime = System.currentTimeMillis()
             if (currentTime - lastCleanupTime >= CLEANUP_INTERVAL_MS) {
                 lastCleanupTime = currentTime
                 try {
                     val repository = com.example.checklist_interactive.data.tactical.TacticalUnitsRepository(context)
-                    repository.hideOldUnits(TACTICAL_UNIT_TIMEOUT_SECONDS)
-                    udpLogD("Auto-cleanup: Hidden units not seen for 15+ minutes (preserves for post-mission review)")
+                    val hideTimeoutSeconds = (_tacticalUnitsHideTimeoutMinutes.value * 60).toInt()
+                    repository.hideOldUnits(hideTimeoutSeconds)
+                    udpLogD("Auto-cleanup: Hidden units not seen for ${_tacticalUnitsHideTimeoutMinutes.value} minutes (preserves for post-mission review)")
                 } catch (e: Exception) {
                     udpLogE("Auto-cleanup failed: ${e.message}", e)
                 }

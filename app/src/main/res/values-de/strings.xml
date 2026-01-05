@@ -423,6 +423,9 @@
     <string name="tactical_unit_visibility_on_map_history_tooltip">Wenn die Entitätsverfolgung deaktiviert ist, kann die Karte trotzdem historische/zuletzt bekannte Positionen anzeigen.</string>
     <string name="tactical_map_update_interval">Karten-Aktualisierungsintervall</string>
     <string name="tactical_map_update_explain">Kleiner = flüssigere Bewegung, größer = bessere Leistung</string>
+    <string name="tactical_interval">Intervall</string>
+    <string name="tactical_hide_after">Ausblenden nach</string>
+    <string name="tactical_hide_after_format">%1$.0f Min.</string>
     <string name="tactical_active_units_label">Aktive Einheiten: %1$d</string>
     <string name="tactical_coalition_neutral">Neutral</string>
     <string name="tactical_coalition_red">Rot</string>

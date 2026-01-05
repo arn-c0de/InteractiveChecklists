@@ -1207,6 +1207,9 @@
     <string name="tactical_units_hidden_on_map">单位在地图上隐藏</string>
     <string name="tactical_map_update_interval">地图更新间隔</string>
     <string name="tactical_map_update_explain">数值越低越流畅，数值越高性能越好</string>
+    <string name="tactical_interval">间隔</string>
+    <string name="tactical_hide_after">隐藏（分钟）</string>
+    <string name="tactical_hide_after_format">%1$.0f 分钟</string>
     <string name="tactical_active_units_label">活动单位: %1$d</string>
     <string name="tactical_coalition_neutral">中立</string>
     <string name="tactical_coalition_red">红方</string>
