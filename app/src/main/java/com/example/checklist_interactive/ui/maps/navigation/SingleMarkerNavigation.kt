@@ -27,6 +27,9 @@ import com.example.checklist_interactive.ui.maps.marker.LocationEditDialog
 import org.json.JSONObject
 import java.time.Instant
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.lifecycleScope
 
 private fun formatLatLon(lat: Double, lon: Double): String {
     val latPrefix = if (lat >= 0) "N" else "S"
@@ -169,12 +172,35 @@ fun MarkerDetailsContent(
  */
 @Composable
 private fun MarkerDetailsHeader(location: LocationEntity) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = location.name,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
-        )
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val repository = remember { com.example.checklist_interactive.data.tactical.TacticalUnitsRepository(context) }
+    
+    // Extract tactical unit ID and highlight status from metadata
+    val (tacticalUnitId, initialHighlightState) = remember(location.metadata) {
+        try {
+            val metadata = location.metadata?.let { org.json.JSONObject(it) }
+            val unitId = metadata?.optInt("tactical_unit_id", -1) ?: -1
+            val isHighlighted = metadata?.optInt("is_highlighted", 0) ?: 0
+            Pair(unitId, isHighlighted == 1)
+        } catch (_: Exception) {
+            Pair(-1, false)
+        }
+    }
+    
+    var isHighlighted by remember { mutableStateOf(initialHighlightState) }
+    
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = location.name,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
         
         // Last Seen display for tactical units (directly under name)
         location.updatedAt?.let { lastSeenStr ->
@@ -225,7 +251,29 @@ private fun MarkerDetailsHeader(location: LocationEntity) {
                 color = textColor
             )
         }
+        }
         
+        // Highlight button for tactical units
+        if (tacticalUnitId > 0) {
+            IconButton(
+                onClick = {
+                    isHighlighted = !isHighlighted
+                    scope.launch {
+                        repository.toggleUnitHighlight(tacticalUnitId, isHighlighted)
+                    }
+                },
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    imageVector = if (isHighlighted) Icons.Default.Star else Icons.Default.StarBorder,
+                    contentDescription = if (isHighlighted) "Remove highlight" else "Highlight on map",
+                    tint = if (isHighlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+    
+    Column(modifier = Modifier.fillMaxWidth()) {
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = formatLatLon(location.latitude, location.longitude),
