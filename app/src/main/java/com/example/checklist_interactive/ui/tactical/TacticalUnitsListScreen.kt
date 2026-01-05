@@ -30,6 +30,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -40,6 +42,7 @@ import com.example.checklist_interactive.data.tactical.TacticalUnitEntity
 import com.example.checklist_interactive.data.tactical.TacticalUnitsRepository
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.text.KeyboardOptions
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -62,6 +65,7 @@ fun TacticalUnitsContent(
     val mapUpdateInterval by dataPadManager.tacticalUnitsMapUpdateInterval.collectAsState()
     val showTacticalUnitsOnMap by dataPadManager.showTacticalUnitsOnMap.collectAsState()
     val tacticalAutoSort by dataPadManager.tacticalUnitsAutoSort.collectAsState()
+    val hideTimeoutMinutes by dataPadManager.tacticalUnitsHideTimeoutMinutes.collectAsState()
 
     val units by viewModel.units.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
@@ -167,6 +171,8 @@ fun TacticalUnitsContent(
             onToggleMapVisibility = { dataPadManager.toggleTacticalUnitsOnMap() },
             mapUpdateInterval = mapUpdateInterval,
             onMapUpdateIntervalChange = { dataPadManager.setTacticalUnitsMapUpdateInterval(it) },
+            hideTimeoutMinutes = hideTimeoutMinutes,
+            onHideTimeoutMinutesChange = { dataPadManager.setTacticalUnitsHideTimeoutMinutes(it) },
             selectedCoalitions = uiState.selectedCoalitions,
             onToggleCoalition = { viewModel.toggleCoalition(it) },
             selectedCategories = uiState.selectedCategories,
@@ -484,6 +490,8 @@ private fun CompactSettingsGrid(
     onToggleMapVisibility: () -> Unit,
     mapUpdateInterval: Float,
     onMapUpdateIntervalChange: (Float) -> Unit,
+    hideTimeoutMinutes: Float,
+    onHideTimeoutMinutesChange: (Float) -> Unit,
     selectedCoalitions: Set<Int>,
     onToggleCoalition: (Int) -> Unit,
     selectedCategories: Set<String>,
@@ -547,6 +555,8 @@ private fun CompactSettingsGrid(
 
             // Map update interval (only if map is visible)
             if (showTacticalUnitsOnMap) {
+                var showIntervalDialog by remember { mutableStateOf(false) }
+                
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -554,13 +564,54 @@ private fun CompactSettingsGrid(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Interval",
+                        text = stringResource(R.string.tactical_interval),
                         style = MaterialTheme.typography.labelSmall
                     )
                     Text(
                         text = String.format("%.1fs", mapUpdateInterval),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clickable { showIntervalDialog = true }
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                    )
+                }
+                
+                if (showIntervalDialog) {
+                    var inputText by remember { mutableStateOf(String.format("%.1f", mapUpdateInterval)) }
+                    AlertDialog(
+                        onDismissRequest = { showIntervalDialog = false },
+                        title = { Text(stringResource(R.string.tactical_interval)) },
+                        text = {
+                            OutlinedTextField(
+                                value = inputText,
+                                onValueChange = { inputText = it },
+                                label = { Text("Seconds (0.5-10.0)") },
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Decimal,
+                                    imeAction = ImeAction.Done
+                                ),
+                                singleLine = true
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    inputText.toFloatOrNull()?.let { value ->
+                                        val clamped = value.coerceIn(0.5f, 10.0f)
+                                        onMapUpdateIntervalChange(clamped)
+                                    }
+                                    showIntervalDialog = false
+                                }
+                            ) {
+                                Text(stringResource(R.string.action_ok))
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showIntervalDialog = false }) {
+                                Text(stringResource(R.string.action_cancel))
+                            }
+                        }
                     )
                 }
                 Slider(
@@ -571,6 +622,74 @@ private fun CompactSettingsGrid(
                     modifier = Modifier.fillMaxWidth()
                 )
             }
+            
+            // Hide timeout slider
+            var showHideTimeoutDialog by remember { mutableStateOf(false) }
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.tactical_hide_after),
+                    style = MaterialTheme.typography.labelSmall
+                )
+                Text(
+                    text = stringResource(R.string.tactical_hide_after_format, hideTimeoutMinutes),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .clickable { showHideTimeoutDialog = true }
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                )
+            }
+            
+            if (showHideTimeoutDialog) {
+                var inputText by remember { mutableStateOf(String.format("%.0f", hideTimeoutMinutes)) }
+                AlertDialog(
+                    onDismissRequest = { showHideTimeoutDialog = false },
+                    title = { Text(stringResource(R.string.tactical_hide_after)) },
+                    text = {
+                        OutlinedTextField(
+                            value = inputText,
+                            onValueChange = { inputText = it },
+                            label = { Text("Minutes (1-120)") },
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Number,
+                                imeAction = ImeAction.Done
+                            ),
+                            singleLine = true
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                inputText.toFloatOrNull()?.let { value ->
+                                    val clamped = value.coerceIn(1.0f, 120.0f)
+                                    onHideTimeoutMinutesChange(clamped)
+                                }
+                                showHideTimeoutDialog = false
+                            }
+                        ) {
+                            Text(stringResource(R.string.action_ok))
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showHideTimeoutDialog = false }) {
+                            Text(stringResource(R.string.action_cancel))
+                        }
+                    }
+                )
+            }
+            Slider(
+                value = hideTimeoutMinutes,
+                onValueChange = onHideTimeoutMinutesChange,
+                valueRange = 1.0f..120.0f,
+                steps = 118,
+                modifier = Modifier.fillMaxWidth()
+            )
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
