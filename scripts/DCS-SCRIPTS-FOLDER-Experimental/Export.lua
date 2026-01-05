@@ -5,10 +5,20 @@ pcall(function()
 	local LOG_PATH = writeDir .. [[Scripts\player_aircraft.log]]
 	local DEBUG_LOG_PATH = writeDir .. [[Scripts\player_aircraft_debug.log]]
 	local JSON_PATH = writeDir .. [[Scripts\player_aircraft_parsed.jsonl]]
-	local ENTITY_CONTACTS_PATH = writeDir .. [[Scripts\entity-contacts-parsed.jsonl]]  -- Batch 1: units 0-250
-	local ENTITY_CONTACTS_PATH_2 = writeDir .. [[Scripts\entity-contacts-parsed-2.jsonl]]  -- Batch 2: units 250-500
-	local ENTITY_CONTACTS_PATH_3 = writeDir .. [[Scripts\entity-contacts-parsed-3.jsonl]]  -- Batch 3: units 500-750
-	local ENTITY_CONTACTS_PATH_4 = writeDir .. [[Scripts\entity-contacts-parsed-4.jsonl]]  -- Batch 4: units 750-1000
+	-- Create entity-batches subfolder for better organization
+	local ENTITY_BATCH_DIR = writeDir .. [[Scripts\entity-batches\]]
+	local ENTITY_CONTACTS_PATH = ENTITY_BATCH_DIR .. [[entity-contacts-parsed.jsonl]]  -- Batch 1: units 0-100
+	local ENTITY_CONTACTS_PATH_2 = ENTITY_BATCH_DIR .. [[entity-contacts-parsed-2.jsonl]]  -- Batch 2: units 100-200
+	local ENTITY_CONTACTS_PATH_3 = ENTITY_BATCH_DIR .. [[entity-contacts-parsed-3.jsonl]]  -- Batch 3: units 200-300
+	local ENTITY_CONTACTS_PATH_4 = ENTITY_BATCH_DIR .. [[entity-contacts-parsed-4.jsonl]]  -- Batch 4: units 300-400
+	local ENTITY_CONTACTS_PATH_5 = ENTITY_BATCH_DIR .. [[entity-contacts-parsed-5.jsonl]]  -- Batch 5: units 400-500
+	local ENTITY_CONTACTS_PATH_6 = ENTITY_BATCH_DIR .. [[entity-contacts-parsed-6.jsonl]]  -- Batch 6: units 500-600
+	local ENTITY_CONTACTS_PATH_7 = ENTITY_BATCH_DIR .. [[entity-contacts-parsed-7.jsonl]]  -- Batch 7: units 600-700
+	local ENTITY_CONTACTS_PATH_8 = ENTITY_BATCH_DIR .. [[entity-contacts-parsed-8.jsonl]]  -- Batch 8: units 700-800
+	local ENTITY_CONTACTS_PATH_9 = ENTITY_BATCH_DIR .. [[entity-contacts-parsed-9.jsonl]]  -- Batch 9: units 800-900
+	local ENTITY_CONTACTS_PATH_10 = ENTITY_BATCH_DIR .. [[entity-contacts-parsed-10.jsonl]]  -- Batch 10: units 900-1000
+	local ENTITY_CONTACTS_PATH_11 = ENTITY_BATCH_DIR .. [[entity-contacts-parsed-11.jsonl]]  -- Batch 11: units 830-913 (overflow)
+	local ENTITY_CONTACTS_PATH_12 = ENTITY_BATCH_DIR .. [[entity-contacts-parsed-12.jsonl]]  -- Batch 12: units 913-996 (overflow)
 	local COMMAND_PATH = writeDir .. [[Scripts\forwarder_command.json]]
 	local DEBUG_DUMP_TABLES = true -- set to false to disable table debug dumps
 	local dumped_tables = {}
@@ -163,8 +173,8 @@ pcall(function()
 
 	-- Maximum distance for unit tracking (meters) - 150km radius for better tactical awareness
 	local MAX_UNIT_DISTANCE = 300000  -- 150km (increased from 50km)
-	local MAX_UNITS_PER_BATCH = 250  -- Units per batch file - optimized for UDP packet size (~65KB)
-	local MAX_TOTAL_UNITS = 1000  -- Maximum total units across all batches (4 batches × 250 units)
+	local MAX_UNITS_PER_BATCH = 90 -- Units per batch file - optimized for UDP packet size (~65KB)
+	local MAX_TOTAL_UNITS = 1000  -- Maximum total units across all batches (12 batches × 83 units)
 	
 	-- Collect all nearby units (aircraft, ground, ships, structures)
 	-- NEW APPROACH: Collect ALL units in range first, then slice by batch
@@ -807,9 +817,9 @@ pcall(function()
 		end
 
 		-- Determine total batches based on total units available
-		local totalBatches = 4  -- Support up to 4 batches (1000 units)
+		local totalBatches = 12  -- Support up to 12 batches (996 units)
 
-		-- Collect batch 1 (units 0-250)
+		-- Collect batch 1 (units 0-167)
 		local batch1_units, hasMore1 = collect_nearby_units(1)
 		local batch1_data = {}
 		for k, v in pairs(baseData) do batch1_data[k] = v end
@@ -817,7 +827,7 @@ pcall(function()
 		batch1_data.batchIndex = 1
 		batch1_data.totalBatches = totalBatches
 
-		-- Collect batch 2 (units 250-500)
+		-- Collect batch 2 (units 167-334)
 		local batch2_data = nil
 		if hasMore1 then
 			local batch2_units, hasMore2 = collect_nearby_units(2)
@@ -830,7 +840,7 @@ pcall(function()
 			end
 		end
 
-		-- Collect batch 3 (units 500-750)
+		-- Collect batch 3 (units 334-501)
 		local batch3_data = nil
 		if hasMore1 then
 			local batch3_units, hasMore3 = collect_nearby_units(3)
@@ -843,7 +853,7 @@ pcall(function()
 			end
 		end
 
-		-- Collect batch 4 (units 750-1000)
+		-- Collect batch 4 (units 501-668)
 		local batch4_data = nil
 		if hasMore1 then
 			local batch4_units, hasMore4 = collect_nearby_units(4)
@@ -856,7 +866,111 @@ pcall(function()
 			end
 		end
 
-		return batch1_data, batch2_data, batch3_data, batch4_data
+		-- Collect batch 5 (units 668-835)
+		local batch5_data = nil
+		if hasMore1 then
+			local batch5_units, hasMore5 = collect_nearby_units(5)
+			if #batch5_units > 0 then
+				batch5_data = {}
+				for k, v in pairs(baseData) do batch5_data[k] = v end
+				batch5_data.nearbyUnits = batch5_units
+				batch5_data.batchIndex = 5
+				batch5_data.totalBatches = totalBatches
+			end
+		end
+
+		-- Collect batch 6 (units 625-750)
+		local batch6_data = nil
+		if hasMore1 then
+			local batch6_units, hasMore6 = collect_nearby_units(6)
+			if #batch6_units > 0 then
+				batch6_data = {}
+				for k, v in pairs(baseData) do batch6_data[k] = v end
+				batch6_data.nearbyUnits = batch6_units
+				batch6_data.batchIndex = 6
+				batch6_data.totalBatches = totalBatches
+			end
+		end
+
+		-- Collect batch 7 (units 750-875)
+		local batch7_data = nil
+		if hasMore1 then
+			local batch7_units, hasMore7 = collect_nearby_units(7)
+			if #batch7_units > 0 then
+				batch7_data = {}
+				for k, v in pairs(baseData) do batch7_data[k] = v end
+				batch7_data.nearbyUnits = batch7_units
+				batch7_data.batchIndex = 7
+				batch7_data.totalBatches = totalBatches
+			end
+		end
+
+		-- Collect batch 8 (units 700-800)
+		local batch8_data = nil
+		if hasMore1 then
+			local batch8_units, hasMore8 = collect_nearby_units(8)
+			if #batch8_units > 0 then
+				batch8_data = {}
+				for k, v in pairs(baseData) do batch8_data[k] = v end
+				batch8_data.nearbyUnits = batch8_units
+				batch8_data.batchIndex = 8
+				batch8_data.totalBatches = totalBatches
+			end
+		end
+
+		-- Collect batch 9 (units 800-900)
+		local batch9_data = nil
+		if hasMore1 then
+			local batch9_units, hasMore9 = collect_nearby_units(9)
+			if #batch9_units > 0 then
+				batch9_data = {}
+				for k, v in pairs(baseData) do batch9_data[k] = v end
+				batch9_data.nearbyUnits = batch9_units
+				batch9_data.batchIndex = 9
+				batch9_data.totalBatches = totalBatches
+			end
+		end
+
+		-- Collect batch 10 (units 747-830)
+		local batch10_data = nil
+		if hasMore1 then
+			local batch10_units, hasMore10 = collect_nearby_units(10)
+			if #batch10_units > 0 then
+				batch10_data = {}
+				for k, v in pairs(baseData) do batch10_data[k] = v end
+				batch10_data.nearbyUnits = batch10_units
+				batch10_data.batchIndex = 10
+				batch10_data.totalBatches = totalBatches
+			end
+		end
+
+		-- Collect batch 11 (units 830-913)
+		local batch11_data = nil
+		if hasMore1 then
+			local batch11_units, hasMore11 = collect_nearby_units(11)
+			if #batch11_units > 0 then
+				batch11_data = {}
+				for k, v in pairs(baseData) do batch11_data[k] = v end
+				batch11_data.nearbyUnits = batch11_units
+				batch11_data.batchIndex = 11
+				batch11_data.totalBatches = totalBatches
+			end
+		end
+
+		-- Collect batch 12 (units 913-996)
+		local batch12_data = nil
+		if hasMore1 then
+			local batch12_units, hasMore12 = collect_nearby_units(12)
+			if #batch12_units > 0 then
+				batch12_data = {}
+				for k, v in pairs(baseData) do batch12_data[k] = v end
+				batch12_data.nearbyUnits = batch12_units
+				batch12_data.batchIndex = 12
+				batch12_data.totalBatches = totalBatches
+			end
+		end
+
+		return batch1_data, batch2_data, batch3_data, batch4_data, batch5_data, batch6_data, batch7_data, batch8_data, batch9_data, batch10_data, batch11_data, batch12_data
 	end
 
 	local function write_log(aircraft, unitID, pos)
@@ -917,6 +1031,94 @@ pcall(function()
 		pcall(function()
 			local json = json_encode_table(data)
 			local f = io.open(ENTITY_CONTACTS_PATH_4, 'a')
+			if not f then return end
+			f:write(json .. '\n')
+			f:flush()  -- Force immediate flush to disk
+			f:close()
+		end)
+	end
+
+	local function write_entity_json_5(data)
+		pcall(function()
+			local json = json_encode_table(data)
+			local f = io.open(ENTITY_CONTACTS_PATH_5, 'a')
+			if not f then return end
+			f:write(json .. '\n')
+			f:flush()  -- Force immediate flush to disk
+			f:close()
+		end)
+	end
+
+	local function write_entity_json_6(data)
+		pcall(function()
+			local json = json_encode_table(data)
+			local f = io.open(ENTITY_CONTACTS_PATH_6, 'a')
+			if not f then return end
+			f:write(json .. '\n')
+			f:flush()  -- Force immediate flush to disk
+			f:close()
+		end)
+	end
+
+	local function write_entity_json_7(data)
+		pcall(function()
+			local json = json_encode_table(data)
+			local f = io.open(ENTITY_CONTACTS_PATH_7, 'a')
+			if not f then return end
+			f:write(json .. '\n')
+			f:flush()  -- Force immediate flush to disk
+			f:close()
+		end)
+	end
+
+	local function write_entity_json_8(data)
+		pcall(function()
+			local json = json_encode_table(data)
+			local f = io.open(ENTITY_CONTACTS_PATH_8, 'a')
+			if not f then return end
+			f:write(json .. '\n')
+			f:flush()  -- Force immediate flush to disk
+			f:close()
+		end)
+	end
+
+	local function write_entity_json_9(data)
+		pcall(function()
+			local json = json_encode_table(data)
+			local f = io.open(ENTITY_CONTACTS_PATH_9, 'a')
+			if not f then return end
+			f:write(json .. '\n')
+			f:flush()  -- Force immediate flush to disk
+			f:close()
+		end)
+	end
+
+	local function write_entity_json_10(data)
+		pcall(function()
+			local json = json_encode_table(data)
+			local f = io.open(ENTITY_CONTACTS_PATH_10, 'a')
+			if not f then return end
+			f:write(json .. '\n')
+			f:flush()  -- Force immediate flush to disk
+			f:close()
+		end)
+	end
+
+	local function write_entity_json_11(data)
+		pcall(function()
+			local json = json_encode_table(data)
+			local f = io.open(ENTITY_CONTACTS_PATH_11, 'a')
+			if not f then return end
+			f:write(json .. '\n')
+			f:flush()  -- Force immediate flush to disk
+			f:close()
+		end)
+	end
+
+	local function write_entity_json_12(data)
+		pcall(function()
+			local json = json_encode_table(data)
+			local f = io.open(ENTITY_CONTACTS_PATH_12, 'a')
 			if not f then return end
 			f:write(json .. '\n')
 			f:flush()  -- Force immediate flush to disk
@@ -1135,6 +1337,326 @@ pcall(function()
 		end)
 	end
 
+	local function trim_entity_file_5()
+		-- Trim the fifth entity contacts JSONL file
+		if not MAX_ENTITY_LINES or MAX_ENTITY_LINES <= 0 then return end
+
+		pcall(function()
+			local tmp = {}
+			local count = 0
+			local ok, r = pcall(io.open, ENTITY_CONTACTS_PATH_5, 'r')
+			if not ok or not r then return end
+
+			for _ in r:lines() do
+				count = count + 1
+			end
+			r:close()
+
+			if count <= MAX_ENTITY_LINES then return end
+
+			local skip = count - MAX_ENTITY_LINES
+			local ok2, r2 = pcall(io.open, ENTITY_CONTACTS_PATH_5, 'r')
+			if not ok2 or not r2 then return end
+
+			local lineNum = 0
+			for line in r2:lines() do
+				lineNum = lineNum + 1
+				if lineNum > skip then
+					table.insert(tmp, line)
+				end
+			end
+			r2:close()
+
+			local ok3, w = pcall(io.open, ENTITY_CONTACTS_PATH_5, 'w')
+			if not ok3 or not w then return end
+			for _, l in ipairs(tmp) do
+				w:write(l .. '\n')
+			end
+			w:flush()
+			w:close()
+		end)
+	end
+
+	local function trim_entity_file_6()
+		-- Trim the sixth entity contacts JSONL file
+		if not MAX_ENTITY_LINES or MAX_ENTITY_LINES <= 0 then return end
+
+		pcall(function()
+			local tmp = {}
+			local count = 0
+			local ok, r = pcall(io.open, ENTITY_CONTACTS_PATH_6, 'r')
+			if not ok or not r then return end
+
+			for _ in r:lines() do
+				count = count + 1
+			end
+			r:close()
+
+			if count <= MAX_ENTITY_LINES then return end
+
+			local skip = count - MAX_ENTITY_LINES
+			local ok2, r2 = pcall(io.open, ENTITY_CONTACTS_PATH_6, 'r')
+			if not ok2 or not r2 then return end
+
+			local lineNum = 0
+			for line in r2:lines() do
+				lineNum = lineNum + 1
+				if lineNum > skip then
+					table.insert(tmp, line)
+				end
+			end
+			r2:close()
+
+			local ok3, w = pcall(io.open, ENTITY_CONTACTS_PATH_6, 'w')
+			if not ok3 or not w then return end
+			for _, l in ipairs(tmp) do
+				w:write(l .. '\n')
+			end
+			w:flush()
+			w:close()
+		end)
+	end
+
+	local function trim_entity_file_7()
+		-- Trim the seventh entity contacts JSONL file
+		if not MAX_ENTITY_LINES or MAX_ENTITY_LINES <= 0 then return end
+
+		pcall(function()
+			local tmp = {}
+			local count = 0
+			local ok, r = pcall(io.open, ENTITY_CONTACTS_PATH_7, 'r')
+			if not ok or not r then return end
+
+			for _ in r:lines() do
+				count = count + 1
+			end
+			r:close()
+
+			if count <= MAX_ENTITY_LINES then return end
+
+			local skip = count - MAX_ENTITY_LINES
+			local ok2, r2 = pcall(io.open, ENTITY_CONTACTS_PATH_7, 'r')
+			if not ok2 or not r2 then return end
+
+			local lineNum = 0
+			for line in r2:lines() do
+				lineNum = lineNum + 1
+				if lineNum > skip then
+					table.insert(tmp, line)
+				end
+			end
+			r2:close()
+
+			local ok3, w = pcall(io.open, ENTITY_CONTACTS_PATH_7, 'w')
+			if not ok3 or not w then return end
+			for _, l in ipairs(tmp) do
+				w:write(l .. '\n')
+			end
+			w:flush()
+			w:close()
+		end)
+	end
+
+	local function trim_entity_file_8()
+		-- Trim the eighth entity contacts JSONL file
+		if not MAX_ENTITY_LINES or MAX_ENTITY_LINES <= 0 then return end
+
+		pcall(function()
+			local tmp = {}
+			local count = 0
+			local ok, r = pcall(io.open, ENTITY_CONTACTS_PATH_8, 'r')
+			if not ok or not r then return end
+
+			for _ in r:lines() do
+				count = count + 1
+			end
+			r:close()
+
+			if count <= MAX_ENTITY_LINES then return end
+
+			local skip = count - MAX_ENTITY_LINES
+			local ok2, r2 = pcall(io.open, ENTITY_CONTACTS_PATH_8, 'r')
+			if not ok2 or not r2 then return end
+
+			local lineNum = 0
+			for line in r2:lines() do
+				lineNum = lineNum + 1
+				if lineNum > skip then
+					table.insert(tmp, line)
+				end
+			end
+			r2:close()
+
+			local ok3, w = pcall(io.open, ENTITY_CONTACTS_PATH_8, 'w')
+			if not ok3 or not w then return end
+			for _, l in ipairs(tmp) do
+				w:write(l .. '\n')
+			end
+			w:flush()
+			w:close()
+		end)
+	end
+
+	local function trim_entity_file_9()
+		-- Trim the ninth entity contacts JSONL file
+		if not MAX_ENTITY_LINES or MAX_ENTITY_LINES <= 0 then return end
+
+		pcall(function()
+			local tmp = {}
+			local count = 0
+			local ok, r = pcall(io.open, ENTITY_CONTACTS_PATH_9, 'r')
+			if not ok or not r then return end
+
+			for _ in r:lines() do
+				count = count + 1
+			end
+			r:close()
+
+			if count <= MAX_ENTITY_LINES then return end
+
+			local skip = count - MAX_ENTITY_LINES
+			local ok2, r2 = pcall(io.open, ENTITY_CONTACTS_PATH_9, 'r')
+			if not ok2 or not r2 then return end
+
+			local lineNum = 0
+			for line in r2:lines() do
+				lineNum = lineNum + 1
+				if lineNum > skip then
+					table.insert(tmp, line)
+				end
+			end
+			r2:close()
+
+			local ok3, w = pcall(io.open, ENTITY_CONTACTS_PATH_9, 'w')
+			if not ok3 or not w then return end
+			for _, l in ipairs(tmp) do
+				w:write(l .. '\n')
+			end
+			w:flush()
+			w:close()
+		end)
+	end
+
+	local function trim_entity_file_10()
+		-- Trim the tenth entity contacts JSONL file
+		if not MAX_ENTITY_LINES or MAX_ENTITY_LINES <= 0 then return end
+
+		pcall(function()
+			local tmp = {}
+			local count = 0
+			local ok, r = pcall(io.open, ENTITY_CONTACTS_PATH_10, 'r')
+			if not ok or not r then return end
+
+			for _ in r:lines() do
+				count = count + 1
+			end
+			r:close()
+
+			if count <= MAX_ENTITY_LINES then return end
+
+			local skip = count - MAX_ENTITY_LINES
+			local ok2, r2 = pcall(io.open, ENTITY_CONTACTS_PATH_10, 'r')
+			if not ok2 or not r2 then return end
+
+			local lineNum = 0
+			for line in r2:lines() do
+				lineNum = lineNum + 1
+				if lineNum > skip then
+					table.insert(tmp, line)
+				end
+			end
+			r2:close()
+
+			local ok3, w = pcall(io.open, ENTITY_CONTACTS_PATH_10, 'w')
+			if not ok3 or not w then return end
+			for _, l in ipairs(tmp) do
+				w:write(l .. '\n')
+			end
+			w:flush()
+			w:close()
+		end)
+	end
+
+	local function trim_entity_file_11()
+		-- Trim the eleventh entity contacts JSONL file
+		if not MAX_ENTITY_LINES or MAX_ENTITY_LINES <= 0 then return end
+
+		pcall(function()
+			local tmp = {}
+			local count = 0
+			local ok, r = pcall(io.open, ENTITY_CONTACTS_PATH_11, 'r')
+			if not ok or not r then return end
+
+			for _ in r:lines() do
+				count = count + 1
+			end
+			r:close()
+
+			if count <= MAX_ENTITY_LINES then return end
+
+			local skip = count - MAX_ENTITY_LINES
+			local ok2, r2 = pcall(io.open, ENTITY_CONTACTS_PATH_11, 'r')
+			if not ok2 or not r2 then return end
+
+			local lineNum = 0
+			for line in r2:lines() do
+				lineNum = lineNum + 1
+				if lineNum > skip then
+					table.insert(tmp, line)
+				end
+			end
+			r2:close()
+
+			local ok3, w = pcall(io.open, ENTITY_CONTACTS_PATH_11, 'w')
+			if not ok3 or not w then return end
+			for _, l in ipairs(tmp) do
+				w:write(l .. '\n')
+			end
+			w:flush()
+			w:close()
+		end)
+	end
+
+	local function trim_entity_file_12()
+		-- Trim the twelfth entity contacts JSONL file
+		if not MAX_ENTITY_LINES or MAX_ENTITY_LINES <= 0 then return end
+
+		pcall(function()
+			local tmp = {}
+			local count = 0
+			local ok, r = pcall(io.open, ENTITY_CONTACTS_PATH_12, 'r')
+			if not ok or not r then return end
+
+			for _ in r:lines() do
+				count = count + 1
+			end
+			r:close()
+
+			if count <= MAX_ENTITY_LINES then return end
+
+			local skip = count - MAX_ENTITY_LINES
+			local ok2, r2 = pcall(io.open, ENTITY_CONTACTS_PATH_12, 'r')
+			if not ok2 or not r2 then return end
+
+			local lineNum = 0
+			for line in r2:lines() do
+				lineNum = lineNum + 1
+				if lineNum > skip then
+					table.insert(tmp, line)
+				end
+			end
+			r2:close()
+
+			local ok3, w = pcall(io.open, ENTITY_CONTACTS_PATH_12, 'w')
+			if not ok3 or not w then return end
+			for _, l in ipairs(tmp) do
+				w:write(l .. '\n')
+			end
+			w:flush()
+			w:close()
+		end)
+	end
+
 	local function serialize_table(obj, depth, maxDepth, seen)
 		depth = depth or 0
 		maxDepth = maxDepth or 3
@@ -1173,6 +1695,8 @@ pcall(function()
 		lastWrite = 0
 		lastTrim = 0  -- Initialize trim timer
 		lastEntityTrim = 0  -- Initialize entity trim timer
+		-- Create entity-batches directory if it doesn't exist
+		pcall(function() lfs.mkdir(ENTITY_BATCH_DIR) end)
 		-- clear files once at start if requested
 		if CLEAR_ON_START then
 			pcall(function()
@@ -1219,6 +1743,14 @@ pcall(function()
 			trim_entity_file_2()
 			trim_entity_file_3()
 			trim_entity_file_4()
+			trim_entity_file_5()
+			trim_entity_file_6()
+			trim_entity_file_7()
+			trim_entity_file_8()
+			trim_entity_file_9()
+			trim_entity_file_10()
+			trim_entity_file_11()
+			trim_entity_file_12()
 			lastEntityTrim = now
 		end
 
@@ -1226,8 +1758,8 @@ pcall(function()
 			-- Write aircraft telemetry (lean, no nearbyUnits for fast updates)
 			local telemetry = collect_telemetry()
 			write_json(telemetry)
-			-- Write entity contacts to SEPARATE files (batch 1-4)
-			local entityBatch1, entityBatch2, entityBatch3, entityBatch4 = collect_entity_contacts()
+			-- Write entity contacts to SEPARATE files (batch 1-12)
+			local entityBatch1, entityBatch2, entityBatch3, entityBatch4, entityBatch5, entityBatch6, entityBatch7, entityBatch8, entityBatch9, entityBatch10, entityBatch11, entityBatch12 = collect_entity_contacts()
 			write_entity_json(entityBatch1)
 			if entityBatch2 then
 				write_entity_json_2(entityBatch2)
@@ -1238,6 +1770,30 @@ pcall(function()
 			if entityBatch4 then
 				write_entity_json_4(entityBatch4)
 			end
+			if entityBatch5 then
+				write_entity_json_5(entityBatch5)
+			end
+			if entityBatch6 then
+				write_entity_json_6(entityBatch6)
+			end
+			if entityBatch7 then
+				write_entity_json_7(entityBatch7)
+			end
+			if entityBatch8 then
+				write_entity_json_8(entityBatch8)
+			end
+			if entityBatch9 then
+				write_entity_json_9(entityBatch9)
+			end
+			if entityBatch10 then
+				write_entity_json_10(entityBatch10)
+			end
+			if entityBatch11 then
+				write_entity_json_11(entityBatch11)
+			end
+			if entityBatch12 then
+				write_entity_json_12(entityBatch12)
+			end
 
 			lastWrite = now
 		end
@@ -1247,8 +1803,8 @@ pcall(function()
 		-- Write final aircraft telemetry
 		local telemetry = collect_telemetry()
 		write_json(telemetry)
-		-- Write final entity contacts (all 4 batches)
-		local entityBatch1, entityBatch2, entityBatch3, entityBatch4 = collect_entity_contacts()
+		-- Write final entity contacts (all 12 batches)
+		local entityBatch1, entityBatch2, entityBatch3, entityBatch4, entityBatch5, entityBatch6, entityBatch7, entityBatch8, entityBatch9, entityBatch10, entityBatch11, entityBatch12 = collect_entity_contacts()
 		write_entity_json(entityBatch1)
 		if entityBatch2 then
 			write_entity_json_2(entityBatch2)
@@ -1258,6 +1814,30 @@ pcall(function()
 		end
 		if entityBatch4 then
 			write_entity_json_4(entityBatch4)
+		end
+		if entityBatch5 then
+			write_entity_json_5(entityBatch5)
+		end
+		if entityBatch6 then
+			write_entity_json_6(entityBatch6)
+		end
+		if entityBatch7 then
+			write_entity_json_7(entityBatch7)
+		end
+		if entityBatch8 then
+			write_entity_json_8(entityBatch8)
+		end
+		if entityBatch9 then
+			write_entity_json_9(entityBatch9)
+		end
+		if entityBatch10 then
+			write_entity_json_10(entityBatch10)
+		end
+		if entityBatch11 then
+			write_entity_json_11(entityBatch11)
+		end
+		if entityBatch12 then
+			write_entity_json_12(entityBatch12)
 		end
 	end
 end, nil)
