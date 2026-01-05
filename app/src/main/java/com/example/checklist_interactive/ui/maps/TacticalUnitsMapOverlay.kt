@@ -81,6 +81,30 @@ class TacticalUnitsMapOverlay(
         style = Paint.Style.FILL
     }
 
+    // Paint for label background
+    private val labelBackgroundPaint = Paint().apply {
+        isAntiAlias = true
+        color = Color.parseColor("#DD000000") // Semi-transparent black
+        style = Paint.Style.FILL
+    }
+
+    // Paint for label text
+    private val labelTextPaint = Paint().apply {
+        isAntiAlias = true
+        color = Color.WHITE
+        textSize = 14f
+        textAlign = Paint.Align.LEFT
+        isFakeBoldText = false
+    }
+
+    // Paint for label border
+    private val labelBorderPaint = Paint().apply {
+        isAntiAlias = true
+        color = Color.WHITE
+        style = Paint.Style.STROKE
+        strokeWidth = 1.5f
+    }
+
     /**
      * Start tracking tactical units
      */
@@ -253,17 +277,98 @@ class TacticalUnitsMapOverlay(
         unitPositions.forEach { (unit, screenPoint) ->
             drawCircleMarker(canvas, screenPoint, unit, mapRotation)
         }
+
+        // BATCH 3: Draw labels for highlighted units
+        unitPositions.forEach { (unit, screenPoint) ->
+            if (unit.isHighlighted == 1) {
+                drawUnitLabel(canvas, screenPoint, unit, mapRotation)
+            }
+        }
+    }
+
+    /**
+     * Draw info label for highlighted units
+     * Shows name, altitude, speed, and distance
+     */
+    private fun drawUnitLabel(canvas: Canvas, point: Point, unit: TacticalUnitEntity, mapRotation: Float) {
+        // Format unit information
+        val lines = mutableListOf<String>()
+        
+        // Line 1: Name
+        lines.add(unit.name)
+        
+        // Line 2: Altitude in feet (convert from meters)
+        val altitudeFt = (unit.altitude * 3.28084).toInt()
+        lines.add("Alt: ${String.format("%,d", altitudeFt)} ft")
+        
+        // Line 3: Speed in knots (convert from m/s)
+        unit.speed?.let { speed ->
+            val speedKts = (speed * 1.94384).toInt()
+            lines.add("Spd: $speedKts kts")
+        }
+        
+        // Line 4: Distance in nautical miles (convert from meters)
+        unit.distance?.let { distance ->
+            val distanceNm = distance / 1852.0
+            lines.add(String.format("Dst: %.1f nm", distanceNm))
+        }
+        
+        // Line 5: Heading
+        unit.heading?.let { heading ->
+            lines.add("Hdg: ${heading.toInt()}°")
+        }
+        
+        // Calculate label dimensions
+        val padding = 6f
+        val lineHeight = 16f
+        var maxWidth = 0f
+        
+        lines.forEach { line ->
+            labelTextPaint.getTextBounds(line, 0, line.length, textBounds)
+            maxWidth = maxOf(maxWidth, textBounds.width().toFloat())
+        }
+        
+        val labelWidth = maxWidth + padding * 2
+        val labelHeight = lines.size * lineHeight + padding * 2
+        
+        canvas.save()
+        
+        // Translate to marker position
+        canvas.translate(point.x.toFloat(), point.y.toFloat())
+        
+        // Counter-rotate to keep label upright
+        canvas.rotate(-mapRotation)
+        
+        // Position label above marker (offset by marker radius + gap)
+        val labelY = -30f - labelHeight
+        
+        // Draw label background
+        val labelRect = RectF(
+            -labelWidth / 2f,
+            labelY,
+            labelWidth / 2f,
+            labelY + labelHeight
+        )
+        canvas.drawRoundRect(labelRect, 4f, 4f, labelBackgroundPaint)
+        canvas.drawRoundRect(labelRect, 4f, 4f, labelBorderPaint)
+        
+        // Draw text lines
+        var textY = labelY + padding + 12f
+        lines.forEach { line ->
+            canvas.drawText(line, -maxWidth / 2f, textY, labelTextPaint)
+            textY += lineHeight
+        }
+        
+        canvas.restore()
     }
 
     /**
      * Draw circle marker with category letter
      * Circle stays in map orientation, letter counter-rotates to stay readable
-     * Highlighted units are drawn larger
      */
     private fun drawCircleMarker(canvas: Canvas, point: Point, unit: TacticalUnitEntity, mapRotation: Float) {
         val coalitionColor = getCoalitionColor(unit.coalition)
-        val baseRadius = 16f // default size / 3f where size = 48f
-        val radius = if (unit.isHighlighted == 1) baseRadius * 1.5f else baseRadius // 50% larger when highlighted
+        val radius = 16f // default size / 3f where size = 48f
 
         // Update fill paint color for this unit
         circleFillPaint.color = coalitionColor
