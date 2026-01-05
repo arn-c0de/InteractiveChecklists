@@ -16,7 +16,7 @@ pcall(function()
 	local lastWrite = 0
 	local lastCommandCheck = 0
 	local COMMAND_CHECK_INTERVAL = 2.0 -- check for command file every 2 seconds
-	local STREAMER_VERSION = "1.0.10"
+	local STREAMER_VERSION = "1.0.11"
 	-- Maximum number of JSON lines to keep in the output file. Set to 0 to disable trimming.
 	local MAX_JSON_LINES = 20  -- Keep only last 20 lines (2 seconds @ 10 Hz) - MINIMAL buffer
 	local MAX_ENTITY_LINES = 2  -- Keep only last 2 lines for entity contacts (FAST load, minimal backlog)
@@ -219,11 +219,55 @@ pcall(function()
 					local categoryName = 'unknown'
 					local unitName = objData.Name or ''
 
+					-- First: Check for weapon names (override Type for misclassified weapons)
+					-- Use more specific patterns that match at start of name
+					local isWeaponByName = 
+					   -- US/NATO missiles and bombs
+					   unitName:match('^AIM[-_]') or
+					   unitName:match('^GBU[-_]') or
+					   unitName:match('^AGM[-_]') or
+					   unitName:match('^Mk[-_]%d') or  -- Mk-82, Mk_82, etc.
+					   unitName:match('^BDU[-_]') or
+					   unitName:match('^CBU[-_]') or
+					   unitName:match('^JDAM') or
+					   unitName:match('^Paveway') or
+					   unitName:match('^Maverick') or
+					   unitName:match('^Sidewinder') or
+					   unitName:match('^AMRAAM') or
+					   unitName:match('^Hellfire') or
+					   unitName:match('^Harpoon') or
+					   unitName:match('^SLAM') or
+					   unitName:match('^JSOW') or
+					   -- Rockets
+					   unitName:match('^HYDRA') or
+					   unitName:match('^LAU[-_]') or
+					   unitName:match('^Zuni') or
+					   -- Russian weapons
+					   unitName:match('^S[-_]24') or unitName:match('^S[-_]25') or unitName:match('^S[-_]8') or
+					   unitName:match('^R[-_]%d') or unitName:match('^R%d') or  -- R-77, R_60, R77, etc.
+					   unitName:match('^KH[-_]') or unitName:match('^Kh[-_]') or
+					   unitName:match('^FAB[-_]') or
+					   unitName:match('^OFAB[-_]') or
+					   unitName:match('^KAB[-_]') or
+					   unitName:match('^BETAB') or
+					   unitName:match('^RBK') or
+					   unitName:match('^KMGU') or
+					   unitName:match('^ZB[-_]') or  -- Incendiary bombs
+					   -- European weapons
+					   unitName:match('^MICA') or
+					   unitName:match('^Magic') or
+					   unitName:match('^Meteor') or
+					   unitName:match('^Brimstone') or
+					   unitName:match('^Exocet')
+
+					if isWeaponByName then
+						categoryName = 'weapon'
 					-- Name-based heuristics for structures
-					if unitName:find('HELIPAD') or unitName:find('FARP') or unitName:find('Invisible FARP') then
+					elseif unitName:find('HELIPAD') or unitName:find('FARP') or unitName:find('Invisible FARP') then
 						categoryName = 'structure'
 					elseif unitName:find('Bunker') or unitName:find('house') or unitName:find('Building') then
 						categoryName = 'structure'
+					-- Type-based categorization (most reliable for non-weapons)
 					elseif objData.Type and type(objData.Type) == 'table' then
 						local level1 = objData.Type.level1 or 0
 						local level3 = objData.Type.level3 or 0
@@ -245,7 +289,7 @@ pcall(function()
 						elseif level1 == 5 then
 							categoryName = 'weapon'
 						elseif level1 == 0 then
-							categoryName = 'structure'
+							categoryName = 'structure'  -- Default for level1 == 0
 						end
 					end
 					
