@@ -66,6 +66,9 @@ fun FABOverlay(
     // Detect orientation from actual screen dimensions (more reliable)
     val isLandscape = screenWidthPx > screenHeightPx
 
+    // Track all FAB positions for collision detection
+    val fabPositions = remember { mutableStateMapOf<String, Pair<Float, Float>>() }
+
     // Log orientation change
     LaunchedEffect(screenWidthPx, screenHeightPx, isLandscape) {
         android.util.Log.d("FABOverlay", "Screen size changed: isLandscape=$isLandscape, screenWidth=$screenWidthPx, screenHeight=$screenHeightPx")
@@ -100,6 +103,10 @@ fun FABOverlay(
                 containerColor = fabConfig.containerColor,
                 contentColor = fabConfig.contentColor,
                 marginPx = marginPx,
+                allFabPositions = fabPositions,
+                onPositionChanged = { x, y ->
+                    fabPositions[fabConfig.id] = Pair(x, y)
+                },
                 content = {
                     Icon(
                         imageVector = fabConfig.icon,
