@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import com.example.checklist_interactive.data.prefs.PreferencesManager
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 /**
  * Draggable FAB button that persists its position in SharedPreferences
@@ -48,7 +49,9 @@ fun DraggableFab(
     containerColor: Color? = null,
     contentColor: Color? = null,
     content: @Composable () -> Unit,
-    marginPx: Int = 0 // horizontal margin on both sides
+    marginPx: Int = 0, // horizontal margin on both sides
+    allFabPositions: Map<String, Pair<Float, Float>> = emptyMap(),
+    onPositionChanged: (Float, Float) -> Unit = { _, _ -> }
 ) {
     if (!visible) return
 
@@ -75,6 +78,60 @@ fun DraggableFab(
     }
     var offsetY by remember(savedYPercent, availableHeight) {
         mutableStateOf((marginPx + (savedYPercent * availableHeight)).coerceIn(marginPx.toFloat(), (marginPx + availableHeight).toFloat()))
+    }
+
+    // Report current position to overlay
+    LaunchedEffect(offsetX, offsetY) {
+        onPositionChanged(offsetX, offsetY)
+    }
+
+    // Function to check collision and adjust position if needed
+    // Use centers for accurate collision and allow touch (no extra margin)
+    fun adjustForCollisions(newX: Float, newY: Float): Pair<Float, Float> {
+        var adjustedX = newX
+        var adjustedY = newY
+        val minDistance = fabSizePx.toFloat() // allow direct touching (no extra margin)
+
+        val centerX = adjustedX + fabSizePx / 2f
+        val centerY = adjustedY + fabSizePx / 2f
+
+        allFabPositions.forEach { (otherId, otherPos) ->
+            if (otherId != name) {
+                val (otherX, otherY) = otherPos
+                val otherCenterX = otherX + fabSizePx / 2f
+                val otherCenterY = otherY + fabSizePx / 2f
+
+                val dx = centerX - otherCenterX
+                val dy = centerY - otherCenterY
+                val distance = sqrt(dx * dx + dy * dy)
+
+                if (distance < minDistance) {
+                    if (distance == 0f) {
+                        // Coincident positions: nudge horizontally by minDistance
+                        adjustedX += minDistance
+                    } else {
+                        // Calculate repulsion vector based on center distance
+                        val pushFactor = (minDistance - distance) / distance
+                        val pushX = dx * pushFactor
+                        val pushY = dy * pushFactor
+
+                        adjustedX += pushX
+                        adjustedY += pushY
+                    }
+                }
+            }
+        }
+
+        // Clamp to screen bounds
+        val minX = marginPx.toFloat()
+        val maxX = (marginPx + availableWidth).toFloat()
+        val minY = marginPx.toFloat()
+        val maxY = (marginPx + availableHeight).toFloat()
+
+        return Pair(
+            adjustedX.coerceIn(minX, maxX),
+            adjustedY.coerceIn(minY, maxY)
+        )
     }
 
     // When orientation changes, reset to default position for that orientation
@@ -142,13 +199,12 @@ fun DraggableFab(
                         },
                         onDrag = { change, dragAmount ->
                             change.consume()
-                            // Update position (respect margins)
-                            val minX = marginPx.toFloat()
-                            val maxX = (marginPx + availableWidth).toFloat()
-                            val minY = marginPx.toFloat()
-                            val maxY = (marginPx + availableHeight).toFloat()
-                            offsetX = (offsetX + dragAmount.x).coerceIn(minX, maxX)
-                            offsetY = (offsetY + dragAmount.y).coerceIn(minY, maxY)
+                            // Calculate new position with collision check
+                            val newX = offsetX + dragAmount.x
+                            val newY = offsetY + dragAmount.y
+                            val (adjustedX, adjustedY) = adjustForCollisions(newX, newY)
+                            offsetX = adjustedX
+                            offsetY = adjustedY
                         },
                         onDragEnd = {
                             if (isDragging) {
@@ -192,13 +248,12 @@ fun DraggableFab(
                         },
                         onDrag = { change, dragAmount ->
                             change.consume()
-                            // Update position (respect margins)
-                            val minX = marginPx.toFloat()
-                            val maxX = (marginPx + availableWidth).toFloat()
-                            val minY = marginPx.toFloat()
-                            val maxY = (marginPx + availableHeight).toFloat()
-                            offsetX = (offsetX + dragAmount.x).coerceIn(minX, maxX)
-                            offsetY = (offsetY + dragAmount.y).coerceIn(minY, maxY)
+                            // Calculate new position with collision check
+                            val newX = offsetX + dragAmount.x
+                            val newY = offsetY + dragAmount.y
+                            val (adjustedX, adjustedY) = adjustForCollisions(newX, newY)
+                            offsetX = adjustedX
+                            offsetY = adjustedY
                         },
                         onDragEnd = {
                             if (isDragging) {
