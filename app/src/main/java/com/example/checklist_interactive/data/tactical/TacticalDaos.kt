@@ -471,6 +471,12 @@ interface TacticalUnitsDao {
     @Query("UPDATE tactical_units SET is_hidden = 1 WHERE last_seen_at < :cutoffTime")
     suspend fun markUnitsHiddenOlderThan(cutoffTime: String): Int
     
+    @Query("UPDATE tactical_units SET is_highlighted = :isHighlighted WHERE id = :unitId")
+    suspend fun setUnitHighlighted(unitId: Int, isHighlighted: Int): Int
+    
+    @Query("UPDATE tactical_units SET is_highlighted = 0")
+    suspend fun clearAllHighlights(): Int
+    
     @Query("UPDATE tactical_units SET is_hidden = 0")
     suspend fun unhideAllUnits()
     

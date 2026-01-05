@@ -548,6 +548,9 @@ data class TacticalUnitEntity(
     @ColumnInfo(name = "is_hidden", defaultValue = "0")
     val isHidden: Int = 0,  // 1=hidden from map/list, 0=visible (allows unhiding old units for review)
     
+    @ColumnInfo(name = "is_highlighted", defaultValue = "0")
+    val isHighlighted: Int = 0,  // 1=highlighted on map (larger icon), 0=normal size
+    
     @ColumnInfo(name = "first_seen_at")
     val firstSeenAt: String,  // ISO 8601 timestamp
     

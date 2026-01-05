@@ -27,8 +27,8 @@ import java.io.File
         TacticalUnitEntity::class,
         TacticalUnitHistoryEntity::class
     ],
-    version = 1,
-    exportSchema = true
+    version = 2,
+    exportSchema = false
 )
 abstract class TacticalDatabase : RoomDatabase() {
     abstract fun locationDao(): LocationDao
@@ -184,8 +184,7 @@ abstract class TacticalDatabase : RoomDatabase() {
                 TacticalDatabase::class.java,
                 DATABASE_NAME
             )
-                .createFromAsset("databases/$DATABASE_NAME")
-
+                .createFromAsset("databases/$DATABASE_NAME")                .addMigrations(MIGRATION_1_2)
             if (allowDestructiveMigration) {
                 builder.fallbackToDestructiveMigration()
             }
@@ -237,6 +236,15 @@ abstract class TacticalDatabase : RoomDatabase() {
             }
             INSTANCE = null
             return getInstance(context)
+        }
+        
+        /**
+         * Migration from version 1 to 2: Add is_highlighted column to tactical_units
+         */
+        private val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE tactical_units ADD COLUMN is_highlighted INTEGER NOT NULL DEFAULT 0")
+            }
         }
     }
 }

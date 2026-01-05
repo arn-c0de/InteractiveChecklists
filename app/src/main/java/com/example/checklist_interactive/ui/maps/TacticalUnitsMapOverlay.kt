@@ -258,10 +258,12 @@ class TacticalUnitsMapOverlay(
     /**
      * Draw circle marker with category letter
      * Circle stays in map orientation, letter counter-rotates to stay readable
+     * Highlighted units are drawn larger
      */
     private fun drawCircleMarker(canvas: Canvas, point: Point, unit: TacticalUnitEntity, mapRotation: Float) {
         val coalitionColor = getCoalitionColor(unit.coalition)
-        val radius = 16f // size / 3f where size = 48f
+        val baseRadius = 16f // default size / 3f where size = 48f
+        val radius = if (unit.isHighlighted == 1) baseRadius * 1.5f else baseRadius // 50% larger when highlighted
 
         // Update fill paint color for this unit
         circleFillPaint.color = coalitionColor

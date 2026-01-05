@@ -1979,6 +1979,8 @@ fun MapViewer(
                                 put("tactical_unit_id", tacticalUnit.id)
                                 // Store heading for extraction by MapMarkerPopup
                                 tacticalUnit.heading?.let { put("heading", it) }
+                                // Store highlight status
+                                put("is_highlighted", tacticalUnit.isHighlighted)
                             }.toString()
                         )
 

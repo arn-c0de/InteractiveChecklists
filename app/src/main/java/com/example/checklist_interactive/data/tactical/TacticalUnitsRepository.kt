@@ -242,8 +242,20 @@ class TacticalUnitsRepository(private val context: Context) {
         historyDao.deleteAllHistory()
         // Step 3: Delete all units
         unitsDao.deleteAllUnits()
+    }    
+    /**
+     * Toggle highlight status for a unit
+     */
+    suspend fun toggleUnitHighlight(unitId: Int, isHighlighted: Boolean) {
+        unitsDao.setUnitHighlighted(unitId, if (isHighlighted) 1 else 0)
     }
     
+    /**
+     * Clear all highlights
+     */
+    suspend fun clearAllHighlights() {
+        unitsDao.clearAllHighlights()
+    }    
     /**
      * Delete all history entries
      */
