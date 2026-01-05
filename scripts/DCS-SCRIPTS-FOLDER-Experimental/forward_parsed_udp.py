@@ -205,7 +205,10 @@ _stats = {
     'messages_rejected_old': 0,
     'entity_batches_loaded': 0,
     'entity_units_cached': 0,
-    'last_print_time': 0
+    'last_print_time': 0,
+    'units_sent': {},  # Track unique units sent by dcsId: {'dcsId': {'name': ..., 'category': ..., 'count': ...}}
+    'units_by_category': {},  # Track count by category
+    'units_by_coalition': {}  # Track count by coalition (Allies/Enemies/Neutral)
 }
 _STATS_PRINT_INTERVAL = 10.0  # Print statistics every 10 seconds
 
@@ -226,11 +229,41 @@ def print_statistics(force: bool = False):
                        f"EntityBatches={_stats['entity_batches_loaded']} | "
                        f"EntityUnits={_stats['entity_units_cached']}")
         
+        # Print detailed unit statistics (by category and coalition)
+        if _stats['units_sent']:
+            total_units = len(_stats['units_sent'])
+            category_summary = []
+            for category in sorted(_stats['units_by_category'].keys()):
+                count = _stats['units_by_category'][category]
+                category_summary.append(f"{category}={count}")
+            
+            coalition_summary = []
+            for coalition in sorted(_stats['units_by_coalition'].keys()):
+                count = _stats['units_by_coalition'][coalition]
+                coalition_summary.append(f"{coalition}={count}")
+            
+            logger.info(f"🎯 UNITS SENT (last {_STATS_PRINT_INTERVAL}s): "
+                       f"Total={total_units} unique units | " + " | ".join(category_summary))
+            
+            if coalition_summary:
+                logger.info(f"🏳️ COALITION: " + " | ".join(coalition_summary))
+            
+            # Optionally: Log sample of units for debugging (first 5 of each category)
+            if logger.level <= 10:  # DEBUG level
+                for category in sorted(_stats['units_by_category'].keys()):
+                    sample_units = [u for u in _stats['units_sent'].values() if u.get('category') == category][:5]
+                    if sample_units:
+                        unit_names = ", ".join([u.get('name', 'Unknown') for u in sample_units])
+                        logger.debug(f"   {category}: {unit_names}...")
+        
         # Reset counters
         _stats['messages_sent'] = 0
         _stats['messages_rejected_old'] = 0
         _stats['entity_batches_loaded'] = 0
         _stats['entity_units_cached'] = 0
+        _stats['units_sent'] = {}
+        _stats['units_by_category'] = {}
+        _stats['units_by_coalition'] = {}
         _stats['last_print_time'] = current_time
 
 
@@ -596,11 +629,30 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
     entity_contacts_path_2 = None
     entity_contacts_path_3 = None
     entity_contacts_path_4 = None
+    entity_contacts_path_5 = None
+    entity_contacts_path_6 = None
+    entity_contacts_path_7 = None
+    entity_contacts_path_8 = None
+    entity_contacts_path_9 = None
+    entity_contacts_path_10 = None
+    entity_contacts_path_11 = None
+    entity_contacts_path_12 = None
     if 'player_aircraft_parsed.jsonl' in path:
-        potential_entity_path = path.replace('player_aircraft_parsed.jsonl', 'entity-contacts-parsed.jsonl')
-        potential_entity_path_2 = path.replace('player_aircraft_parsed.jsonl', 'entity-contacts-parsed-2.jsonl')
-        potential_entity_path_3 = path.replace('player_aircraft_parsed.jsonl', 'entity-contacts-parsed-3.jsonl')
-        potential_entity_path_4 = path.replace('player_aircraft_parsed.jsonl', 'entity-contacts-parsed-4.jsonl')
+        # Entity batches are now in a subfolder 'entity-batches'
+        scripts_dir = os.path.dirname(path)
+        entity_batch_dir = os.path.join(scripts_dir, 'entity-batches')
+        potential_entity_path = os.path.join(entity_batch_dir, 'entity-contacts-parsed.jsonl')
+        potential_entity_path_2 = os.path.join(entity_batch_dir, 'entity-contacts-parsed-2.jsonl')
+        potential_entity_path_3 = os.path.join(entity_batch_dir, 'entity-contacts-parsed-3.jsonl')
+        potential_entity_path_4 = os.path.join(entity_batch_dir, 'entity-contacts-parsed-4.jsonl')
+        potential_entity_path_5 = os.path.join(entity_batch_dir, 'entity-contacts-parsed-5.jsonl')
+        potential_entity_path_6 = os.path.join(entity_batch_dir, 'entity-contacts-parsed-6.jsonl')
+        potential_entity_path_7 = os.path.join(entity_batch_dir, 'entity-contacts-parsed-7.jsonl')
+        potential_entity_path_8 = os.path.join(entity_batch_dir, 'entity-contacts-parsed-8.jsonl')
+        potential_entity_path_9 = os.path.join(entity_batch_dir, 'entity-contacts-parsed-9.jsonl')
+        potential_entity_path_10 = os.path.join(entity_batch_dir, 'entity-contacts-parsed-10.jsonl')
+        potential_entity_path_11 = os.path.join(entity_batch_dir, 'entity-contacts-parsed-11.jsonl')
+        potential_entity_path_12 = os.path.join(entity_batch_dir, 'entity-contacts-parsed-12.jsonl')
 
         if os.path.exists(potential_entity_path):
             entity_contacts_path = potential_entity_path
@@ -614,6 +666,12 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
         if os.path.exists(potential_entity_path_4):
             entity_contacts_path_4 = potential_entity_path_4
             logger.info(f"📡 Entity contacts file (batch 4) detected: {entity_contacts_path_4}")
+        if os.path.exists(potential_entity_path_5):
+            entity_contacts_path_5 = potential_entity_path_5
+            logger.info(f"📡 Entity contacts file (batch 5) detected: {entity_contacts_path_5}")
+        if os.path.exists(potential_entity_path_6):
+            entity_contacts_path_6 = potential_entity_path_6
+            logger.info(f"📡 Entity contacts file (batch 6) detected: {entity_contacts_path_6}")
 
     # Create a UDP socket bound to handshake_port for handshake, send data to destination port
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -647,6 +705,14 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
     f_entity_2 = None
     f_entity_3 = None
     f_entity_4 = None
+    f_entity_5 = None
+    f_entity_6 = None
+    f_entity_7 = None
+    f_entity_8 = None
+    f_entity_9 = None
+    f_entity_10 = None
+    f_entity_11 = None
+    f_entity_12 = None
     if entity_contacts_path and os.path.exists(entity_contacts_path):
         f_entity = open_for_tail(entity_contacts_path)
     if entity_contacts_path_2 and os.path.exists(entity_contacts_path_2):
@@ -655,6 +721,22 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
         f_entity_3 = open_for_tail(entity_contacts_path_3)
     if entity_contacts_path_4 and os.path.exists(entity_contacts_path_4):
         f_entity_4 = open_for_tail(entity_contacts_path_4)
+    if entity_contacts_path_5 and os.path.exists(entity_contacts_path_5):
+        f_entity_5 = open_for_tail(entity_contacts_path_5)
+    if entity_contacts_path_6 and os.path.exists(entity_contacts_path_6):
+        f_entity_6 = open_for_tail(entity_contacts_path_6)
+    if entity_contacts_path_7 and os.path.exists(entity_contacts_path_7):
+        f_entity_7 = open_for_tail(entity_contacts_path_7)
+    if entity_contacts_path_8 and os.path.exists(entity_contacts_path_8):
+        f_entity_8 = open_for_tail(entity_contacts_path_8)
+    if entity_contacts_path_9 and os.path.exists(entity_contacts_path_9):
+        f_entity_9 = open_for_tail(entity_contacts_path_9)
+    if entity_contacts_path_10 and os.path.exists(entity_contacts_path_10):
+        f_entity_10 = open_for_tail(entity_contacts_path_10)
+    if entity_contacts_path_11 and os.path.exists(entity_contacts_path_11):
+        f_entity_11 = open_for_tail(entity_contacts_path_11)
+    if entity_contacts_path_12 and os.path.exists(entity_contacts_path_12):
+        f_entity_12 = open_for_tail(entity_contacts_path_12)
 
     try:
         # Declare global variables at the start of the loop to avoid SyntaxError
@@ -668,6 +750,14 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
         last_entity_data_batch2 = None  # Cache last entity batch 2
         last_entity_data_batch3 = None  # Cache last entity batch 3
         last_entity_data_batch4 = None  # Cache last entity batch 4
+        last_entity_data_batch5 = None  # Cache last entity batch 5
+        last_entity_data_batch6 = None  # Cache last entity batch 6
+        last_entity_data_batch7 = None  # Cache last entity batch 7
+        last_entity_data_batch8 = None  # Cache last entity batch 8
+        last_entity_data_batch9 = None  # Cache last entity batch 9
+        last_entity_data_batch10 = None  # Cache last entity batch 10
+        last_entity_data_batch11 = None  # Cache last entity batch 11
+        last_entity_data_batch12 = None  # Cache last entity batch 12
         
         while True:
             # Check heartbeat FIRST (independent of data availability)
@@ -823,6 +913,14 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                     last_entity_data_batch2 = None
                     last_entity_data_batch3 = None
                     last_entity_data_batch4 = None
+                    last_entity_data_batch5 = None
+                    last_entity_data_batch6 = None
+                    last_entity_data_batch7 = None
+                    last_entity_data_batch8 = None
+                    last_entity_data_batch9 = None
+                    last_entity_data_batch10 = None
+                    last_entity_data_batch11 = None
+                    last_entity_data_batch12 = None
                     logger.info("🗑️ Cleared entity data caches (new mission detected)")
                     _last_timestamp_update_time = 0
                     logger.info("🔄 Reset timestamp filter after file trim")
@@ -1077,34 +1175,240 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                         except Exception as e:
                             logger.warning(f"⚠️ Failed to read entity batch 4: {e}")
 
+                # Batch 5 (units 668-835)
+                if f_entity_5:
+                    try:
+                        latest_line = None
+                        for line in f_entity_5:
+                            latest_line = line.strip()
+
+                            if latest_line:
+                                entity_jsonpart_5 = extract_json_from_line(latest_line)
+                                if entity_jsonpart_5 and len(entity_jsonpart_5) < 500000:
+                                    entity_parsed_5 = safe_json_parse(entity_jsonpart_5, max_size=500000)
+                                    if entity_parsed_5 and 'nearbyUnits' in entity_parsed_5:
+                                        last_entity_data_batch5 = entity_parsed_5['nearbyUnits']
+                                        entity_data_updated = True
+                                        with _stats_lock:
+                                            _stats['entity_batches_loaded'] += 1
+                                            _stats['entity_units_cached'] += len(last_entity_data_batch5)
+                                        logger.debug(f"📡 Cached batch 5: {len(last_entity_data_batch5)} units")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Failed to read entity batch 5: {e}")
+
+                # Batch 6 (units 625-750)
+                if f_entity_6:
+                    try:
+                        latest_line = None
+                        for line in f_entity_6:
+                            latest_line = line.strip()
+
+                            if latest_line:
+                                entity_jsonpart_6 = extract_json_from_line(latest_line)
+                                if entity_jsonpart_6 and len(entity_jsonpart_6) < 500000:
+                                    entity_parsed_6 = safe_json_parse(entity_jsonpart_6, max_size=500000)
+                                    if entity_parsed_6 and 'nearbyUnits' in entity_parsed_6:
+                                        last_entity_data_batch6 = entity_parsed_6['nearbyUnits']
+                                        entity_data_updated = True
+                                        with _stats_lock:
+                                            _stats['entity_batches_loaded'] += 1
+                                            _stats['entity_units_cached'] += len(last_entity_data_batch6)
+                                        logger.debug(f"📡 Cached batch 6: {len(last_entity_data_batch6)} units")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Failed to read entity batch 6: {e}")
+
+                # Batch 7 (units 750-875)
+                if f_entity_7:
+                    try:
+                        latest_line = None
+                        for line in f_entity_7:
+                            latest_line = line.strip()
+
+                            if latest_line:
+                                entity_jsonpart_7 = extract_json_from_line(latest_line)
+                                if entity_jsonpart_7 and len(entity_jsonpart_7) < 500000:
+                                    entity_parsed_7 = safe_json_parse(entity_jsonpart_7, max_size=500000)
+                                    if entity_parsed_7 and 'nearbyUnits' in entity_parsed_7:
+                                        last_entity_data_batch7 = entity_parsed_7['nearbyUnits']
+                                        entity_data_updated = True
+                                        with _stats_lock:
+                                            _stats['entity_batches_loaded'] += 1
+                                            _stats['entity_units_cached'] += len(last_entity_data_batch7)
+                                        logger.debug(f"📡 Cached batch 7: {len(last_entity_data_batch7)} units")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Failed to read entity batch 7: {e}")
+
+                # Batch 8 (units 700-800)
+                if f_entity_8:
+                    try:
+                        latest_line = None
+                        for line in f_entity_8:
+                            latest_line = line.strip()
+
+                            if latest_line:
+                                entity_jsonpart_8 = extract_json_from_line(latest_line)
+                                if entity_jsonpart_8 and len(entity_jsonpart_8) < 500000:
+                                    entity_parsed_8 = safe_json_parse(entity_jsonpart_8, max_size=500000)
+                                    if entity_parsed_8 and 'nearbyUnits' in entity_parsed_8:
+                                        last_entity_data_batch8 = entity_parsed_8['nearbyUnits']
+                                        entity_data_updated = True
+                                        with _stats_lock:
+                                            _stats['entity_batches_loaded'] += 1
+                                            _stats['entity_units_cached'] += len(last_entity_data_batch8)
+                                        logger.debug(f"📡 Cached batch 8: {len(last_entity_data_batch8)} units")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Failed to read entity batch 8: {e}")
+
+                # Batch 9 (units 800-900)
+                if f_entity_9:
+                    try:
+                        latest_line = None
+                        for line in f_entity_9:
+                            latest_line = line.strip()
+
+                            if latest_line:
+                                entity_jsonpart_9 = extract_json_from_line(latest_line)
+                                if entity_jsonpart_9 and len(entity_jsonpart_9) < 500000:
+                                    entity_parsed_9 = safe_json_parse(entity_jsonpart_9, max_size=500000)
+                                    if entity_parsed_9 and 'nearbyUnits' in entity_parsed_9:
+                                        last_entity_data_batch9 = entity_parsed_9['nearbyUnits']
+                                        entity_data_updated = True
+                                        with _stats_lock:
+                                            _stats['entity_batches_loaded'] += 1
+                                            _stats['entity_units_cached'] += len(last_entity_data_batch9)
+                                        logger.debug(f"📡 Cached batch 9: {len(last_entity_data_batch9)} units")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Failed to read entity batch 9: {e}")
+
+                # Batch 10 (units 900-1000)
+                if f_entity_10:
+                    try:
+                        latest_line = None
+                        for line in f_entity_10:
+                            latest_line = line.strip()
+
+                            if latest_line:
+                                entity_jsonpart_10 = extract_json_from_line(latest_line)
+                                if entity_jsonpart_10 and len(entity_jsonpart_10) < 500000:
+                                    entity_parsed_10 = safe_json_parse(entity_jsonpart_10, max_size=500000)
+                                    if entity_parsed_10 and 'nearbyUnits' in entity_parsed_10:
+                                        last_entity_data_batch10 = entity_parsed_10['nearbyUnits']
+                                        entity_data_updated = True
+                                        with _stats_lock:
+                                            _stats['entity_batches_loaded'] += 1
+                                            _stats['entity_units_cached'] += len(last_entity_data_batch10)
+                                        logger.debug(f"📡 Cached batch 10: {len(last_entity_data_batch10)} units")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Failed to read entity batch 10: {e}")
+
+                # Batch 11
+                if f_entity_11:
+                    try:
+                        latest_line = None
+                        for line in f_entity_11:
+                            latest_line = line.strip()
+
+                            if latest_line:
+                                entity_jsonpart_11 = extract_json_from_line(latest_line)
+                                if entity_jsonpart_11 and len(entity_jsonpart_11) < 500000:
+                                    entity_parsed_11 = safe_json_parse(entity_jsonpart_11, max_size=500000)
+                                    if entity_parsed_11 and 'nearbyUnits' in entity_parsed_11:
+                                        last_entity_data_batch11 = entity_parsed_11['nearbyUnits']
+                                        entity_data_updated = True
+                                        with _stats_lock:
+                                            _stats['entity_batches_loaded'] += 1
+                                            _stats['entity_units_cached'] += len(last_entity_data_batch11)
+                                        logger.debug(f"📡 Cached batch 11: {len(last_entity_data_batch11)} units")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Failed to read entity batch 11: {e}")
+
+                # Batch 12
+                if f_entity_12:
+                    try:
+                        latest_line = None
+                        for line in f_entity_12:
+                            latest_line = line.strip()
+
+                            if latest_line:
+                                entity_jsonpart_12 = extract_json_from_line(latest_line)
+                                if entity_jsonpart_12 and len(entity_jsonpart_12) < 500000:
+                                    entity_parsed_12 = safe_json_parse(entity_jsonpart_12, max_size=500000)
+                                    if entity_parsed_12 and 'nearbyUnits' in entity_parsed_12:
+                                        last_entity_data_batch12 = entity_parsed_12['nearbyUnits']
+                                        entity_data_updated = True
+                                        with _stats_lock:
+                                            _stats['entity_batches_loaded'] += 1
+                                            _stats['entity_units_cached'] += len(last_entity_data_batch12)
+                                        logger.debug(f"📡 Cached batch 12: {len(last_entity_data_batch12)} units")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Failed to read entity batch 12: {e}")
+
             # Merge cached tactical data with player data whenever available (uses cached data)
             # ROTATION: Alternate between batch groups to fit all units in UDP packets
             final_json = jsonpart
             # Send entity data if ANY cached batches are available (not just when freshly updated!)
             if (last_entity_data_batch1 is not None or last_entity_data_batch2 is not None
-                or last_entity_data_batch3 is not None or last_entity_data_batch4 is not None):
+                or last_entity_data_batch3 is not None or last_entity_data_batch4 is not None
+                or last_entity_data_batch5 is not None or last_entity_data_batch6 is not None
+                or last_entity_data_batch7 is not None or last_entity_data_batch8 is not None
+                or last_entity_data_batch9 is not None or last_entity_data_batch10 is not None
+                or last_entity_data_batch11 is not None or last_entity_data_batch12 is not None):
                 try:
                     # Parse player data, combine batches based on rotation, re-encode
                     player_data = safe_json_parse(jsonpart, max_size=_MAX_DATA_MESSAGE_SIZE)
                     if player_data:
-                        # ROTATION LOGIC: Alternate between batch groups
-                        # Even frames (0, 2, 4...): Send batch 1+2 (units 0-500, closer)
-                        # Odd frames (1, 3, 5...): Send batch 3+4 (units 500-1000, farther)
+                        # ROTATION LOGIC: Alternate between 6 batch groups (12 batches total, 83 units each)
+                        # Frame 0, 6, 12...: Send batch 1+2 (units 0-166, closest)
+                        # Frame 1, 7, 13...: Send batch 3+4 (units 166-332)
+                        # Frame 2, 8, 14...: Send batch 5+6 (units 332-498)
+                        # Frame 3, 9, 15...: Send batch 7+8 (units 498-664)
+                        # Frame 4, 10, 16...: Send batch 9+10 (units 664-830)
+                        # Frame 5, 11, 17...: Send batch 11+12 (units 830-996, farthest)
                         combined_units = []
-                        if batch_rotation_counter % 2 == 0:
-                            # Send batch 1+2 (closer units)
+                        rotation_group = batch_rotation_counter % 6
+                        
+                        if rotation_group == 0:
+                            # Send batch 1+2 (closest units)
                             if last_entity_data_batch1:
                                 combined_units.extend(last_entity_data_batch1)
                             if last_entity_data_batch2:
                                 combined_units.extend(last_entity_data_batch2)
                             batch_group = "1+2"
-                        else:
-                            # Send batch 3+4 (farther units)
+                        elif rotation_group == 1:
+                            # Send batch 3+4
                             if last_entity_data_batch3:
                                 combined_units.extend(last_entity_data_batch3)
                             if last_entity_data_batch4:
                                 combined_units.extend(last_entity_data_batch4)
                             batch_group = "3+4"
+                        elif rotation_group == 2:
+                            # Send batch 5+6
+                            if last_entity_data_batch5:
+                                combined_units.extend(last_entity_data_batch5)
+                            if last_entity_data_batch6:
+                                combined_units.extend(last_entity_data_batch6)
+                            batch_group = "5+6"
+                        elif rotation_group == 3:
+                            # Send batch 7+8
+                            if last_entity_data_batch7:
+                                combined_units.extend(last_entity_data_batch7)
+                            if last_entity_data_batch8:
+                                combined_units.extend(last_entity_data_batch8)
+                            batch_group = "7+8"
+                        elif rotation_group == 4:
+                            # Send batch 9+10
+                            if last_entity_data_batch9:
+                                combined_units.extend(last_entity_data_batch9)
+                            if last_entity_data_batch10:
+                                combined_units.extend(last_entity_data_batch10)
+                            batch_group = "9+10"
+                        else:
+                            # Send batch 11+12 (farthest units)
+                            if last_entity_data_batch11:
+                                combined_units.extend(last_entity_data_batch11)
+                            if last_entity_data_batch12:
+                                combined_units.extend(last_entity_data_batch12)
+                            batch_group = "11+12"
 
                         # Increment rotation counter for next update
                         batch_rotation_counter += 1
@@ -1122,6 +1426,32 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                                 # Check if it fits in UDP packet (~65KB after encryption)
                                 if final_size <= _MAX_DATA_MESSAGE_SIZE:
                                     logger.debug(f"📡 Sending {len(units_to_send)} units ({final_size} bytes) from batch group {batch_group}")
+                                    
+                                    # Track units being sent for statistics
+                                    with _stats_lock:
+                                        for unit in units_to_send:
+                                            unit_id = unit.get('dcsId')
+                                            unit_cat = unit.get('category', 'unknown')
+                                            unit_coal = unit.get('coalition', 'Unknown')
+                                            if unit_id:
+                                                # Track unique units (only count once per 10-second window)
+                                                if unit_id not in _stats['units_sent']:
+                                                    _stats['units_sent'][unit_id] = {
+                                                        'name': unit.get('name', 'Unknown'),
+                                                        'category': unit_cat,
+                                                        'coalition': unit_coal,
+                                                        'count': 1
+                                                    }
+                                                    
+                                                    # Track by category (only for NEW units)
+                                                    _stats['units_by_category'][unit_cat] = _stats['units_by_category'].get(unit_cat, 0) + 1
+                                                    
+                                                    # Track by coalition (only for NEW units)
+                                                    _stats['units_by_coalition'][unit_coal] = _stats['units_by_coalition'].get(unit_coal, 0) + 1
+                                                else:
+                                                    # Unit already seen in this window, just increment repeat counter
+                                                    _stats['units_sent'][unit_id]['count'] += 1
+                                    
                                     break
                                 else:
                                     # Too large! Reduce by 20% and try again
@@ -1205,6 +1535,46 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
         try:
             if f_entity_4:
                 f_entity_4.close()
+        except Exception:
+            pass
+        try:
+            if f_entity_5:
+                f_entity_5.close()
+        except Exception:
+            pass
+        try:
+            if f_entity_6:
+                f_entity_6.close()
+        except Exception:
+            pass
+        try:
+            if f_entity_7:
+                f_entity_7.close()
+        except Exception:
+            pass
+        try:
+            if f_entity_8:
+                f_entity_8.close()
+        except Exception:
+            pass
+        try:
+            if f_entity_9:
+                f_entity_9.close()
+        except Exception:
+            pass
+        try:
+            if f_entity_10:
+                f_entity_10.close()
+        except Exception:
+            pass
+        try:
+            if f_entity_11:
+                f_entity_11.close()
+        except Exception:
+            pass
+        try:
+            if f_entity_12:
+                f_entity_12.close()
         except Exception:
             pass
         sock.close()
