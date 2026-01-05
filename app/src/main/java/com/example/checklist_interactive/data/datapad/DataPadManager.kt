@@ -49,6 +49,9 @@ class DataPadManager(private val context: Context) {
         private const val KEY_SHOW_TACTICAL_UNITS_ON_MAP = "show_tactical_units_on_map"
         // Automatic list sorting enabled (true = auto-sort by last-seen, false = keep insertion/order by id)
         private const val KEY_TACTICAL_UNITS_AUTO_SORT = "tactical_units_auto_sort"
+        
+        // Show hidden units (units older than 15 minutes) on map
+        private const val KEY_TACTICAL_UNITS_SHOW_HIDDEN = "tactical_units_show_hidden"
 
         // Handshake timeout
         private const val HANDSHAKE_TIMEOUT_MS = 10000L
@@ -113,6 +116,10 @@ class DataPadManager(private val context: Context) {
     // Tactical units live filter - only show units seen in last 10 seconds
     private val _tacticalUnitsShowLiveOnly = MutableStateFlow(prefs.getBoolean(KEY_TACTICAL_UNITS_SHOW_LIVE_ONLY, false))
     val tacticalUnitsShowLiveOnly: StateFlow<Boolean> = _tacticalUnitsShowLiveOnly.asStateFlow()
+    
+    // Tactical units show hidden - show units older than 15 minutes
+    private val _tacticalUnitsShowHidden = MutableStateFlow(prefs.getBoolean(KEY_TACTICAL_UNITS_SHOW_HIDDEN, false))
+    val tacticalUnitsShowHidden: StateFlow<Boolean> = _tacticalUnitsShowHidden.asStateFlow()
 
     // Tactical units map visibility - show/hide units on map (independent from entity tracking)
     private val _showTacticalUnitsOnMap = MutableStateFlow(prefs.getBoolean(KEY_SHOW_TACTICAL_UNITS_ON_MAP, true))
@@ -645,6 +652,15 @@ class DataPadManager(private val context: Context) {
         prefs.edit().putBoolean(KEY_TACTICAL_UNITS_SHOW_LIVE_ONLY, liveOnly).apply()
         _tacticalUnitsShowLiveOnly.value = liveOnly
         udpLogD("Tactical units live filter ${if (liveOnly) "enabled" else "disabled"}")
+    }
+    
+    /**
+     * Show or hide units older than 15 minutes
+     */
+    fun setTacticalUnitsShowHidden(showHidden: Boolean) {
+        prefs.edit().putBoolean(KEY_TACTICAL_UNITS_SHOW_HIDDEN, showHidden).apply()
+        _tacticalUnitsShowHidden.value = showHidden
+        udpLogD("Tactical units show hidden ${if (showHidden) "enabled" else "disabled"}")
     }
 
     /**

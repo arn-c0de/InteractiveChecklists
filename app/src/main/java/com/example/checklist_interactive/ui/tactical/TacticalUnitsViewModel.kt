@@ -21,7 +21,9 @@ class TacticalUnitsViewModel(
 
     // --- UI State ---
     
-    private val _uiState = MutableStateFlow(TacticalUnitsUiState())
+    private val _uiState = MutableStateFlow(TacticalUnitsUiState(
+        showHiddenUnits = dataPadManager.tacticalUnitsShowHidden.value
+    ))
     val uiState: StateFlow<TacticalUnitsUiState> = _uiState.asStateFlow()
     
     // --- Units List (filtered) ---
@@ -136,6 +138,7 @@ class TacticalUnitsViewModel(
     
     fun setShowHiddenUnits(showHidden: Boolean) {
         _uiState.update { it.copy(showHiddenUnits = showHidden) }
+        dataPadManager.setTacticalUnitsShowHidden(showHidden)
     }
     
     fun toggleShowHiddenUnits() {
