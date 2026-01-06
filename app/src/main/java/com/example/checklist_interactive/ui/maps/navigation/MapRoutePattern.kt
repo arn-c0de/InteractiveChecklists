@@ -420,9 +420,17 @@ object TrafficPatternGenerator {
         }
         
         val smoothed = mutableListOf<GeoPoint>()
-        smoothed.add(points.first()) // Keep first point (runway threshold)
         
-        for (i in 1 until points.size - 1) {
+        // Don't add the first threshold point yet - we'll add it at the end if needed
+        // This allows us to round the departure corner properly
+        
+        for (i in 0 until points.size) {
+            // Skip if this is the very first or very last point (runway thresholds)
+            if (i == 0 || i == points.size - 1) {
+                smoothed.add(points[i])
+                continue
+            }
+            
             val prev = points[i - 1]
             val current = points[i]
             val next = points[i + 1]
@@ -431,8 +439,16 @@ object TrafficPatternGenerator {
             val distToPrev = calculateDistance(current, prev)
             val distToNext = calculateDistance(current, next)
             
+            // For corners very close to threshold (departure end and short final),
+            // use smaller threshold to still allow rounding
+            val distThreshold = if (i == 1 || i == points.size - 2) {
+                fixedSmoothDist * 0.8  // Allow rounding even if segment is shorter
+            } else {
+                fixedSmoothDist * 1.5
+            }
+            
             // Skip smoothing if segments are too short for the fixed smoothing distance
-            if (distToPrev < fixedSmoothDist * 1.5 || distToNext < fixedSmoothDist * 1.5) {
+            if (distToPrev < distThreshold || distToNext < distThreshold) {
                 smoothed.add(current)
                 continue
             }
@@ -478,8 +494,6 @@ object TrafficPatternGenerator {
             // Add exit point
             smoothed.add(exitPoint)
         }
-        
-        smoothed.add(points.last()) // Keep last point (runway threshold)
         
         return smoothed
     }
