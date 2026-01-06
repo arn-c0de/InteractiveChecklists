@@ -26,6 +26,52 @@ class TacticalUnitsViewModel(
     ))
     val uiState: StateFlow<TacticalUnitsUiState> = _uiState.asStateFlow()
     
+    // --- Auto-highlight logic ---
+    
+    init {
+        // Watch for changes in auto-highlight settings and update units accordingly
+        viewModelScope.launch {
+            combine(
+                dataPadManager.autoHighlightAll,
+                dataPadManager.autoHighlightAircraft,
+                dataPadManager.autoHighlightHelicopter,
+                dataPadManager.autoHighlightGround,
+                dataPadManager.autoHighlightShip,
+                dataPadManager.autoHighlightStructure,
+                dataPadManager.autoHighlightWeapon,
+                repository.getAllUnits()
+            ) { values ->
+                val highlightAll = values[0] as Boolean
+                val highlightAircraft = values[1] as Boolean
+                val highlightHelicopter = values[2] as Boolean
+                val highlightGround = values[3] as Boolean
+                val highlightShip = values[4] as Boolean
+                val highlightStructure = values[5] as Boolean
+                val highlightWeapon = values[6] as Boolean
+                val allUnits = values[7] as List<TacticalUnitEntity>
+                
+                // Update highlight status for each unit based on rules
+                allUnits.forEach { unit ->
+                    val shouldHighlight = when {
+                        highlightAll -> true
+                        unit.category.equals("aircraft", ignoreCase = true) && highlightAircraft -> true
+                        unit.category.equals("helicopter", ignoreCase = true) && highlightHelicopter -> true
+                        unit.category.equals("ground", ignoreCase = true) && highlightGround -> true
+                        unit.category.equals("ship", ignoreCase = true) && highlightShip -> true
+                        unit.category.equals("structure", ignoreCase = true) && highlightStructure -> true
+                        unit.category.equals("weapon", ignoreCase = true) && highlightWeapon -> true
+                        else -> false
+                    }
+                    
+                    val newHighlightStatus = if (shouldHighlight) 1 else 0
+                    if (unit.isHighlighted != newHighlightStatus) {
+                        repository.toggleUnitHighlight(unit.id, shouldHighlight)
+                    }
+                }
+            }.collect()
+        }
+    }
+    
     // --- Units List (filtered) ---
     
     val units: StateFlow<List<TacticalUnitEntity>> = combine(
