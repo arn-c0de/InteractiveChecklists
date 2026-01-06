@@ -459,6 +459,7 @@ fun MapViewer(
         mapState.patternSize,
         mapState.patternDirection,
         mapState.patternFinalDistanceNm,
+        mapState.roundedPatternCorners,
         mapState.navigationRestored
     ) {
         mapState.saveNavigationState()
@@ -1026,7 +1027,8 @@ fun MapViewer(
         mapState.originalAirportTarget?.metadata,
         mapState.patternFinalDistanceNm,
         mapState.customPatternAltitudeAglFt,
-        mapState.selectedRunwayHeading
+        mapState.selectedRunwayHeading,
+        mapState.roundedPatternCorners
     ) {
         val mv = mapState.mapView ?: return@LaunchedEffect
         val target = mapState.originalAirportTarget ?: return@LaunchedEffect
