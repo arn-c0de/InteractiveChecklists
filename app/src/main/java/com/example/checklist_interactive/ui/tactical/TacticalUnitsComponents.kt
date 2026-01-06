@@ -1469,12 +1469,12 @@ fun FilterDialog(
                                 
                                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                                 
-                                // Individual category toggles (disabled when master is off)
+                                // Individual category toggles (independent)
                                 HighlightToggleRow(
                                     icon = Icons.Default.Flight,
                                     label = stringResource(R.string.category_aircraft),
                                     checked = autoHighlightAircraft,
-                                    enabled = autoHighlightAll,
+                                    enabled = true,
                                     onCheckedChange = { dataPadManager.toggleAutoHighlightAircraft() }
                                 )
                                 
@@ -1482,7 +1482,7 @@ fun FilterDialog(
                                     icon = Icons.Default.FlightTakeoff,
                                     label = stringResource(R.string.category_heli),
                                     checked = autoHighlightHelicopter,
-                                    enabled = autoHighlightAll,
+                                    enabled = true,
                                     onCheckedChange = { dataPadManager.toggleAutoHighlightHelicopter() }
                                 )
                                 
@@ -1490,7 +1490,7 @@ fun FilterDialog(
                                     icon = Icons.Default.DirectionsCar,
                                     label = stringResource(R.string.category_ground),
                                     checked = autoHighlightGround,
-                                    enabled = autoHighlightAll,
+                                    enabled = true,
                                     onCheckedChange = { dataPadManager.toggleAutoHighlightGround() }
                                 )
                                 
@@ -1498,7 +1498,7 @@ fun FilterDialog(
                                     icon = Icons.Default.DirectionsBoat,
                                     label = stringResource(R.string.category_ship),
                                     checked = autoHighlightShip,
-                                    enabled = autoHighlightAll,
+                                    enabled = true,
                                     onCheckedChange = { dataPadManager.toggleAutoHighlightShip() }
                                 )
                                 
@@ -1506,7 +1506,7 @@ fun FilterDialog(
                                     icon = Icons.Default.Business,
                                     label = stringResource(R.string.category_structure),
                                     checked = autoHighlightStructure,
-                                    enabled = autoHighlightAll,
+                                    enabled = true,
                                     onCheckedChange = { dataPadManager.toggleAutoHighlightStructure() }
                                 )
                                 
@@ -1514,7 +1514,7 @@ fun FilterDialog(
                                     icon = Icons.Default.Repartition,
                                     label = stringResource(R.string.category_weapon),
                                     checked = autoHighlightWeapon,
-                                    enabled = autoHighlightAll,
+                                    enabled = true,
                                     onCheckedChange = { dataPadManager.toggleAutoHighlightWeapon() }
                                 )
                             }
