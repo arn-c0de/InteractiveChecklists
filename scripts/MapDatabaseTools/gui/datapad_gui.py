@@ -481,6 +481,8 @@ class DataPadGUI(QMainWindow):
         self.assets_manager.asset_edited.connect(self.on_asset_changed)
         self.assets_manager.asset_deleted.connect(self.on_asset_deleted)
         self.assets_manager.draw_border_requested.connect(self.on_draw_border_requested)
+        # Reload DB request from Assets manager
+        self.assets_manager.reload_db_requested.connect(self.on_reload_database_requested)
         left_splitter.addWidget(self.assets_manager)
 
         # Keep detailed managers available (but placed in a collapsible area if needed)
@@ -1350,6 +1352,45 @@ class DataPadGUI(QMainWindow):
         """Load all borders from database and display on map"""
         if not self.webview:
             return
+
+    def on_reload_database_requested(self):
+        """Handle reload request: re-open DB connection, refresh lists and redraw map"""
+        try:
+            # Close existing DB connection if supported
+            try:
+                self.db.close()
+            except Exception:
+                pass
+
+            # Recreate DB object using same path
+            from core.markers_database import MarkersDatabase
+            new_db = MarkersDatabase(self.db.db_path if hasattr(self.db, 'db_path') else None)
+            self.db = new_db
+
+            # Update child widgets with new DB reference
+            self.assets_manager.db = self.db
+            try:
+                self.assets_manager.refresh_list()
+            except Exception:
+                pass
+            self.location_manager.db = self.db
+            try:
+                self.location_manager.refresh_list()
+            except Exception:
+                pass
+            self.border_manager.db = self.db
+            try:
+                self.border_manager.refresh_list()
+            except Exception:
+                pass
+
+            # Redraw map
+            self.refresh_map_markers()
+            self.refresh_map_borders()
+
+            QMessageBox.information(self, "Reloaded", "Database reloaded and map refreshed.")
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Failed to reload database: {e}")
         
         try:
             import json
