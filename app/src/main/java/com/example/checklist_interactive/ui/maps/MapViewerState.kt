@@ -371,6 +371,8 @@ class MapViewerState(
                 putInt("pattern_size_ordinal", patternSize.ordinal)
                 putBoolean("pattern_direction_left", patternDirection == PatternDirection.LEFT_HAND)
                 putFloat("pattern_final_distance_nm", patternFinalDistanceNm.toFloat())
+                // Persist rounded corners preference
+                putBoolean("rounded_pattern_corners", roundedPatternCorners)
                 // Save pattern altitude thresholds
                 putFloat("pattern_alt_small_tolerance_ft", patternAltitudeSmallToleranceFt.toFloat())
                 putFloat("pattern_alt_warning_tolerance_ft", patternAltitudeWarningToleranceFt.toFloat())
