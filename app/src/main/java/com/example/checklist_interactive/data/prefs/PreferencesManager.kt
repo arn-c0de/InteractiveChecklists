@@ -27,6 +27,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_MARKDOWN_FONT_SIZE = "markdown_font_size"
         private const val DEFAULT_MARKDOWN_FONT_SIZE = 18
         private const val KEY_VISIBLE_AIRCRAFTS = "visible_aircrafts"
+        private const val KEY_VISIBLE_MAPS = "visible_maps"
         private const val KEY_MARKDOWN_SECTIONS_EXPANDED = "markdown_sections_expanded"
         private const val KEY_ACTIVE_TAG_FILTERS = "active_tag_filters"
         private const val KEY_TAG_FILTER_MODE = "tag_filter_mode" // "any" or "all"
@@ -214,6 +215,38 @@ class PreferencesManager(context: Context) {
     fun resetVisibleAircrafts() {
         // Remove the stored preference to return to default behavior (all visible)
         prefs.edit().remove(KEY_VISIBLE_AIRCRAFTS).apply()
+    }
+
+    // Map visibility settings: stored as a StringSet in SharedPreferences
+    // Default visible maps: prefer Caucasus and Marianas variants
+    // Include common variants so defaults work regardless of naming in DB
+    private val defaultVisibleMaps = setOf("Caucasus", "Marianas", "MarianaIslands", "Mariana_Islands")
+
+    fun setVisibleMaps(maps: Set<String>) {
+        prefs.edit().putStringSet(KEY_VISIBLE_MAPS, maps).apply()
+    }
+
+    /**
+     * Returns the stored visible maps, or default set if no preference has been set yet.
+     */
+    fun getVisibleMaps(): Set<String> {
+        return prefs.getStringSet(KEY_VISIBLE_MAPS, null)?.toSet() ?: defaultVisibleMaps
+    }
+
+    fun isMapVisible(mapName: String): Boolean {
+        val set = getVisibleMaps()
+        return set.any { it.equals(mapName, ignoreCase = true) }
+    }
+
+    fun setMapVisible(mapName: String, visible: Boolean) {
+        val current = getVisibleMaps().toMutableSet()
+        if (visible) current.add(mapName) else current.removeIf { it.equals(mapName, ignoreCase = true) }
+        setVisibleMaps(current)
+    }
+
+    fun resetVisibleMaps() {
+        // Reset to default: Caucasus and Marianas
+        setVisibleMaps(defaultVisibleMaps)
     }
 
     // Tag filtering preferences

@@ -610,6 +610,13 @@
     <string name="settings_reset_fab_positions">FAB-Positionen zurücksetzen</string>
     <string name="settings_view_contributors_json">Mitwirkenden-JSON anzeigen</string>
     <string name="settings_select_visible_aircraft">Sichtbare Flugzeuge auswählen</string>
+    <string name="settings_select_visible_maps">Sichtbare Karten auswählen</string>
+    <string name="settings_map_visibility_explain">Wählen Sie, welche DCS-Karten Markierungen im Karten-Viewer anzeigen sollen. Standard: Kaukasus und Marianen.</string>
+    <string name="settings_map_dialog_title">Sichtbare Karten auswählen</string>
+    <string name="settings_map_dialog_explain">Wählen Sie die Karten aus, für die Sie Markierungen sehen möchten:</string>
+    <string name="settings_map_no_maps_found">In der Datenbank wurden keine Karten mit Markierungen gefunden</string>
+    <string name="settings_reset_map_visibility_title">Kartensichtbarkeit auf Standard zurücksetzen</string>
+    <string name="settings_reset_map_visibility_message">Dies setzt zurück, um nur Markierungen von Kaukasus und Marianen anzuzeigen. Fortfahren?</string>
     <string name="settings_reset_to_defaults">Auf Standardwerte zurücksetzen</string>
     <string name="settings_view_internal_tag_json">Interne Tag-JSON anzeigen</string>
     <string name="settings_view_default_asset_json">Standard-Asset-JSON anzeigen</string>

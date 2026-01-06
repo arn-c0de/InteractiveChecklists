@@ -68,6 +68,8 @@ fun SettingsScreen(
 
     var showAircraftDialog by remember { mutableStateOf(false) }
     var showResetConfirm by remember { mutableStateOf(false) }
+    var showMapDialog by remember { mutableStateOf(false) }
+    var showResetMapConfirm by remember { mutableStateOf(false) }
     var visibilityRefreshKey by remember { mutableIntStateOf(0) }
 
     // Map cache clear state
@@ -939,6 +941,35 @@ fun SettingsScreen(
                 }
             }
 
+            // === Map Visibility ===
+            item {
+                Spacer(modifier = Modifier.height(12.dp))
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = stringResource(R.string.settings_select_visible_maps),
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = stringResource(R.string.settings_map_visibility_explain),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Button(onClick = { showMapDialog = true }) {
+                                Text(stringResource(R.string.settings_select_visible_maps))
+                            }
+                            OutlinedButton(onClick = { showResetMapConfirm = true }) {
+                                Text(stringResource(R.string.settings_reset_to_defaults))
+                            }
+                        }
+                    }
+                }
+            }
+
             // === Tags ===
             item {
                 Spacer(modifier = Modifier.height(16.dp))
@@ -1395,6 +1426,99 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton({ showResetConfirm = false }) { Text(stringResource(R.string.action_cancel)) }
+            }
+        )
+    }
+
+    // === Map Selection Dialog ===
+    if (showMapDialog) {
+        // Load available maps from DB via ViewModel
+        LaunchedEffect(Unit) { vm.loadAvailableMaps() }
+        val availableMaps by vm.availableMaps.collectAsState()
+        val storedVisibleMaps = prefsManager.getVisibleMaps()
+
+        // Compute initial selection: intersection of stored selection and available maps
+        var selectedMapSet by remember(visibilityRefreshKey, availableMaps) {
+            val intersect = storedVisibleMaps.intersect(availableMaps.toSet())
+            val init = if (intersect.isNotEmpty()) {
+                intersect.toMutableSet()
+            } else {
+                // Prefer defaults: any available map containing 'cauc' or 'marian' (case-insensitive)
+                val defaultsFound = availableMaps.filter { it.contains("cauc", ignoreCase = true) || it.contains("marian", ignoreCase = true) }
+                if (defaultsFound.isNotEmpty()) defaultsFound.toMutableSet() else availableMaps.toMutableSet()
+            }
+            mutableStateOf(init)
+        }
+
+        AlertDialog(
+            onDismissRequest = { showMapDialog = false },
+            title = { Text(stringResource(R.string.settings_map_dialog_title)) },
+            text = {
+                Column {
+                    Text(
+                        text = stringResource(R.string.settings_map_dialog_explain),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    if (availableMaps.isEmpty()) {
+                        Text(text = stringResource(R.string.settings_map_no_maps_found), style = MaterialTheme.typography.bodySmall)
+                    } else {
+                        LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
+                            items(availableMaps) { mapName ->
+                                val isChecked = selectedMapSet.contains(mapName)
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            selectedMapSet = if (isChecked) (selectedMapSet - mapName).toMutableSet() else (selectedMapSet + mapName).toMutableSet()
+                                        }
+                                        .padding(vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Checkbox(
+                                        checked = isChecked,
+                                        onCheckedChange = { checked ->
+                                            selectedMapSet = if (checked) (selectedMapSet + mapName).toMutableSet() else (selectedMapSet - mapName).toMutableSet()
+                                        }
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(text = mapName.replace("_", " "))
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton({
+                    prefsManager.setVisibleMaps(selectedMapSet)
+                    visibilityRefreshKey++
+                    showMapDialog = false
+                }) { Text(stringResource(R.string.action_save)) }
+            },
+            dismissButton = {
+                TextButton({ showMapDialog = false }) { Text(stringResource(R.string.action_cancel)) }
+            }
+        )
+    }
+
+    // === Reset Map Visibility Confirmation ===
+    if (showResetMapConfirm) {
+        AlertDialog(
+            onDismissRequest = { showResetMapConfirm = false },
+            title = { Text(stringResource(R.string.settings_reset_map_visibility_title)) },
+            text = { Text(stringResource(R.string.settings_reset_map_visibility_message)) },
+            confirmButton = {
+                TextButton({
+                    prefsManager.resetVisibleMaps()
+                    visibilityRefreshKey++
+                    showResetMapConfirm = false
+                }) { Text(stringResource(R.string.action_reset)) }
+            },
+            dismissButton = {
+                TextButton({ showResetMapConfirm = false }) { Text(stringResource(R.string.action_cancel)) }
             }
         )
     }

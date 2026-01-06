@@ -606,6 +606,13 @@
     <string name="settings_reset_fab_positions">Reset FAB positions</string>
     <string name="settings_view_contributors_json">View contributors JSON</string>
     <string name="settings_select_visible_aircraft">Select visible aircraft</string>
+    <string name="settings_select_visible_maps">Select visible maps</string>
+    <string name="settings_map_visibility_explain">Choose which DCS maps should display markers on the map viewer. Default: Caucasus and Marianas.</string>
+    <string name="settings_map_dialog_title">Select visible maps</string>
+    <string name="settings_map_dialog_explain">Select which maps you want to see markers for:</string>
+    <string name="settings_map_no_maps_found">No maps with markers were found in the database</string>
+    <string name="settings_reset_map_visibility_title">Reset map visibility to defaults</string>
+    <string name="settings_reset_map_visibility_message">This will reset to show markers from Caucasus and Marianas maps only. Continue?</string>
     <string name="settings_reset_to_defaults">Reset to defaults</string>
     <string name="settings_view_internal_tag_json">View internal tag JSON</string>
     <string name="settings_view_default_asset_json">View default asset JSON</string>
