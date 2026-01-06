@@ -75,7 +75,8 @@ object TrafficPatternGenerator {
         runwayLengthMeters: Double,
         patternSize: PatternSize = PatternSize.NORMAL,
         direction: PatternDirection = PatternDirection.LEFT_HAND,
-        finalDistanceNm: Double = 1.0
+        finalDistanceNm: Double = 1.0,
+        roundedCorners: Boolean = false
     ): List<GeoPoint> {
         
         val points = mutableListOf<GeoPoint>()
@@ -151,7 +152,12 @@ object TrafficPatternGenerator {
         // 11. Threshold (landing point)
         points.add(runwayThreshold)
         
-        return points
+        // Apply corner smoothing if enabled
+        return if (roundedCorners) {
+            smoothCorners(points, smoothingRadius = 0.15) // 15% smoothing radius
+        } else {
+            points
+        }
     }
     
     /**
@@ -290,6 +296,84 @@ object TrafficPatternGenerator {
         val c = 2 * atan2(sqrt(a), sqrt(1 - a))
         
         return earthRadius * c
+    }
+    
+    /**
+     * Smooth corners of a pattern by adding interpolated points at turns
+     * Uses a simple arc approximation for smooth flyable corners
+     * 
+     * @param points Original pattern points
+     * @param smoothingRadius Fraction of segment length to use for smoothing (0.0-0.5)
+     * @return Smoothed pattern with additional points at corners
+     */
+    private fun smoothCorners(points: List<GeoPoint>, smoothingRadius: Double = 0.15): List<GeoPoint> {
+        if (points.size < 3) return points
+        
+        val smoothed = mutableListOf<GeoPoint>()
+        val radius = smoothingRadius.coerceIn(0.05, 0.4) // Clamp to reasonable range
+        
+        smoothed.add(points.first()) // Keep first point (runway threshold)
+        
+        for (i in 1 until points.size - 1) {
+            val prev = points[i - 1]
+            val current = points[i]
+            val next = points[i + 1]
+            
+            // Calculate distances to adjacent points
+            val distToPrev = calculateDistance(current, prev)
+            val distToNext = calculateDistance(current, next)
+            
+            // Skip smoothing if segments are too short
+            if (distToPrev < 100 || distToNext < 100) {
+                smoothed.add(current)
+                continue
+            }
+            
+            // Calculate smoothing distance (use smaller of the two segments)
+            val smoothDist = minOf(distToPrev, distToNext) * radius
+            
+            // Calculate bearings
+            val bearingFromPrev = calculateBearing(prev, current)
+            val bearingToNext = calculateBearing(current, next)
+            
+            // Create approach and exit points before/after corner
+            val approachPoint = calculateDestination(
+                current,
+                normalizeHeading(bearingFromPrev + 180.0),
+                smoothDist
+            )
+            val exitPoint = calculateDestination(
+                current,
+                bearingToNext,
+                smoothDist
+            )
+            
+            // Add approach point
+            smoothed.add(approachPoint)
+            
+            // Add arc points for smooth corner (3-5 points depending on turn angle)
+            val turnAngle = abs(normalizeHeading(bearingToNext - bearingFromPrev))
+            val arcPoints = when {
+                turnAngle > 60 -> 5 // Sharp turn
+                turnAngle > 30 -> 3 // Medium turn
+                else -> 2 // Gentle turn
+            }
+            
+            for (j in 1..arcPoints) {
+                val t = j.toDouble() / (arcPoints + 1)
+                // Simple linear interpolation (could be improved with true arc)
+                val lat = approachPoint.latitude + (exitPoint.latitude - approachPoint.latitude) * t
+                val lon = approachPoint.longitude + (exitPoint.longitude - approachPoint.longitude) * t
+                smoothed.add(GeoPoint(lat, lon))
+            }
+            
+            // Add exit point
+            smoothed.add(exitPoint)
+        }
+        
+        smoothed.add(points.last()) // Keep last point (runway threshold)
+        
+        return smoothed
     }
     
     /**

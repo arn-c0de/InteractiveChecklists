@@ -109,6 +109,7 @@ class MapViewerState(
     var patternSize by mutableStateOf(PatternSize.NORMAL)
     var patternDirection by mutableStateOf(PatternDirection.LEFT_HAND)
     var patternFinalDistanceNm by mutableStateOf(1.0)
+    var roundedPatternCorners by mutableStateOf(false)
     var showPatternDetails by mutableStateOf(true)
     var customPatternAltitudeAglFt by mutableStateOf<Int?>(null) // Custom override for pattern altitude AGL
 
@@ -298,6 +299,7 @@ class MapViewerState(
         showTrafficPattern = prefs.getBoolean("show_traffic_pattern", false)
         patternFinalDistanceNm = prefs.getFloat("pattern_final_distance_nm", 1.0f).toDouble()
         patternSize = PatternSize.fromOrdinal(prefs.getInt("pattern_size_ordinal", PatternSize.NORMAL.ordinal))
+        roundedPatternCorners = prefs.getBoolean("rounded_pattern_corners", false)
         patternDirection = if (prefs.getBoolean("pattern_direction_left", true)) PatternDirection.LEFT_HAND else PatternDirection.RIGHT_HAND
 
         // Restore pattern altitude thresholds

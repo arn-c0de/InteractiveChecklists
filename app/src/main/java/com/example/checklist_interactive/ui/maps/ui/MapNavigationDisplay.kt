@@ -107,6 +107,8 @@ fun MapNavigationDisplay(
     onPatternDirectionChange: (PatternDirection) -> Unit,
     patternFinalDistanceNm: Double,
     onPatternFinalDistanceNmChange: (Double) -> Unit,
+    roundedPatternCorners: Boolean,
+    onRoundedPatternCornersChange: (Boolean) -> Unit,
     selectedRunwayIndex: Int?,
     onSelectedRunwayIndexChange: (Int?) -> Unit,
     /* Pattern details visibility (hoisted) */
@@ -625,6 +627,31 @@ fun MapNavigationDisplay(
                                                 text = stringResource(R.string.map_nav_pattern_button),
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontSize = 11.sp
+                                            )
+                                        }
+
+                                        // Rounded corners toggle button
+                                        Button(
+                                            onClick = {
+                                                val newState = !roundedPatternCorners
+                                                onRoundedPatternCornersChange(newState)
+                                                saveNavigationState()
+                                            },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = if (roundedPatternCorners) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                                                contentColor = if (roundedPatternCorners) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                                            ),
+                                            modifier = Modifier
+                                                .height(28.dp)
+                                                .pointerInput(Unit) {
+                                                    detectTapGestures(onTap = { /* Handled by onClick */ })
+                                                },
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                                        ) {
+                                            Text(
+                                                text = "⤴",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontSize = 14.sp
                                             )
                                         }
 

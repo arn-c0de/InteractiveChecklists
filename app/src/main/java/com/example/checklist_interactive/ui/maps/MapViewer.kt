@@ -1074,14 +1074,15 @@ fun MapViewer(
             // The headingForPattern already accounts for runway direction (07 vs 25)
             // The direction parameter handles LEFT_HAND vs RIGHT_HAND
             // No post-generation mirroring needed - the generator creates the pattern correctly
-            Log.d(TAG, "✈️ Generating pattern: heading=$headingForPattern, size=${mapState.patternSize}, dir=${mapState.patternDirection}")
+            Log.d(TAG, "✈️ Generating pattern: heading=$headingForPattern, size=${mapState.patternSize}, dir=${mapState.patternDirection}, rounded=${mapState.roundedPatternCorners}")
             val patternPoints = TrafficPatternGenerator.generateTrafficPattern(
                 runwayThreshold = runwayThreshold,
                 runwayHeading = headingForPattern,
                 runwayLengthMeters = runwayLengthMeters,
                 patternSize = mapState.patternSize,
                 direction = mapState.patternDirection,
-                finalDistanceNm = mapState.patternFinalDistanceNm
+                finalDistanceNm = mapState.patternFinalDistanceNm,
+                roundedCorners = mapState.roundedPatternCorners
             )
             Log.d(TAG, "✈️ Pattern generated with ${patternPoints.size} points")
 
@@ -2276,6 +2277,8 @@ fun MapViewer(
             onShowPatternDetailsChange = { mapState.showPatternDetails = it },
             patternFinalDistanceNm = mapState.patternFinalDistanceNm,
             onPatternFinalDistanceNmChange = { mapState.patternFinalDistanceNm = it },
+            roundedPatternCorners = mapState.roundedPatternCorners,
+            onRoundedPatternCornersChange = { mapState.roundedPatternCorners = it },
             selectedRunwayIndex = mapState.selectedRunwayIndex,
             onSelectedRunwayIndexChange = { mapState.selectedRunwayIndex = it },
             selectedRunway = mapState.selectedRunway,
@@ -3066,6 +3069,7 @@ fun MapViewer(
                     putInt("pattern_size_ordinal", mapState.patternSize.ordinal)
                     putBoolean("pattern_direction_left", mapState.patternDirection == PatternDirection.LEFT_HAND)
                     putFloat("pattern_final_distance_nm", mapState.patternFinalDistanceNm.toFloat())
+                    putBoolean("rounded_pattern_corners", mapState.roundedPatternCorners)
                     
                     apply()
                 }
