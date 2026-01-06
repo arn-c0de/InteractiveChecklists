@@ -1851,12 +1851,19 @@ fun MapViewer(
                         // Clear mapping to avoid holding stale references
                         markerToLocation.clear()
 
+                        // Filter markers by visible maps from preferences
+                        val visibleMaps = prefsManager.getVisibleMaps()
+                        val filteredMarkers = markers.filter { marker ->
+                            val markerMap = marker.map?.takeIf { it.isNotEmpty() } ?: "Unknown"
+                            visibleMaps.any { it.equals(markerMap, ignoreCase = true) }
+                        }
+
                         // Add markers to map
                         // Prepare icons and marker payloads off main thread to avoid UI jank
                         data class PreparedMarker(val entity: com.example.checklist_interactive.data.tactical.LocationEntity, val icon: BitmapDrawable?)
 
                         val prepared = withContext(kotlinx.coroutines.Dispatchers.Default) {
-                            markers.map { marker ->
+                            filteredMarkers.map { marker ->
                                 var markerIcon: BitmapDrawable? = null
                                 try {
                                     if (marker.symbolEntity.isNotEmpty()) {

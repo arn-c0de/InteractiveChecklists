@@ -167,6 +167,23 @@ class SettingsViewModel(
     private val _mapWipePreview = MutableStateFlow<List<MarkerPreview>>(emptyList())
     val mapWipePreview = _mapWipePreview.asStateFlow()
 
+    // Available maps in the tactical DB (computed on demand)
+    private val _availableMaps = MutableStateFlow<List<String>>(emptyList())
+    val availableMaps = _availableMaps.asStateFlow()
+
+    fun loadAvailableMaps() = viewModelScope.launch {
+        try {
+            val maps = withContext(Dispatchers.IO) {
+                val db = TacticalDatabase.getInstance(app)
+                db.locationDao().getAllMaps().first().filter { it.isNotBlank() }.sorted()
+            }
+            _availableMaps.value = maps
+        } catch (e: Exception) {
+            _snackbarMessages.tryEmit(app.getString(com.example.checklist_interactive.R.string.import_failed, e.message ?: ""))
+            _availableMaps.value = emptyList()
+        }
+    }
+
     fun loadMapWipePreview() = viewModelScope.launch {
         try {
             val list = withContext(Dispatchers.IO) {

@@ -601,6 +601,13 @@
     <string name="settings_reset_fab_positions">重置FAB位置</string>
     <string name="settings_view_contributors_json">查看贡献者 JSON</string>
     <string name="settings_select_visible_aircraft">选择可见飞机</string>
+    <string name="settings_select_visible_maps">选择可见地图</string>
+    <string name="settings_map_visibility_explain">选择哪些 DCS 地图应在地图查看器中显示标记。默认：高加索和马里亚纳。</string>
+    <string name="settings_map_dialog_title">选择可见地图</string>
+    <string name="settings_map_dialog_explain">选择您想要查看标记的地图：</string>
+    <string name="settings_map_no_maps_found">在数据库中未找到带有标记的地图</string>
+    <string name="settings_reset_map_visibility_title">重置地图可见性为默认</string>
+    <string name="settings_reset_map_visibility_message">这将重置为仅显示高加索和马里亚纳地图的标记。继续？</string>
     <string name="settings_reset_to_defaults">恢复默认</string>
     <string name="settings_view_internal_tag_json">查看内部标签 JSON</string>
     <string name="settings_view_default_asset_json">查看默认资源 JSON</string>
