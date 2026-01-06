@@ -1201,7 +1201,7 @@ def germany_samples():
             map="CW Germany"
         ),
         Location(
-            name="Perwenitz",
+            name="Perwenitz Highway Strip",
             latitude=52.670527,
             longitude=13.006096,
             marker_type=MarkerType.AIRPORT.value,
@@ -1211,7 +1211,7 @@ def germany_samples():
             runways=[Runway(name="10/28", length_m=1600, width_m=30, heading=185.0, surface="grass")],
             frequencies={"tower": 120.0},
             country="East Germany",
-            tags=["military", "training"],
+            tags=["Highway Strip", "military", "emergency airstrip", "cold war", "unused"],
             source="DCS World",
             map="CW Germany"
         ),
