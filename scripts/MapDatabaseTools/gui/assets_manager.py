@@ -290,3 +290,35 @@ class AssetsManagerWidget(QWidget):
                     QMessageBox.warning(self, "Error", "Failed to update border.")
             except Exception as e:
                 QMessageBox.warning(self, "Error", f"Failed to update border: {e}")
+
+    def select_asset(self, asset_tuple: Optional[Tuple[str, int]]) -> bool:
+        """Select an asset in the list by tuple ("marker"/"border", id).
+        Sets the current item, scrolls it into view and emits the selection signal (same behavior as clicking an item).
+        Returns True if selection succeeded, False otherwise.
+        """
+        if not asset_tuple:
+            return False
+        typ, obj_id = asset_tuple
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            data = item.data(Qt.ItemDataRole.UserRole)
+            if data and data[0] == typ and data[1] == obj_id:
+                self.list_widget.setCurrentItem(item)
+                # Scroll to center the item
+                try:
+                    self.list_widget.scrollToItem(item, QListWidget.PositionAtCenter)
+                except Exception:
+                    pass
+                # Emit selection with full object fetched from DB
+                if typ == "marker":
+                    loc = self.db.get_location(obj_id)
+                    if loc:
+                        self.asset_selected.emit(("marker", loc))
+                        return True
+                elif typ == "border":
+                    border = self.db.get_border(obj_id)
+                    if border:
+                        self.asset_selected.emit(("border", border))
+                        return True
+                return False
+        return False
