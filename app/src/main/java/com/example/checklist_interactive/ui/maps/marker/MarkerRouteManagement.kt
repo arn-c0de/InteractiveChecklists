@@ -12,7 +12,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -553,6 +555,9 @@ fun MarkerRouteManagementSheet(
                 }
 
                 1 -> {
+                    // Preserve scroll state when switching tabs
+                    val listState = rememberLazyListState()
+                    
                     Column {
                         OutlinedTextField(
                             value = markerSearch,
@@ -603,6 +608,7 @@ fun MarkerRouteManagementSheet(
                             expandedGroups = expandedGroups,
                             searchText = markerSearch,
                             selectedMap = selectedMapFilter,
+                            listState = listState,
                             onToggleGroup = { viewModel.toggleGroup(it) },
                             onMarkerClick = { marker ->
                                 onMarkerClick(marker)
@@ -657,6 +663,7 @@ fun MarkerGroupsList(
     expandedGroups: Set<Int>,
     searchText: String = "",
     selectedMap: String? = null,
+    listState: LazyListState = rememberLazyListState(),
     onToggleGroup: (Int) -> Unit,
     onMarkerClick: (LocationEntity) -> Unit,
     onDeleteMarker: (Int) -> Unit,
@@ -699,6 +706,7 @@ fun MarkerGroupsList(
     }
     
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -800,13 +808,18 @@ fun MarkerGroupItem(
                 enter = expandVertically(),
                 exit = shrinkVertically()
             ) {
-                Column(
+                // Use LazyColumn for efficient rendering of large marker lists (100+ items)
+                LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .heightIn(max = 800.dp) // Limit height to prevent excessive expansion
                         .padding(start = 40.dp, end = 12.dp, bottom = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    markers.forEach { marker ->
+                    items(
+                        items = markers,
+                        key = { it.id }
+                    ) { marker ->
                         MarkerListItem(
                             marker = marker,
                             onClick = { onMarkerClick(marker) },
