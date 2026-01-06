@@ -3,12 +3,24 @@
 
 All relevant changes are summarized here by version.
 
+## [1.0.22] - 2026-01-06
+
+
 ## [1.0.21] - 2026-01-03
 
 ### Important ⚠️
 - **Database reset:** The bundled map database (`assets/databases/map_data.db`) has been reset to **version 1** and the schema has been updated. If you are upgrading from an earlier build, you **must fully uninstall the app (including app data)** and perform a **fresh install** of the new version to avoid schema mismatch errors and potential data loss. See `README.md` → Installation for backup and migration guidance.
 
+### Summary
+- **Map database & markers:** Reset the asset map DB to v1 and added/finalized Marianas markers; first version of CW Germany markers were added (some airports need review/corrections). Added fixes to Esri tile URL and ensured 6-decimal coordinate display.
+- **Map & Navigation UI:** Added a draggable transparent compass widget for heading measurements, maintained marker highlight sizing, added info labels for highlighted units (name, altitude, speed, distance, heading), and added a `Reload DB` button and handler to refresh lists/maps and preserve selected assets on reload.
+- **Map settings & behavior:** Added DB-driven map visibility in Settings (select which maps will display markers) and updated MapViewer to filter markers by selected maps.
+- **Tactical units:** Many UI & UX improvements — comprehensive tactical settings including auto-highlight and independent category toggles, configurable hide timeout, compact persisted sliders, "Last seen" display in marker details, show-hidden toggle/queries, and a new Details button. Treat unnamed aircraft as countermeasures and add a CM filter/marker.
+- **Export & scripts:** Entity batch export improvements (store in Scripts/entity-batches and load on start), weapon-detection improvements in export scripts, and forward_parsed_udp now aggregates summary stats every 10s to reduce log spam.
+- **FAB & UX fixes:** FAB collision avoidance, persistent FAB overlay positions, Enter key now selects/centers assets, and various UI bug fixes and refactors to tidy tactical components.
+- **Misc & docs:** Added map flightpath screenshot, documentation updates (README, README_zh), site improvements (Jekyll site, enforced dark mode, GitHub Actions workflow), and general cleanup (disable Room schema export warnings, other small fixes).
 
+ 
 ## [1.0.20] - 2026-01-01
 
 ### Summary
