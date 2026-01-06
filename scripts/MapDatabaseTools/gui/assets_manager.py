@@ -21,6 +21,7 @@ class AssetsManagerWidget(QWidget):
     asset_edited = Signal(object)
     asset_deleted = Signal(object)
     draw_border_requested = Signal()
+    reload_db_requested = Signal()  # Request main app to reload DB and refresh map
 
     def __init__(self, db: MarkersDatabase, parent=None):
         super().__init__(parent)
@@ -75,6 +76,12 @@ class AssetsManagerWidget(QWidget):
         self.delete_btn = QPushButton("🗑️ Delete")
         self.delete_btn.clicked.connect(self.delete_selected)
         btn_layout.addWidget(self.delete_btn)
+
+        # Reload DB button (useful when DB modified externally)
+        self.reload_db_btn = QPushButton("🔁 Reload DB")
+        self.reload_db_btn.setToolTip("Reload database from disk and refresh map/lists")
+        self.reload_db_btn.clicked.connect(self.request_reload_db)
+        btn_layout.addWidget(self.reload_db_btn)
 
         btn_layout.addStretch()
         layout.addLayout(btn_layout)
@@ -196,6 +203,13 @@ class AssetsManagerWidget(QWidget):
 
     def request_draw_border(self):
         self.draw_border_requested.emit()
+
+    def request_reload_db(self):
+        """Emit signal to request reloading database and refreshing map/UI"""
+        confirm = QMessageBox.question(self, "Reload Database", "Reload database from disk and refresh all map data?",
+                                       QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if confirm == QMessageBox.StandardButton.Yes:
+            self.reload_db_requested.emit()
 
     def edit_selected(self):
         item = self.list_widget.currentItem()
