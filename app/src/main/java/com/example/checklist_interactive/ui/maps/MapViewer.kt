@@ -1135,10 +1135,38 @@ fun MapViewer(
                 mv.overlays.remove(it)
                 mapState.trafficPatternLabelOverlay = null
             }
-            // Clear navigation if it was pattern navigation (id = -2)
+            // Restore navigation to original target if pattern navigation was active (id = -2)
             if (mapState.activeNavigationTarget?.id == -2) {
-                mapState.activeNavigationTarget = null
-                mapState.activeNavigationTacticalUnitId = null
+                // If showRunwayApproach is still active, restore to approach point
+                if (mapState.showRunwayApproach && mapState.originalAirportTarget != null && mapState.selectedRunwayHeading != null) {
+                    // Recreate approach target with selected runway heading
+                    val target = mapState.originalAirportTarget!!
+                    val heading = mapState.selectedRunwayHeading!!
+                    val distanceMeters = mapState.finalApproachDistanceNm * 1852.0
+                    val rad = Math.toRadians(heading)
+                    val lat1 = Math.toRadians(target.latitude)
+                    val lon1 = Math.toRadians(target.longitude)
+                    val dLat = distanceMeters * Math.cos(rad) / 6371000.0
+                    val dLon = distanceMeters * Math.sin(rad) / (6371000.0 * Math.cos(lat1))
+                    val endLat = lat1 + dLat
+                    val endLon = lon1 + dLon
+                    val endpoint = org.osmdroid.util.GeoPoint(Math.toDegrees(endLat), Math.toDegrees(endLon))
+                    
+                    val approachTarget = target.copy(
+                        id = -1,
+                        name = "${target.name} RWY ${(heading / 10).toInt().toString().padStart(2, '0')}",
+                        latitude = endpoint.latitude,
+                        longitude = endpoint.longitude
+                    )
+                    mapState.activeNavigationTarget = approachTarget
+                } else {
+                    // Otherwise restore to original airport target or clear if none
+                    mapState.activeNavigationTarget = mapState.originalAirportTarget
+                    // Only clear tactical unit ID if we're completely clearing navigation
+                    if (mapState.originalAirportTarget == null) {
+                        mapState.activeNavigationTacticalUnitId = null
+                    }
+                }
             }
             mv.invalidate()
         }
