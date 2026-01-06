@@ -54,6 +54,8 @@ class AssetsManagerWidget(QWidget):
         self.list_widget = QListWidget()
         self.list_widget.itemClicked.connect(self.on_item_clicked)
         self.list_widget.itemDoubleClicked.connect(self.on_item_double_clicked)
+        # Activate (Enter key / double-click) should behave like a click then open editor
+        self.list_widget.itemActivated.connect(self.on_item_activated)
         layout.addWidget(self.list_widget)
 
         # Buttons row
@@ -170,6 +172,13 @@ class AssetsManagerWidget(QWidget):
         elif typ == "border":
             border = self.db.get_border(obj_id)
             self.edit_border_dialog(border)
+
+    def on_item_activated(self, item: QListWidgetItem):
+        """Handle keyboard activation (Enter) — select/center the asset (like single click)."""
+        if not item:
+            return
+        # Emulate a single click: emit selection and center on map, but do NOT open the editor.
+        self.on_item_clicked(item)
 
     def add_marker(self):
         # Open location edit dialog with empty location
