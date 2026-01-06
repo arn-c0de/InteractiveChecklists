@@ -10,6 +10,7 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -210,13 +211,15 @@ fun MapNavigationDisplay(
     }
 
     // When landing mode toggles, expand or collapse related UI
+    // NOTE: We no longer auto-enable pattern here - let user control it independently
     LaunchedEffect(showRunwayApproach) {
         if (showRunwayApproach) {
             onShowNavigationDetailsChange(true)
             showManualLandingDetails = true
-            onShowTrafficPatternChange(true)
-            onShowPatternDetailsChange(true)
-            Log.d("MapNavigationDisplay", "Landing enabled -> expanding manual/pattern details")
+            // Don't force pattern on - let user decide
+            // onShowTrafficPatternChange(true)
+            // onShowPatternDetailsChange(true)
+            Log.d("MapNavigationDisplay", "Landing enabled -> expanding UI details (pattern controlled by user)")
         } else {
             showManualLandingDetails = false
         }
@@ -492,12 +495,13 @@ fun MapNavigationDisplay(
                                         onOriginalAirportTargetChange(activeNavigationTarget)
                                         Log.d("MapNavigationDisplay", "Set originalAirportTarget to ${activeNavigationTarget?.name}")
                                     }
-                                    // Expand manual/pattern sections
+                                    // Expand manual/pattern sections but DON'T force pattern on
                                     showManualLandingDetails = true
-                                    onShowTrafficPatternChange(true)
-                                    onShowPatternDetailsChange(true)
+                                    // Let user toggle pattern independently
+                                    // onShowTrafficPatternChange(true)
+                                    // onShowPatternDetailsChange(true)
                                 } else {
-                                    // Collapse manual/pattern sections when landing disabled
+                                    // When landing is disabled, also disable pattern
                                     showManualLandingDetails = false
                                     onShowTrafficPatternChange(false)
                                     onShowPatternDetailsChange(false)
@@ -592,14 +596,29 @@ fun MapNavigationDisplay(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        // Pattern button
+                                        // Pattern button - consume pointer events to prevent click-through
                                         Button(
-                                            onClick = { onShowTrafficPatternChange(!showTrafficPattern) },
+                                            onClick = {
+                                                val newPatternState = !showTrafficPattern
+                                                android.util.Log.d("MapNavigationDisplay", "Pattern button clicked: current=$showTrafficPattern, new=$newPatternState")
+                                                onShowTrafficPatternChange(newPatternState)
+                                                // Only expand pattern details when enabling, not when disabling
+                                                if (newPatternState) {
+                                                    onShowPatternDetailsChange(true)
+                                                }
+                                                // Don't collapse showPatternDetails when disabling - let it stay expanded for runway info
+                                                saveNavigationState()
+                                            },
                                             colors = ButtonDefaults.buttonColors(
                                                 containerColor = if (showTrafficPattern) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
                                                 contentColor = if (showTrafficPattern) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
                                             ),
-                                            modifier = Modifier.height(28.dp),
+                                            modifier = Modifier
+                                                .height(28.dp)
+                                                .pointerInput(Unit) {
+                                                    // Consume all pointer events to prevent click-through to map
+                                                    detectTapGestures(onTap = { /* Handled by onClick */ })
+                                                },
                                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
                                         ) {
                                             Text(
