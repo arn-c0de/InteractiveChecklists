@@ -884,6 +884,10 @@ fun MapViewer(
 
                 // Calculate final approach distance in meters
                 val distanceMeters = mapState.finalApproachDistanceNm * 1852.0
+                
+                // Get runway length in meters
+                val runwayLengthMeters = (runway.lengthM?.toDouble() ?: runway.lengthFt?.toDouble()?.times(0.3048)) ?: 2000.0
+                val halfRunwayLength = runwayLengthMeters / 2.0
 
                 // Direction 1: heading
                 val rad1 = Math.toRadians(heading)
@@ -904,6 +908,40 @@ fun MapViewer(
                 val endLon2 = lon1 + dLon2
                 val endpoint2 = GeoPoint(Math.toDegrees(endLat2), Math.toDegrees(endLon2))
 
+                // Calculate runway start/end points (half length in each direction from center)
+                val dLatStart = halfRunwayLength * Math.cos(rad1) / 6371000.0
+                val dLonStart = halfRunwayLength * Math.sin(rad1) / (6371000.0 * Math.cos(lat1))
+                val runwayStart = GeoPoint(Math.toDegrees(lat1 + dLatStart), Math.toDegrees(lon1 + dLonStart))
+                
+                val dLatEnd = halfRunwayLength * Math.cos(rad2) / 6371000.0
+                val dLonEnd = halfRunwayLength * Math.sin(rad2) / (6371000.0 * Math.cos(lat1))
+                val runwayEnd = GeoPoint(Math.toDegrees(lat1 + dLatEnd), Math.toDegrees(lon1 + dLonEnd))
+
+                // Calculate perpendicular heading (90 degrees to runway heading)
+                val perpHeading = (heading + 90) % 360
+                val perpRad = Math.toRadians(perpHeading)
+                val perpDistance = 100.0 // 100 meters width for threshold markers
+                
+                // Helper function to calculate perpendicular line endpoints
+                fun getPerpendicularPoints(point: GeoPoint): Pair<GeoPoint, GeoPoint> {
+                    val latRad = Math.toRadians(point.latitude)
+                    val lonRad = Math.toRadians(point.longitude)
+                    
+                    // One side
+                    val dLat1 = perpDistance * Math.cos(perpRad) / 6371000.0
+                    val dLon1 = perpDistance * Math.sin(perpRad) / (6371000.0 * Math.cos(latRad))
+                    val side1 = GeoPoint(Math.toDegrees(latRad + dLat1), Math.toDegrees(lonRad + dLon1))
+                    
+                    // Other side (opposite direction)
+                    val perpHeading2 = (perpHeading + 180) % 360
+                    val perpRad2 = Math.toRadians(perpHeading2)
+                    val dLat2 = perpDistance * Math.cos(perpRad2) / 6371000.0
+                    val dLon2 = perpDistance * Math.sin(perpRad2) / (6371000.0 * Math.cos(latRad))
+                    val side2 = GeoPoint(Math.toDegrees(latRad + dLat2), Math.toDegrees(lonRad + dLon2))
+                    
+                    return Pair(side1, side2)
+                }
+
                 // Create lines for both directions
                 val line1 = org.osmdroid.views.overlay.Polyline(map).apply {
                     outlinePaint.color = android.graphics.Color.argb(128, 255, 255, 0) // 50% transparent yellow
@@ -923,6 +961,27 @@ fun MapViewer(
 
                 newLines.add(line1)
                 newLines.add(line2)
+                
+                // Add perpendicular threshold markers at runway start and end
+                val (startSide1, startSide2) = getPerpendicularPoints(runwayStart)
+                val thresholdLine1 = org.osmdroid.views.overlay.Polyline(map).apply {
+                    outlinePaint.color = android.graphics.Color.argb(180, 255, 255, 0) // Slightly more opaque
+                    outlinePaint.strokeWidth = 6f
+                    outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                    setPoints(listOf(startSide1, startSide2))
+                    map.overlays.add(this)
+                }
+                newLines.add(thresholdLine1)
+                
+                val (endSide1, endSide2) = getPerpendicularPoints(runwayEnd)
+                val thresholdLine2 = org.osmdroid.views.overlay.Polyline(map).apply {
+                    outlinePaint.color = android.graphics.Color.argb(180, 255, 255, 0) // Slightly more opaque
+                    outlinePaint.strokeWidth = 6f
+                    outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                    setPoints(listOf(endSide1, endSide2))
+                    map.overlays.add(this)
+                }
+                newLines.add(thresholdLine2)
             }
             }
             // Case 2: No runways but manual heading is set - draw single approach line
