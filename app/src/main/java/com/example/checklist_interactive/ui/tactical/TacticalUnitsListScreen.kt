@@ -34,6 +34,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.alpha
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.checklist_interactive.R
 import com.example.checklist_interactive.data.datapad.DataPadManager
@@ -1814,6 +1817,362 @@ private fun CoalitionIndicator(coalition: Int, getCoalitionName: (Int) -> String
 
 @Composable
 private fun FilterDialog(
+    uiState: TacticalUnitsUiState,
+    onDismiss: () -> Unit,
+    onToggleCategory: (String) -> Unit,
+    onToggleCoalition: (Int) -> Unit,
+    onToggleActiveOnly: (Boolean) -> Unit,
+    onClearFilters: () -> Unit
+) {
+    val dataPadManager = LocalDataPadManager.current
+    val context = LocalContext.current
+    val prefs = context.getSharedPreferences("tactical_units_prefs", android.content.Context.MODE_PRIVATE)
+    
+    // Persistent collapsed/expanded state for each section
+    val KEY_FILTERS_EXPANDED = "settings_filters_expanded"
+    val KEY_HIGHLIGHTS_EXPANDED = "settings_highlights_expanded"
+    
+    var filtersExpanded by rememberSaveable { mutableStateOf(prefs.getBoolean(KEY_FILTERS_EXPANDED, true)) }
+    var highlightsExpanded by rememberSaveable { mutableStateOf(prefs.getBoolean(KEY_HIGHLIGHTS_EXPANDED, true)) }
+    
+    // Persist when changed
+    LaunchedEffect(filtersExpanded) {
+        prefs.edit().putBoolean(KEY_FILTERS_EXPANDED, filtersExpanded).apply()
+    }
+    LaunchedEffect(highlightsExpanded) {
+        prefs.edit().putBoolean(KEY_HIGHLIGHTS_EXPANDED, highlightsExpanded).apply()
+    }
+    
+    // Collect auto-highlight states
+    val autoHighlightAll by dataPadManager.autoHighlightAll.collectAsState()
+    val autoHighlightAircraft by dataPadManager.autoHighlightAircraft.collectAsState()
+    val autoHighlightHelicopter by dataPadManager.autoHighlightHelicopter.collectAsState()
+    val autoHighlightGround by dataPadManager.autoHighlightGround.collectAsState()
+    val autoHighlightShip by dataPadManager.autoHighlightShip.collectAsState()
+    val autoHighlightStructure by dataPadManager.autoHighlightStructure.collectAsState()
+    val autoHighlightWeapon by dataPadManager.autoHighlightWeapon.collectAsState()
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.tactical_settings_title)) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                // === FILTERS SECTION (Collapsible) ===
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        // Section header with expand/collapse button
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { filtersExpanded = !filtersExpanded },
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = stringResource(R.string.filter_title),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Icon(
+                                imageVector = if (filtersExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = if (filtersExpanded) "Collapse" else "Expand"
+                            )
+                        }
+                        
+                        // Collapsible content
+                        AnimatedVisibility(visible = filtersExpanded) {
+                            Column {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                Text(
+                                    text = stringResource(R.string.filter_by_coalition),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    FilterChip(
+                                        selected = uiState.selectedCoalitions.contains(0),
+                                        onClick = { onToggleCoalition(0) },
+                                        label = { Text(stringResource(R.string.coalition_neutral)) }
+                                    )
+                                    FilterChip(
+                                        selected = uiState.selectedCoalitions.contains(1),
+                                        onClick = { onToggleCoalition(1) },
+                                        label = { Text(stringResource(R.string.coalition_red)) }
+                                    )
+                                    FilterChip(
+                                        selected = uiState.selectedCoalitions.contains(2),
+                                        onClick = { onToggleCoalition(2) },
+                                        label = { Text(stringResource(R.string.coalition_blue)) }
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                Text(
+                                    text = stringResource(R.string.filter_by_category),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                FlowRow(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    FilterChip(
+                                        selected = uiState.selectedCategories.contains("aircraft"),
+                                        onClick = { onToggleCategory("aircraft") },
+                                        label = { Text(stringResource(R.string.category_aircraft)) }
+                                    )
+                                    FilterChip(
+                                        selected = uiState.selectedCategories.contains("helicopter"),
+                                        onClick = { onToggleCategory("helicopter") },
+                                        label = { Text(stringResource(R.string.category_helicopter)) }
+                                    )
+                                    FilterChip(
+                                        selected = uiState.selectedCategories.contains("ground"),
+                                        onClick = { onToggleCategory("ground") },
+                                        label = { Text(stringResource(R.string.category_ground)) }
+                                    )
+                                    FilterChip(
+                                        selected = uiState.selectedCategories.contains("ship"),
+                                        onClick = { onToggleCategory("ship") },
+                                        label = { Text(stringResource(R.string.category_ship)) }
+                                    )
+                                    FilterChip(
+                                        selected = uiState.selectedCategories.contains("structure"),
+                                        onClick = { onToggleCategory("structure") },
+                                        label = { Text(stringResource(R.string.category_structure)) }
+                                    )
+                                    FilterChip(
+                                        selected = uiState.selectedCategories.contains("weapon"),
+                                        onClick = { onToggleCategory("weapon") },
+                                        label = { Text(stringResource(R.string.category_weapon)) }
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.filter_active_only),
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    Switch(
+                                        checked = uiState.showActiveOnly,
+                                        onCheckedChange = onToggleActiveOnly
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // === AUTO-HIGHLIGHT SECTION (Collapsible) ===
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        // Section header with expand/collapse button
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { highlightsExpanded = !highlightsExpanded },
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = stringResource(R.string.auto_highlight_title),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Icon(
+                                imageVector = if (highlightsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = if (highlightsExpanded) "Collapse" else "Expand"
+                            )
+                        }
+                        
+                        // Collapsible content
+                        AnimatedVisibility(visible = highlightsExpanded) {
+                            Column {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                Text(
+                                    text = stringResource(R.string.auto_highlight_description),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                // Highlight All toggle
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { dataPadManager.toggleAutoHighlightAll() },
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Visibility,
+                                            contentDescription = null,
+                                            tint = if (autoHighlightAll) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            text = stringResource(R.string.auto_highlight_all),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = if (autoHighlightAll) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    }
+                                    Switch(
+                                        checked = autoHighlightAll,
+                                        onCheckedChange = { dataPadManager.setAutoHighlightAll(it) }
+                                    )
+                                }
+                                
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                                
+                                Text(
+                                    text = stringResource(R.string.auto_highlight_by_category),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                
+                                Spacer(modifier = Modifier.height(4.dp))
+                                
+                                // Category-specific highlights
+                                HighlightToggleRow(
+                                    icon = Icons.Default.Flight,
+                                    label = stringResource(R.string.category_aircraft),
+                                    checked = autoHighlightAircraft,
+                                    enabled = !autoHighlightAll,
+                                    onCheckedChange = { dataPadManager.setAutoHighlightAircraft(it) }
+                                )
+                                HighlightToggleRow(
+                                    icon = Icons.Default.Flight,
+                                    label = stringResource(R.string.category_helicopter),
+                                    checked = autoHighlightHelicopter,
+                                    enabled = !autoHighlightAll,
+                                    onCheckedChange = { dataPadManager.setAutoHighlightHelicopter(it) }
+                                )
+                                HighlightToggleRow(
+                                    icon = Icons.Default.DirectionsCar,
+                                    label = stringResource(R.string.category_ground),
+                                    checked = autoHighlightGround,
+                                    enabled = !autoHighlightAll,
+                                    onCheckedChange = { dataPadManager.setAutoHighlightGround(it) }
+                                )
+                                HighlightToggleRow(
+                                    icon = Icons.Default.DirectionsBoat,
+                                    label = stringResource(R.string.category_ship),
+                                    checked = autoHighlightShip,
+                                    enabled = !autoHighlightAll,
+                                    onCheckedChange = { dataPadManager.setAutoHighlightShip(it) }
+                                )
+                                HighlightToggleRow(
+                                    icon = Icons.Default.Home,
+                                    label = stringResource(R.string.category_structure),
+                                    checked = autoHighlightStructure,
+                                    enabled = !autoHighlightAll,
+                                    onCheckedChange = { dataPadManager.setAutoHighlightStructure(it) }
+                                )
+                                HighlightToggleRow(
+                                    icon = Icons.Default.GpsFixed,
+                                    label = stringResource(R.string.category_weapon),
+                                    checked = autoHighlightWeapon,
+                                    enabled = !autoHighlightAll,
+                                    onCheckedChange = { dataPadManager.setAutoHighlightWeapon(it) }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.done))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = {
+                onClearFilters()
+                onDismiss()
+            }) {
+                Text(stringResource(R.string.clear_filters))
+            }
+        }
+    )
+}
+
+@Composable
+private fun HighlightToggleRow(
+    icon: ImageVector,
+    label: String,
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(if (enabled) 1f else 0.5f)
+            .clickable(enabled = enabled) { onCheckedChange(!checked) }
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = if (checked && enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (checked && enabled) FontWeight.Bold else FontWeight.Normal
+            )
+        }
+        Switch(
+            checked = checked,
+            enabled = enabled,
+            onCheckedChange = onCheckedChange
+        )
+    }
+}
+
+@Composable
+private fun OldFilterDialog(
     uiState: TacticalUnitsUiState,
     onDismiss: () -> Unit,
     onToggleCategory: (String) -> Unit,

@@ -55,6 +55,15 @@ class DataPadManager(private val context: Context) {
         
         // Hide units timeout (in minutes) - how long after last contact units should be auto-hidden
         private const val KEY_TACTICAL_UNITS_HIDE_TIMEOUT_MINUTES = "tactical_units_hide_timeout_minutes"
+        
+        // Auto-highlight settings
+        private const val KEY_AUTO_HIGHLIGHT_ALL = "auto_highlight_all"
+        private const val KEY_AUTO_HIGHLIGHT_AIRCRAFT = "auto_highlight_aircraft"
+        private const val KEY_AUTO_HIGHLIGHT_HELICOPTER = "auto_highlight_helicopter"
+        private const val KEY_AUTO_HIGHLIGHT_GROUND = "auto_highlight_ground"
+        private const val KEY_AUTO_HIGHLIGHT_SHIP = "auto_highlight_ship"
+        private const val KEY_AUTO_HIGHLIGHT_STRUCTURE = "auto_highlight_structure"
+        private const val KEY_AUTO_HIGHLIGHT_WEAPON = "auto_highlight_weapon"
 
         // Handshake timeout
         private const val HANDSHAKE_TIMEOUT_MS = 10000L
@@ -135,6 +144,28 @@ class DataPadManager(private val context: Context) {
     // Tactical units hide timeout (minutes) - how long after last contact units should be auto-hidden
     private val _tacticalUnitsHideTimeoutMinutes = MutableStateFlow(prefs.getFloat(KEY_TACTICAL_UNITS_HIDE_TIMEOUT_MINUTES, 15.0f))
     val tacticalUnitsHideTimeoutMinutes: StateFlow<Float> = _tacticalUnitsHideTimeoutMinutes.asStateFlow()
+    
+    // Auto-highlight settings
+    private val _autoHighlightAll = MutableStateFlow(prefs.getBoolean(KEY_AUTO_HIGHLIGHT_ALL, false))
+    val autoHighlightAll: StateFlow<Boolean> = _autoHighlightAll.asStateFlow()
+    
+    private val _autoHighlightAircraft = MutableStateFlow(prefs.getBoolean(KEY_AUTO_HIGHLIGHT_AIRCRAFT, false))
+    val autoHighlightAircraft: StateFlow<Boolean> = _autoHighlightAircraft.asStateFlow()
+    
+    private val _autoHighlightHelicopter = MutableStateFlow(prefs.getBoolean(KEY_AUTO_HIGHLIGHT_HELICOPTER, false))
+    val autoHighlightHelicopter: StateFlow<Boolean> = _autoHighlightHelicopter.asStateFlow()
+    
+    private val _autoHighlightGround = MutableStateFlow(prefs.getBoolean(KEY_AUTO_HIGHLIGHT_GROUND, false))
+    val autoHighlightGround: StateFlow<Boolean> = _autoHighlightGround.asStateFlow()
+    
+    private val _autoHighlightShip = MutableStateFlow(prefs.getBoolean(KEY_AUTO_HIGHLIGHT_SHIP, false))
+    val autoHighlightShip: StateFlow<Boolean> = _autoHighlightShip.asStateFlow()
+    
+    private val _autoHighlightStructure = MutableStateFlow(prefs.getBoolean(KEY_AUTO_HIGHLIGHT_STRUCTURE, false))
+    val autoHighlightStructure: StateFlow<Boolean> = _autoHighlightStructure.asStateFlow()
+    
+    private val _autoHighlightWeapon = MutableStateFlow(prefs.getBoolean(KEY_AUTO_HIGHLIGHT_WEAPON, false))
+    val autoHighlightWeapon: StateFlow<Boolean> = _autoHighlightWeapon.asStateFlow()
 
     // Connection health tracking (for heartbeat monitoring)
     enum class ConnectionHealth {
@@ -708,6 +739,97 @@ class DataPadManager(private val context: Context) {
         prefs.edit().putFloat(KEY_TACTICAL_UNITS_HIDE_TIMEOUT_MINUTES, clamped).apply()
         _tacticalUnitsHideTimeoutMinutes.value = clamped
         udpLogD("Tactical units hide timeout set to ${clamped} minutes")
+    }
+    
+    /**
+     * Auto-highlight all tactical units
+     */
+    fun setAutoHighlightAll(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTO_HIGHLIGHT_ALL, enabled).apply()
+        _autoHighlightAll.value = enabled
+        udpLogD("Auto-highlight all ${if (enabled) "enabled" else "disabled"}")
+    }
+    
+    fun toggleAutoHighlightAll() {
+        setAutoHighlightAll(!_autoHighlightAll.value)
+    }
+    
+    /**
+     * Auto-highlight aircraft units
+     */
+    fun setAutoHighlightAircraft(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTO_HIGHLIGHT_AIRCRAFT, enabled).apply()
+        _autoHighlightAircraft.value = enabled
+        udpLogD("Auto-highlight aircraft ${if (enabled) "enabled" else "disabled"}")
+    }
+    
+    fun toggleAutoHighlightAircraft() {
+        setAutoHighlightAircraft(!_autoHighlightAircraft.value)
+    }
+    
+    /**
+     * Auto-highlight helicopter units
+     */
+    fun setAutoHighlightHelicopter(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTO_HIGHLIGHT_HELICOPTER, enabled).apply()
+        _autoHighlightHelicopter.value = enabled
+        udpLogD("Auto-highlight helicopter ${if (enabled) "enabled" else "disabled"}")
+    }
+    
+    fun toggleAutoHighlightHelicopter() {
+        setAutoHighlightHelicopter(!_autoHighlightHelicopter.value)
+    }
+    
+    /**
+     * Auto-highlight ground units
+     */
+    fun setAutoHighlightGround(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTO_HIGHLIGHT_GROUND, enabled).apply()
+        _autoHighlightGround.value = enabled
+        udpLogD("Auto-highlight ground ${if (enabled) "enabled" else "disabled"}")
+    }
+    
+    fun toggleAutoHighlightGround() {
+        setAutoHighlightGround(!_autoHighlightGround.value)
+    }
+    
+    /**
+     * Auto-highlight ship units
+     */
+    fun setAutoHighlightShip(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTO_HIGHLIGHT_SHIP, enabled).apply()
+        _autoHighlightShip.value = enabled
+        udpLogD("Auto-highlight ship ${if (enabled) "enabled" else "disabled"}")
+    }
+    
+    fun toggleAutoHighlightShip() {
+        setAutoHighlightShip(!_autoHighlightShip.value)
+    }
+    
+    /**
+     * Auto-highlight structure units
+     */
+    fun setAutoHighlightStructure(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTO_HIGHLIGHT_STRUCTURE, enabled).apply()
+        _autoHighlightStructure.value = enabled
+        udpLogD("Auto-highlight structure ${if (enabled) "enabled" else "disabled"}")
+    }
+    
+    fun toggleAutoHighlightStructure() {
+        setAutoHighlightStructure(!_autoHighlightStructure.value)
+    }
+    
+    /**
+     * Auto-highlight weapon units
+     */
+    fun setAutoHighlightWeapon(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTO_HIGHLIGHT_WEAPON, enabled).apply()
+        _autoHighlightWeapon.value = enabled
+        udpLogD("Auto-highlight weapon ${if (enabled) "enabled" else "disabled"}")
+    }
+    
+    fun toggleAutoHighlightWeapon() {
+        setAutoHighlightWeapon(!_autoHighlightWeapon.value)
     }
 
     /**
