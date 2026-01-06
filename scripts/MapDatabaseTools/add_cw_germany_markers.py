@@ -692,6 +692,21 @@ def germany_samples():
             map="CW Germany"
         ),
         Location(
+            name="Sittensen Highway Strip",
+            latitude=53.315083,
+            longitude=9.568405,
+            marker_type=MarkerType.AIRPORT.value,
+            icao="",
+            iata="",
+            elevation_m=6.0,
+            runways=[Runway(name="05/23", length_m=1650, width_m=16, heading=54.0, surface="concrete/asphalt")],
+            frequencies={"tower": 120.0},
+            country="West Germany",
+            tags=["Highway Strip", "military", "emergency airstrip", "cold war", "unused"],
+            source="DCS World / Verified",
+            map="CW Germany"
+        ),
+        Location(
             name="Hannover",
             latitude=52.4611,
             longitude=9.6850,
