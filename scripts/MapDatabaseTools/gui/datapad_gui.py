@@ -1354,8 +1354,16 @@ class DataPadGUI(QMainWindow):
             return
 
     def on_reload_database_requested(self):
-        """Handle reload request: re-open DB connection, refresh lists and redraw map"""
+        """Handle reload request: re-open DB connection, refresh lists and redraw map
+        Preserve current selection (if any) and re-select/center the same asset after reload."""
         try:
+            # Capture current selection from assets list (if any)
+            try:
+                sel_item = self.assets_manager.list_widget.currentItem()
+                saved_selection = sel_item.data(Qt.ItemDataRole.UserRole) if sel_item else None
+            except Exception:
+                saved_selection = None
+
             # Close existing DB connection if supported
             try:
                 self.db.close()
@@ -1387,6 +1395,11 @@ class DataPadGUI(QMainWindow):
             # Redraw map
             self.refresh_map_markers()
             self.refresh_map_borders()
+
+            # Restore previous selection (if possible) after a short delay to allow lists and map to update
+            from PySide6.QtCore import QTimer
+            if saved_selection:
+                QTimer.singleShot(200, lambda: self.assets_manager.select_asset(saved_selection))
 
             QMessageBox.information(self, "Reloaded", "Database reloaded and map refreshed.")
         except Exception as e:
