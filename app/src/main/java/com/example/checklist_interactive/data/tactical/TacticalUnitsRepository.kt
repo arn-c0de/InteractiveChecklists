@@ -296,6 +296,7 @@ class TacticalUnitsRepository(private val context: Context) {
             "ship" -> "Ship"
             "structure" -> "Structure"
             "weapon" -> "Weapon"
+            "countermeasure" -> "Countermeasure"
             else -> category.capitalize()
         }
     }

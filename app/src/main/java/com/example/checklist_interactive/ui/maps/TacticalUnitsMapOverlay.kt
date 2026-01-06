@@ -395,6 +395,7 @@ class TacticalUnitsMapOverlay(
             "ship" -> "S"
             "structure" -> "B" // Building
             "weapon" -> "W"
+            "countermeasure" -> "C" // Countermeasure (Flares/Chaffs)
             else -> "U" // Unknown
         }
 

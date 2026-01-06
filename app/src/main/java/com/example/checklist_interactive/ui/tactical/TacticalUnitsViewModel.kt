@@ -85,6 +85,7 @@ class TacticalUnitsViewModel(
             shipCount = categoryDist["ship"] ?: 0,
             structureCount = categoryDist["structure"] ?: 0,
             weaponCount = categoryDist["weapon"] ?: 0,
+            countermeasureCount = categoryDist["countermeasure"] ?: 0,
             neutralCount = coalitionDist[0] ?: 0,
             redCount = coalitionDist[1] ?: 0,
             blueCount = coalitionDist[2] ?: 0
@@ -251,6 +252,7 @@ data class UnitStatistics(
     val shipCount: Int = 0,
     val structureCount: Int = 0,
     val weaponCount: Int = 0,
+    val countermeasureCount: Int = 0,
     val neutralCount: Int = 0,
     val redCount: Int = 0,
     val blueCount: Int = 0

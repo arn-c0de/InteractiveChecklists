@@ -770,6 +770,11 @@ private fun CompactSettingsGrid(
                     isSelected = selectedCategories.contains("weapon"),
                     onClick = { onToggleCategory("weapon") }
                 )
+                if (stats.countermeasureCount > 0) CompactCategoryChip(
+                    label = "CM: ${stats.countermeasureCount}",
+                    isSelected = selectedCategories.contains("countermeasure"),
+                    onClick = { onToggleCategory("countermeasure") }
+                )
             }
         }
     }
@@ -1732,7 +1737,7 @@ private fun FilterDialog(
                 // Categories
                 Text(stringResource(R.string.filter_categories_title), style = MaterialTheme.typography.titleSmall)
                 Spacer(modifier = Modifier.height(8.dp))
-                listOf("aircraft", "helicopter", "ground", "ship", "structure", "weapon").forEach { category ->
+                listOf("aircraft", "helicopter", "ground", "ship", "structure", "weapon", "countermeasure").forEach { category ->
                     val categoryLabel = when (category) {
                         "aircraft" -> stringResource(R.string.category_aircraft)
                         "helicopter" -> stringResource(R.string.category_heli)
@@ -1740,6 +1745,7 @@ private fun FilterDialog(
                         "ship" -> stringResource(R.string.category_ship)
                         "structure" -> stringResource(R.string.category_structure)
                         "weapon" -> stringResource(R.string.category_weapon)
+                        "countermeasure" -> "Countermeasures (CM)"
                         else -> category.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
                     }
                     Row(

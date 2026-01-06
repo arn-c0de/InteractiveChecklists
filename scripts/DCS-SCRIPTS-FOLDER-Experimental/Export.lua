@@ -270,7 +270,20 @@ pcall(function()
 					   unitName:match('^Brimstone') or
 					   unitName:match('^Exocet')
 
-					if isWeaponByName then
+					-- Check for countermeasures (flares/chaffs) - these are aircraft without a name
+					local isCountermeasure = false
+					if objData.Type and type(objData.Type) == 'table' then
+						local level1 = objData.Type.level1 or 0
+						local level3 = objData.Type.level3 or 0
+						-- Aircraft type (level1==1) without a proper name = countermeasure
+						if level1 == 1 and (unitName == '' or unitName == 'Unknown' or unitName == nil) then
+							isCountermeasure = true
+						end
+					end
+
+					if isCountermeasure then
+						categoryName = 'countermeasure'
+					elseif isWeaponByName then
 						categoryName = 'weapon'
 					-- Name-based heuristics for structures
 					elseif unitName:find('HELIPAD') or unitName:find('FARP') or unitName:find('Invisible FARP') then
