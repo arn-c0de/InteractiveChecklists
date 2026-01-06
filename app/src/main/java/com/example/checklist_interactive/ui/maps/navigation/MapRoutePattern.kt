@@ -154,10 +154,95 @@ object TrafficPatternGenerator {
         
         // Apply corner smoothing if enabled
         return if (roundedCorners) {
-            smoothCorners(points, smoothingRadius = 0.15) // 15% smoothing radius
+            smoothCorners(points, patternSize)
         } else {
             points
         }
+    }
+    
+    /**
+     * Generate traffic pattern with corner information for labels
+     * Returns pair of (smoothed points, original corner indices)
+     */
+    fun generateTrafficPatternWithCorners(
+        runwayThreshold: GeoPoint,
+        runwayHeading: Double,
+        runwayLengthMeters: Double,
+        patternSize: PatternSize = PatternSize.NORMAL,
+        direction: PatternDirection = PatternDirection.LEFT_HAND,
+        finalDistanceNm: Double = 1.0,
+        roundedCorners: Boolean = false
+    ): Pair<List<GeoPoint>, Map<String, GeoPoint>> {
+        val points = mutableListOf<GeoPoint>()
+        
+        // [Copy the entire pattern generation logic here - same as generateTrafficPattern]
+        val sizeScale = when (patternSize) {
+            PatternSize.NORMAL -> 1.25
+            PatternSize.MEDIUM -> 1.5
+            PatternSize.LARGE -> 1.75
+            PatternSize.VERY_LARGE -> 2.25
+            PatternSize.EXTRA_LARGE -> 3.0
+        }
+
+        val downwindDistanceMeters = patternSize.downwindDistanceNm * 1852.0 * sizeScale
+        val baseDistanceMeters = downwindDistanceMeters
+        val turnMultiplier = if (direction == PatternDirection.LEFT_HAND) -1.0 else 1.0
+        
+        points.add(runwayThreshold)
+        val departureEndDistance = runwayLengthMeters + (0.5 * 1852.0 * sizeScale)
+        val departureEnd = calculateDestination(runwayThreshold, runwayHeading, departureEndDistance)
+        points.add(departureEnd)
+        
+        val crosswindTurnDistance = 0.3 * 1852.0 * sizeScale
+        val crosswindTurnPoint = calculateDestination(departureEnd, runwayHeading, crosswindTurnDistance)
+        points.add(crosswindTurnPoint)
+        
+        val crosswindHeading = normalizeHeading(runwayHeading + (90.0 * turnMultiplier))
+        val downwindEntryPoint = calculateDestination(crosswindTurnPoint, crosswindHeading, downwindDistanceMeters)
+        points.add(downwindEntryPoint)
+        
+        val downwindHeading = normalizeHeading(runwayHeading + 180.0)
+        val downwindLength = runwayLengthMeters + (finalDistanceNm * 1852.0) + (0.5 * 1852.0 * sizeScale)
+        val downwindMidpoint = calculateDestination(downwindEntryPoint, downwindHeading, downwindLength / 2)
+        points.add(downwindMidpoint)
+        
+        val downwindAbeam = calculateDestination(downwindEntryPoint, downwindHeading, downwindLength)
+        points.add(downwindAbeam)
+        
+        val baseExtension = (0.3 + (finalDistanceNm * 0.2)) * 1852.0 * sizeScale
+        val baseTurnPoint = calculateDestination(downwindAbeam, downwindHeading, baseExtension)
+        points.add(baseTurnPoint)
+        
+        val baseHeading = normalizeHeading(runwayHeading + (270.0 * turnMultiplier))
+        val basePoint = calculateDestination(baseTurnPoint, baseHeading, baseDistanceMeters)
+        points.add(basePoint)
+        
+        val finalDistance = finalDistanceNm * 1852.0
+        val finalPoint = calculateDestination(runwayThreshold, normalizeHeading(runwayHeading + 180.0), finalDistance)
+        points.add(finalPoint)
+        
+        val shortFinalDistance = (finalDistanceNm * 0.2) * 1852.0
+        val shortFinalPoint = calculateDestination(runwayThreshold, normalizeHeading(runwayHeading + 180.0), shortFinalDistance)
+        points.add(shortFinalPoint)
+        
+        points.add(runwayThreshold)
+        
+        // Store original corner positions before smoothing
+        val corners = mapOf(
+            "departure" to points[1],
+            "crosswind" to calculateDestination(points[2], calculateBearing(points[2], points[3]), calculateDistance(points[2], points[3]) / 2.0),
+            "downwind" to points[3],
+            "base" to points[6],
+            "final" to (calculateLineIntersection(points[6], points[7], points[0], points[8]) ?: points[8])
+        )
+        
+        val finalPoints = if (roundedCorners) {
+            smoothCorners(points, patternSize)
+        } else {
+            points
+        }
+        
+        return Pair(finalPoints, corners)
     }
     
     /**
@@ -182,6 +267,10 @@ object TrafficPatternGenerator {
     
     /**
      * Generate pattern leg labels for overlay with distances and headings
+     * Works with both smoothed and non-smoothed patterns
+     * 
+     * @param points Pattern points (may be smoothed)
+     * @param cornerPositions Optional map of original corner positions (for smoothed patterns)
      */
     fun generatePatternLabels(
         points: List<GeoPoint>,
@@ -189,55 +278,54 @@ object TrafficPatternGenerator {
         runwayHeading: Double,
         patternSize: PatternSize = PatternSize.NORMAL,
         runwayElevationFt: Int = 0,
-        customAltitudeAglFt: Int? = null
+        customAltitudeAglFt: Int? = null,
+        cornerPositions: Map<String, GeoPoint>? = null
     ): List<Pair<GeoPoint, String>> {
-        if (points.size < 11) return emptyList()
+        // Use corner positions if provided (for smoothed patterns), otherwise use indices
+        val useFallback = cornerPositions == null || points.size < 11
+        
+        if (useFallback && points.size < 11) return emptyList()
 
-        // Distances for each leg in NM (use the actual leg endpoints)
-        val departureDist = calculateDistance(points[0], points[1]) / 1852.0
-        val crosswindDist = calculateDistance(points[2], points[3]) / 1852.0
-        val downwindDist = calculateDistance(points[3], points[5]) / 1852.0
-        val baseDist = calculateDistance(points[6], points[7]) / 1852.0
-        val finalDist = calculateDistance(points[8], points[10]) / 1852.0
-
-        // Compute headings for each leg based on actual points (more robust when points are transformed)
-        val departureHdg = calculateBearing(points[0], points[1]).toInt()
-        val crosswindHdg = calculateBearing(points[2], points[3]).toInt()
-        val downwindHdg = calculateBearing(points[3], points[5]).toInt()
-        // Base leg heading is the heading flown from base turn point to base point
-        val baseHdg = calculateBearing(points[6], points[7]).toInt()
-        val finalHdg = calculateBearing(points[9], points[10]).toInt()
-        // Compute midpoints where needed
-        val crosswindMid = run {
-            val distMeters = calculateDistance(points[2], points[3])
-            val bearing = calculateBearing(points[2], points[3])
-            calculateDestination(points[2], bearing, distMeters / 2.0)
+        // For non-smoothed patterns, calculate from indices
+        val departurePoint = cornerPositions?.get("departure") ?: points.getOrNull(1) ?: return emptyList()
+        val crosswindPoint = cornerPositions?.get("crosswind") ?: run {
+            if (points.size > 3) {
+                val distMeters = calculateDistance(points[2], points[3])
+                val bearing = calculateBearing(points[2], points[3])
+                calculateDestination(points[2], bearing, distMeters / 2.0)
+            } else return emptyList()
         }
-        // DOWNWIND label at the corner (entry point) between Crosswind and Downwind
-        val downwindCorner = points[3] // downwindEntryPoint
+        val downwindPoint = cornerPositions?.get("downwind") ?: points.getOrNull(3) ?: return emptyList()
+        val basePoint = cornerPositions?.get("base") ?: points.getOrNull(6) ?: return emptyList()
+        val finalPoint = cornerPositions?.get("final") ?: run {
+            if (points.size > 8) {
+                calculateLineIntersection(points[6], points[7], points[0], points[8]) ?: points[8]
+            } else return emptyList()
+        }
 
-        // Determine the true Base->Final corner by intersecting the Base leg (points[6]->points[7])
-        // with the Final approach line (runway threshold -> points[8]). If lines are parallel fall back to points[8].
-        // points[0] is the runway threshold (first point in the pattern)
-        val intersection = calculateLineIntersection(points[6], points[7], points[0], points[8])
-        val finalCorner = intersection ?: points[8]
-        // Use the computed corner directly for the FINAL label so it sits at the turn point between Base and Final
-        val finalLabelPoint = finalCorner
+        // Calculate distances based on nearby points (works for both smoothed and non-smoothed)
+        val departureDist = if (points.size > 1) calculateDistance(points[0], points[1]) / 1852.0 else 0.0
+        val crosswindDist = if (points.size > 3) calculateDistance(points[2], points[3]) / 1852.0 else 0.0
+        val downwindDist = if (points.size > 5) calculateDistance(points[3], points[5]) / 1852.0 else 0.0
+        val baseDist = if (points.size > 7) calculateDistance(points[6], points[7]) / 1852.0 else 0.0
+        val finalDist = if (points.size > 10) calculateDistance(points[8], points[10]) / 1852.0 else 0.0
+
+        // Compute headings
+        val departureHdg = if (points.size > 1) calculateBearing(points[0], points[1]).toInt() else 0
+        val crosswindHdg = if (points.size > 3) calculateBearing(points[2], points[3]).toInt() else 0
+        val downwindHdg = if (points.size > 5) calculateBearing(points[3], points[5]).toInt() else 0
+        val baseHdg = if (points.size > 7) calculateBearing(points[6], points[7]).toInt() else 0
+        val finalHdg = if (points.size > 10) calculateBearing(points[9], points[10]).toInt() else 0
 
         val altAglFt = customAltitudeAglFt ?: patternSize.patternAltitudeAglFt
         val altMslFt = altAglFt + runwayElevationFt
 
         return listOf(
-            // DEPARTURE at end of climb-out
-            points[1] to String.format("DEPARTURE\nHDG %03d°\n%.1f NM", departureHdg, departureDist),
-            // CROSSWIND shown at midpoint of the crosswind leg
-            crosswindMid to String.format("CROSSWIND\nHDG %03d°\n%.1f NM", crosswindHdg, crosswindDist),
-            // DOWNWIND shown at the corner between Crosswind and Downwind (includes pattern altitude with both MSL and AGL)
-            downwindCorner to String.format("DOWNWIND\nHDG %03d°\n%.1f NM\n%d ft MSL (%d AGL)", downwindHdg, downwindDist, altMslFt, altAglFt),
-            // BASE at the base-turn corner
-            points[6] to String.format("BASE\nHDG %03d°\n%.1f NM", baseHdg, baseDist),
-            // FINAL offset a little from the corner to avoid overlapping the final leg
-            finalLabelPoint to String.format("FINAL\nHDG %03d°\n%.1f NM", finalHdg, finalDist)
+            departurePoint to String.format("DEPARTURE\nHDG %03d°\n%.1f NM", departureHdg, departureDist),
+            crosswindPoint to String.format("CROSSWIND\nHDG %03d°\n%.1f NM", crosswindHdg, crosswindDist),
+            downwindPoint to String.format("DOWNWIND\nHDG %03d°\n%.1f NM\n%d ft MSL (%d AGL)", downwindHdg, downwindDist, altMslFt, altAglFt),
+            basePoint to String.format("BASE\nHDG %03d°\n%.1f NM", baseHdg, baseDist),
+            finalPoint to String.format("FINAL\nHDG %03d°\n%.1f NM", finalHdg, finalDist)
         )
     }
     
@@ -303,15 +391,35 @@ object TrafficPatternGenerator {
      * Uses a simple arc approximation for smooth flyable corners
      * 
      * @param points Original pattern points
-     * @param smoothingRadius Fraction of segment length to use for smoothing (0.0-0.5)
+     * @param patternSize Pattern size determines smoothing radius (larger = more rounded)
      * @return Smoothed pattern with additional points at corners
      */
-    private fun smoothCorners(points: List<GeoPoint>, smoothingRadius: Double = 0.15): List<GeoPoint> {
+    private fun smoothCorners(points: List<GeoPoint>, patternSize: PatternSize): List<GeoPoint> {
         if (points.size < 3) return points
         
-        val smoothed = mutableListOf<GeoPoint>()
-        val radius = smoothingRadius.coerceIn(0.05, 0.4) // Clamp to reasonable range
+        // Scale smoothing radius based on pattern size
+        // Larger patterns get progressively more rounding for smoother, easier turns
+        val smoothingRadius = when (patternSize) {
+            PatternSize.NORMAL -> 0.12       // 12% - tighter turns
+            PatternSize.MEDIUM -> 0.15       // 15% - moderate
+            PatternSize.LARGE -> 0.18        // 18% - smoother
+            PatternSize.VERY_LARGE -> 0.22   // 22% - very smooth
+            PatternSize.EXTRA_LARGE -> 0.28  // 28% - wide, gentle turns
+        }
         
+        val radius = smoothingRadius.coerceIn(0.05, 0.4) // Safety clamp
+        
+        // Calculate a fixed smoothing distance based on pattern size (in meters)
+        // This ensures all corners are rounded equally
+        val fixedSmoothDist = when (patternSize) {
+            PatternSize.NORMAL -> 250.0        // 250m radius
+            PatternSize.MEDIUM -> 500.0        // 500m radius
+            PatternSize.LARGE -> 1000.0        // 1km radius - much smoother
+            PatternSize.VERY_LARGE -> 1500.0   // 1.5km radius - very smooth
+            PatternSize.EXTRA_LARGE -> 2200.0  // 2.2km radius - extremely smooth
+        }
+        
+        val smoothed = mutableListOf<GeoPoint>()
         smoothed.add(points.first()) // Keep first point (runway threshold)
         
         for (i in 1 until points.size - 1) {
@@ -323,14 +431,14 @@ object TrafficPatternGenerator {
             val distToPrev = calculateDistance(current, prev)
             val distToNext = calculateDistance(current, next)
             
-            // Skip smoothing if segments are too short
-            if (distToPrev < 100 || distToNext < 100) {
+            // Skip smoothing if segments are too short for the fixed smoothing distance
+            if (distToPrev < fixedSmoothDist * 1.5 || distToNext < fixedSmoothDist * 1.5) {
                 smoothed.add(current)
                 continue
             }
             
-            // Calculate smoothing distance (use smaller of the two segments)
-            val smoothDist = minOf(distToPrev, distToNext) * radius
+            // Use fixed smoothing distance for consistent rounding on all corners
+            val smoothDist = fixedSmoothDist
             
             // Calculate bearings
             val bearingFromPrev = calculateBearing(prev, current)
