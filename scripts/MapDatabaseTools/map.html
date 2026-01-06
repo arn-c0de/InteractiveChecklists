@@ -24,11 +24,94 @@
         #map-controls #map-menu label { display: block; width: 160px; padding: 8px 12px; cursor: pointer; user-select: none; }
         #map-controls #map-menu label:hover { background: rgba(0,0,0,0.06); }
         #map-controls #map-menu input[type="checkbox"] { margin-right: 8px; }
+        
+        /* Compass Widget */
+        #compass-widget { 
+            position: absolute; 
+            bottom: 20px; 
+            right: 20px; 
+            z-index: 1100;
+            background: transparent; /* fully transparent */
+            border-radius: 8px;
+            padding: 6px;
+            width: auto;
+            cursor: move;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        #compass-widget.hidden { display: none; }
+        #compass-widget.dragging { cursor: grabbing; }
+        #compass-canvas {
+            width: 320px;
+            height: 320px;
+            cursor: move; /* clicking canvas will move widget */
+            user-select: none;
+            background: transparent; /* no background */
+            border-radius: 50%;
+            box-shadow: none; /* remove shadow */
+            display: block;
+        }
+        #compass-canvas:active { cursor: grabbing; }
+        #compass-controls {
+            margin-top: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            background: transparent; /* transparent controls bar */
+            padding: 2px 4px;
+            border-radius: 5px;
+        }
+        #compass-heading {
+            font-size: 20px;
+            font-weight: bold;
+            color: #fff; /* white for visibility on map */
+            text-align: center;
+            flex: 1;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+        }
+        #compass-controls button {
+            padding: 4px 8px;
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        #compass-controls button:hover { background: rgba(255, 255, 255, 0.18); }
+        #compass-toggle {
+            position: absolute;
+            top: 10px;
+            right: 200px;
+            z-index: 1100;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            padding: 8px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+        #compass-toggle:hover { background: rgba(255, 255, 255, 1); }
     </style>
 </head>
 <body>
     <div id="status">Loading map...</div>
     <div id="map"></div>
+    
+    <!-- Compass Toggle Button -->
+    <button id="compass-toggle" title="Toggle Compass">🧭</button>
+    
+    <!-- Compass Widget -->
+    <div id="compass-widget" class="hidden">
+        <canvas id="compass-canvas" width="320" height="320" aria-label="Compass"></canvas>
+        <div id="compass-controls">
+            <button id="compass-reset" title="Reset to North">↻</button>
+            <div id="compass-heading">0°</div>
+            <button id="compass-lock" title="Compass locked to map north" disabled>🔒</button>
+        </div>
+    </div>
 
     <!-- Load Leaflet from CDN -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -696,7 +779,289 @@
                         console.error('drawClosingLine error', e);
                     }
                 };
+                // ===========================================
+                // COMPASS WIDGET IMPLEMENTATION
+                // ===========================================
+                
+                var compassWidget = document.getElementById('compass-widget');
+                var compassCanvas = document.getElementById('compass-canvas');
+                var compassHeading = document.getElementById('compass-heading');
+                var compassToggle = document.getElementById('compass-toggle');
+                var compassResetBtn = document.getElementById('compass-reset');
+                var compassLockBtn = document.getElementById('compass-lock');
+                
+                var compassRotation = 0; // Current rotation in degrees
+                // Compass is fixed to map north by default (non-rotatable)
+                var compassLocked = true;
+                var compassDragging = false;
+                var compassRotating = false;
+                
+                // Widget dragging state
+                var widgetDragging = false;
+                var widgetDragOffset = { x: 0, y: 0 };
+                
+                // Load saved state
+                var compassVisible = localStorage.getItem('compass_visible') === 'true';
+                var savedPosition = localStorage.getItem('compass_position');
+                
+                if (compassVisible) {
+                    compassWidget.classList.remove('hidden');
+                }
+                
+                // Restore saved position
+                if (savedPosition) {
+                    try {
+                        var pos = JSON.parse(savedPosition);
+                        compassWidget.style.right = 'auto';
+                        compassWidget.style.bottom = 'auto';
+                        compassWidget.style.left = pos.x + 'px';
+                        compassWidget.style.top = pos.y + 'px';
+                    } catch (e) {
+                        console.error('Failed to restore compass position', e);
+                    }
+                }
+                
+                // Ensure lock button shows locked and cannot be toggled (compass fixed to map north)
+                try {
+                    compassLockBtn.textContent = '🔒';
+                    compassLockBtn.title = 'Compass locked to map north (not rotatable)';
+                    compassLockBtn.disabled = true;
+                    compassCanvas.style.cursor = 'default';
+                } catch (e) {
+                    // If button missing, ignore
+                }
+                
+                // Toggle compass visibility
+                compassToggle.addEventListener('click', function() {
+                    compassWidget.classList.toggle('hidden');
+                    var visible = !compassWidget.classList.contains('hidden');
+                    localStorage.setItem('compass_visible', visible.toString());
+                });
+                
+                // Draw compass rose dynamically scaled to canvas size
+                function drawCompass() {
+                    var ctx = compassCanvas.getContext('2d');
+                    var width = compassCanvas.width;
+                    var height = compassCanvas.height;
+                    var centerX = width / 2;
+                    var centerY = height / 2;
+                    var radius = Math.min(width, height) / 2 - 16; // padding
+                    
+                    // Clear canvas
+                    ctx.clearRect(0, 0, width, height);
+                    
+                    // Background subtle ring for visibility
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, radius + 10, 0, 2 * Math.PI);
+                    ctx.fillStyle = 'rgba(0,0,0,0)'; // fully transparent
+                    ctx.fill();
+                    
+                    // Save state (no rotation because compass is fixed to map north)
+                    ctx.save();
+                    ctx.translate(centerX, centerY);
+                    
+                    // Draw outer circle (thin and semi-transparent for visibility)
+                    ctx.beginPath();
+                    ctx.arc(0, 0, radius, 0, 2 * Math.PI);
+                    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+                    ctx.lineWidth = Math.max(2, Math.round(radius * 0.02));
+                    ctx.stroke();
+                    
+                    // Draw degree tick marks (5° resolution, numeric labels every 10°)
+                    for (var i = 0; i < 360; i += 5) {
+                        var angle = (i * Math.PI) / 180;
+                        var isMajor = i % 10 === 0; // label every 10°
+                        var tickLength = isMajor ? Math.round(radius * 0.08) : Math.round(radius * 0.04);
+                        var tickWidth = isMajor ? Math.max(2, Math.round(radius * 0.01)) : Math.max(1, Math.round(radius * 0.006));
+                        
+                        var x1 = Math.sin(angle) * (radius - tickLength);
+                        var y1 = -Math.cos(angle) * (radius - tickLength);
+                        var x2 = Math.sin(angle) * radius;
+                        var y2 = -Math.cos(angle) * radius;
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(x1, y1);
+                        ctx.lineTo(x2, y2);
+                        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+                        ctx.lineWidth = tickWidth;
+                        ctx.stroke();
+                        
+                        // Draw numeric labels every 10° (skip cardinal letters which are drawn separately)
+                        if (isMajor && (i % 90 !== 0)) {
+                            ctx.save();
+                            var labelRadius = radius - tickLength - Math.round(radius * 0.06);
+                            ctx.translate(Math.sin(angle) * labelRadius, -Math.cos(angle) * labelRadius);
+                            ctx.rotate(-((compassRotation + i) * Math.PI) / 180);
+                            ctx.font = Math.max(12, Math.round(radius * 0.08)) + 'px Arial';
+                            ctx.fillStyle = 'rgba(255,255,255,0.95)';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillText(i.toString(), 0, 0);
+                            ctx.restore();
+                        }
+                    }
+                    
+                    // Draw cardinal direction labels
+                    var directions = [
+                        { angle: 0, label: 'N', color: '#ff4d4d' },
+                        { angle: 90, label: 'E', color: 'rgba(255,255,255,0.95)' },
+                        { angle: 180, label: 'S', color: 'rgba(255,255,255,0.95)' },
+                        { angle: 270, label: 'W', color: 'rgba(255,255,255,0.95)' }
+                    ];
+                    directions.forEach(function(dir) {
+                        var angle = (dir.angle * Math.PI) / 180;
+                        var labelRadius = radius - Math.round(radius * 0.16);
+                        var x = Math.sin(angle) * labelRadius;
+                        var y = -Math.cos(angle) * labelRadius;
+                        
+                        ctx.save();
+                        ctx.translate(x, y);
+                        ctx.rotate(-((compassRotation + dir.angle) * Math.PI) / 180);
+                        ctx.font = 'bold ' + Math.max(16, Math.round(radius * 0.12)) + 'px Arial';
+                        ctx.fillStyle = dir.color;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(dir.label, 0, 0);
+                        ctx.restore();
+                    });
+                    
+                    // Draw north arrow (fixed, non-rotating reference)
+                    ctx.restore();
+                    ctx.save();
+                    ctx.translate(centerX, centerY);
+                    var arrowH = Math.max(20, Math.round(radius * 0.12));
+                    var arrowW = Math.max(10, Math.round(radius * 0.06));
+                    ctx.beginPath();
+                    ctx.moveTo(0, -radius + 6);
+                    ctx.lineTo(-arrowW, -radius + arrowH);
+                    ctx.lineTo(0, -radius + Math.round(arrowH*0.8));
+                    ctx.lineTo(arrowW, -radius + arrowH);
+                    ctx.closePath();
+                    ctx.fillStyle = '#ff4d4d';
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+                    ctx.lineWidth = Math.max(1, Math.round(radius * 0.01));
+                    ctx.stroke();
+                    
+                    // Draw center dot
+                    ctx.beginPath();
+                    ctx.arc(0, 0, Math.max(5, Math.round(radius * 0.03)), 0, 2 * Math.PI);
+                    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+                    ctx.fill();
+                    
+                    ctx.restore();
+                }
+                
+                // Update heading display
+                function updateHeading() {
+                    var normalized = ((compassRotation % 360) + 360) % 360;
+                    compassHeading.textContent = Math.round(normalized) + '°';
+                    drawCompass();
+                }
+                
+                // Widget dragging (move entire compass). Allow dragging when clicking on canvas as well.
+                compassWidget.addEventListener('mousedown', function(e) {
+                    // Start widget drag if clicking on the widget container or the canvas
+                    if (e.target === compassWidget || e.target === compassCanvas) {
+                        widgetDragging = true;
+                        var rect = compassWidget.getBoundingClientRect();
+                        widgetDragOffset.x = e.clientX - rect.left;
+                        widgetDragOffset.y = e.clientY - rect.top;
+                        compassWidget.classList.add('dragging');
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }
+                });
+                
+                // Mouse/touch interaction for rotating compass (disabled because compass locked)
+                compassCanvas.addEventListener('mousedown', function(e) {
+                    // rotation disabled; prevent accidental text selection
+                    e.preventDefault();
+                    e.stopPropagation();
+                });
+                
+                document.addEventListener('mousemove', function(e) {
+                    // Widget dragging
+                    if (widgetDragging) {
+                        var x = e.clientX - widgetDragOffset.x;
+                        var y = e.clientY - widgetDragOffset.y;
+                        
+                        // Keep within window bounds
+                        x = Math.max(0, Math.min(x, window.innerWidth - compassWidget.offsetWidth));
+                        y = Math.max(0, Math.min(y, window.innerHeight - compassWidget.offsetHeight));
+                        
+                        compassWidget.style.left = x + 'px';
+                        compassWidget.style.top = y + 'px';
+                        compassWidget.style.right = 'auto';
+                        compassWidget.style.bottom = 'auto';
+                        
+                        return;
+                    }
+                    
+                    // Compass rotation
+                    if (compassRotating && !compassLocked) {
+                        var rect = compassCanvas.getBoundingClientRect();
+                        var centerX = rect.left + rect.width / 2;
+                        var centerY = rect.top + rect.height / 2;
+                        
+                        var dx = e.clientX - centerX;
+                        var dy = e.clientY - centerY;
+                        
+                        // Calculate angle from center
+                        var angle = Math.atan2(dx, -dy) * (180 / Math.PI);
+                        compassRotation = angle;
+                        
+                        updateHeading();
+                    }
+                });
+                
+                document.addEventListener('mouseup', function() {
+                    if (widgetDragging) {
+                        widgetDragging = false;
+                        compassWidget.classList.remove('dragging');
+                        
+                        // Save position
+                        var rect = compassWidget.getBoundingClientRect();
+                        var position = {
+                            x: rect.left,
+                            y: rect.top
+                        };
+                        localStorage.setItem('compass_position', JSON.stringify(position));
+                    }
+                    compassRotating = false;
+                });
+                
+                // Reset button
+                compassResetBtn.addEventListener('click', function() {
+                    compassRotation = 0;
+                    updateHeading();
+                });
+                
+                // Lock button
+                compassLockBtn.addEventListener('click', function() {
+                    compassLocked = !compassLocked;
+                    compassLockBtn.textContent = compassLocked ? '🔒' : '🔓';
+                    compassLockBtn.title = compassLocked ? 'Unlock rotation' : 'Lock rotation';
+                    compassCanvas.style.cursor = compassLocked ? 'default' : 'grab';
+                    drawCompass();
+                });
+                
+                // Initial draw
+                updateHeading();
+                
+                // Expose function to set compass rotation from external code
+                window.setCompassRotation = function(degrees) {
+                    compassRotation = degrees;
+                    updateHeading();
+                };
+                
+                window.getCompassRotation = function() {
+                    return ((compassRotation % 360) + 360) % 360;
+                };
 
+                // ===========================================
+                // END COMPASS WIDGET
+                // ===========================================
                 // Coordinate picking state
                 var isPickingCoordinate = false;
                 var pickedCoordinate = null;
