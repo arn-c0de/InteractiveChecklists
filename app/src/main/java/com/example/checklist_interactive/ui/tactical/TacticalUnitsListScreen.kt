@@ -74,6 +74,17 @@ fun TacticalUnitsContent(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showCleanupMenu by remember { mutableStateOf(false) }
 
+    // Persisted collapsed/expanded state for settings
+    val contextForSettings = LocalContext.current
+    val prefsSettings = contextForSettings.getSharedPreferences("tactical_units_prefs", android.content.Context.MODE_PRIVATE)
+    val KEY_SETTINGS_EXPANDED = "tactical_settings_expanded"
+    var settingsExpanded by rememberSaveable { mutableStateOf(prefsSettings.getBoolean(KEY_SETTINGS_EXPANDED, true)) }
+
+    // Persist when changed
+    LaunchedEffect(settingsExpanded) {
+        prefsSettings.edit().putBoolean(KEY_SETTINGS_EXPANDED, settingsExpanded).apply()
+    }
+
     Column(
         modifier = modifier.fillMaxSize()
     ) {
@@ -110,6 +121,27 @@ fun TacticalUnitsContent(
             )
 
             Spacer(modifier = Modifier.width(4.dp))
+
+            // Total units badge (compact) - left of filter button
+            TotalBadge(count = stats.totalActive, modifier = Modifier.padding(end = 6.dp))
+
+            // Settings expand/collapse button (more prominent)
+            IconButton(
+                onClick = { settingsExpanded = !settingsExpanded },
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(
+                        color = if (settingsExpanded) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent,
+                        shape = CircleShape
+                    )
+            ) {
+                Icon(
+                    imageVector = if (settingsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (settingsExpanded) "Collapse settings" else "Expand settings",
+                    modifier = Modifier.size(20.dp),
+                    tint = if (settingsExpanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
             // Filter button
             IconButton(onClick = { viewModel.toggleFilterDialog() }, modifier = Modifier.size(32.dp)) {
@@ -162,27 +194,37 @@ fun TacticalUnitsContent(
             }
         }
 
-        // Compact settings grid
-        CompactSettingsGrid(
+        // Compact settings grid - collapsible controls
+        AnimatedVisibility(
+            visible = settingsExpanded,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            CompactSettingsControls(
+                isEntityTrackingEnabled = isEntityTrackingEnabled,
+                onToggleEntityTracking = { dataPadManager.toggleEntityTracking() },
+                showTacticalUnitsOnMap = showTacticalUnitsOnMap,
+                onToggleMapVisibility = { dataPadManager.toggleTacticalUnitsOnMap() },
+                mapUpdateInterval = mapUpdateInterval,
+                onMapUpdateIntervalChange = { dataPadManager.setTacticalUnitsMapUpdateInterval(it) },
+                hideTimeoutMinutes = hideTimeoutMinutes,
+                onHideTimeoutMinutesChange = { dataPadManager.setTacticalUnitsHideTimeoutMinutes(it) },
+                tacticalAutoSort = tacticalAutoSort,
+                onToggleAutoSort = { dataPadManager.toggleTacticalUnitsAutoSort() },
+                showHiddenUnits = uiState.showHiddenUnits,
+                onToggleShowHiddenUnits = { viewModel.toggleShowHiddenUnits() },
+                showLiveOnly = uiState.showLiveOnly,
+                onToggleLiveOnly = { viewModel.setShowLiveOnly(!uiState.showLiveOnly) }
+            )
+        }
+
+        // Always-visible stats and filters
+        CompactStatsAndFilters(
             stats = stats,
-            isEntityTrackingEnabled = isEntityTrackingEnabled,
-            onToggleEntityTracking = { dataPadManager.toggleEntityTracking() },
-            showTacticalUnitsOnMap = showTacticalUnitsOnMap,
-            onToggleMapVisibility = { dataPadManager.toggleTacticalUnitsOnMap() },
-            mapUpdateInterval = mapUpdateInterval,
-            onMapUpdateIntervalChange = { dataPadManager.setTacticalUnitsMapUpdateInterval(it) },
-            hideTimeoutMinutes = hideTimeoutMinutes,
-            onHideTimeoutMinutesChange = { dataPadManager.setTacticalUnitsHideTimeoutMinutes(it) },
             selectedCoalitions = uiState.selectedCoalitions,
             onToggleCoalition = { viewModel.toggleCoalition(it) },
             selectedCategories = uiState.selectedCategories,
-            onToggleCategory = { viewModel.toggleCategory(it) },
-            tacticalAutoSort = tacticalAutoSort,
-            onToggleAutoSort = { dataPadManager.toggleTacticalUnitsAutoSort() },
-            showHiddenUnits = uiState.showHiddenUnits,
-            onToggleShowHiddenUnits = { viewModel.toggleShowHiddenUnits() },
-            showLiveOnly = uiState.showLiveOnly,
-            onToggleLiveOnly = { viewModel.setShowLiveOnly(!uiState.showLiveOnly) }
+            onToggleCategory = { viewModel.toggleCategory(it) }
         )
 
         // Units list
@@ -478,12 +520,11 @@ fun TacticalUnitsListScreen(
 }
 
 /**
- * Compact settings grid with toggle buttons
+ * Compact settings controls (collapsible)
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun CompactSettingsGrid(
-    stats: UnitStatistics,
+private fun CompactSettingsControls(
     isEntityTrackingEnabled: Boolean,
     onToggleEntityTracking: () -> Unit,
     showTacticalUnitsOnMap: Boolean,
@@ -492,10 +533,6 @@ private fun CompactSettingsGrid(
     onMapUpdateIntervalChange: (Float) -> Unit,
     hideTimeoutMinutes: Float,
     onHideTimeoutMinutesChange: (Float) -> Unit,
-    selectedCoalitions: Set<Int>,
-    onToggleCoalition: (Int) -> Unit,
-    selectedCategories: Set<String>,
-    onToggleCategory: (String) -> Unit,
     tacticalAutoSort: Boolean,
     onToggleAutoSort: () -> Unit,
     showHiddenUnits: Boolean,
@@ -506,9 +543,9 @@ private fun CompactSettingsGrid(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .padding(vertical = 2.dp)
     ) {
-        Column(modifier = Modifier.padding(8.dp)) {
+        Column(modifier = Modifier.padding(6.dp)) {
             // Main toggles in a grid (2 columns)
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
@@ -557,7 +594,7 @@ private fun CompactSettingsGrid(
             if (showTacticalUnitsOnMap) {
                 var showIntervalDialog by remember { mutableStateOf(false) }
                 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(2.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -619,14 +656,16 @@ private fun CompactSettingsGrid(
                     onValueChange = onMapUpdateIntervalChange,
                     valueRange = 0.5f..10.0f,
                     steps = 18,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(24.dp)
                 )
             }
             
             // Hide timeout slider
             var showHideTimeoutDialog by remember { mutableStateOf(false) }
             
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -688,20 +727,32 @@ private fun CompactSettingsGrid(
                 onValueChange = onHideTimeoutMinutesChange,
                 valueRange = 1.0f..120.0f,
                 steps = 118,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(24.dp)
             )
+        }
+    }
+}
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
-            // Coalition stats (compact)
-            Text(
-                text = "${stats.totalActive} units",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Medium
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
+/**
+ * Always-visible stats and filters section
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CompactStatsAndFilters(
+    stats: UnitStatistics,
+    selectedCoalitions: Set<Int>,
+    onToggleCoalition: (Int) -> Unit,
+    selectedCategories: Set<String>,
+    onToggleCategory: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(6.dp)) {
             // Coalition badges (compact, 3 in a row)
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -733,13 +784,15 @@ private fun CompactSettingsGrid(
                 )
             }
 
-            // Category chips (compact, horizontal scroll)
-            Spacer(modifier = Modifier.height(4.dp))
+            // Category chips (compact, horizontal scroll) with total badge at start
+            Spacer(modifier = Modifier.height(2.dp))
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                maxItemsInEachRow = 10
             ) {
+                TotalBadge(count = stats.totalActive, modifier = Modifier.padding(end = 2.dp))
                 if (stats.aircraftCount > 0) CompactCategoryChip(
                     label = "Air: ${stats.aircraftCount}",
                     isSelected = selectedCategories.contains("aircraft"),
@@ -828,7 +881,9 @@ private fun CompactCategoryChip(
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
-        modifier = Modifier.clickable(onClick = onClick)
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .height(28.dp)
     ) {
         Text(
             text = label,
@@ -840,6 +895,27 @@ private fun CompactCategoryChip(
     }
 }
 
+@Composable
+private fun TotalBadge(count: Int, modifier: Modifier = Modifier) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = modifier
+            .height(28.dp)
+            .padding(start = 2.dp)
+    ) {
+        Row(modifier = Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(imageVector = Icons.Default.FormatListNumbered, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "$count",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
 @Composable
 private fun StatsCard(
     stats: UnitStatistics,
