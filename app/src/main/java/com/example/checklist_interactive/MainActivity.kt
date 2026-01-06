@@ -608,12 +608,23 @@ class MainActivity : ComponentActivity() {
 
                     // Tactical Units Popup Overlay (shown over map when active)
                     if (showTacticalUnits) {
+                        val scope = rememberCoroutineScope()
                         com.example.checklist_interactive.ui.tactical.TacticalUnitsListScreen(
                             onNavigateBack = { showTacticalUnits = false },
                             onUnitClick = { unit ->
                                 // Optional: Center map on unit location
                                 // For now, just close the list
                                 showTacticalUnits = false
+                            },
+                            onCenterOnMap = { latitude, longitude ->
+                                scope.launch {
+                                    com.example.checklist_interactive.ui.maps.MapActionBus.centerMap(latitude, longitude)
+                                }
+                            },
+                            onShowDetails = { unit ->
+                                scope.launch {
+                                    com.example.checklist_interactive.ui.maps.MapActionBus.showTacticalUnitDetails(unit)
+                                }
                             }
                         )
                     }

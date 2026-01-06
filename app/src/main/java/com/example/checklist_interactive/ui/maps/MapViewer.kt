@@ -223,6 +223,58 @@ fun MapViewer(
         mapState.loadRunwaysForSelectedLocation()
     }
 
+    // Listen for center map events from MapActionBus
+    LaunchedEffect(mapState.mapView) {
+        MapActionBus.centerMapEvent.collect { (latitude, longitude) ->
+            mapState.mapView?.let { mv ->
+                (context as? android.app.Activity)?.runOnUiThread {
+                    try {
+                        mv.controller?.animateTo(org.osmdroid.util.GeoPoint(latitude, longitude))
+                        mv.invalidate()
+                    } catch (_: Exception) { }
+                }
+            }
+        }
+    }
+
+    // Listen for show tactical unit details events from MapActionBus
+    LaunchedEffect(Unit) {
+        MapActionBus.showTacticalUnitDetailsEvent.collect { tacticalUnit ->
+            // Convert TacticalUnitEntity to LocationEntity for display
+            val tempLocation = com.example.checklist_interactive.data.tactical.LocationEntity(
+                id = 0, // Temporary, no DB ID
+                name = "${tacticalUnit.name} (${tacticalUnit.category})",
+                latitude = tacticalUnit.latitude,
+                longitude = tacticalUnit.longitude,
+                elevationM = tacticalUnit.altitude,
+                markerType = "tactical_unit",
+                description = buildString {
+                    append("Coalition: ")
+                    append(when (tacticalUnit.coalition) {
+                        0 -> "Neutral"
+                        1 -> "Red"
+                        2 -> "Blue"
+                        else -> "Unknown"
+                    })
+                    tacticalUnit.groupName?.let { append("\nGroup: $it") }
+                    tacticalUnit.pilotName?.let { append("\nPilot: $it") }
+                },
+                isStatic = 1,
+                source = "tactical_tracking",
+                updatedAt = tacticalUnit.lastSeenAt,
+                metadata = org.json.JSONObject().apply {
+                    put("tactical_unit_id", tacticalUnit.id)
+                    tacticalUnit.heading?.let { put("heading", it) }
+                    put("is_highlighted", tacticalUnit.isHighlighted)
+                }.toString()
+            )
+            
+            // Show marker details popup
+            mapState.selectedLocation = tempLocation
+            mapState.showMarkerRouteManagement = true
+        }
+    }
+
     // Observe visible routes and draw them on map
     val visibleRouteIds by (markerRouteViewModel?.visibleRouteIds?.collectAsState(initial = emptySet()) ?: remember { mutableStateOf(emptySet<Int>()) })
     // Also observe all routes so changes (e.g. color updates) trigger a redraw

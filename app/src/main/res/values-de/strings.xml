@@ -467,6 +467,7 @@
     <string name="pilot_info_title">Pilot info</string>
     <string name="pilot_label">Pilot:</string>
     <string name="center_on_map">Auf Karte zentrieren</string>
+    <string name="show_details">Details</string>
     <string name="tactical_options">Optionen</string>
     <string name="tactical_time_seconds">vor %1$ds</string>
     <string name="tactical_time_minutes">vor %1$dm</string>
