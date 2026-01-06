@@ -1251,6 +1251,7 @@
     <string name="pilot_info_title">飞行员信息</string>
     <string name="pilot_label">飞行员:</string>
     <string name="center_on_map">在地图上居中</string>
+    <string name="show_details">详细信息</string>
     <string name="tactical_options">选项</string>
     <string name="tactical_time_seconds">%1$ds 秒前</string>
     <string name="tactical_time_minutes">%1$dm 分钟前</string>

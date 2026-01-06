@@ -350,6 +350,7 @@
     <string name="pilot_info_title">Info del piloto</string>
     <string name="pilot_label">Piloto:</string>
     <string name="center_on_map">Centrar en el mapa</string>
+    <string name="show_details">Detalles</string>
     <string name="tactical_options">Opciones</string>
     <string name="tactical_time_seconds">hace %1$ds</string>
     <string name="tactical_time_minutes">hace %1$dm</string>

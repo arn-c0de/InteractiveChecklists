@@ -1272,6 +1272,7 @@
     <string name="pilot_info_title">Pilot Info</string>
     <string name="pilot_label">Pilot:</string>
     <string name="center_on_map">Center on Map</string>
+    <string name="show_details">Details</string>
     <string name="tactical_options">Options</string>
     <string name="tactical_time_seconds">%1$ds ago</string>
     <string name="tactical_time_minutes">%1$dm ago</string>

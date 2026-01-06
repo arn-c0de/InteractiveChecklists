@@ -57,6 +57,7 @@ fun TacticalUnitsContent(
     viewModel: TacticalUnitsViewModel,
     onUnitClick: ((TacticalUnitEntity) -> Unit)? = null,
     onCenterOnMap: ((latitude: Double, longitude: Double) -> Unit)? = null,
+    onShowDetails: ((TacticalUnitEntity) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val dataPadManager = LocalDataPadManager.current
@@ -249,6 +250,7 @@ fun TacticalUnitsContent(
                         unit = unit,
                         onClick = { onUnitClick?.invoke(unit) },
                         onCenterOnMap = onCenterOnMap,
+                        onShowDetails = onShowDetails,
                         getCoalitionName = { viewModel.getCoalitionName(it) },
                         getCategoryDisplayName = { viewModel.getCategoryDisplayName(it) }
                     )
@@ -302,7 +304,8 @@ fun TacticalUnitsContent(
 fun TacticalUnitsListScreen(
     onNavigateBack: () -> Unit,
     onUnitClick: ((TacticalUnitEntity) -> Unit)? = null,
-    onCenterOnMap: ((latitude: Double, longitude: Double) -> Unit)? = null
+    onCenterOnMap: ((latitude: Double, longitude: Double) -> Unit)? = null,
+    onShowDetails: ((TacticalUnitEntity) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val repository = remember { TacticalUnitsRepository(context) }
@@ -473,6 +476,7 @@ fun TacticalUnitsListScreen(
                     viewModel = viewModel,
                     onUnitClick = onUnitClick,
                     onCenterOnMap = onCenterOnMap,
+                    onShowDetails = onShowDetails,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -1312,6 +1316,7 @@ private fun UnitCard(
     unit: TacticalUnitEntity,
     onClick: () -> Unit,
     onCenterOnMap: ((latitude: Double, longitude: Double) -> Unit)?,
+    onShowDetails: ((TacticalUnitEntity) -> Unit)?,
     getCoalitionName: (Int) -> String,
     getCategoryDisplayName: (String) -> String
 ) {
@@ -1732,22 +1737,48 @@ private fun UnitCard(
                         }
                     }
                     
-                    // Center on Map button
-                    if (onCenterOnMap != null) {
-                        Button(
-                            onClick = { onCenterOnMap(unit.latitude, unit.longitude) },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer
-                            )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.MyLocation,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(stringResource(R.string.center_on_map))
+                    // Action buttons - side by side at half size
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        onCenterOnMap?.let {
+                            Button(
+                                onClick = { it(unit.latitude, unit.longitude) },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.MyLocation,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = stringResource(R.string.center_on_map),
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                            }
+                        }
+                        
+                        onShowDetails?.let {
+                            OutlinedButton(
+                                onClick = { it(unit) },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = stringResource(R.string.show_details),
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                            }
                         }
                     }
                 }

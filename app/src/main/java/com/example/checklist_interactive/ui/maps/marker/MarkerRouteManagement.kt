@@ -632,12 +632,16 @@ fun MarkerRouteManagementSheet(
                     onEditWaypoints = onEditRouteWaypoints
                 )
 
-                3 -> com.example.checklist_interactive.ui.tactical.TacticalUnitsContent(
-                    viewModel = tacticalViewModel,
-                    onUnitClick = null,
-                    onCenterOnMap = onCenterOnMap,
-                    modifier = Modifier.fillMaxSize()
-                )
+                3 -> {
+                    val scope = rememberCoroutineScope()
+                    com.example.checklist_interactive.ui.tactical.TacticalUnitsContent(
+                        viewModel = tacticalViewModel,
+                        onUnitClick = null,
+                        onCenterOnMap = onCenterOnMap,
+                        onShowDetails = { unit -> scope.launch { com.example.checklist_interactive.ui.maps.MapActionBus.showTacticalUnitDetails(unit) } },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
         }
     }
