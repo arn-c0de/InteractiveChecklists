@@ -314,12 +314,16 @@ object TrafficPatternGenerator {
             } else return emptyList()
         }
 
-        // Calculate distances based on nearby points (works for both smoothed and non-smoothed)
-        val departureDist = if (points.size > 1) calculateDistance(points[0], points[1]) / 1852.0 else 0.0
-        val crosswindDist = if (points.size > 3) calculateDistance(points[2], points[3]) / 1852.0 else 0.0
-        val downwindDist = if (points.size > 5) calculateDistance(points[3], points[5]) / 1852.0 else 0.0
-        val baseDist = if (points.size > 7) calculateDistance(points[6], points[7]) / 1852.0 else 0.0
-        val finalDist = if (points.size > 10) calculateDistance(points[8], points[10]) / 1852.0 else 0.0
+        // Calculate distances to NEXT waypoint (distance remaining to fly to next turn/threshold)
+        // DEPARTURE: distance to DOWNWIND entry
+        val departureDist = calculateDistance(departurePoint, downwindPoint) / 1852.0
+        // CROSSWIND: no distance shown (it's a turn, not a straight leg to fly)
+        // DOWNWIND: distance to BASE turn
+        val downwindDist = calculateDistance(downwindPoint, basePoint) / 1852.0
+        // BASE: distance to FINAL turn
+        val baseDist = calculateDistance(basePoint, finalPoint) / 1852.0
+        // FINAL: distance to runway threshold (marker center)
+        val finalDist = calculateDistance(finalPoint, points.getOrNull(0) ?: finalPoint) / 1852.0
 
         // Use provided headings if available (for smoothed patterns), otherwise calculate from points
         val departureHdg = (segmentHeadings?.get("departure") ?: 
@@ -338,7 +342,7 @@ object TrafficPatternGenerator {
 
         return listOf(
             departurePoint to String.format("DEPARTURE\nHDG %03d°\n%.1f NM", departureHdg, departureDist),
-            crosswindPoint to String.format("CROSSWIND\nHDG %03d°\n%.1f NM", crosswindHdg, crosswindDist),
+            crosswindPoint to String.format("CROSSWIND\nHDG %03d°", crosswindHdg),
             downwindPoint to String.format("DOWNWIND\nHDG %03d°\n%.1f NM\n%d ft MSL (%d AGL)", downwindHdg, downwindDist, altMslFt, altAglFt),
             basePoint to String.format("BASE\nHDG %03d°\n%.1f NM", baseHdg, baseDist),
             finalPoint to String.format("FINAL\nHDG %03d°\n%.1f NM", finalHdg, finalDist)
