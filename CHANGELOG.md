@@ -5,6 +5,10 @@ All relevant changes are summarized here by version.
 
 ## [1.0.22] - 2026-01-06
 
+### Summary
+- **Maps & DB:** Rounded traffic patterns, compass widget, threshold markers; finalised Marianas markers and initial CW Germany markers (needs review); `Reload DB` + map filtering.
+- **Tactical & UI:** Improved tactical settings (auto-highlight, category toggles), "Last seen", Details button, CM filter; virtualized marker list and FAB/selection polish.
+- **Export & docs:** Entity batches stored in `Scripts/entity-batches`, better weapon detection, `forward_parsed_udp` aggregates stats, plus docs/screenshots.
 
 ## [1.0.21] - 2026-01-03
 
