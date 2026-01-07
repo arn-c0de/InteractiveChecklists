@@ -1140,6 +1140,8 @@ fun MapNavigationDisplay(
                                                     PatternSize.LARGE -> 1.75
                                                     PatternSize.VERY_LARGE -> 2.25
                                                     PatternSize.EXTRA_LARGE -> 3.0
+                                                    PatternSize.HUGE -> 4.0
+                                                    PatternSize.GIGANTIC -> 6.0
                                                 }
                                                 val turnMultiplier = if (patternDirection == PatternDirection.LEFT_HAND) -1 else 1
                                                 val selectedRwy = selectedRunway
@@ -2035,6 +2037,8 @@ fun MapNavigationDisplay(
                                                     PatternSize.LARGE -> 1.75
                                                     PatternSize.VERY_LARGE -> 2.25
                                                     PatternSize.EXTRA_LARGE -> 3.0
+                                                    PatternSize.HUGE -> 4.0
+                                                    PatternSize.GIGANTIC -> 6.0
                                                 }
                                                 val turnMultiplier = if (patternDirection == PatternDirection.LEFT_HAND) -1 else 1
                                                 val runwayHeading = selectedRunwayHeading ?: manualLandingHeading.toDoubleOrNull() ?: 0.0

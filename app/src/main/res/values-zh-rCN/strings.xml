@@ -1067,6 +1067,13 @@
     <string name="map_nav_pattern_leg_base">• 基础段: 航向 %1$03d° • %2$.1f 海里 (在 %3$.1f 海里处转弯)</string>
     <string name="map_nav_pattern_leg_final">• 最后进近: 航向 %1$03d° • %2$.1f 海里</string>
     <string name="map_nav_pattern_size_label">盘旋尺寸</string>
+    <string name="map_nav_pattern_size_normal">正常</string>
+    <string name="map_nav_pattern_size_medium">中等</string>
+    <string name="map_nav_pattern_size_large">大型</string>
+    <string name="map_nav_pattern_size_very_large">很大</string>
+    <string name="map_nav_pattern_size_extra_large">特大型</string>
+    <string name="map_nav_pattern_size_huge">巨大</string>
+    <string name="map_nav_pattern_size_gigantic">超巨大</string>
     
     <!-- Landing Pattern for Tactical Markers -->
     <string name="map_landing_pattern">着陆模式</string>

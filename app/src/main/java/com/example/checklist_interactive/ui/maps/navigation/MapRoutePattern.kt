@@ -20,15 +20,17 @@ import kotlin.math.*
 /**
  * Pattern size presets
  *
- * NOTE: sizes increased slightly for more realistic military patterns; an EXTRA_LARGE
- * preset is available for military operations (larger lateral spacing and higher pattern altitude).
+ * NOTE: sizes increased slightly for more realistic military patterns; EXTRA_LARGE and even larger
+ * presets (HUGE, GIGANTIC) are available for large-scale or military training patterns.
  */
 enum class PatternSize(val displayName: String, val downwindDistanceNm: Double, val patternAltitudeAglFt: Int) {
     NORMAL("Normal", 0.75, 1200),
     MEDIUM("Medium", 1.0, 1400),
     LARGE("Large", 1.5, 1800),
     VERY_LARGE("Very Large", 2.0, 2200),
-    EXTRA_LARGE("Extra Large", 3.0, 3000);
+    EXTRA_LARGE("Extra Large", 3.0, 3000),
+    HUGE("Huge", 4.5, 4500),
+    GIGANTIC("Gigantic", 6.0, 9000);
     
     companion object {
         fun fromOrdinal(ordinal: Int): PatternSize = values().getOrNull(ordinal) ?: NORMAL
@@ -89,6 +91,8 @@ object TrafficPatternGenerator {
             PatternSize.LARGE -> 1.75
             PatternSize.VERY_LARGE -> 2.25
             PatternSize.EXTRA_LARGE -> 3.0
+            PatternSize.HUGE -> 4.0
+            PatternSize.GIGANTIC -> 6.0
         }
 
         // Lateral downwind distance (NM -> meters) and base uses same lateral distance
@@ -182,6 +186,8 @@ object TrafficPatternGenerator {
             PatternSize.LARGE -> 1.75
             PatternSize.VERY_LARGE -> 2.25
             PatternSize.EXTRA_LARGE -> 3.0
+            PatternSize.HUGE -> 4.0
+            PatternSize.GIGANTIC -> 6.0
         }
 
         val downwindDistanceMeters = patternSize.downwindDistanceNm * 1852.0 * sizeScale
@@ -315,8 +321,7 @@ object TrafficPatternGenerator {
         }
 
         // Calculate distances to NEXT waypoint (distance remaining to fly to next turn/threshold)
-        // DEPARTURE: distance to DOWNWIND entry
-        val departureDist = calculateDistance(departurePoint, downwindPoint) / 1852.0
+        // DEPARTURE: heading to DOWNWIND entry (display heading only)
         // CROSSWIND: no distance shown (it's a turn, not a straight leg to fly)
         // DOWNWIND: distance to BASE turn
         val downwindDist = calculateDistance(downwindPoint, basePoint) / 1852.0
@@ -326,10 +331,11 @@ object TrafficPatternGenerator {
         val finalDist = calculateDistance(finalPoint, points.getOrNull(0) ?: finalPoint) / 1852.0
 
         // Use provided headings if available (for smoothed patterns), otherwise calculate from points
-        val departureHdg = (segmentHeadings?.get("departure") ?: 
-            if (points.size > 1) calculateBearing(points[0], points[1]) else 0.0).toInt()
+        // Compute CROSSWIND heading first
         val crosswindHdg = (segmentHeadings?.get("crosswind") ?: 
             if (points.size > 3) calculateBearing(points[2], points[3]) else 0.0).toInt()
+        // DEPARTURE always uses the same heading as CROSSWIND (perpendicular turn from runway)
+        val departureHdg = crosswindHdg
         val downwindHdg = (segmentHeadings?.get("downwind") ?: 
             if (points.size > 5) calculateBearing(points[3], points[5]) else 0.0).toInt()
         val baseHdg = (segmentHeadings?.get("base") ?: 
@@ -341,7 +347,7 @@ object TrafficPatternGenerator {
         val altMslFt = altAglFt + runwayElevationFt
 
         return listOf(
-            departurePoint to String.format("DEPARTURE\nHDG %03d°\n%.1f NM", departureHdg, departureDist),
+            departurePoint to String.format("DEPARTURE\nHDG %03d°", departureHdg),
             crosswindPoint to String.format("CROSSWIND\nHDG %03d°", crosswindHdg),
             downwindPoint to String.format("DOWNWIND\nHDG %03d°\n%.1f NM\n%d ft MSL (%d AGL)", downwindHdg, downwindDist, altMslFt, altAglFt),
             basePoint to String.format("BASE\nHDG %03d°\n%.1f NM", baseHdg, baseDist),
@@ -425,9 +431,12 @@ object TrafficPatternGenerator {
             PatternSize.LARGE -> 0.18        // 18% - smoother
             PatternSize.VERY_LARGE -> 0.22   // 22% - very smooth
             PatternSize.EXTRA_LARGE -> 0.28  // 28% - wide, gentle turns
+            PatternSize.HUGE -> 0.34         // 34% - very wide
+            PatternSize.GIGANTIC -> 0.42     // 42% - extremely wide
         }
         
-        val radius = smoothingRadius.coerceIn(0.05, 0.4) // Safety clamp
+        // Allow larger upper clamp for giant patterns
+        val radius = smoothingRadius.coerceIn(0.05, 0.6) // Safety clamp
         
         // Calculate a fixed smoothing distance based on pattern size (in meters)
         // This ensures all corners are rounded equally
@@ -437,6 +446,8 @@ object TrafficPatternGenerator {
             PatternSize.LARGE -> 400.0        // 400m radius
             PatternSize.VERY_LARGE -> 550.0   // 550m radius
             PatternSize.EXTRA_LARGE -> 750.0  // 750m radius
+            PatternSize.HUGE -> 1000.0        // 1km radius
+            PatternSize.GIGANTIC -> 1500.0    // 1.5km radius
         }
         
         val smoothed = mutableListOf<GeoPoint>()
