@@ -1137,30 +1137,18 @@ fun MapViewer(
             // No post-generation mirroring needed - the generator creates the pattern correctly
             Log.d(TAG, "✈️ Generating pattern: heading=$headingForPattern, size=${mapState.patternSize}, dir=${mapState.patternDirection}, rounded=${mapState.roundedPatternCorners}")
             
-            // Use the new function that returns corner positions for labels
-            val (patternPoints, cornerPositions) = if (mapState.roundedPatternCorners) {
-                TrafficPatternGenerator.generateTrafficPatternWithCorners(
-                    runwayThreshold = runwayThreshold,
-                    runwayHeading = headingForPattern,
-                    runwayLengthMeters = runwayLengthMeters,
-                    patternSize = mapState.patternSize,
-                    direction = mapState.patternDirection,
-                    finalDistanceNm = mapState.patternFinalDistanceNm,
-                    roundedCorners = true
-                )
-            } else {
-                val points = TrafficPatternGenerator.generateTrafficPattern(
-                    runwayThreshold = runwayThreshold,
-                    runwayHeading = headingForPattern,
-                    runwayLengthMeters = runwayLengthMeters,
-                    patternSize = mapState.patternSize,
-                    direction = mapState.patternDirection,
-                    finalDistanceNm = mapState.patternFinalDistanceNm,
-                    roundedCorners = false
-                )
-                Pair(points, null)
-            }
-            Log.d(TAG, "✈️ Pattern generated with ${patternPoints.size} points")
+            // Use the new function that returns corner positions and headings for labels
+            // Always use generateTrafficPatternWithCorners to get proper headings for labels
+            val (patternPoints, cornerPositions, segmentHeadings) = TrafficPatternGenerator.generateTrafficPatternWithCorners(
+                runwayThreshold = runwayThreshold,
+                runwayHeading = headingForPattern,
+                runwayLengthMeters = runwayLengthMeters,
+                patternSize = mapState.patternSize,
+                direction = mapState.patternDirection,
+                finalDistanceNm = mapState.patternFinalDistanceNm,
+                roundedCorners = mapState.roundedPatternCorners
+            )
+            Log.d(TAG, "✈️ Pattern generated with ${patternPoints.size} points, headings provided: ${segmentHeadings != null}")
 
             // Create and add pattern polyline
             val polyline = TrafficPatternGenerator.createPatternPolyline(
@@ -1181,7 +1169,8 @@ fun MapViewer(
                 patternSize = mapState.patternSize,
                 runwayElevationFt = runwayElevationFt,
                 customAltitudeAglFt = mapState.customPatternAltitudeAglFt,
-                cornerPositions = cornerPositions
+                cornerPositions = cornerPositions,
+                segmentHeadings = segmentHeadings
             )
             // Pass current map rotation so labels stay upright when map rotates
             val currentMapRotation = mv.mapOrientation
