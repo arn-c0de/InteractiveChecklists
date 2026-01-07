@@ -1168,6 +1168,13 @@
     <string name="map_nav_pattern_leg_base">• Base: HDG %1$03d° • %2$.1f NM (giro en %3$.1f NM)</string>
     <string name="map_nav_pattern_leg_final">• Final: HDG %1$03d° • %2$.1f NM</string>
     <string name="map_nav_pattern_size_label">Tamaño Patrón</string>
+    <string name="map_nav_pattern_size_normal">Normal</string>
+    <string name="map_nav_pattern_size_medium">Mediano</string>
+    <string name="map_nav_pattern_size_large">Grande</string>
+    <string name="map_nav_pattern_size_very_large">Muy Grande</string>
+    <string name="map_nav_pattern_size_extra_large">Extra Grande</string>
+    <string name="map_nav_pattern_size_huge">Enorme</string>
+    <string name="map_nav_pattern_size_gigantic">Gigantesco</string>
     
     <!-- Landing Pattern for Tactical Markers -->
     <string name="map_landing_pattern">Patrón de Aterrizaje</string>
