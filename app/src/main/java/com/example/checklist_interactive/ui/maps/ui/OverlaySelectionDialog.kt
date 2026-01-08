@@ -25,6 +25,7 @@ fun OverlaySelectionDialog(
     rangeRingsMaxNm: Int,
     mgrsGridEnabled: Boolean,
     flightInstrumentsEnabled: Boolean,
+    markerLabelsEnabled: Boolean,
     flightPathEnabled: Boolean,
     flightPathRecording: Boolean,
     flightPathPointCount: Int,
@@ -35,6 +36,7 @@ fun OverlaySelectionDialog(
     onChangeRangeRingsMaxNm: (Int) -> Unit,
     onToggleMgrsGrid: (Boolean) -> Unit,
     onToggleFlightInstruments: (Boolean) -> Unit,
+    onToggleMarkerLabels: (Boolean) -> Unit,
     onToggleFlightPath: (Boolean) -> Unit,
     onStartTracking: () -> Unit,
     onPauseTracking: () -> Unit,
@@ -91,6 +93,14 @@ fun OverlaySelectionDialog(
                         Text(stringResource(R.string.map_overlay_flight_instruments_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(checked = flightInstrumentsEnabled, onCheckedChange = onToggleFlightInstruments)
+                }
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Column {
+                        Text(stringResource(R.string.map_marker_labels_toggle), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.map_marker_labels_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = markerLabelsEnabled, onCheckedChange = onToggleMarkerLabels)
                 }
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))

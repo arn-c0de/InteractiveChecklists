@@ -237,6 +237,36 @@ fun MapViewer(
         }
     }
 
+    // Manage airport labels overlay lifecycle
+    LaunchedEffect(mapState.mapView, mapState.showMarkerLabels, locationRepository, mapState.tacticalDb) {
+        mapState.mapView?.let { mv ->
+            if (mapState.showMarkerLabels && locationRepository != null && mapState.tacticalDb != null) {
+                // Add overlay if not present
+                if (mapState.airportLabelsOverlay == null) {
+                    val labelsOverlay = AirportMarkerLabelsOverlay(
+                        context = context,
+                        locationRepository = locationRepository,
+                        database = mapState.tacticalDb!!,
+                        getVisibleMaps = { prefsManager.getVisibleMaps().toList() },
+                        isEnabled = { mapState.showMarkerLabels },
+                        getMapView = { mapState.mapView }
+                    )
+                    mv.overlays.add(labelsOverlay)
+                    mapState.airportLabelsOverlay = labelsOverlay
+                    mv.invalidate()
+                }
+            } else {
+                // Remove overlay if present
+                mapState.airportLabelsOverlay?.let { overlay ->
+                    overlay.cleanup()
+                    mv.overlays.remove(overlay)
+                    mapState.airportLabelsOverlay = null
+                    mv.invalidate()
+                }
+            }
+        }
+    }
+
     // Listen for show tactical unit details events from MapActionBus
     LaunchedEffect(Unit) {
         MapActionBus.showTacticalUnitDetailsEvent.collect { tacticalUnit ->
@@ -2766,6 +2796,21 @@ fun MapViewer(
                     mv.overlays.add(mg)
                     mapState.mgrsGridOverlay = mg
                 }
+                
+                // Airport labels overlay
+                if (mapState.showMarkerLabels && mapState.airportLabelsOverlay == null && locationRepository != null && mapState.tacticalDb != null) {
+                    val labelsOverlay = AirportMarkerLabelsOverlay(
+                        context = context,
+                        locationRepository = locationRepository,
+                        database = mapState.tacticalDb!!,
+                        getVisibleMaps = { prefsManager.getVisibleMaps().toList() },
+                        isEnabled = { mapState.showMarkerLabels },
+                        getMapView = { mapState.mapView }
+                    )
+                    mv.overlays.add(labelsOverlay)
+                    mapState.airportLabelsOverlay = labelsOverlay
+                }
+                
                 mv.invalidate()
             }
         }
@@ -2804,6 +2849,7 @@ fun MapViewer(
             rangeRingsMaxNm = mapState.rangeRingsMaxNm,
             mgrsGridEnabled = mapState.mgrsGridEnabled,
             flightInstrumentsEnabled = mapState.flightInstrumentsEnabled,
+            markerLabelsEnabled = mapState.showMarkerLabels,
             flightPathEnabled = mapState.flightPathEnabled,
             flightPathRecording = mapState.flightPathRecording,
             flightPathPointCount = mapState.flightPathPointCount,
@@ -2880,6 +2926,10 @@ fun MapViewer(
             onToggleFlightInstruments = { enabled ->
                 mapState.flightInstrumentsEnabled = enabled
                 prefsManager.setMapOverlayFlightInstrumentsEnabled(enabled)
+            },
+            onToggleMarkerLabels = { enabled ->
+                mapState.showMarkerLabels = enabled
+                prefsManager.setMapMarkerLabelsEnabled(enabled)
             },
             onToggleFlightPath = { enabled ->
                 mapState.flightPathEnabled = enabled
