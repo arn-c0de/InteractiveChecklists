@@ -103,6 +103,7 @@
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     
     <string name="common_ellipsis">...</string>
+    <string name="common_loading">Cargando...</string>
 
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <!-- CHECKLIST & MARKDOWN -->
@@ -1301,7 +1302,26 @@
     <string name="map_db_not_ready_retry">Map database not ready — please tap again to retry.</string>
 <string name="app_name">Checklist-Interactive</string>
 
-    
-    
-    
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- SETUP WIZARD -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="setup_wizard_title">Asistente de Bienvenida</string>
+    <string name="setup_wizard_welcome">¡Bienvenido a Checklist Interactive!</string>
+    <string name="setup_wizard_description">Configura tus ajustes esenciales para empezar rápidamente.</string>
+    <string name="setup_wizard_get_started">Comenzar</string>
+    <string name="setup_wizard_skip">Omitir</string>
+    <string name="setup_datapad_description">Habilitar integración de telemetría en tiempo real con DCS World</string>
+    <string name="setup_aircraft_title">Seleccionar Aeronaves</string>
+    <string name="setup_aircraft_description">Elige qué listas de verificación de aeronaves mostrar en tu biblioteca</string>
+    <string name="setup_maps_title">Seleccionar Mapas</string>
+    <string name="setup_maps_description">Elige qué mapas tácticos estarán disponibles</string>
+    <string name="settings_map_select_all">Seleccionar Todo</string>
+    <string name="settings_map_select_none">Seleccionar Ninguno</string>
+    <string name="settings_run_setup_wizard">Ejecutar Asistente de Configuración</string>
+    <string name="settings_run_setup_wizard_description">Reconfigurar aeronaves, mapas y otras configuraciones iniciales</string>
+    <string name="setup_tactical_tracking_title">Seguimiento de Unidades Tácticas</string>
+    <string name="setup_tactical_tracking_description">Rastrear y mostrar aeronaves cercanas y unidades terrestres en el mapa</string>
+    <string name="setup_configure_datapad">Configurar Ajustes de DataPad</string>
+
+
     </resources>

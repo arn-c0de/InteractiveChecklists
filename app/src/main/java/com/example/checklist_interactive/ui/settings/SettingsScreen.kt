@@ -60,7 +60,8 @@ fun SettingsScreen(
     fileManager: InternalFileManager,
     onBack: () -> Unit,
     softwareVersion: String,
-    onFilesRefreshed: () -> Unit = {}
+    onFilesRefreshed: () -> Unit = {},
+    onShowSetupWizard: () -> Unit = {}
 ) {
     var importExpanded by remember { mutableStateOf(false) }
     var currentFolderUri by remember { mutableStateOf(prefsManager.getImportFolderUri()) }
@@ -234,8 +235,37 @@ fun SettingsScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // === Setup Wizard ===
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = stringResource(R.string.settings_run_setup_wizard),
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = stringResource(R.string.settings_run_setup_wizard_description),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = { onShowSetupWizard() },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Settings, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.settings_run_setup_wizard))
+                        }
+                    }
+                }
+            }
+
             // === Import Settings Section ===
             item {
+                Spacer(modifier = Modifier.height(12.dp))
                 ImportSettingsSection(
                     importExpanded = importExpanded,
                     onExpandToggle = { importExpanded = !importExpanded },

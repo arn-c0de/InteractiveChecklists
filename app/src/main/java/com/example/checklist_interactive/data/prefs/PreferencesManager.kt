@@ -66,6 +66,9 @@ class PreferencesManager(context: Context) {
         private const val KEY_FAB_SIZE = "fab_size"
         private const val DEFAULT_FAB_SIZE = "medium"
 
+        // Setup wizard completion flag
+        private const val KEY_SETUP_WIZARD_COMPLETE = "setup_wizard_complete"
+
         // Shared Json instance to avoid redundant creation
         private val json = Json { prettyPrint = true }
     }
@@ -685,5 +688,19 @@ class PreferencesManager(context: Context) {
             "large" -> 72
             else -> 56 // medium (default Material3 FAB size)
         }
+    }
+
+    /**
+     * Checks if the setup wizard has been completed
+     */
+    fun isSetupWizardComplete(): Boolean {
+        return prefs.getBoolean(KEY_SETUP_WIZARD_COMPLETE, false)
+    }
+
+    /**
+     * Marks that the setup wizard has been completed
+     */
+    fun setSetupWizardComplete(complete: Boolean) {
+        prefs.edit().putBoolean(KEY_SETUP_WIZARD_COMPLETE, complete).apply()
     }
 }
