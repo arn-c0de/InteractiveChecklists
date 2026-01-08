@@ -1,7 +1,10 @@
 package com.example.checklist_interactive.ui.datapad
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Visibility
@@ -124,6 +127,11 @@ fun DataPadSettingsDialog(
             }
         }
 
+        // Limit dialog height on small screens and make contents scrollable
+        val configuration = LocalConfiguration.current
+        val maxDialogHeight = (configuration.screenHeightDp.dp * 0.8f)
+        val scrollState = rememberScrollState()
+
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -133,6 +141,8 @@ fun DataPadSettingsDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(max = maxDialogHeight)
+                    .verticalScroll(scrollState)
                     .padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
