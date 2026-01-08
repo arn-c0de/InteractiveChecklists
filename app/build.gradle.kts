@@ -64,17 +64,12 @@ dependencies {
     // SplashScreen API for Android 12+
     implementation("androidx.core:core-splashscreen:1.0.1")
 
-    // CameraX for QR scanning
-    implementation("androidx.camera:camera-core:1.3.1")
-    implementation("androidx.camera:camera-camera2:1.3.1")
-    implementation("androidx.camera:camera-lifecycle:1.3.1")
-    implementation("androidx.camera:camera-view:1.3.1")
-    
-    // ML Kit Barcode Scanning
-    implementation("com.google.mlkit:barcode-scanning:17.2.0")
-    
-    // Accompanist Permissions
+    // Accompanist Permissions (for camera permission handling)
     implementation("com.google.accompanist:accompanist-permissions:0.32.0")
+
+    // ZXing for QR code scanning
+    implementation("com.google.zxing:core:3.5.3")
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 
     // Room Database
     implementation(libs.androidx.room.runtime)

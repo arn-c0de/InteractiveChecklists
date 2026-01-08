@@ -38,7 +38,12 @@ python registration_token.py generate --server-ip 192.168.1.100 --port 5010 --ou
 
 ```bash
 python forward_parsed_udp.py --host 192.168.1.100 --port 5010
+# Or skip the interactive QR prompt:
+python forward_parsed_udp.py --host 192.168.1.100 --port 5010 --skip-qr-prompt
 ```
+
+- On startup you'll see an interactive prompt: press **B** within 5 seconds to generate a QR token and wait for registration.
+- If you don't press **B**, the server will start normally.
 
 **Server is ready when:**
 ```
@@ -49,10 +54,10 @@ python forward_parsed_udp.py --host 192.168.1.100 --port 5010
 
 ### 4. Configure Android App
 
-**Option A: Scan QR code (not yet implemented)**
+**Option A: Scan QR code (implemented)**
 - DataPad Settings → "Scan QR code"
-- Point camera at QR code
-- Wait for "Device registered successfully"
+- Camera opens full-screen and detects QR codes
+- Wait for confirmation "Device registered successfully" (app automatically sends DeviceRegistration)
 
 **Option B: Manual (temporary solution)**
 
@@ -110,18 +115,18 @@ lifecycleScope.launch {
 cat authorized_devices.json
 ```
 
-Should contain:
+Should contain (camelCase fields):
 ```json
 {
   "devices": [
     {
-      "device_id": "test_device_12345678",
+      "deviceId": "test_device_12345678",
       "name": "My Tablet",
-      "public_key": "MFkwEw...",
+      "publicKey": "MFkwEw...",
       "permissions": ["receive", "send_commands"],
-      "added_date": "2026-01-08 15:30:00",
-      "added_by": "qr_registration",
-      "registered_from_ip": "192.168.1.x"
+      "addedDate": "2026-01-08 15:30:00",
+      "addedBy": "qr_registration",
+      "registeredFromIp": "192.168.1.x"
     }
   ]
 }
@@ -226,12 +231,26 @@ val publicKey = keyManager.exportPublicKey()
 Log.d("Debug", "Public key: $publicKey")
 ```
 
+### Problem: Python crypto dependency error
+
+**Cause:** Missing native dependencies for the `cryptography` package (e.g. `_cffi_backend`) or not installed in the active environment.
+
+**Solution:**
+```bash
+# Install cryptography and cffi
+pip install cryptography cffi
+# Use a virtual environment to keep dependencies isolated
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1  # PowerShell
+pip install -r requirements.txt  # if provided
+```
+
 ### Problem: Server doesn't receive DeviceRegistration
 
 **Cause:** forward_parsed_udp.py not patched
 
 **Solution:**
-- See [qr_registration.md](qr_registration.md) "Manual Patch Required"
+- DeviceRegistration routing is now handled by `forward_parsed_udp.py` (no manual patch required). Use the interactive prompt at startup (press 'B') to generate a token and wait for registration or use `--skip-qr-prompt` to skip.
 - Add handler for `DeviceRegistration` message
 
 ## Token Management
@@ -296,10 +315,10 @@ if len(manager.list_active_tokens()) >= MAX_ACTIVE_TOKENS:
 
 ## Next Steps
 
-1. **Implement QR scanner UI** (see qr_registration.md)
-2. **Integrate ML Kit Barcode Scanner**
-3. **Extend settings fragment**
-4. **End-to-end testing with real QR code**
+1. ✅ QR scanner UI implemented (ZXing-based `QrCodeScannerScreen`)
+2. ⏳ ML Kit remains optional (can be swapped in as an alternative)
+3. ✅ Settings fragment already integrates the scan flow and registration
+4. ⏳ End-to-end testing with real QR code (please test on target devices)
 
 ## Support
 

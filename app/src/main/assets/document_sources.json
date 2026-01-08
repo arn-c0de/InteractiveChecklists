@@ -3,5 +3,10 @@
     "name": "OpenStreetMap",
     "website": "https://www.openstreetmap.org",
     "license": "Open Database License (ODbL) 1.0 – © OpenStreetMap contributors"
+  },
+  {
+    "name": "ZXing (Zebra Crossing)",
+    "website": "https://github.com/zxing/zxing",
+    "license": "Apache License 2.0 – © ZXing authors"
   }
 ]

@@ -1,10 +1,6 @@
 package com.example.checklist_interactive.ui.datapad
 
 import android.Manifest
-import android.util.Log
-import androidx.camera.core.*
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -13,20 +9,23 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
-import com.google.mlkit.vision.barcode.BarcodeScanning
-import com.google.mlkit.vision.barcode.common.Barcode
-import com.google.mlkit.vision.common.InputImage
-import java.util.concurrent.Executors
+import com.journeyapps.barcodescanner.BarcodeCallback
+import com.journeyapps.barcodescanner.BarcodeResult
+import com.journeyapps.barcodescanner.DecoratedBarcodeView
+import com.journeyapps.barcodescanner.DefaultDecoderFactory
+import com.google.zxing.BarcodeFormat
 
 /**
- * Full-screen QR Code Scanner using CameraX and ML Kit
+ * Full-screen QR Code Scanner using ZXing
+ * Secure, battle-tested library for QR code scanning
+ * CRITICAL: This MUST be shown in a full-screen dialog to get proper camera dimensions
  */
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -34,81 +33,128 @@ fun QrCodeScannerScreen(
     onQrCodeScanned: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
+    // Wrap in full-screen dialog to escape any parent size constraints
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false,  // CRITICAL: allows true fullscreen
+            decorFitsSystemWindows = false     // CRITICAL: allows edge-to-edge
+        )
+    ) {
+        QrCodeScannerContent(
+            onQrCodeScanned = onQrCodeScanned,
+            onDismiss = onDismiss
+        )
+    }
+}
+
+/**
+ * The actual full-screen camera content
+ */
+@OptIn(ExperimentalPermissionsApi::class)
+@Composable
+private fun QrCodeScannerContent(
+    onQrCodeScanned: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
     val cameraPermissionState = rememberPermissionState(Manifest.permission.CAMERA)
-    
     var hasScanned by remember { mutableStateOf(false) }
-    
+
     LaunchedEffect(Unit) {
         if (!cameraPermissionState.status.isGranted) {
             cameraPermissionState.launchPermissionRequest()
         }
     }
-    
-    Box(modifier = Modifier.fillMaxSize()) {
+
+    Box(
+        modifier = Modifier.fillMaxSize()
+    ) {
         when {
             cameraPermissionState.status.isGranted -> {
-                // Camera preview
+                // ZXing barcode scanner view with camera preview - MUST BE FIRST IN BOX
+                var scannerView by remember { mutableStateOf<DecoratedBarcodeView?>(null) }
+
+                // Camera preview layer - takes full screen
                 AndroidView(
                     factory = { ctx ->
-                        val previewView = PreviewView(ctx)
-                        val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
-                        
-                        cameraProviderFuture.addListener({
-                            val cameraProvider = cameraProviderFuture.get()
+                        DecoratedBarcodeView(ctx).apply {
+                            // Configure to only scan QR codes (not barcodes)
+                            val formats = listOf(BarcodeFormat.QR_CODE)
+                            this.barcodeView.decoderFactory = DefaultDecoderFactory(formats)
+                            android.util.Log.d("QrScanner", "📱 QR Scanner initialized - QR_CODE format ONLY")
+
+                            // Ensure view is visible and sized properly - CRITICAL for camera preview
+                            layoutParams = android.widget.FrameLayout.LayoutParams(
+                                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                                android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+                            )
                             
-                            // Preview use case
-                            val preview = Preview.Builder().build().also {
-                                it.setSurfaceProvider(previewView.surfaceProvider)
-                            }
-                            
-                            // Image analysis for QR scanning
-                            val imageAnalyzer = ImageAnalysis.Builder()
-                                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                                .build()
-                                .also {
-                                    it.setAnalyzer(
-                                        Executors.newSingleThreadExecutor(),
-                                        QrCodeAnalyzer { qrCode ->
-                                            if (!hasScanned) {
-                                                hasScanned = true
-                                                onQrCodeScanned(qrCode)
-                                            }
+                            // Force view to be visible
+                            visibility = android.view.View.VISIBLE
+                            android.util.Log.d("QrScanner", "📐 Camera view size: ${layoutParams.width}x${layoutParams.height}")
+
+                            // Set up the callback for scan results
+                            decodeContinuous(object : BarcodeCallback {
+                                override fun barcodeResult(result: BarcodeResult?) {
+                                    if (result != null && !hasScanned && result.barcodeFormat == BarcodeFormat.QR_CODE) {
+                                        val scannedText = result.text
+                                        android.util.Log.d("QrScanner", "📷 QR Code scanned: ${scannedText.take(50)}...")
+                                        
+                                        // Accept QR codes with datapad_registration type
+                                        if (scannedText.contains("datapad_registration", ignoreCase = true)) {
+                                            android.util.Log.i("QrScanner", "✅ Valid DataPad registration QR code detected!")
+                                            hasScanned = true
+                                            pause()
+                                            onQrCodeScanned(scannedText)
+                                        } else {
+                                            android.util.Log.w("QrScanner", "⚠️ QR code is not a DataPad registration token")
                                         }
-                                    )
+                                    } else if (result != null) {
+                                        android.util.Log.w("QrScanner", "⚠️ Non-QR barcode detected: ${result.barcodeFormat}")
+                                    }
                                 }
-                            
-                            // Select back camera
-                            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-                            
-                            try {
-                                cameraProvider.unbindAll()
-                                cameraProvider.bindToLifecycle(
-                                    lifecycleOwner,
-                                    cameraSelector,
-                                    preview,
-                                    imageAnalyzer
-                                )
-                            } catch (e: Exception) {
-                                Log.e("QrScanner", "Camera binding failed", e)
-                            }
-                        }, ContextCompat.getMainExecutor(ctx))
-                        
-                        previewView
+
+                                override fun possibleResultPoints(resultPoints: MutableList<com.google.zxing.ResultPoint>?) {
+                                    // Optional: handle possible result points for visual feedback
+                                }
+                            })
+
+                            scannerView = this
+                        }
                     },
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .align(Alignment.Center),  // Ensure centered alignment
+                    update = { view ->
+                        // Resume camera when view is updated
+                        if (!hasScanned) {
+                            view.resume()
+                        }
+                    }
                 )
-                
-                // Overlay UI
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.SpaceBetween
+
+                // Manage camera lifecycle - start and stop properly
+                DisposableEffect(scannerView) {
+                    scannerView?.resume()
+                    onDispose {
+                        // CRITICAL: Stop camera when leaving the scanner
+                        scannerView?.pause()
+                    }
+                }
+
+                // Overlay UI - TOP LAYER - This draws OVER the camera
+                Box(
+                    modifier = Modifier.fillMaxSize()
                 ) {
                     // Top bar with close button
                     Surface(
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                        modifier = Modifier.fillMaxWidth()
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.TopCenter)
                     ) {
                         Row(
                             modifier = Modifier
@@ -131,11 +177,13 @@ fun QrCodeScannerScreen(
                             }
                         }
                     }
-                    
+
                     // Bottom instruction text
                     Surface(
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                        modifier = Modifier.fillMaxWidth()
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.BottomCenter)
                     ) {
                         Column(
                             modifier = Modifier.padding(24.dp),
@@ -148,20 +196,12 @@ fun QrCodeScannerScreen(
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Scanner will automatically detect and process the code",
+                                text = "Using ZXing - secure QR scanner",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
-                }
-                
-                // Scanning frame overlay
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    ScanningFrame()
                 }
             }
             else -> {
@@ -201,72 +241,15 @@ fun QrCodeScannerScreen(
             }
         }
     }
-}
 
-/**
- * Visual frame overlay for QR scanning area
- */
-@Composable
-fun ScanningFrame() {
-    Box(
-        modifier = Modifier
-            .size(280.dp)
-            .padding(16.dp)
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
-            shape = MaterialTheme.shapes.medium,
-            border = androidx.compose.foundation.BorderStroke(
-                3.dp,
-                MaterialTheme.colorScheme.primary
-            )
-        ) {}
-    }
-}
-
-/**
- * ML Kit QR Code Analyzer
- */
-private class QrCodeAnalyzer(
-    private val onQrCodeDetected: (String) -> Unit
-) : ImageAnalysis.Analyzer {
-    
-    private val scanner = BarcodeScanning.getClient()
-    
-    @androidx.camera.core.ExperimentalGetImage
-    override fun analyze(imageProxy: ImageProxy) {
-        val mediaImage = imageProxy.image
-        if (mediaImage != null) {
-            val image = InputImage.fromMediaImage(
-                mediaImage,
-                imageProxy.imageInfo.rotationDegrees
-            )
-            
-            scanner.process(image)
-                .addOnSuccessListener { barcodes ->
-                    for (barcode in barcodes) {
-                        when (barcode.valueType) {
-                            Barcode.TYPE_TEXT,
-                            Barcode.TYPE_URL -> {
-                                barcode.rawValue?.let { qrCode ->
-                                    // Check if it's a registration token
-                                    if (qrCode.contains("datapad_registration")) {
-                                        onQrCodeDetected(qrCode)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                .addOnFailureListener { e ->
-                    Log.e("QrCodeAnalyzer", "QR scanning failed", e)
-                }
-                .addOnCompleteListener {
-                    imageProxy.close()
-                }
-        } else {
-            imageProxy.close()
+    // Cleanup camera when composable is disposed or dismissed
+    DisposableEffect(cameraPermissionState.status.isGranted) {
+        onDispose {
+            // Stop camera to prevent it from running in background
+            if (cameraPermissionState.status.isGranted) {
+                // Camera will be paused when view is removed
+            }
         }
     }
 }
+

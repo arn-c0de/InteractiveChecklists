@@ -71,7 +71,11 @@ python registration_token.py generate --server-ip 192.168.1.100 --port 5010 --ou
 - Automatic addition to authorized_devices.json
 
 **forward_parsed_udp.py** - Extended with:
-- DeviceRegistration message routing (see Manual Patch below)
+- DeviceRegistration message routing (built-in)
+- Interactive registration mode at startup (press 'B' to generate QR token and wait for registration)
+- `--skip-qr-prompt` flag to skip the interactive prompt
+
+> Note: The previous "manual patch" has been applied. `forward_parsed_udp.py` now handles `DeviceRegistration` messages and can listen for registration at startup.
 
 ### Kotlin Components
 
@@ -155,28 +159,11 @@ python registration_token.py verify <token-id>
 python registration_token.py cleanup
 ```
 
-## Manual Patch Required
+**Status: Applied**
 
-**forward_parsed_udp.py** - Line ~803 and ~1716
+The `DeviceRegistration` handler has been implemented and integrated into `forward_parsed_udp.py`. The server can optionally start in interactive registration mode (press 'B' at startup) or skip the prompt with `--skip-qr-prompt`.
 
-Add after the `ClientHello` handler:
-
-```python
-elif 'type' in msg and msg['type'] == 'DeviceRegistration':
-    logger.info(f"📥 Received DeviceRegistration from {addr}")
-    response = session_mgr.handle_device_registration(msg, addr)
-    # Send response in PLAINTEXT
-    response_json = json.dumps(response).encode('utf-8')
-    handshake_sock.sendto(response_json, addr)
-    if response.get('type') == 'RegistrationSuccess':
-        logger.info(f"✅ Device registered: {response.get('deviceId', 'unknown')} ({response.get('deviceName', 'unknown')})")
-    else:
-        logger.warning(f"❌ Registration failed: {response.get('message', 'unknown error')}")
-```
-
-**Insert between:**
-- After `elif 'type' in msg and msg['type'] == 'ClientHello':` block
-- Before `elif 'type' in msg and msg['type'] == 'KeyConfirm':` block
+If you need to reproduce the manual changes, see the commit history for the exact diff.
 
 ## Dependencies
 
@@ -193,30 +180,28 @@ pip install cryptography  # Already present
 implementation("com.google.mlkit:barcode-scanning:17.2.0")
 ```
 
-## UI Integration (TODO)
+## UI Integration
 
-### Extend DataPadSettingsFragment:
+The QR scanner UI is implemented inside the app using ZXing and a Compose `QrCodeScannerScreen` composable (full-screen dialog). ML Kit remains an option for future improvements.
 
-```kotlin
-// Add button for QR scanner
-binding.btnScanQr.setOnClickListener {
-    startQrScanner()
-}
+Recommended integration:
 
-private fun startQrScanner() {
-    // Start QR scanner activity (ML Kit or ZXing)
-    val intent = Intent(requireContext(), QrScannerActivity::class.java)
-    startActivityForResult(intent, REQUEST_CODE_QR_SCAN)
-}
+- Add a "Scan QR code" action in DataPad Settings that opens `QrCodeScannerScreen`.
+- The scanner opens full-screen, filters for QR codes only, and automatically returns the scanned payload to the registration flow.
 
-override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-    super.onActivityResult(requestCode, resultCode, data)
+Example flow (already implemented in the project):
 
-    if (requestCode == REQUEST_CODE_QR_SCAN && resultCode == Activity.RESULT_OK) {
-        val qrData = data?.getStringExtra("qr_data") ?: return
+1. User taps **Scan QR Code** in settings
+2. `QrCodeScannerScreen` opens in a full-screen dialog
+3. QR is scanned; app validates `datapad_registration` payload
+4. App calls `QrRegistrationManager.completeRegistration(...)`
+5. On success, settings are applied and handshake starts
 
-        // Show loading dialog
-        showProgressDialog("Registering device...")
+The code lives in:
+- `app/src/main/java/.../ui/datapad/QrCodeScannerComposable.kt` (ZXing-based scanner)
+- `app/src/main/java/.../data/datapad/QrRegistrationManager.kt`
+
+You can keep ML Kit as an alternative scanner by swapping the composable implementation if desired.
 
         lifecycleScope.launch {
             val result = qrRegistrationManager.completeRegistration(
@@ -291,11 +276,11 @@ lifecycleScope.launch {
 
 1. ✅ Python server-side implemented
 2. ✅ Kotlin client-side implemented
-3. ⏳ Patch forward_parsed_udp.py (see Manual Patch)
-4. ⏳ Add QR scanner library to build.gradle.kts
-5. ⏳ UI integration in DataPadSettingsFragment
-6. ⏳ Create QrScannerActivity (ML Kit or ZXing)
-7. ⏳ Testing with real QR code
+3. ✅ Patch forward_parsed_udp.py (implemented) — `DeviceRegistration` routing added and interactive registration support included
+4. ✅ QR scanner integrated (ZXing) — `QrCodeScannerScreen` composable in `QrCodeScannerComposable.kt`
+5. ✅ UI integration: settings include a scan flow that completes registration and triggers handshake
+6. ⏳ Optional: Add a dedicated `QrScannerActivity` (if you prefer Activity-based flow rather than composable dialog)
+7. ⏳ Testing with real QR code (recommended)
 
 ## Troubleshooting
 
@@ -308,6 +293,13 @@ lifecycleScope.launch {
 - Check network connectivity
 - Check firewall rules (Port 5010 UDP)
 - Check server log: `forward_parsed_udp.py` output
+- If you see a Python error like `ModuleNotFoundError: No module named '_cffi_backend'`, ensure `cryptography` and `cffi` are installed in your environment:
+
+```bash
+pip install cryptography cffi
+```
+
+Use a virtual environment (`python -m venv .venv` + `source .venv/bin/activate` or PowerShell equivalent) to avoid system conflicts.
 
 ### Device already registered
 - Check authorized_devices.json
