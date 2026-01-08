@@ -2101,6 +2101,19 @@ class PdfStructureParser(private val pdfFile: File) {
         if (data.isEmpty()) return data
 
         val rowSize = columns + 1 // +1 for predictor byte
+        
+        // Prevent division-by-zero if columns is -1, making rowSize 0.
+        // Also handles other invalid column values.
+        if (rowSize <= 0) {
+            Log.w(TAG, "Invalid columns value for PNG predictor: $columns. Aborting.")
+            return data // Return original data as a safe fallback
+        }
+        
+        if (data.size % rowSize != 0) {
+             Log.w(TAG, "Data size (${data.size}) is not a multiple of row size ($rowSize) for PNG predictor.")
+             return data // Data is malformed
+        }
+
         val rowCount = data.size / rowSize
         val output = ByteArray(rowCount * columns)
 
