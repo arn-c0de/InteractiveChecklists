@@ -643,6 +643,7 @@
     <string name="settings_fab_size_small">小</string>
     <string name="settings_fab_size_medium">中</string>
     <string name="settings_fab_size_large">大</string>
+    <string name="setup_fab_size_recommendation">推荐：%1$s</string>
     <string name="contributors_title">贡献者</string>
     <string name="contributors_explain">查看和管理项目贡献者</string>
     <string name="error_encoding_contributors">编码贡献者数据时出错</string>
