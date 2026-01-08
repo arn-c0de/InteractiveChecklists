@@ -24,7 +24,7 @@ CONFIG_FILE = "server_config.json"
 DEFAULT_CONFIG = {
     "last_mode": 1,
     "ip_address": "192.168.178.100",
-    "target_ip": "192.168.178.132",
+    "target_ip": "192.168.178.132",  # Supports multiple IPs (comma-separated) and wildcards (e.g., "192.168.178.*")
     "port": 5010,
     "handshake_port": 5011,
     "interval": 10,
@@ -262,6 +262,7 @@ def show_main_menu(config, selected_mode):
     print(f"{Color.DIM}{'─' * 78}{Color.RESET}")
     print()
     print(f"{Color.DIM}  ↑↓: Navigate  ENTER: Start Server  ESC: Quit{Color.RESET}")
+    print(f"{Color.DIM}  💡 Tip: Target IP supports multiple IPs (comma) or wildcards (192.168.178.*){Color.RESET}")
 
 
 def update_main_selection(old_id: int, new_id: int, config: dict):
@@ -338,8 +339,8 @@ def edit_setting_inline(prompt, current_value, validator=None):
 def show_settings_menu(config):
     """Interactive settings editor with grid navigation (flicker-free)"""
     settings_items = [
-        ("bind_ip", "Bind IP Address (Server)", "ip_address", lambda x: True),
-        ("target_ip", "Target IP Address (Client)", "target_ip", lambda x: True),
+        ("bind_ip", "Bind IP (Server - single IP only)", "ip_address", lambda x: True),
+        ("target_ip", "Target IPs (comma/wildcard: 192.168.*)", "target_ip", lambda x: True),
         ("port", "Data Port", "port", lambda x: x.isdigit() and 1 <= int(x) <= 65535),
         ("handshake_port", "Handshake Port", "handshake_port", lambda x: x.isdigit() and 1 <= int(x) <= 65535),
         ("interval", "Update Interval (ms)", "interval", lambda x: x.isdigit() and int(x) > 0),
@@ -456,7 +457,18 @@ def show_command_builder(config):
     
     print()
     print(f"{Color.CYAN}Parameters:{Color.RESET}")
-    print(f"  --host {config['target_ip']}")
+    
+    # Expand target_ip to handle multiple IPs or wildcards
+    target_ip_str = config['target_ip']
+    target_ips = [ip.strip() for ip in target_ip_str.split(',')]
+    
+    if len(target_ips) == 1:
+        print(f"  --host {target_ips[0]}")
+    else:
+        print(f"  --host (multiple):")
+        for ip in target_ips:
+            print(f"    → {ip}")
+    
     print(f"  --port {config['port']}")
     print(f"  --bind-ip {config['ip_address']}")
     print(f"  --interval {config['interval']}")
@@ -470,7 +482,11 @@ def show_command_builder(config):
     if config.get("enable_pow", False):
         cmd += f" --enable-pow --pow-difficulty {config['pow_difficulty']}"
     cmd += f" --interval {config['interval']}"
-    cmd += f" --host {config['target_ip']}"
+    
+    # Add multiple --host arguments if needed
+    for ip in target_ips:
+        cmd += f" --host {ip}"
+    
     cmd += f" --port {config['port']}"
     cmd += f" --verbose"
     cmd += f" --authorized-devices {config['authorized_devices']}"
@@ -496,15 +512,31 @@ def build_command(mode_id, config):
     if mode['command'] == "custom":
         return show_command_builder(config)
     
-    return mode['command'].format(
+    # Expand target_ip to handle multiple IPs or wildcards
+    target_ip_str = config['target_ip']
+    # Support comma-separated IPs or single IP/wildcard
+    target_ips = [ip.strip() for ip in target_ip_str.split(',')]
+    
+    # Build command with expanded IPs
+    # For now, we'll use the first target_ip in the template format,
+    # then replace it with proper --host arguments in the final command
+    base_cmd = mode['command'].format(
         ip_address=config['ip_address'],
-        target_ip=config['target_ip'],
+        target_ip=target_ips[0],  # Use first IP for template
         port=config['port'],
         handshake_port=config['handshake_port'],
         interval=config['interval'],
         authorized_devices=config['authorized_devices'],
         pow_difficulty=config.get('pow_difficulty', 16)
     )
+    
+    # Replace single --host argument with multiple if needed
+    if len(target_ips) > 1:
+        # Find --host argument and replace with multiple --host arguments
+        import re
+        base_cmd = re.sub(r'--host \S+', lambda m: ' '.join(f'--host {ip}' for ip in target_ips), base_cmd)
+    
+    return base_cmd
 
 
 def main():
