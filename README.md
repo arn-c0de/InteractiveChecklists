@@ -121,6 +121,8 @@ python forward_parsed_udp.py --repeat-last --interval 3 --host 127.0.0.1 --port 
 
 See [docs/EN/technical/ECDH_USAGE_GUIDE.md](docs/EN/technical/ECDH_USAGE_GUIDE.md) and [docs/EN/technical/DATA_FLOW_ANALYSIS.md](docs/EN/technical/DATA_FLOW_ANALYSIS.md) for complete setup instructions, PSK guidance, and PoW tuning and troubleshooting.
 
+QR-based Device Registration (added in v1.0.23): Generate a short-lived registration token with `python scripts/DCS-SCRIPTS-FOLDER-Experimental/registration_token.py generate --server-ip <IP> --port 5010` (supports ASCII or PNG output). You can also start the forwarder and press **B** within 5 seconds to enter interactive registration mode which generates a token and listens for DeviceRegistration messages; use `--skip-qr-prompt` to skip this prompt. After successful registration the device is added to `authorized_devices.json` and the server logs the event. See [docs/EN/features/qr_registration_quickstart.md](docs/EN/features/qr_registration_quickstart.md) and [docs/EN/features/qr_registration.md](docs/EN/features/qr_registration.md) for full instructions and troubleshooting.
+
 DataPad also supports receiving **entity contacts** (tactical units) exported from DCS. Enable **Entity Tracking** in the app to receive tactical units and display them as live markers (requires running the forwarder with entity tracking enabled). For details and setup instructions, see [scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md](scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md) and [docs/EN/features/TACTICAL_UNITS_TRACKING.md](docs/EN/features/TACTICAL_UNITS_TRACKING.md).
 
 See [docs/EN/technical/ECDH_USAGE_GUIDE.md](docs/EN/technical/ECDH_USAGE_GUIDE.md) for complete setup instructions and [docs/EN/features/DATAPAD_FEATURE.md](docs/EN/features/DATAPAD_FEATURE.md) for full usage, configuration, and troubleshooting.
@@ -172,6 +174,7 @@ Step-by-step instructions to get the project running locally.
 	 - Install Android Studio (Arctic Fox or later recommended).
 	 - Install a compatible JDK (Java 11 or later recommended).
 	 - Configure Android SDK and at least one emulator or use a physical device.
+	 - For Python forwarder scripts (optional): install `qrcode` and cryptography dependencies: `pip install qrcode[pil] cryptography cffi` (use a virtual environment to avoid system conflicts).
 
 2. Clone the repository
 
