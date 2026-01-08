@@ -52,7 +52,9 @@ scripts/DCS-SCRIPTS-FOLDER-Experimental/ip_blacklist.json
 # CodeQL local analysis files
 .codeql/
 codeql-db/
+codeql-db*/
 codeql-results.sarif
+codeql-*/
 
 codeql-db-py
 codeql-py-analysis.sarif
