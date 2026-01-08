@@ -275,16 +275,16 @@ class MainActivity : ComponentActivity() {
                             // perform import again
                             val importedAgain = fileManager.importFromExternalImportsFolder()
                             if (importedAgain == 0) {
-                                // Offer fallback to SAF
-                                if (!prefsManager.hasShownImportDialog()) {
+                                // Offer fallback to SAF (only after setup wizard is complete)
+                                if (!prefsManager.hasShownImportDialog() && prefsManager.isSetupWizardComplete()) {
                                     showImportDialog = true
                                     prefsManager.setImportDialogShown(true)
                                 }
                                 prefsManager.setFirstLaunchComplete()
                             }
                         } else {
-                            // No permission granted: show fallback dialog
-                            if (!prefsManager.hasShownImportDialog()) {
+                            // No permission granted: show fallback dialog (only after setup wizard is complete)
+                            if (!prefsManager.hasShownImportDialog() && prefsManager.isSetupWizardComplete()) {
                                 showImportDialog = true
                                 prefsManager.setImportDialogShown(true)
                             }
@@ -332,8 +332,8 @@ class MainActivity : ComponentActivity() {
                         
                         // 3. Tab restoration is handled before composition to avoid UI flicker.
                         
-                        // Show import dialog only on first launch if no files
-                        if (!prefsManager.hasShownImportDialog() && prefsManager.isFirstLaunch() && importedFromExternal == 0 && fileManager.getAllFilesGrouped().values.flatten().isEmpty()) {
+                        // Show import dialog only on first launch if no files AND setup wizard is complete
+                        if (!prefsManager.hasShownImportDialog() && prefsManager.isFirstLaunch() && importedFromExternal == 0 && fileManager.getAllFilesGrouped().values.flatten().isEmpty() && prefsManager.isSetupWizardComplete()) {
                             showImportDialog = true
                             prefsManager.setImportDialogShown(true)
                             prefsManager.setFirstLaunchComplete()
@@ -431,10 +431,22 @@ class MainActivity : ComponentActivity() {
                                 onComplete = {
                                     showSetupWizard = false
                                     refreshTrigger++
+                                    // After setup wizard completes, check if import dialog should be shown
+                                    if (!prefsManager.hasShownImportDialog() && fileManager.getAllFilesGrouped().values.flatten().isEmpty()) {
+                                        showImportDialog = true
+                                        prefsManager.setImportDialogShown(true)
+                                    }
                                 },
                                 onSkip = {
                                     showSetupWizard = false
-                                }
+                                    // After setup wizard is skipped, check if import dialog should be shown
+                                    if (!prefsManager.hasShownImportDialog() && fileManager.getAllFilesGrouped().values.flatten().isEmpty()) {
+                                        showImportDialog = true
+                                        prefsManager.setImportDialogShown(true)
+                                    }
+                                },
+                                isDarkTheme = isDarkTheme,
+                                onToggleTheme = toggleTheme
                             )
                         }
                         showSettings -> {

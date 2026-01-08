@@ -31,7 +31,9 @@ import kotlinx.coroutines.flow.first
 fun SetupWizardScreen(
     prefsManager: PreferencesManager,
     onComplete: () -> Unit,
-    onSkip: () -> Unit
+    onSkip: () -> Unit,
+    isDarkTheme: Boolean = false,
+    onToggleTheme: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -97,6 +99,14 @@ fun SetupWizardScreen(
                         text = stringResource(R.string.setup_wizard_title),
                         style = MaterialTheme.typography.headlineSmall
                     )
+                },
+                actions = {
+                    IconButton(onClick = onToggleTheme) {
+                        Icon(
+                            imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
+                            contentDescription = if (isDarkTheme) stringResource(R.string.action_light_mode) else stringResource(R.string.action_dark_mode)
+                        )
+                    }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,

@@ -27,6 +27,8 @@
     <string name="action_search">搜索</string>
     <string name="action_expand">展开</string>
     <string name="action_collapse">折叠</string>
+    <string name="action_dark_mode">深色模式</string>
+    <string name="action_light_mode">浅色模式</string>  
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <!-- NAVIGATION & UI ELEMENTS -->
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
@@ -1277,7 +1279,7 @@
     <!-- SETUP WIZARD -->
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="setup_wizard_title">欢迎设置向导</string>
-    <string name="setup_wizard_welcome">欢迎使用 Checklist Interactive！</string>
+    <string name="setup_wizard_welcome">欢迎使用 Interactive Checklists！</string>
     <string name="setup_wizard_description">配置您的基本设置以快速入门。</string>
     <string name="setup_wizard_get_started">开始使用</string>
     <string name="setup_wizard_skip">跳过</string>
