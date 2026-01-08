@@ -544,6 +544,58 @@ def safe_json_parse(data: bytes | str, max_size: int = 8192, max_depth: int = 6)
         logger.warning(f"⚠️ Invalid or unsafe JSON: {e}")
         return None
 
+def expand_host_patterns(host_patterns: list) -> list:
+    """Expand wildcard IP patterns and resolve multiple hosts.
+    
+    Args:
+        host_patterns: List of host patterns (can include wildcards like 192.168.178.*)
+    
+    Returns:
+        List of resolved IP addresses
+    """
+    expanded_hosts = []
+    
+    for pattern in host_patterns:
+        pattern = pattern.strip()
+        if '*' in pattern:
+            # Wildcard pattern - expand to range
+            parts = pattern.split('.')
+            if len(parts) == 4:
+                try:
+                    # Find which octet has the wildcard
+                    if parts[3] == '*':
+                        # Last octet is wildcard - expand to .1-.254
+                        base = '.'.join(parts[:3])
+                        for i in range(1, 255):
+                            expanded_hosts.append(f"{base}.{i}")
+                    elif parts[2] == '*':
+                        # Third octet is wildcard
+                        base = '.'.join(parts[:2])
+                        for j in range(0, 256):
+                            for i in range(1, 255):
+                                expanded_hosts.append(f"{base}.{j}.{i}")
+                    else:
+                        logger.warning(f"⚠️ Wildcard in unsupported position: {pattern}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Failed to expand wildcard pattern {pattern}: {e}")
+            else:
+                logger.warning(f"⚠️ Invalid IP pattern: {pattern}")
+        else:
+            # Regular host - add directly
+            expanded_hosts.append(pattern)
+    
+    # Remove duplicates while preserving order
+    seen = set()
+    result = []
+    for host in expanded_hosts:
+        if host not in seen:
+            seen.add(host)
+            result.append(host)
+    
+    logger.info(f"📡 Expanded {len(host_patterns)} host pattern(s) to {len(result)} target(s)")
+    return result
+
+
 def send_udp(payload: bytes, host: str, port: int, sock: socket.socket,
              session_mgr: 'SessionManager', device_id: str) -> bool:
     """Send UDP packet with ECDH encryption
@@ -577,6 +629,28 @@ def send_udp(payload: bytes, host: str, port: int, sock: socket.socket,
     except Exception as e:
         print(f"Send error: {e}", file=sys.stderr)
         return False
+
+
+def send_udp_multi(payload: bytes, hosts: list, port: int, sock: socket.socket,
+                   session_mgr: 'SessionManager', device_id: str) -> int:
+    """Send UDP packet to multiple hosts with ECDH encryption
+
+    Args:
+        payload: Data to send
+        hosts: List of destination hosts
+        port: Destination port
+        sock: UDP socket
+        session_mgr: SessionManager instance (required for ECDH mode)
+        device_id: Device ID to send to (looks up active session)
+    
+    Returns:
+        Number of successful sends
+    """
+    success_count = 0
+    for host in hosts:
+        if send_udp(payload, host, port, sock, session_mgr, device_id):
+            success_count += 1
+    return success_count
 
 
 def extract_json_from_line(line: str) -> str | None:
@@ -616,9 +690,13 @@ def _is_same_file(f, path: str) -> bool:
     return (int(st1.st_mtime) == int(st2.st_mtime)) and (st1.st_size == st2.st_size)
 
 
-def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager', send_existing=False, once=False, interval=0.2,
+def tail_and_send(path: str, hosts: list, port: int, session_mgr: 'SessionManager', send_existing=False, once=False, interval=0.2,
                   verbose=False, show_env=False, handshake_port: int = None, bind_ip: str = '127.0.0.1'):
-    """Tail aircraft data file and optionally entity contacts file, sending as UDP datagrams (ECDH only)."""
+    """Tail aircraft data file and optionally entity contacts file, sending as UDP datagrams (ECDH only).
+    
+    Args:
+        hosts: List of destination hosts to send data to
+    """
     # Use global timestamp state to prevent forwarding old/cached messages
     global _last_processed_timestamp
     if not os.path.exists(path):
@@ -684,7 +762,8 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
     sock.settimeout(max(0.01, interval))  # At least 10ms, use configured interval
     logger.info(f"🔐 Listening for handshakes on {bind_ip}:{listen_port}")
     if handshake_port is not None and handshake_port != port:
-        logger.info(f"📤 Will send data to {host}:{port}")
+        hosts_display = f"{hosts[0]}:{port}" if len(hosts) == 1 else f"{len(hosts)} hosts on port {port}"
+        logger.info(f"📤 Will send data to {hosts_display}")
     handshake_sock = sock  # Use same socket for handshake and data
 
     # Heartbeat tracking: send heartbeat every 30 seconds when no new data
@@ -773,8 +852,8 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                 # Send heartbeat to all active sessions
                 heartbeat_sent = False
                 for device_id in list(session_mgr.device_sessions.keys()):
-                    if send_udp(heartbeat_json, host, port, sock,
-                               session_mgr=session_mgr, device_id=device_id):
+                    if send_udp_multi(heartbeat_json, hosts, port, sock,
+                                     session_mgr=session_mgr, device_id=device_id):
                         logger.info(f"💓 Heartbeat sent to {device_id[:8]}...")
                         heartbeat_sent = True
                 
@@ -837,8 +916,8 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                                     }
                                     heartbeat_json = json.dumps(heartbeat_data).encode('utf-8')
                                     try:
-                                        if send_udp(heartbeat_json, host, port, handshake_sock,
-                                                    session_mgr=session_mgr, device_id=device_id):
+                                        if send_udp_multi(heartbeat_json, hosts, port, handshake_sock,
+                                                         session_mgr=session_mgr, device_id=device_id):
                                             logger.info(f"💓 Initial heartbeat sent to {device_id[:8]}...")
                                             # Update last_data_sent_time so we don't immediately send another heartbeat
                                             try:
@@ -1478,16 +1557,19 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                     logger.debug(f"Failed to merge entity data: {e}")
                     # Fall back to player-only data
 
-            # Send merged data to all devices with active sessions (ECDH mode)
+            # Send merged data to all devices with active sessions (ECDH mode - broadcast to all hosts)
             sent_count = 0
             for device_id, session_id in list(session_mgr.device_sessions.items()):
                 # Get device info for logging
                 device = session_mgr.authorized_devices.get(device_id)
                 device_name = device.name if device else device_id[:8]
 
-                if send_udp(final_json.encode('utf-8'), host, port, sock,
-                           session_mgr=session_mgr, device_id=device_id):
+                success_count = send_udp_multi(final_json.encode('utf-8'), hosts, port, sock,
+                                               session_mgr=session_mgr, device_id=device_id)
+                if success_count > 0:
                     sent_count += 1
+                    if success_count < len(hosts):
+                        logger.debug(f"⚠️ Partial send to {device_name}: {success_count}/{len(hosts)} hosts")
                 else:
                     logger.warning(f"⚠️ Failed to send to {device_name} (session may have expired)")
 
@@ -1515,7 +1597,8 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                             wind = env.get('wind') or {'speed': env.get('windSpeed'), 'direction': env.get('windDirection')}
                             wspeed = wind.get('speed')
                             wdir = wind.get('direction')
-                            print(f"{ts} SENT {host}:{port} temp={temp}C pres={pres} wind={wspeed}@{wdir}")
+                            hosts_display = f"{hosts[0]}:{port}" if len(hosts) == 1 else f"{len(hosts)} hosts on port {port}"
+                            print(f"{ts} SENT {hosts_display} temp={temp}C pres={pres} wind={wspeed}@{wdir}")
                     except Exception:
                         pass
 
@@ -1635,9 +1718,13 @@ def get_last_line(path: str) -> str | None:
 
 
 # New feature: repeat the last line every X seconds
-def repeat_last_line(path: str, host: str, port: int, session_mgr: 'SessionManager', interval=5.0, verbose=False, show_env=False,
+def repeat_last_line(path: str, hosts: list, port: int, session_mgr: 'SessionManager', interval=5.0, verbose=False, show_env=False,
                      handshake_port: int = None, bind_ip: str = '127.0.0.1'):
-    """Send the last line of the file as a UDP datagram every <interval> seconds (ECDH only)."""
+    """Send the last line of the file as a UDP datagram every <interval> seconds (ECDH only).
+    
+    Args:
+        hosts: List of destination hosts to send data to
+    """
     # Use global timestamp state to prevent forwarding old/cached messages
     global _last_processed_timestamp
     if not os.path.exists(path):
@@ -1654,7 +1741,8 @@ def repeat_last_line(path: str, host: str, port: int, session_mgr: 'SessionManag
     sock.settimeout(max(0.01, interval))  # At least 10ms, use configured interval
     logger.info(f"🔐 Listening for handshakes on {bind_ip}:{listen_port}")
     if handshake_port is not None and handshake_port != port:
-        logger.info(f"📤 Will send data to {host}:{port}")
+        hosts_display = f"{hosts[0]}:{port}" if len(hosts) == 1 else f"{len(hosts)} hosts on port {port}"
+        logger.info(f"📤 Will send data to {hosts_display}")
     handshake_sock = sock  # Use same socket for handshake and data
     
     # Heartbeat tracking: send heartbeat every 30 seconds when no new data
@@ -1684,8 +1772,8 @@ def repeat_last_line(path: str, host: str, port: int, session_mgr: 'SessionManag
                 # Send heartbeat to all active sessions
                 heartbeat_sent = False
                 for device_id in list(session_mgr.device_sessions.keys()):
-                    if send_udp(heartbeat_json, host, port, sock,
-                               session_mgr=session_mgr, device_id=device_id):
+                    if send_udp_multi(heartbeat_json, hosts, port, sock,
+                                     session_mgr=session_mgr, device_id=device_id):
                         logger.info(f"💓 Heartbeat sent to {device_id[:8]}...")
                         heartbeat_sent = True
                 
@@ -1760,8 +1848,8 @@ def repeat_last_line(path: str, host: str, port: int, session_mgr: 'SessionManag
                                     }
                                     heartbeat_json = json.dumps(heartbeat_data).encode('utf-8')
                                     try:
-                                        if send_udp(heartbeat_json, host, port, handshake_sock,
-                                                    session_mgr=session_mgr, device_id=device_id):
+                                        if send_udp_multi(heartbeat_json, hosts, port, handshake_sock,
+                                                         session_mgr=session_mgr, device_id=device_id):
                                             logger.info(f"💓 Initial heartbeat sent to {device_id[:8]}...")
                                             # Update last_data_sent_time so we don't immediately send another heartbeat
                                             try:
@@ -1847,15 +1935,16 @@ def repeat_last_line(path: str, host: str, port: int, session_mgr: 'SessionManag
                     _last_timestamp_update_time = current_time
                     logger.debug(f"✅ Accepted data with timestamp={cur_ts}")
 
-                # Send to all devices with active sessions (ECDH mode)
+                # Send to all devices with active sessions (ECDH mode - broadcast to all hosts)
                 sent_count = 0
                 for device_id, session_id in list(session_mgr.device_sessions.items()):
                     # Get device info for logging
                     device = session_mgr.authorized_devices.get(device_id)
                     device_name = device.name if device else device_id[:8]
 
-                    if send_udp(jsonpart.encode('utf-8'), host, port, sock,
-                               session_mgr=session_mgr, device_id=device_id):
+                    success_count = send_udp_multi(jsonpart.encode('utf-8'), hosts, port, sock,
+                                                   session_mgr=session_mgr, device_id=device_id)
+                    if success_count > 0:
                         sent_count += 1
                     else:
                         logger.warning(f"⚠️ Failed to send to {device_name} (session may have expired)")
@@ -1885,7 +1974,8 @@ def repeat_last_line(path: str, host: str, port: int, session_mgr: 'SessionManag
                                 wind = parsed.get('wind') or {'speed': env.get('windSpeed'), 'direction': env.get('windDirection')}
                                 wspeed = wind.get('speed')
                                 wdir = wind.get('direction')
-                                print(f"{ts} REPEAT {host}:{port} temp={temp}C pres={pres} wind={wspeed}@{wdir}")
+                                hosts_display = f"{hosts[0]}:{port}" if len(hosts) == 1 else f"{len(hosts)} hosts on port {port}"
+                                print(f"{ts} REPEAT {hosts_display} temp={temp}C pres={pres} wind={wspeed}@{wdir}")
                         except Exception:
                             pass
             except Exception as e:
@@ -2127,7 +2217,8 @@ def main(argv=None):
     p.add_argument('--file', '-f', default=DEFAULT_FILE, help='Path to JSONL file')
     p.add_argument('--use-export', action='store_true', help='Auto-detect and use export.lua-generated JSON in DCS Saved Games Scripts folder')
     p.add_argument('--scripts-dir', default=None, help='Override path to DCS Scripts directory for auto-detection')
-    p.add_argument('--host', default=DEFAULT_HOST, help='Destination host')
+    p.add_argument('--host', action='append', 
+                   help='Destination host (can be specified multiple times, supports wildcards like 192.168.178.*). Default: 127.0.0.1')
     p.add_argument('--port', '-p', type=int, default=DEFAULT_PORT, help='Destination port')
     p.add_argument('--bind-ip', default='127.0.0.1',
                    help='IP address to bind to for ECDH handshakes (default: 127.0.0.1 for localhost only). '
@@ -2201,6 +2292,34 @@ def main(argv=None):
         else:
             print("⚠️ Could not locate DCS Scripts folder; continuing with specified/default file")
 
+    # Process host arguments - handle both single and multiple hosts with wildcards
+    if args.host is None or (isinstance(args.host, list) and len(args.host) == 1 and args.host[0] == DEFAULT_HOST):
+        # No --host specified or only default, use default
+        host_patterns = [DEFAULT_HOST]
+    elif isinstance(args.host, list):
+        # Multiple --host arguments
+        host_patterns = args.host
+    else:
+        # Single host
+        host_patterns = [args.host]
+    
+    # Expand wildcard patterns
+    target_hosts = expand_host_patterns(host_patterns)
+    
+    if not target_hosts:
+        print("❌ Error: No valid target hosts specified", file=sys.stderr)
+        return 1
+    
+    print(f"📡 Configured {len(target_hosts)} target host(s):")
+    if len(target_hosts) <= 10:
+        for h in target_hosts:
+            print(f"   → {h}:{args.port}")
+    else:
+        print(f"   → {target_hosts[0]}:{args.port}")
+        print(f"   ... ({len(target_hosts)-2} more hosts)")
+        print(f"   → {target_hosts[-1]}:{args.port}")
+    print()
+
     # Check ECDH mode requirements
     if not HANDSHAKE_AVAILABLE:
         print("❌ Error: crypto_handshake.py not found", file=sys.stderr)
@@ -2210,8 +2329,8 @@ def main(argv=None):
     # Interactive QR Registration Mode (unless skipped)
     if not args.skip_qr_prompt:
         try:
-            # Determine bind IP for registration (use host IP if bind is 0.0.0.0)
-            registration_ip = args.host if args.bind_ip == '0.0.0.0' else args.bind_ip
+            # Determine bind IP for registration (use first target host if bind is 0.0.0.0)
+            registration_ip = target_hosts[0] if args.bind_ip == '0.0.0.0' else args.bind_ip
             interactive_qr_registration(registration_ip, args.port, timeout_seconds=5)
         except Exception as e:
             logger.warning(f"QR registration prompt failed: {e}")
@@ -2240,14 +2359,16 @@ def main(argv=None):
     
     try:
         if args.repeat_last:
-            print(f"Repeating last line every {args.interval} ms from {args.file} to {args.host}:{args.port} ({enc_status})")
-            repeat_last_line(args.file, args.host, args.port, session_mgr, interval=interval_seconds, verbose=args.verbose,
+            hosts_str = f"{len(target_hosts)} host(s)" if len(target_hosts) > 1 else target_hosts[0]
+            print(f"Repeating last line every {args.interval} ms from {args.file} to {hosts_str}:{args.port} ({enc_status})")
+            repeat_last_line(args.file, target_hosts, args.port, session_mgr, interval=interval_seconds, verbose=args.verbose,
                            show_env=args.show_env, handshake_port=args.handshake_port, bind_ip=args.bind_ip)
         else:
-            print(f"Forwarding {args.file} to {args.host}:{args.port} (forward only new lines) ({enc_status})")
+            hosts_str = f"{len(target_hosts)} host(s)" if len(target_hosts) > 1 else target_hosts[0]
+            print(f"Forwarding {args.file} to {hosts_str}:{args.port} (forward only new lines) ({enc_status})")
             while True:
                 try:
-                    tail_and_send(args.file, args.host, args.port, session_mgr, send_existing=False, once=False,
+                    tail_and_send(args.file, target_hosts, args.port, session_mgr, send_existing=False, once=False,
                                 interval=interval_seconds, verbose=args.verbose, show_env=args.show_env,
                                 handshake_port=args.handshake_port, bind_ip=args.bind_ip)
                 except KeyboardInterrupt:
