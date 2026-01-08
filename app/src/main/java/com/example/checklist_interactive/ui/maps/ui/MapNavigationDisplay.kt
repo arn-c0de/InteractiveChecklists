@@ -36,10 +36,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.KeyboardActions
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -55,6 +55,7 @@ import org.osmdroid.util.GeoPoint
 import kotlin.math.abs
 import android.util.Log
 import org.json.JSONObject
+import kotlinx.coroutines.delay
 
 /**
  * Extract heading from location metadata, description, or tags
@@ -2135,6 +2136,8 @@ fun PatternAltitudeEditDialog(
     val keyboardController = LocalSoftwareKeyboardController.current
 
     LaunchedEffect(Unit) {
+        // Small delay ensures the dialog is fully composed before requesting focus
+        delay(100L)
         focusRequester.requestFocus()
         keyboardController?.show()
     }
