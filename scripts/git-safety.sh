@@ -19,8 +19,8 @@ if [ "${SKIP_CODEQL_SCAN:-0}" = "1" ]; then
 else
   if command -v codeql >/dev/null 2>&1; then
     echo "[git-safety] Running CodeQL (this can be slow)..."
-    # Create database if missing or if language set changed
-    if [ ! -d codeql-db ] || [ ! -f codeql-db/codeql-database.yml ] || ! grep -q "languages: \[kotlin, python\]" codeql-db/codeql-database.yml; then
+    # Create database if missing or if sub-databases don't exist
+    if [ ! -d codeql-db/python ] || [ ! -d codeql-db/java ]; then
       echo "[git-safety] Creating multi-language CodeQL database (first run or language change, may take a while)..."
       codeql database create codeql-db --language=python,kotlin --source-root=. --overwrite --db-cluster
     fi
@@ -28,27 +28,35 @@ else
     # The '|| true' is intentional. codeql analyze exits with 2 if it finds issues,
     # which would otherwise terminate the script. We want the Python script below to
     # parse the results and decide if the exit code should be 1.
-    codeql database analyze codeql-db --format=sarif-latest --output=codeql-results.sarif codeql/python-queries codeql/kotlin-queries -j 0 || true
+    # Analyze each sub-database separately and merge results
+    codeql database analyze codeql-db/python --format=sarif-latest --output=codeql-py-analysis.sarif codeql/python-queries -j 0 || true
+    codeql database analyze codeql-db/java --format=sarif-latest --output=codeql-kt-analysis.sarif codeql/kotlin-queries -j 0 || true
 
     if python - <<'PY'
 import json, sys
-try:
-    with open('codeql-results.sarif') as f:
-        d = json.load(f)
-except FileNotFoundError:
-    print('[git-safety] Error: codeql-results.sarif not found. The analysis may have failed.', file=sys.stderr)
-    sys.exit(1)
-except json.JSONDecodeError:
-    print('[git-safety] Error: Could not decode codeql-results.sarif. It may be empty or corrupt.', file=sys.stderr)
-    sys.exit(1)
 
-runs = d.get('runs', [])
-count = 0
-if runs:
-    count = len(runs[0].get('results', []))
+# Check both Python and Kotlin analysis results
+files = ['codeql-py-analysis.sarif', 'codeql-kt-analysis.sarif']
+total_count = 0
 
-if count > 0:
-    print(f'[git-safety] CodeQL found {count} issue(s). See codeql-results.sarif for details.')
+for sarif_file in files:
+    try:
+        with open(sarif_file) as f:
+            d = json.load(f)
+        runs = d.get('runs', [])
+        if runs:
+            count = len(runs[0].get('results', []))
+            total_count += count
+            if count > 0:
+                print(f'[git-safety] {sarif_file}: {count} issue(s) found.')
+    except FileNotFoundError:
+        print(f'[git-safety] Warning: {sarif_file} not found.', file=sys.stderr)
+    except json.JSONDecodeError:
+        print(f'[git-safety] Error: Could not decode {sarif_file}.', file=sys.stderr)
+        sys.exit(1)
+
+if total_count > 0:
+    print(f'[git-safety] CodeQL found {total_count} total issue(s). Review SARIF files for details.')
     sys.exit(1)
 
 sys.exit(0)

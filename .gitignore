@@ -55,6 +55,7 @@ codeql-db/
 codeql-db*/
 codeql-results.sarif
 codeql-*/
+*-analysis.sarif
 
 codeql-db-py
 codeql-py-analysis.sarif
