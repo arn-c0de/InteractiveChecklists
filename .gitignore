@@ -36,6 +36,7 @@ google-services.json
 
 # Python virtual environment and cache
 .venv/
+venv/
 __pycache__/
 
 # MapDatabaseTools - Downloaded Leaflet assets

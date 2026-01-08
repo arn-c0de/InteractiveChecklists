@@ -1,5 +1,20 @@
 # Requirements for DCS-SCRIPTS-FOLDER-Experimental tools
 # Install with: python -m pip install -r requirements.txt
+# Runtime and developer/test dependencies used by scripts in this folder.
 
-# AES-GCM and ECDH support used by the scripts
-cryptography>=40.0.0
+# Cryptography primitives for ECDH, AES-GCM, HKDF, etc.
+cryptography>=46.0.3
+
+# QR code generation (used by registration_token), with Pillow for image support
+qrcode[pil]>=8.2
+Pillow>=12.1.0
+
+# HTTP utilities used by MapDatabaseTools
+requests>=2.32.5
+
+# GUI toolkit for MapDatabaseTools GUI
+PySide6>=6.10.1
+
+# Test framework (dev dependency)
+pytest>=9.0.2
+
