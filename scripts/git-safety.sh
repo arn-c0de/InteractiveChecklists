@@ -24,6 +24,16 @@ else
       echo "[git-safety] Creating multi-language CodeQL database (first run or language change, may take a while)..."
       codeql database create codeql-db --language=python,kotlin --source-root=. --overwrite --db-cluster
     fi
+    
+    # Finalize databases if needed before analysis
+    if [ -d codeql-db/python ] && ! codeql database check codeql-db/python >/dev/null 2>&1; then
+      echo "[git-safety] Finalizing Python database..."
+      codeql database finalize codeql-db/python || true
+    fi
+    if [ -d codeql-db/java ] && ! codeql database check codeql-db/java >/dev/null 2>&1; then
+      echo "[git-safety] Finalizing Kotlin/Java database..."
+      codeql database finalize codeql-db/java || true
+    fi
 
     # The '|| true' is intentional. codeql analyze exits with 2 if it finds issues,
     # which would otherwise terminate the script. We want the Python script below to
