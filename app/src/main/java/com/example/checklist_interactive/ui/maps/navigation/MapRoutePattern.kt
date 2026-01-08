@@ -334,14 +334,14 @@ object TrafficPatternGenerator {
         // Compute CROSSWIND heading first
         val crosswindHdg = (segmentHeadings?.get("crosswind") ?: 
             if (points.size > 3) calculateBearing(points[2], points[3]) else 0.0).toInt()
-        // DEPARTURE always uses the same heading as CROSSWIND (perpendicular turn from runway)
-        val departureHdg = crosswindHdg
+        // Use FINAL heading for DEPARTURE label per request (departure should display same heading as final approach)
+        val finalHdg = (segmentHeadings?.get("final") ?: 
+            if (points.size > 10) calculateBearing(points[9], points[10]) else 0.0).toInt()
+        val departureHdg = finalHdg
         val downwindHdg = (segmentHeadings?.get("downwind") ?: 
             if (points.size > 5) calculateBearing(points[3], points[5]) else 0.0).toInt()
         val baseHdg = (segmentHeadings?.get("base") ?: 
             if (points.size > 7) calculateBearing(points[6], points[7]) else 0.0).toInt()
-        val finalHdg = (segmentHeadings?.get("final") ?: 
-            if (points.size > 10) calculateBearing(points[9], points[10]) else 0.0).toInt()
 
         val altAglFt = customAltitudeAglFt ?: patternSize.patternAltitudeAglFt
         val altMslFt = altAglFt + runwayElevationFt
