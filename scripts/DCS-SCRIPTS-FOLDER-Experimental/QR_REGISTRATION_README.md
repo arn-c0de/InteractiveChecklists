@@ -41,11 +41,11 @@ This system enables automatic registration of Android DataPad devices via QR cod
 # Processes DeviceRegistration messages and adds devices to whitelist
 ```
 
-### forward_parsed_udp.py (MANUAL PATCH REQUIRED!)
+### forward_parsed_udp.py (Updated)
 ```python
-# Line ~803 and ~1716: Extend message routing
-# + Add DeviceRegistration message handler
-# See qr_registration.md for exact code snippet
+# Forwarder includes DeviceRegistration message routing and an interactive registration mode.
+# Start server and press 'B' within 5 seconds to generate a token and wait for registration.
+# Use --skip-qr-prompt to skip the interactive prompt.
 ```
 
 ## Installation

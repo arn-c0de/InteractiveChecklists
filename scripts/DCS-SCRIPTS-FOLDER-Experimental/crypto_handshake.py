@@ -1286,15 +1286,15 @@ class SessionManager:
                 else:
                     whitelist_data = {"devices": []}
                 
-                # Add new device
+                # Add new device (use camelCase to match loader format)
                 new_device = {
-                    "device_id": device_id,
+                    "deviceId": device_id,
                     "name": device_name,
-                    "public_key": public_key_b64,
+                    "publicKey": public_key_b64,
                     "permissions": token.permissions,
-                    "added_date": time.strftime("%Y-%m-%d %H:%M:%S"),
-                    "added_by": "qr_registration",
-                    "registered_from_ip": ip_address
+                    "addedDate": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "addedBy": "qr_registration",
+                    "registeredFromIp": ip_address
                 }
                 
                 whitelist_data["devices"].append(new_device)

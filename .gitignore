@@ -71,3 +71,5 @@ codeql-py-analysis.sarif
 
 security_audit.jsonl
 security_audit.key
+
+scripts/DCS-SCRIPTS-FOLDER-Experimental/authorized_devices.json.bak

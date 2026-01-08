@@ -1964,6 +1964,164 @@ def update_export_lua_interval(interval_ms: int, lua_path: str):
         logger.error(f"Failed to update {os.path.basename(lua_path)}: {e}")
 
 
+def interactive_qr_registration(server_ip: str, port: int, timeout_seconds: int = 5) -> bool:
+    """
+    Interactive QR code registration at server startup
+    
+    Args:
+        server_ip: Server IP address
+        port: Server port
+        timeout_seconds: Seconds to wait for 'B' key press
+    
+    Returns:
+        True if device registered successfully, False if skipped
+    """
+    import select
+    import msvcrt  # Windows keyboard input
+    
+    print("\n" + "=" * 70)
+    print("📱 DEVICE REGISTRATION MODE")
+    print("=" * 70)
+    print(f"\n⏱️  Press 'B' within {timeout_seconds} seconds to register a new device...")
+    print("   (Or wait to skip and start server normally)")
+    print("=" * 70)
+    
+    start_time = time.time()
+    
+    # Wait for key press with timeout
+    while (time.time() - start_time) < timeout_seconds:
+        if msvcrt.kbhit():
+            key = msvcrt.getch().decode('utf-8', errors='ignore').upper()
+            if key == 'B':
+                print("\n✅ Registration mode activated!")
+                return _perform_qr_registration(server_ip, port)
+        time.sleep(0.1)
+    
+    print("\n⏭️  Skipped - starting server normally...")
+    return False
+
+
+def _perform_qr_registration(server_ip: str, port: int) -> bool:
+    """Generate QR code and wait for device registration"""
+    try:
+        # Import registration token manager
+        from registration_token import RegistrationTokenManager, generate_qr_code_ascii
+        
+        # Generate registration token
+        manager = RegistrationTokenManager()
+        token = manager.generate_token(
+            server_ip=server_ip,
+            port=port,
+            validity_minutes=10
+        )
+        
+        # Display QR code
+        qr_data = token.to_qr_payload()
+        print("\n" + "=" * 70)
+        print("🔐 REGISTRATION TOKEN GENERATED")
+        print("=" * 70)
+        print(f"📱 Server: {token.server_ip}:{token.port}")
+        print(f"⏰ Valid for: 10 minutes")
+        print(f"\n📋 QR Code Payload ({len(qr_data)} bytes):")
+        print(qr_data)
+        print("\n📱 QR CODE - Scan with DataPad app:")
+        print(generate_qr_code_ascii(qr_data))
+        print("=" * 70)
+        print("\n⏳ Waiting for device registration...")
+        print("   (Press Ctrl+C to cancel and start server)")
+        
+        # Start temporary UDP listener for registration
+        # We need to listen on the actual port to receive DeviceRegistration message
+        temp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        temp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        temp_sock.bind((server_ip, port))
+        temp_sock.settimeout(1.0)  # 1 second timeout for checking
+        
+        print(f"🔊 Listening on {server_ip}:{port} for registration...")
+        
+        # Create temporary SessionManager to handle registration
+        temp_session_mgr = SessionManager(
+            authorized_devices_path='authorized_devices.json',
+            enable_pow=False  # No PoW for registration
+        )
+        
+        start_wait = time.time()
+        
+        while True:
+            elapsed = int(time.time() - start_wait)
+            remaining = 600 - elapsed  # 10 minutes
+            
+            if remaining <= 0:
+                print("\n❌ Token expired (10 minutes passed)")
+                print("   Restart server and try again")
+                temp_sock.close()
+                return False
+            
+            # Show waiting indicator
+            print(f"⏳ Waiting... ({elapsed}s elapsed, listening for registration)", end='\r')
+            
+            try:
+                # Listen for UDP packets
+                data, addr = temp_sock.recvfrom(8192)
+                
+                # Try to parse as JSON
+                try:
+                    msg = json.loads(data.decode('utf-8'))
+                    
+                    # Check if it's a DeviceRegistration message
+                    if msg.get('type') == 'DeviceRegistration':
+                        print(f"\n📥 Received registration from {addr[0]}:{addr[1]}")
+                        
+                        # Handle registration
+                        response = temp_session_mgr.handle_device_registration(msg, addr)
+                        
+                        # Send response back
+                        response_json = json.dumps(response).encode('utf-8')
+                        temp_sock.sendto(response_json, addr)
+                        
+                        if response['type'] == 'RegistrationSuccess':
+                            print("\n✅ Device successfully registered!")
+                            print(f"   Device: {msg.get('deviceName', 'Unknown')}")
+                            print(f"   Device ID: {msg.get('deviceId', 'Unknown')}")
+                            temp_sock.close()
+                            time.sleep(1)
+                            return True
+                        else:
+                            print(f"\n❌ Registration failed: {response.get('message', 'Unknown error')}")
+                            # Continue waiting in case they try again
+                    else:
+                        # Ignore non-registration messages
+                        pass
+                        
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    # Ignore invalid packets
+                    pass
+                    
+            except socket.timeout:
+                # No packet received, continue waiting
+                pass
+            
+    except KeyboardInterrupt:
+        print("\n\n⏭️  Registration cancelled - starting server...")
+        try:
+            temp_sock.close()
+        except:
+            pass
+        return False
+    except ImportError:
+        print("\n❌ Error: registration_token.py not found")
+        print("   Make sure registration_token.py is in the same directory")
+        return False
+    except Exception as e:
+        print(f"\n❌ Registration error: {e}")
+        traceback.print_exc()
+        try:
+            temp_sock.close()
+        except:
+            pass
+        return False
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description='Forward parsed JSONL as UDP datagrams with ECDH encryption (PSK mode removed)')
     p.add_argument('--file', '-f', default=DEFAULT_FILE, help='Path to JSONL file')
@@ -1987,6 +2145,7 @@ def main(argv=None):
     p.add_argument('--pow-difficulty', type=int, default=16, help='PoW difficulty in bits (default: 16 = ~50-100ms, 12 = ~5-20ms, 20 = ~500-1000ms)')
     p.add_argument('--export-lua-path', default=None, help='Path to Export.lua to update interval. If not provided, will search in script folder.')
     p.add_argument('--no-update-lua', action='store_true', help='Do not attempt to update Export.lua.')
+    p.add_argument('--skip-qr-prompt', action='store_true', help='Skip interactive QR registration prompt at startup')
     args = p.parse_args(argv)
 
     # Setup logging
@@ -2048,10 +2207,22 @@ def main(argv=None):
         print("   Make sure crypto_handshake.py is in the same directory", file=sys.stderr)
         return 2
 
+    # Interactive QR Registration Mode (unless skipped)
+    if not args.skip_qr_prompt:
+        try:
+            # Determine bind IP for registration (use host IP if bind is 0.0.0.0)
+            registration_ip = args.host if args.bind_ip == '0.0.0.0' else args.bind_ip
+            interactive_qr_registration(registration_ip, args.port, timeout_seconds=5)
+        except Exception as e:
+            logger.warning(f"QR registration prompt failed: {e}")
+            print("⚠️  Continuing with normal server startup...")
+
+    print("\n" + "=" * 70)
     print("🔐 ECDH Handshake Mode (PSK removed)")
     print(f"📂 Authorized devices: {args.authorized_devices}")
     if args.enable_pow:
         print(f"🛡️  Proof-of-Work enabled (difficulty: {args.pow_difficulty} bits)")
+    print("=" * 70)
 
     # Security check: warn if binding to all interfaces
     check_bind_security(args.bind_ip)
