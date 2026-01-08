@@ -97,6 +97,7 @@
     <!-- COMMON -->
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="common_ellipsis">...</string>
+    <string name="common_loading">加载中...</string>
 
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <!-- CHECKLIST & MARKDOWN -->
@@ -1271,5 +1272,26 @@
     <string name="tactical_time_minutes">%1$dm 分钟前</string>
     <string name="tactical_time_hours">%1$dh 小时前</string>
     <string name="tactical_time_unknown">未知</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- SETUP WIZARD -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="setup_wizard_title">欢迎设置向导</string>
+    <string name="setup_wizard_welcome">欢迎使用 Checklist Interactive！</string>
+    <string name="setup_wizard_description">配置您的基本设置以快速入门。</string>
+    <string name="setup_wizard_get_started">开始使用</string>
+    <string name="setup_wizard_skip">跳过</string>
+    <string name="setup_datapad_description">启用与 DCS World 的实时遥测集成</string>
+    <string name="setup_aircraft_title">选择飞机</string>
+    <string name="setup_aircraft_description">选择要在库中显示的飞机检查清单</string>
+    <string name="setup_maps_title">选择地图</string>
+    <string name="setup_maps_description">选择可用的战术地图</string>
+    <string name="settings_map_select_all">全选</string>
+    <string name="settings_map_select_none">全不选</string>
+    <string name="settings_run_setup_wizard">运行设置向导</string>
+    <string name="settings_run_setup_wizard_description">重新配置飞机、地图和其他初始设置</string>
+    <string name="setup_tactical_tracking_title">战术单位追踪</string>
+    <string name="setup_tactical_tracking_description">追踪并在地图上显示附近的飞机和地面单位</string>
+    <string name="setup_configure_datapad">配置 DataPad 设置</string>
 
 </resources>

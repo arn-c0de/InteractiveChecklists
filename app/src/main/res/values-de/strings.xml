@@ -1209,9 +1209,10 @@
     
     
     <string name="common_ellipsis">...</string>
+    <string name="common_loading">Laden...</string>
 
-    
-    
+
+
     
     <string name="pdf_marker">Marker</string>
     <string name="pdf_sharpen_label">Sharpen: %1$s%%</string>
@@ -1392,5 +1393,26 @@
     <string name="db_update_btn_clean">Clean Import</string>
     <string name="db_update_btn_skip">Skip</string>
 
-    
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- SETUP WIZARD -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="setup_wizard_title">Willkommens-Assistent</string>
+    <string name="setup_wizard_welcome">Willkommen bei Checklist Interactive!</string>
+    <string name="setup_wizard_description">Konfiguriere deine wichtigsten Einstellungen für einen schnellen Start.</string>
+    <string name="setup_wizard_get_started">Los geht\'s</string>
+    <string name="setup_wizard_skip">Überspringen</string>
+    <string name="setup_datapad_description">Echtzeit-Telemetrie-Integration mit DCS World aktivieren</string>
+    <string name="setup_aircraft_title">Flugzeuge auswählen</string>
+    <string name="setup_aircraft_description">Wähle aus, welche Flugzeug-Checklisten in deiner Bibliothek angezeigt werden</string>
+    <string name="setup_maps_title">Karten auswählen</string>
+    <string name="setup_maps_description">Wähle aus, welche taktischen Karten verfügbar sein sollen</string>
+    <string name="settings_map_select_all">Alle auswählen</string>
+    <string name="settings_map_select_none">Keine auswählen</string>
+    <string name="settings_run_setup_wizard">Einrichtungsassistent starten</string>
+    <string name="settings_run_setup_wizard_description">Flugzeuge, Karten und andere Ersteinstellungen neu konfigurieren</string>
+    <string name="setup_tactical_tracking_title">Tactical Units Tracking</string>
+    <string name="setup_tactical_tracking_description">Nahegelegene Flugzeuge und Bodeneinheiten auf der Karte verfolgen und anzeigen</string>
+    <string name="setup_configure_datapad">DataPad-Einstellungen konfigurieren</string>
+
+
     </resources>

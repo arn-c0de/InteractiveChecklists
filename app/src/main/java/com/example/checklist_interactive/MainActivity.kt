@@ -57,6 +57,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import android.content.res.Configuration
 import java.util.Locale
+import com.example.checklist_interactive.ui.setup.SetupWizardScreen
 
 class MainActivity : ComponentActivity() {
         companion object {
@@ -140,12 +141,16 @@ class MainActivity : ComponentActivity() {
             var showFileList by remember { mutableStateOf(prefsManager.getLastMainPage() == 0) }
             var showSettings by remember { mutableStateOf(false) }
                     var showTacticalUnits by remember { mutableStateOf(false) }
+                    var showSetupWizard by remember { mutableStateOf(!prefsManager.isSetupWizardComplete()) }
                     var isScreenLocked by remember { mutableStateOf(prefsManager.isScreenLocked()) }
-                    val backHandlerEnabled = openTabs.isNotEmpty() || showSettings || showTacticalUnits
+                    val backHandlerEnabled = openTabs.isNotEmpty() || showSettings || showTacticalUnits || showSetupWizard
 
             // Handle Android back button: return to file list instead of closing app
             BackHandler(enabled = backHandlerEnabled) {
-                if (showTacticalUnits) {
+                if (showSetupWizard) {
+                    // Don't allow back on setup wizard during first run
+                    // User must complete or skip
+                } else if (showTacticalUnits) {
                     showTacticalUnits = false
                 } else if (showSettings) {
                     showSettings = false
@@ -419,6 +424,19 @@ class MainActivity : ComponentActivity() {
                     }
 
                     when {
+                        showSetupWizard -> {
+                            // Setup wizard (shown on first run or when manually opened)
+                            SetupWizardScreen(
+                                prefsManager = prefsManager,
+                                onComplete = {
+                                    showSetupWizard = false
+                                    refreshTrigger++
+                                },
+                                onSkip = {
+                                    showSetupWizard = false
+                                }
+                            )
+                        }
                         showSettings -> {
                             // Settings screen
                             SettingsScreen(
@@ -426,7 +444,8 @@ class MainActivity : ComponentActivity() {
                                 fileManager = fileManager,
                                 onBack = { showSettings = false },
                                 softwareVersion = softwareVersion,
-                                onFilesRefreshed = { refreshTrigger++ }
+                                onFilesRefreshed = { refreshTrigger++ },
+                                onShowSetupWizard = { showSetupWizard = true }
                             )
                         }
                         else -> {

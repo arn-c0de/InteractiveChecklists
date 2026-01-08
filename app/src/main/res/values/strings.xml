@@ -99,6 +99,8 @@
     <!-- COMMON -->
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="common_ellipsis">...</string>
+    <string name="common_empty">Empty</string>
+    <string name="common_loading">Loading...</string>
 
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <!-- CHECKLIST & MARKDOWN -->
@@ -238,7 +240,6 @@
     <string name="quick_notes_empty_hint">Use quick input below</string>
     <string name="quick_notes_untitled">Untitled</string>
     <string name="quick_notes_delete_confirm">Press again to delete</string>
-    <string name="common_empty">(empty)</string>
     <string name="text_empty">(empty)</string>
     <string name="common_placeholder_dash">-</string>
     <string name="greeting_hello">Hello %1$s!</string>
@@ -1306,5 +1307,26 @@
     <string name="tactical_time_minutes">%1$dm ago</string>
     <string name="tactical_time_hours">%1$dh ago</string>
     <string name="tactical_time_unknown">Unknown</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- SETUP WIZARD -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="setup_wizard_title">Welcome Setup</string>
+    <string name="setup_wizard_welcome">Welcome to Checklist Interactive!</string>
+    <string name="setup_wizard_description">Configure your essential settings to get started quickly.</string>
+    <string name="setup_wizard_get_started">Get Started</string>
+    <string name="setup_wizard_skip">Skip</string>
+    <string name="setup_datapad_description">Enable real-time telemetry integration with DCS World</string>
+    <string name="setup_aircraft_title">Select Aircraft</string>
+    <string name="setup_aircraft_description">Choose which aircraft checklists to display in your library</string>
+    <string name="setup_maps_title">Select Maps</string>
+    <string name="setup_maps_description">Choose which tactical maps to make available</string>
+    <string name="settings_map_select_all">Select All</string>
+    <string name="settings_map_select_none">Select None</string>
+    <string name="settings_run_setup_wizard">Run Setup Wizard</string>
+    <string name="settings_run_setup_wizard_description">Re-configure aircraft, maps, and other initial settings</string>
+    <string name="setup_tactical_tracking_title">Tactical Units Tracking</string>
+    <string name="setup_tactical_tracking_description">Track and display nearby aircraft and ground units on the map</string>
+    <string name="setup_configure_datapad">Configure DataPad Settings</string>
 
 </resources>

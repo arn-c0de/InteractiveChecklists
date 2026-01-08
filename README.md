@@ -82,7 +82,7 @@ InteractiveChecklists is an Android application for viewing and interacting with
 | --- | --- | --- |
 | Caucasus | Supported | Marker set available in DB |
 | Marianas | Supported | Marker set available in DB |
-| Germany (CW) | In progress | Marker addition in progress |
+| Germany (CW) | mostly Supported | Marker addition in progress |
 
 ## Experimental: DataPad (Live Flight Telemetry)
 
