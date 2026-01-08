@@ -446,7 +446,8 @@ class MainActivity : ComponentActivity() {
                                     }
                                 },
                                 isDarkTheme = isDarkTheme,
-                                onToggleTheme = toggleTheme
+                                onToggleTheme = toggleTheme,
+                                softwareVersion = softwareVersion
                             )
                         }
                         showSettings -> {

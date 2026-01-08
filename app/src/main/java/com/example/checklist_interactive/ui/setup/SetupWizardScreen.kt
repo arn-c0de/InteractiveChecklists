@@ -33,7 +33,8 @@ fun SetupWizardScreen(
     onComplete: () -> Unit,
     onSkip: () -> Unit,
     isDarkTheme: Boolean = false,
-    onToggleTheme: () -> Unit = {}
+    onToggleTheme: () -> Unit = {},
+    softwareVersion: String = ""
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -152,6 +153,14 @@ fun SetupWizardScreen(
                     Text(
                         text = stringResource(R.string.setup_wizard_description),
                         style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(R.string.settings_version, softwareVersion),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
                     )
