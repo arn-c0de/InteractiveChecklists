@@ -27,6 +27,8 @@
     <string name="action_search">Suchen</string>
     <string name="action_expand">Erweitern</string>
     <string name="action_collapse">Einklappen</string>
+    <string name="action_dark_mode">Dunkelmodus</string>
+    <string name="action_light_mode">Hellmodus</string>  
 
     
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
@@ -1397,7 +1399,7 @@
     <!-- SETUP WIZARD -->
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="setup_wizard_title">Willkommens-Assistent</string>
-    <string name="setup_wizard_welcome">Willkommen bei Checklist Interactive!</string>
+    <string name="setup_wizard_welcome">Willkommen bei Interactive Checklists!</string>
     <string name="setup_wizard_description">Konfiguriere deine wichtigsten Einstellungen für einen schnellen Start.</string>
     <string name="setup_wizard_get_started">Los geht\'s</string>
     <string name="setup_wizard_skip">Überspringen</string>

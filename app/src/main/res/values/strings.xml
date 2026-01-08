@@ -27,6 +27,8 @@
     <string name="action_search">Search</string>
     <string name="action_expand">Expand</string>
     <string name="action_collapse">Collapse</string>
+    <string name="action_dark_mode">Dark mode</string>
+    <string name="action_light_mode">Light mode</string>  
 
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <!-- NAVIGATION & UI ELEMENTS -->
@@ -1312,7 +1314,7 @@
     <!-- SETUP WIZARD -->
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <string name="setup_wizard_title">Welcome Setup</string>
-    <string name="setup_wizard_welcome">Welcome to Checklist Interactive!</string>
+    <string name="setup_wizard_welcome">Welcome to Interactive Checklists!</string>
     <string name="setup_wizard_description">Configure your essential settings to get started quickly.</string>
     <string name="setup_wizard_get_started">Get Started</string>
     <string name="setup_wizard_skip">Skip</string>
