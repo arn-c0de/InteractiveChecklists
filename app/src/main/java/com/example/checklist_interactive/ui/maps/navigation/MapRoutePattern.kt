@@ -156,9 +156,9 @@ object TrafficPatternGenerator {
         // 11. Threshold (landing point)
         points.add(runwayThreshold)
         
-        // Apply corner smoothing if enabled
+        // Apply corner smoothing if enabled (use aggressive smoothing when enabled)
         return if (roundedCorners) {
-            smoothCorners(points, patternSize)
+            smoothCorners(points, patternSize, true)
         } else {
             points
         }
@@ -252,7 +252,7 @@ object TrafficPatternGenerator {
         )
         
         val finalPoints = if (roundedCorners) {
-            smoothCorners(points, patternSize)
+            smoothCorners(points, patternSize, true)
         } else {
             points
         }
@@ -418,14 +418,14 @@ object TrafficPatternGenerator {
      * 
      * @param points Original pattern points
      * @param patternSize Pattern size determines smoothing radius (larger = more rounded)
+     * @param aggressive When true, apply stronger rounding (larger radii and denser arc points)
      * @return Smoothed pattern with additional points at corners
      */
-    private fun smoothCorners(points: List<GeoPoint>, patternSize: PatternSize): List<GeoPoint> {
+    private fun smoothCorners(points: List<GeoPoint>, patternSize: PatternSize, aggressive: Boolean = false): List<GeoPoint> {
         if (points.size < 3) return points
         
-        // Scale smoothing radius based on pattern size
-        // Larger patterns get progressively more rounding for smoother, easier turns
-        val smoothingRadius = when (patternSize) {
+        // Base smoothing percentages by size
+        val baseSmoothingRadius = when (patternSize) {
             PatternSize.NORMAL -> 0.12       // 12% - tighter turns
             PatternSize.MEDIUM -> 0.15       // 15% - moderate
             PatternSize.LARGE -> 0.18        // 18% - smoother
@@ -434,21 +434,24 @@ object TrafficPatternGenerator {
             PatternSize.HUGE -> 0.34         // 34% - very wide
             PatternSize.GIGANTIC -> 0.42     // 42% - extremely wide
         }
+
+        // Increase radius when aggressive rounding is requested
+        val radiusMultiplier = if (aggressive) 1.6 else 1.0
+        val radius = (baseSmoothingRadius * radiusMultiplier).coerceIn(0.05, if (aggressive) 0.9 else 0.6)
         
-        // Allow larger upper clamp for giant patterns
-        val radius = smoothingRadius.coerceIn(0.05, 0.6) // Safety clamp
-        
-        // Calculate a fixed smoothing distance based on pattern size (in meters)
-        // This ensures all corners are rounded equally
-        val fixedSmoothDist = when (patternSize) {
-            PatternSize.NORMAL -> 200.0       // 200m radius
-            PatternSize.MEDIUM -> 300.0       // 300m radius
-            PatternSize.LARGE -> 400.0        // 400m radius
-            PatternSize.VERY_LARGE -> 550.0   // 550m radius
-            PatternSize.EXTRA_LARGE -> 750.0  // 750m radius
-            PatternSize.HUGE -> 1000.0        // 1km radius
-            PatternSize.GIGANTIC -> 1500.0    // 1.5km radius
+        // Base fixed smoothing distances (meters)
+        val baseFixedSmoothDist = when (patternSize) {
+            PatternSize.NORMAL -> 200.0
+            PatternSize.MEDIUM -> 300.0
+            PatternSize.LARGE -> 400.0
+            PatternSize.VERY_LARGE -> 550.0
+            PatternSize.EXTRA_LARGE -> 750.0
+            PatternSize.HUGE -> 1000.0
+            PatternSize.GIGANTIC -> 1500.0
         }
+
+        // Increase fixed smoothing when aggressive to make corners noticeably rounder
+        val fixedSmoothDist = baseFixedSmoothDist * if (aggressive) 1.8 else 1.0
         
         val smoothed = mutableListOf<GeoPoint>()
         smoothed.add(points.first()) // Keep first point (runway threshold)
@@ -490,12 +493,12 @@ object TrafficPatternGenerator {
             // Add approach point
             smoothed.add(approachPoint)
             
-            // Add arc points for smooth corner (3-5 points depending on turn angle)
+            // Add arc points for smooth corner; increase points when aggressive for smoother arcs
             val turnAngle = abs(normalizeHeading(bearingToNext - bearingFromPrev))
             val arcPoints = when {
-                turnAngle > 60 -> 5 // Sharp turn
-                turnAngle > 30 -> 3 // Medium turn
-                else -> 2 // Gentle turn
+                turnAngle > 60 -> if (aggressive) 7 else 5 // Sharp turn
+                turnAngle > 30 -> if (aggressive) 5 else 3 // Medium turn
+                else -> if (aggressive) 3 else 2 // Gentle turn
             }
             
             for (j in 1..arcPoints) {
