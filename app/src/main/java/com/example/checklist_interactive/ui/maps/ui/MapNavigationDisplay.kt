@@ -1067,6 +1067,54 @@ fun MapNavigationDisplay(
 
                                     Spacer(modifier = Modifier.height(8.dp))
 
+                                    // Pattern altitude selector
+                                    var showAltitudeEditDialog by remember { mutableStateOf(false) }
+                                    val runwayElevationFt = (originalAirportTarget?.elevationM?.times(3.28084))?.toInt() ?: 0
+                                    val patternAltAgl = customPatternAltitudeAglFt ?: patternSize.patternAltitudeAglFt
+                                    val patternAltMsl = patternAltAgl + runwayElevationFt
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.map_nav_pattern_alt_msl, patternAltMsl),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+
+                                        FilterChip(
+                                            selected = false,
+                                            onClick = { showAltitudeEditDialog = true },
+                                            label = {
+                                                Text(
+                                                    text = "$patternAltAgl ft AGL ($patternAltMsl ft MSL)" + if (customPatternAltitudeAglFt != null) " ✎" else "",
+                                                    style = MaterialTheme.typography.labelSmall
+                                                )
+                                            },
+                                            modifier = Modifier.height(28.dp)
+                                        )
+                                    }
+
+                                    // Altitude edit dialog
+                                    if (showAltitudeEditDialog) {
+                                        PatternAltitudeEditDialog(
+                                            currentAltitudeAgl = patternAltAgl,
+                                            onDismiss = { showAltitudeEditDialog = false },
+                                            onSave = { newAltitude ->
+                                                onCustomPatternAltitudeAglFtChange(newAltitude)
+                                                saveNavigationState()
+                                            },
+                                            onReset = {
+                                                onCustomPatternAltitudeAglFtChange(null)
+                                                saveNavigationState()
+                                            }
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
                                     // Collapsible settings container (default collapsed)
                                     var showAltThresholdSettings by remember { mutableStateOf(false) }
                                     Card(
@@ -1248,199 +1296,6 @@ fun MapNavigationDisplay(
                                                     fontSize = 11.sp,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
-
-                                                // Pattern settings: size, direction, final distance, and show toggle
-                                                Spacer(modifier = Modifier.height(6.dp))
-
-                                                Column(modifier = Modifier.fillMaxWidth()) {
-                                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                                        // Pattern size dropdown
-                                                        var sizeExpanded by remember { mutableStateOf(false) }
-                                                        ExposedDropdownMenuBox(
-                                                            expanded = sizeExpanded,
-                                                            onExpandedChange = { sizeExpanded = !sizeExpanded },
-                                                            modifier = Modifier.weight(1f)
-                                                        ) {
-                                                            OutlinedTextField(
-                                                                value = patternSize.displayName,
-                                                                onValueChange = {},
-                                                                readOnly = true,
-                                                                label = { Text(stringResource(R.string.map_nav_pattern_size_label)) },
-                                                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = sizeExpanded) },
-                                                                modifier = Modifier.menuAnchor()
-                                                            )
-                                                            ExposedDropdownMenu(
-                                                                expanded = sizeExpanded,
-                                                                onDismissRequest = { sizeExpanded = false }
-                                                            ) {
-                                                                PatternSize.values().forEach { size ->
-                                                                    DropdownMenuItem(
-                                                                        text = { Text(size.displayName) },
-                                                                        onClick = {
-                                                                            onPatternSizeChange(size)
-                                                                            saveNavigationState()
-                                                                            sizeExpanded = false
-                                                                        }
-                                                                    )
-                                                                }
-                                                            }
-                                                        }
-
-                                                        // Pattern direction buttons
-                                                        Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                            Button(
-                                                                onClick = {
-                                                                    onPatternDirectionChange(PatternDirection.LEFT_HAND)
-                                                                    saveNavigationState()
-                                                                },
-                                                                colors = if (patternDirection == PatternDirection.LEFT_HAND) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary) else ButtonDefaults.buttonColors()
-                                                            ) {
-                                                                Text(stringResource(R.string.map_nav_pattern_dir_left))
-                                                            }
-                                                            Button(
-                                                                onClick = {
-                                                                    onPatternDirectionChange(PatternDirection.RIGHT_HAND)
-                                                                    saveNavigationState()
-                                                                },
-                                                                colors = if (patternDirection == PatternDirection.RIGHT_HAND) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary) else ButtonDefaults.buttonColors()
-                                                            ) {
-                                                                Text(stringResource(R.string.map_nav_pattern_dir_right))
-                                                            }
-                                                        }
-                                                    }
-
-                                                    Spacer(modifier = Modifier.height(8.dp))
-
-                                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                                        var finalDistText by remember { mutableStateOf(String.format("%.1f", patternFinalDistanceNm)) }
-                                                        OutlinedTextField(
-                                                            value = finalDistText,
-                                                            onValueChange = { v ->
-                                                                val filtered = v.filter { it.isDigit() || it == '.' }
-                                                                finalDistText = filtered
-                                                                val d = filtered.toDoubleOrNull()
-                                                                if (d != null) {
-                                                                    onPatternFinalDistanceNmChange(d)
-                                                                    saveNavigationState()
-                                                                }
-                                                            },
-                                                            label = { Text(stringResource(R.string.map_nav_final_dist_nm, "")) },
-                                                            singleLine = true,
-                                                            modifier = Modifier.weight(1f)
-                                                        )
-
-                                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                                            Text(text = stringResource(R.string.map_nav_show_pattern))
-                                                            Spacer(modifier = Modifier.width(6.dp))
-                                                            Switch(checked = showTrafficPattern, onCheckedChange = {
-                                                                onShowTrafficPatternChange(it)
-                                                                saveNavigationState()
-                                                            })
-                                                        }
-                                                    }
-                                                }
-
-                                                // Show pattern altitude and current altitude with indicator
-                                                var showAltitudeEditDialog by remember { mutableStateOf(false) }
-                                                val runwayElevationFt = (originalAirportTarget?.elevationM?.times(3.28084))?.toInt() ?: 0
-                                                val patternAltAgl = customPatternAltitudeAglFt ?: patternSize.patternAltitudeAglFt
-                                                val patternAltMsl = patternAltAgl + runwayElevationFt
-                                                val currentAltMeters = flightData?.altitude?.let { it.toDouble() } ?: Double.NaN
-                                                val currentAlt = if (currentAltMeters.isNaN()) Double.NaN else currentAltMeters * 3.28084 // convert m -> ft
-                                                val currentAltDisplay = if (currentAlt.isNaN()) "n/a" else String.format("%d ft", currentAlt.toInt())
-                                                val diff = if (currentAlt.isNaN()) null else currentAlt - patternAltMsl
-                                                val smallTolerance = patternAltitudeSmallToleranceFt
-                                                val warningTol = patternAltitudeWarningToleranceFt
-
-                                                Row(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .padding(top = 4.dp),
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.Start
-                                                ) {
-                                                    Column(
-                                                        modifier = Modifier.clickable { showAltitudeEditDialog = true }
-                                                    ) {
-                                                        Text(
-                                                            text = stringResource(R.string.map_nav_pattern_alt_msl, patternAltMsl),
-                                                            style = MaterialTheme.typography.labelSmall,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = MaterialTheme.colorScheme.primary
-                                                        )
-                                                        Text(
-                                                            text = stringResource(R.string.map_nav_pattern_alt_agl, patternAltAgl, runwayElevationFt, if (customPatternAltitudeAglFt != null) stringResource(R.string.map_nav_pattern_alt_custom_suffix) else ""),
-                                                            style = MaterialTheme.typography.labelSmall,
-                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                        )
-                                                    }
-                                                
-                                                // Altitude edit dialog
-                                                if (showAltitudeEditDialog) {
-                                                    PatternAltitudeEditDialog(
-                                                        currentAltitudeAgl = patternAltAgl,
-                                                        onDismiss = { showAltitudeEditDialog = false },
-                                                        onSave = { newAltitude ->
-                                                            onCustomPatternAltitudeAglFtChange(newAltitude)
-                                                            saveNavigationState()
-                                                        },
-                                                        onReset = {
-                                                            onCustomPatternAltitudeAglFtChange(null)
-                                                            saveNavigationState()
-                                                        }
-                                                    )
-                                                }
-
-                                                    Spacer(modifier = Modifier.width(8.dp))
-
-                                                    // Indicator between pattern and current altitude
-                                                    if (diff != null) {
-                                                        val absDiff = kotlin.math.abs(diff)
-                                                        when {
-                                                            // Within small tolerance -> show green '≈'
-                                                            absDiff <= smallTolerance -> {
-                                                                Text(
-                                                                    text = "≈",
-                                                                    style = MaterialTheme.typography.bodySmall,
-                                                                    color = androidx.compose.ui.graphics.Color(0xFF00C853)
-                                                                )
-                                                            }
-                                                            else -> {
-                                                                // Use yellow when within warningTol, red when beyond
-                                                                val col = if (absDiff <= warningTol) androidx.compose.ui.graphics.Color(0xFFFFA000) else androidx.compose.ui.graphics.Color(0xFFD50000)
-                                                                if (diff < 0) {
-                                                                    // Below pattern -> show UP arrow
-                                                                    Icon(
-                                                                        imageVector = Icons.Default.KeyboardArrowUp,
-                                                                        contentDescription = stringResource(R.string.map_nav_alt_climb),
-                                                                        tint = col
-                                                                    )
-                                                                } else {
-                                                                    // Above pattern -> show DOWN arrow
-                                                                    Icon(
-                                                                        imageVector = Icons.Default.KeyboardArrowDown,
-                                                                        contentDescription = stringResource(R.string.map_nav_alt_descend),
-                                                                        tint = col
-                                                                    )
-                                                                }
-                                                            }
-                                                        }
-                                                    } else {
-                                                        Text(
-                                                            text = "?",
-                                                            style = MaterialTheme.typography.bodySmall,
-                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                        )
-                                                    }
-
-                                                    Spacer(modifier = Modifier.width(8.dp))
-
-                                                    Text(
-                                                        text = stringResource(R.string.map_nav_current_alt_label, currentAltDisplay),
-                                                        style = MaterialTheme.typography.labelSmall,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
-                                                }
                                             }
                                         }
                                     }
