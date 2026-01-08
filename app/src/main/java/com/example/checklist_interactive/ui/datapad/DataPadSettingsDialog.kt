@@ -5,10 +5,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,6 +36,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import com.example.checklist_interactive.data.datapad.KeyManager
+import com.example.checklist_interactive.data.datapad.QrRegistrationManager
+import com.example.checklist_interactive.data.datapad.RegistrationResult
 
 /**
  * Settings dialog for DataPad configuration
@@ -44,6 +51,9 @@ fun DataPadSettingsDialog(
     modifier: Modifier = Modifier
 ) {
     val manager = LocalDataPadManager.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    
     val currentPort by manager.udpPort.collectAsState()
     val currentBindIp by manager.bindIp.collectAsState()
     val currentServerIp by manager.serverIp.collectAsState()
@@ -365,6 +375,103 @@ fun DataPadSettingsDialog(
 
                 HorizontalDivider()
                 
+                // QR Code Registration Section
+                var showQrScannerDialog by remember { mutableStateOf(false) }
+                var registrationMessage by remember { mutableStateOf<String?>(null) }
+                
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Quick Setup",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Scan QR code from server to auto-configure",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        Button(
+                            onClick = { showQrScannerDialog = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CameraAlt,
+                                contentDescription = "Scan QR Code"
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Scan QR Code")
+                        }
+                        
+                        registrationMessage?.let { msg ->
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = msg,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (msg.contains("success", ignoreCase = true)) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.error
+                                }
+                            )
+                        }
+                    }
+                }
+                
+                if (showQrScannerDialog) {
+                    // Full-screen camera QR scanner
+                    QrCodeScannerScreen(
+                        onQrCodeScanned = { qrData ->
+                            showQrScannerDialog = false
+                            // Process QR code with QrRegistrationManager
+                            scope.launch {
+                                registrationMessage = "⏳ Processing registration..."
+                                try {
+                                    // Initialize KeyManager and QrRegistrationManager
+                                    val keyManager = KeyManager(context)
+                                    val qrRegistrationManager = QrRegistrationManager(context, keyManager)
+                                    
+                                    // Complete registration flow
+                                    when (val result = qrRegistrationManager.completeRegistration(
+                                        qrData = qrData,
+                                        deviceName = deviceNameText.ifEmpty { "Android-${android.os.Build.MODEL}" },
+                                        dataPadManager = manager
+                                    )) {
+                                        is RegistrationResult.Success -> {
+                                            registrationMessage = "✅ Registration successful! Device authorized."
+                                            // Settings already updated by applyTokenSettings
+                                        }
+                                        is RegistrationResult.Error -> {
+                                            registrationMessage = "❌ Registration failed: ${result.message}"
+                                        }
+                                        is RegistrationResult.Timeout -> {
+                                            registrationMessage = "⏱️ Registration timeout - server not responding"
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    registrationMessage = "❌ Error: ${e.message}"
+                                    android.util.Log.e("DataPadSettings", "QR Registration error", e)
+                                }
+                            }
+                        },
+                        onDismiss = { showQrScannerDialog = false }
+                    )
+                }
+                
+                HorizontalDivider()
+                
                 // Action Buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -428,4 +535,64 @@ fun DataPadSettingsDialog(
             }
         }
     }
+}
+
+/**
+ * Simple QR Scanner Dialog
+ * Uses a text input as placeholder until ML Kit barcode scanner is integrated
+ */
+@Composable
+fun QrScannerDialog(
+    onDismiss: () -> Unit,
+    onQrScanned: (String) -> Unit
+) {
+    var qrInput by remember { mutableStateOf("") }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Scan QR Code") },
+        text = {
+            Column {
+                Text(
+                    text = "Paste QR code data or scan using camera",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                OutlinedTextField(
+                    value = qrInput,
+                    onValueChange = { qrInput = it },
+                    label = { Text("QR Code Data") },
+                    placeholder = { Text("{\"type\":\"datapad_registration\"...}") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                    maxLines = 5
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Tip: Generate token on server with:\npython registration_token.py generate --server-ip <IP> --port 5010",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (qrInput.isNotBlank()) {
+                        onQrScanned(qrInput.trim())
+                    }
+                },
+                enabled = qrInput.isNotBlank()
+            ) {
+                Text("Process")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }

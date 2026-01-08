@@ -61,7 +61,7 @@ import com.example.checklist_interactive.ui.setup.SetupWizardScreen
 
 class MainActivity : ComponentActivity() {
         companion object {
-            const val SOFTWARE_VERSION = "1.0.22"
+            const val SOFTWARE_VERSION = "1.0.23"
         }
 
         val softwareVersion = SOFTWARE_VERSION
