@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -25,6 +26,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.first
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -244,6 +246,75 @@ fun SetupWizardScreen(
                                 Icon(Icons.Default.Settings, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(stringResource(R.string.setup_configure_datapad))
+                            }
+                        }
+                    }
+                }
+            }
+
+            // FAB Size recommendation and selection
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.TouchApp,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = stringResource(R.string.settings_fab_size),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Compute recommended size based on screen width
+                    val configuration = LocalConfiguration.current
+                    val screenWidthDp = configuration.screenWidthDp
+                    val recommended = if (screenWidthDp >= 600) "medium" else "small"
+
+                    Text(
+                        text = stringResource(R.string.setup_fab_size_recommendation, if (recommended == "medium") stringResource(R.string.settings_fab_size_medium) else stringResource(R.string.settings_fab_size_small)),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    var currentFabSize by remember { mutableStateOf(prefsManager.getFabSize()) }
+                    val fabSizes = listOf(
+                        "small" to stringResource(R.string.settings_fab_size_small),
+                        "medium" to stringResource(R.string.settings_fab_size_medium),
+                        "large" to stringResource(R.string.settings_fab_size_large)
+                    )
+
+                    Column {
+                        fabSizes.forEach { (size, label) ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        currentFabSize = size
+                                        prefsManager.setFabSize(size)
+                                    }
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = (currentFabSize == size),
+                                    onClick = {
+                                        currentFabSize = size
+                                        prefsManager.setFabSize(size)
+                                    }
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(label)
                             }
                         }
                     }

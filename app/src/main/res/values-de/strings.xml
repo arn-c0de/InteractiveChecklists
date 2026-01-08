@@ -709,6 +709,7 @@
     <string name="settings_fab_size_small">Klein</string>
     <string name="settings_fab_size_medium">Mittel</string>
     <string name="settings_fab_size_large">Groß</string>
+    <string name="setup_fab_size_recommendation">Empfohlen: %1$s</string>
 
     <string name="contributors_title">Mitwirkende</string>
     <string name="contributors_explain">Mitwirkende hinzufügen. Jede Person kann eine Webseite und eine optionale Rolle haben.</string>
