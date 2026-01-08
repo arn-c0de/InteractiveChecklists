@@ -699,7 +699,7 @@ def germany_samples():
             icao="",
             iata="",
             elevation_m=6.0,
-            runways=[Runway(name="05/23", length_m=4000, width_m=16, heading=54.0, surface="concrete/asphalt")],
+            runways=[Runway(name="05/23", length_m=2000, width_m=16, heading=54.0, surface="concrete/asphalt")],
             frequencies={"tower": 120.0},
             country="West Germany",
             tags=["Highway Strip", "military", "emergency airstrip", "cold war", "unused"],
