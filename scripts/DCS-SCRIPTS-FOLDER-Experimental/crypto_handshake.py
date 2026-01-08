@@ -366,13 +366,14 @@ class SessionData:
     """Information about an active session"""
     def __init__(self, session_id: str, device_id: str, session_key: bytes,
                  peer_public_key: bytes, aircraft: Optional[str] = None,
-                 entity_tracking_enabled: bool = False):
+                 entity_tracking_enabled: bool = False, client_ip: str = None):
         self.session_id = session_id
         self.device_id = device_id
         self.session_key = session_key
         self.peer_public_key = peer_public_key
         self.aircraft = aircraft
         self.entity_tracking_enabled = entity_tracking_enabled  # Whether client wants tactical unit data
+        self.client_ip = client_ip  # Track client's IP address for targeted sending
         self.created_at = time.time()
         self.last_activity = time.time()
         # Whether the client completed KeyConfirm for this session
@@ -1585,15 +1586,17 @@ class SessionManager:
             # Derive session key using HKDF-SHA256 with random salt
             session_key = self._derive_session_key(shared_secret, salt)
             
-            # Create session
+            # Create session with client IP tracking
             session_id = str(uuid.uuid4())
+            client_ip = sender_address[0]  # Extract IP from (ip, port) tuple
             session = SessionData(
                 session_id=session_id,
                 device_id=device_id,
                 session_key=session_key,
                 peer_public_key=client_public_key_b64.encode(),
                 aircraft=self.aircraft_name,
-                entity_tracking_enabled=entity_tracking_enabled  # Pass client's preference
+                entity_tracking_enabled=entity_tracking_enabled,  # Pass client's preference
+                client_ip=client_ip  # Track client IP for targeted sending
             )
             
             # Remove old session for this device (if exists)
