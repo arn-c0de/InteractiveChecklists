@@ -518,8 +518,13 @@ fun InternalFilesScreen(
                     }
                 }
             } else {
+                // Ensure enough bottom padding so items can be scrolled above floating FABs
+                val fabSizeDp = prefsManager.getFabSizeDp()
+                val fabBottomPadding = (fabSizeDp.dp + 24.dp)
+
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = fabBottomPadding)
                 ) {
                     // Tag filter bar
                     if (showTagFilter && allUsedTags.isNotEmpty()) {
