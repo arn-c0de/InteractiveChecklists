@@ -3,12 +3,32 @@
 
 All relevant changes are summarized here by version.
 
+## [1.0.23] - 2026-01-08
+
+### Summary
+- **QR Registration & onboarding:** Implemented a full QR-based device registration flow. Server-side `registration_token.py` (token manager + QR generation), temporary UDP listener & interactive startup mode in `forward_parsed_udp.py` (press **B** within 5s to generate token and wait for registration), `crypto_handshake.py` integration to validate/consume tokens and add devices to `authorized_devices.json` (camelCase fields).
+- **Security & robustness:** Tokens are single-use, time-limited (default 10 min), bound to server IP; public key validation enforces EC SECP256R1; registration attempts are rate-limited and audited (audit log written to `security_audit.jsonl`).
+- **Android: QR Scanner & registration client:** Added `QrRegistrationManager.kt` and a full-screen ZXing-based `QrCodeScannerScreen` composable. Fixed camera sizing and lifecycle (resume/pause on lifecycle events), improved overlay/z-order, logging and QR validation (case-insensitive datapad_registration detection).
+- **Tests & docs:** Added `test_qr_registration.py` integration tests and updated docs (`docs/EN/features/qr_registration.md`, `.../qr_registration_quickstart.md`) to reflect implemented behavior and troubleshooting (cryptography/cffi note).
+- **Fixes & polish:** Fixed ClassCastException and layout issues in camera preview, ensured the scanner stops after scan, improved UX in DataPad settings (scan flow, field validation), and added `--skip-qr-prompt` for non-interactive startup.
+
+### Files of note
+- Added: `scripts/registration_token.py`, `scripts/tests/test_qr_registration.py`, `app/.../data/datapad/QrRegistrationManager.kt`
+- Modified: `scripts/forward_parsed_udp.py`, `scripts/crypto_handshake.py`, `app/.../ui/datapad/QrCodeScannerComposable.kt`, docs and quickstart files.
+
 ## [1.0.22] - 2026-01-06
 
 ### Summary
 - **Maps & DB:** Rounded traffic patterns, compass widget, threshold markers; finalised Marianas markers and initial CW Germany markers (needs review); `Reload DB` + map filtering.
 - **Tactical & UI:** Improved tactical settings (auto-highlight, category toggles), "Last seen", Details button, CM filter; virtualized marker list and FAB/selection polish.
 - **Export & docs:** Entity batches stored in `Scripts/entity-batches`, better weapon detection, `forward_parsed_udp` aggregates stats, plus docs/screenshots.
+- **Additional fixes & polish (collected from branch):**
+  - Pattern altitude input UX: improved focus behavior and numeric keyboard autofocus (delay before requestFocus, show validation after input).
+  - Pattern generation: larger corner smoothing radii when rounded corners are enabled; use FINAL heading for DEPARTURE label in pattern labels.
+  - Map markers/usability: show airport labels for DB airports, move pattern altitude control into configuration, route auto-center marker fix, SingleMarkerNavigation & MapNavigationDisplay responsiveness and runway selection layout fixes.
+  - Setup & onboarding: first-run setup wizard, FAB size selection with device recommendations, show app version in setup wizard, dark-mode toggle and related strings.
+  - DataPad UI: make settings dialog scrollable and add bottom padding so lists scroll above FABs.
+  - CI/infra: CodeQL fixes and .gitignore updates for CodeQL DB artifacts.
 
 ## [1.0.21] - 2026-01-03
 
