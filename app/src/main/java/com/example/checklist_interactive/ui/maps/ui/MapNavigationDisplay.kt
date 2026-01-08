@@ -33,6 +33,13 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.KeyboardActions
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -2119,8 +2126,18 @@ fun PatternAltitudeEditDialog(
     onSave: (Int) -> Unit,
     onReset: () -> Unit = {}
 ) {
-    var altitudeText by remember { mutableStateOf(currentAltitudeAgl.toString()) }
-    var isValid by remember { mutableStateOf(true) }
+    // Start with an empty input so the user can immediately type a new value
+    var altitudeText by remember { mutableStateOf("") }
+    var isValid by remember { mutableStateOf(false) }
+
+    // Focus and keyboard handling so the field is focused and numeric keyboard opened when dialog appears
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+        keyboardController?.show()
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -2138,18 +2155,25 @@ fun PatternAltitudeEditDialog(
                                         altitudeText = it.filter { ch -> ch.isDigit() }
                                         isValid = altitudeText.toIntOrNull()?.let { alt -> alt in 500..5000 } ?: false
                                     },
-                                    label = { Text(stringResource(R.string.map_nav_edit_pattern_alt_hint)) },                    isError = !isValid,
+                                    modifier = Modifier.focusRequester(focusRequester),
+                                    label = { Text(stringResource(R.string.map_nav_edit_pattern_alt_hint)) },
+                    // Only show an error state once the user has typed something invalid
+                    isError = altitudeText.isNotBlank() && !isValid,
                     supportingText = {
-                        if (!isValid) {
+                        if (altitudeText.isNotBlank() && !isValid) {
                             Text(stringResource(R.string.map_nav_edit_pattern_alt_error), color = MaterialTheme.colorScheme.error)
                         } else {
                             Text(stringResource(R.string.map_nav_edit_pattern_alt_info))
                         }
                     },
-                    singleLine = true
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() })
                 )
             }
         },
+
+
         confirmButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(
