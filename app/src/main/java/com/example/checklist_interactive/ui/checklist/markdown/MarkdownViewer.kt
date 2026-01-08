@@ -28,6 +28,7 @@ import kotlinx.coroutines.launch
 import android.content.SharedPreferences
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
+import java.io.File
 import java.io.InputStreamReader
 
 /**
@@ -76,7 +77,7 @@ fun MarkdownViewer(
         errorMessage = null
         try {
             val content = if (isInternalFile) {
-                loadMarkdownFromFile(assetPath)
+                loadMarkdownFromFile(context, assetPath)
             } else {
                 loadMarkdownFromAssets(context, assetPath)
             }
@@ -977,12 +978,23 @@ private suspend fun loadMarkdownFromAssets(context: Context, assetPath: String):
 /**
  * Loads markdown content from an internal file
  */
-private suspend fun loadMarkdownFromFile(filePath: String): String {
+private suspend fun loadMarkdownFromFile(context: Context, filePath: String): String {
     return withContext(Dispatchers.IO) {
+        // Define the single, trusted directory where internal markdown files are stored.
+        val allowedDirectory = File(context.filesDir, "internal_markdown")
+
+        val targetFile = File(filePath)
+
+        // CRITICAL: Verify that the canonical path of the requested file
+        // is within the canonical path of the allowed directory.
+        if (!targetFile.canonicalPath.startsWith(allowedDirectory.canonicalPath)) {
+            throw SecurityException("Path Traversal Access Denied for: ${targetFile.path}")
+        }
+
         try {
-            java.io.File(filePath).readText()
+            targetFile.readText()
         } catch (e: Exception) {
-            throw Exception("File not found: $filePath", e)
+            throw Exception("Could not read internal file: ${targetFile.path}", e)
         }
     }
 }
