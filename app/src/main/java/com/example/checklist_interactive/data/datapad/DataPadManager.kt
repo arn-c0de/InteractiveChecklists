@@ -853,6 +853,28 @@ class DataPadManager(private val context: Context) {
     }
     
     /**
+     * Clear pinned server key (useful when server keys change or for testing)
+     * This will allow a new connection to the server and re-pin the new key
+     */
+    fun clearPinnedServerKey() {
+        val serverIp = _serverIp.value
+        if (serverIp.isNotEmpty()) {
+            serverKeyPinning.unpinServer(serverIp)
+            udpLogD("🗑️ Cleared pinned server key for $serverIp")
+            _handshakeStatus.value = "Server key cleared - ready to reconnect"
+        } else {
+            udpLogD("⚠️ No server IP configured - cannot clear pinned key")
+        }
+    }
+    
+    /**
+     * Get all pinned server fingerprints
+     */
+    fun getPinnedServers(): Map<String, String> {
+        return serverKeyPinning.getPinnedServers()
+    }
+    
+    /**
      * Restart the UDP socket with new settings
      */
     private fun restart() {
@@ -956,23 +978,23 @@ class DataPadManager(private val context: Context) {
                     _handshakeStatus.value = "First connection - server key pinned"
                 }
                 is PinStatus.Mismatch -> {
-                    udpLogE("⚠️ SERVER KEY MISMATCH - Possible MITM attack!")
+                    udpLogE("⚠️ SERVER KEY MISMATCH detected!")
                     udpLogE("Expected: ${pinStatus.expected}")
                     udpLogE("Received: ${pinStatus.received}")
                     
-                    // TEMPORARY FIX: For ephemeral server keys (server restarts)
-                    // In production, this should prompt user confirmation
-                    if (serverIpAddress == "255.255.255.255") {
-                        udpLogE("⚠️ Broadcast discovery detected - unpinning old key (server likely restarted)")
+                    // If server has AUTHORIZED this device, trust the new key
+                    // (Server restarts generate new ephemeral keys, but authorization persists)
+                    if (serverHello.authorized) {
+                        udpLogD("✅ Server authorized this device - accepting new key (server likely restarted)")
                         serverKeyPinning.unpinServer(serverIpAddress)
-                        // Re-pin with new key
                         serverKeyPinning.pinServerKey(serverIpAddress, serverPublicKey)
-                        udpLogD("📌 Server key re-pinned after mismatch")
-                        _handshakeStatus.value = "Server key changed - re-pinned"
+                        udpLogD("📌 Server key re-pinned after authorization confirmation")
+                        _handshakeStatus.value = "Server key updated (authorized)"
                     } else {
-                        // For unicast addresses, require manual intervention
-                        _handshakeStatus.value = "SECURITY ALERT: Server key changed!"
-                        // SECURITY: Reject connection on key mismatch
+                        // Server does NOT recognize us - potential MITM attack!
+                        udpLogE("🚨 SECURITY ALERT: Server key changed AND device not authorized!")
+                        udpLogE("🛑 This could be a Man-in-the-Middle attack - rejecting connection")
+                        _handshakeStatus.value = "SECURITY ALERT: Unauthorized key change!"
                         return@withLock false
                     }
                 }
