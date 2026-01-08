@@ -705,6 +705,15 @@ class SessionManager:
         except Exception as e:
             logger.debug(f"Could not load IP blacklist: {e}")
 
+        # Registration token manager for QR-code based device onboarding
+        try:
+            from registration_token import RegistrationTokenManager
+            self.token_manager = RegistrationTokenManager()
+            logger.info("✅ Registration token system enabled")
+        except ImportError:
+            self.token_manager = None
+            logger.warning("⚠️ Registration token system unavailable (registration_token.py not found)")
+
         # Start periodic cleanup thread
         self._start_cleanup_thread()
     
@@ -1183,6 +1192,165 @@ class SessionManager:
 
             if expired_combined or expired_devices or expired_blacklist:
                 logger.debug(f"🧹 Cleaned up {len(expired_combined)} combined limits, {len(expired_devices)} device limits, {len(expired_blacklist)} blacklist entries")
+
+    def handle_device_registration(self, message: dict, sender_address: Tuple[str, int]) -> dict:
+        """
+        Handle DeviceRegistration message - QR-code based device onboarding
+        Client provides: registration token, device info, public key
+        Server validates token and adds device to authorized_devices.json
+        
+        Returns: RegistrationResponse (success/failure)
+        """
+        try:
+            if not self.token_manager:
+                logger.warning(f"❌ Registration attempted but token system disabled from {sender_address[0]}")
+                return {
+                    "type": "RegistrationError",
+                    "error": "RegistrationDisabled",
+                    "message": "Registration token system is not available",
+                    "timestamp": int(time.time() * 1000)
+                }
+            
+            ip_address = sender_address[0]
+            token_id = message.get('registrationToken', '')
+            device_id = message.get('deviceId', '')
+            device_name = message.get('deviceName', 'Unknown Device')
+            public_key_b64 = message.get('publicKey', '')
+            
+            # Validate required fields
+            if not token_id or not device_id or not public_key_b64:
+                logger.warning(f"❌ Incomplete registration from {ip_address}")
+                return {
+                    "type": "RegistrationError",
+                    "error": "InvalidRequest",
+                    "message": "Missing required fields: registrationToken, deviceId, publicKey",
+                    "timestamp": int(time.time() * 1000)
+                }
+            
+            # Verify token (consume it - single use only)
+            token = self.token_manager.consume_token(token_id)
+            
+            if not token:
+                logger.warning(f"❌ Invalid/expired registration token from {ip_address}: {token_id[:16]}...")
+                get_audit_logger().log_event(
+                    'registration_failure',
+                    'medium',
+                    {'reason': 'invalid_token', 'ip': ip_address, 'device_id': device_id}
+                )
+                return {
+                    "type": "RegistrationError",
+                    "error": "InvalidToken",
+                    "message": "Registration token is invalid or expired",
+                    "timestamp": int(time.time() * 1000)
+                }
+            
+            # Check if device is already registered
+            if device_id in self.authorized_devices:
+                logger.warning(f"⚠️ Device already registered: {device_id} from {ip_address}")
+                return {
+                    "type": "RegistrationError",
+                    "error": "AlreadyRegistered",
+                    "message": "This device is already registered",
+                    "timestamp": int(time.time() * 1000)
+                }
+            
+            # Validate public key format
+            try:
+                # Attempt to decode and verify it's a valid EC public key
+                import base64
+                key_bytes = base64.b64decode(public_key_b64)
+                from cryptography.hazmat.primitives.serialization import load_der_public_key
+                pub_key = load_der_public_key(key_bytes, backend=default_backend())
+                
+                # Verify it's an EC key on the correct curve
+                if not isinstance(pub_key, ec.EllipticCurvePublicKey):
+                    raise ValueError("Not an EC public key")
+                if not isinstance(pub_key.curve, ec.SECP256R1):
+                    raise ValueError("Wrong curve (must be SECP256R1)")
+                    
+            except Exception as e:
+                logger.warning(f"❌ Invalid public key from {ip_address}: {e}")
+                return {
+                    "type": "RegistrationError",
+                    "error": "InvalidPublicKey",
+                    "message": "Public key is invalid or malformed",
+                    "timestamp": int(time.time() * 1000)
+                }
+            
+            # Add device to authorized_devices.json
+            try:
+                # Load current whitelist
+                if self.authorized_devices_path.exists():
+                    with open(self.authorized_devices_path, 'r') as f:
+                        whitelist_data = json.load(f)
+                else:
+                    whitelist_data = {"devices": []}
+                
+                # Add new device
+                new_device = {
+                    "device_id": device_id,
+                    "name": device_name,
+                    "public_key": public_key_b64,
+                    "permissions": token.permissions,
+                    "added_date": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "added_by": "qr_registration",
+                    "registered_from_ip": ip_address
+                }
+                
+                whitelist_data["devices"].append(new_device)
+                
+                # Save whitelist (atomic write with backup)
+                backup_path = self.authorized_devices_path.with_suffix('.json.bak')
+                if self.authorized_devices_path.exists():
+                    import shutil
+                    shutil.copy2(self.authorized_devices_path, backup_path)
+                
+                with open(self.authorized_devices_path, 'w') as f:
+                    json.dump(whitelist_data, f, indent=2)
+                
+                logger.info(f"✅ Device registered via QR: {device_id} ({device_name}) from {ip_address}")
+                
+                # Reload authorized devices to pick up the new device
+                self.load_authorized_devices()
+                
+                # Audit log
+                get_audit_logger().log_event(
+                    'device_registered',
+                    'low',
+                    {
+                        'device_id': device_id,
+                        'device_name': device_name,
+                        'ip': ip_address,
+                        'method': 'qr_token'
+                    }
+                )
+                
+                return {
+                    "type": "RegistrationSuccess",
+                    "message": "Device successfully registered",
+                    "deviceId": device_id,
+                    "deviceName": device_name,
+                    "permissions": token.permissions,
+                    "timestamp": int(time.time() * 1000)
+                }
+                
+            except Exception as e:
+                logger.error(f"❌ Failed to save device registration: {e}")
+                return {
+                    "type": "RegistrationError",
+                    "error": "ServerError",
+                    "message": "Failed to save device registration",
+                    "timestamp": int(time.time() * 1000)
+                }
+        
+        except Exception as e:
+            logger.error(f"❌ Device registration error: {e}", exc_info=True)
+            return {
+                "type": "RegistrationError",
+                "error": "ServerError",
+                "message": "Internal server error during registration",
+                "timestamp": int(time.time() * 1000)
+            }
 
     def handle_client_hello(self, message: dict, sender_address: Tuple[str, int]) -> dict:
         """

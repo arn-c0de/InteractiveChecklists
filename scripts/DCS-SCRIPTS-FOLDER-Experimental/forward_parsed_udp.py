@@ -806,6 +806,16 @@ def tail_and_send(path: str, host: str, port: int, session_mgr: 'SessionManager'
                             response_json = json.dumps(response).encode('utf-8')
                             handshake_sock.sendto(response_json, addr)
                             logger.info(f"📤 Sent ServerHello to {addr}")
+                        elif 'type' in msg and msg['type'] == 'DeviceRegistration':
+                            logger.info(f"📥 Received DeviceRegistration from {addr}")
+                            response = session_mgr.handle_device_registration(msg, addr)
+                            # Send response in PLAINTEXT
+                            response_json = json.dumps(response).encode('utf-8')
+                            handshake_sock.sendto(response_json, addr)
+                            if response.get('type') == 'RegistrationSuccess':
+                                logger.info(f"✅ Device registered: {response.get('deviceId', 'unknown')} ({response.get('deviceName', 'unknown')})")
+                            else:
+                                logger.warning(f"❌ Registration failed: {response.get('message', 'unknown error')}")
                         elif 'type' in msg and msg['type'] == 'KeyConfirm':
                             logger.info(f"📥 Received KeyConfirm from {addr}")
                             response = session_mgr.handle_key_confirm(msg)
@@ -1719,6 +1729,16 @@ def repeat_last_line(path: str, host: str, port: int, session_mgr: 'SessionManag
                             response_json = json.dumps(response).encode('utf-8')
                             handshake_sock.sendto(response_json, addr)
                             logger.info(f"📤 Sent ServerHello to {addr}")
+                        elif 'type' in msg and msg['type'] == 'DeviceRegistration':
+                            logger.info(f"📥 Received DeviceRegistration from {addr}")
+                            response = session_mgr.handle_device_registration(msg, addr)
+                            # Send response in PLAINTEXT
+                            response_json = json.dumps(response).encode('utf-8')
+                            handshake_sock.sendto(response_json, addr)
+                            if response.get('type') == 'RegistrationSuccess':
+                                logger.info(f"✅ Device registered: {response.get('deviceId', 'unknown')} ({response.get('deviceName', 'unknown')})")
+                            else:
+                                logger.warning(f"❌ Registration failed: {response.get('message', 'unknown error')}")
                         elif 'type' in msg and msg['type'] == 'KeyConfirm':
                             logger.info(f"📥 Received KeyConfirm from {addr}")
                             response = session_mgr.handle_key_confirm(msg)
