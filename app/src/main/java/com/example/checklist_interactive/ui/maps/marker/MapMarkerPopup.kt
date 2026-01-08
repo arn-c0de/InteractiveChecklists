@@ -115,7 +115,8 @@ fun MapMarkerPopup(
     onClose: () -> Unit,
     onManage: () -> Unit,
     onRunwayClick: (RunwayEntity) -> Unit = {},
-    onSetRoute: (LocationEntity) -> Unit = {}
+    onSetRoute: (LocationEntity) -> Unit = {},
+    onCenter: (LocationEntity) -> Unit = {}
 ) {
     val context = LocalContext.current
     // Persisted sheet fraction + opacity like DataPadPopup
