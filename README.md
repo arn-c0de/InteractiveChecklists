@@ -156,8 +156,8 @@ Planned enhancements include additional telemetry (speed, vertical speed, fuel, 
 		<img src="images/routeplanner.png" alt="Route planner - line preview" width="360" />
 		<img src="images/landingroute-planner.png" alt="Create Route sheet" width="360" />
 		<img src="images/datapad.png" alt="DataPad live telemetry panel" width="360" />
-		<img src="images/datapad-server-udp_forwarder.png" alt="DataPad server (launcher)" width="360" />
 		<img src="images/settings_menu.png" alt="Settings and preferences" width="360" />
+		<img src="images/datapad-server-udp_forwarder.png" alt="DataPad server (launcher)" width="360" />
 </p>
 
 
