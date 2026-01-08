@@ -3,6 +3,7 @@ package com.example.checklist_interactive.ui.maps.navigation
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -12,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -175,6 +177,8 @@ private fun MarkerDetailsHeader(location: LocationEntity) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val repository = remember { com.example.checklist_interactive.data.tactical.TacticalUnitsRepository(context) }
+    val configuration = LocalConfiguration.current
+    val isSmallScreen = configuration.screenWidthDp < 600
     
     // Extract tactical unit ID and highlight status from metadata
     val (tacticalUnitId, initialHighlightState) = remember(location.metadata) {
@@ -198,8 +202,9 @@ private fun MarkerDetailsHeader(location: LocationEntity) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = location.name,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
+                style = if (isSmallScreen) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                maxLines = if (isSmallScreen) 2 else Int.MAX_VALUE
             )
         
         // Last Seen display for tactical units (directly under name)
@@ -246,7 +251,7 @@ private fun MarkerDetailsHeader(location: LocationEntity) {
             
             Text(
                 text = "$strLastSeen $timeAgoText",
-                style = MaterialTheme.typography.bodyMedium,
+                style = if (isSmallScreen) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
                 color = textColor
             )
@@ -274,18 +279,18 @@ private fun MarkerDetailsHeader(location: LocationEntity) {
     }
     
     Column(modifier = Modifier.fillMaxWidth()) {
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(if (isSmallScreen) 2.dp else 4.dp))
         Text(
             text = formatLatLon(location.latitude, location.longitude),
-            style = MaterialTheme.typography.bodySmall,
+            style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         // Show altitude if available
         location.elevationM?.let { elevation ->
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = "Altitude: ${String.format(java.util.Locale.getDefault(), "%.0f", elevation)} m (${String.format(java.util.Locale.getDefault(), "%.0f", elevation * 3.28084)} ft)",
-                style = MaterialTheme.typography.bodyMedium,
+                text = "Alt: ${String.format(java.util.Locale.getDefault(), "%.0f", elevation)}m (${String.format(java.util.Locale.getDefault(), "%.0f", elevation * 3.28084)}ft)",
+                style = if (isSmallScreen) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -294,10 +299,10 @@ private fun MarkerDetailsHeader(location: LocationEntity) {
         // Show heading below altitude if present
         val markerHdg = extractHeadingFromLocation(location)
         markerHdg?.let { hdg ->
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(if (isSmallScreen) 2.dp else 4.dp))
             Text(
                 text = "${stringResource(R.string.heading_label)}: ${String.format(java.util.Locale.getDefault(), "%.0f°", (((hdg % 360) + 360) % 360))}",
-                style = MaterialTheme.typography.bodyMedium,
+                style = if (isSmallScreen) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -313,34 +318,39 @@ private fun MarkerDetailsInfoGrid(location: LocationEntity, runways: List<Runway
     val infoItems = remember(location, runways) {
         buildMarkerInfoItems(location, runways)
     }
+    val configuration = LocalConfiguration.current
+    val isSmallScreen = configuration.screenWidthDp < 600
+    val columnsPerRow = if (isSmallScreen) 1 else 2
     
     if (infoItems.isNotEmpty()) {
         Column {
-            infoItems.chunked(2).forEach { row ->
+            infoItems.chunked(columnsPerRow).forEach { row ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     row.forEach { (k, v) ->
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = k,
-                                style = MaterialTheme.typography.labelSmall,
+                                style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
                                 text = v,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium
+                                style = if (isSmallScreen) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = if (isSmallScreen) 1 else Int.MAX_VALUE,
+                                softWrap = true
                             )
                         }
                     }
-                    if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
+                    if (row.size == 1 && columnsPerRow == 2) Spacer(modifier = Modifier.weight(1f))
                 }
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
             }
         }
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
     }
 }
 
@@ -401,6 +411,8 @@ private fun buildMarkerInfoItems(
  */
 @Composable
 private fun MarkerDetailsFrequencies(location: LocationEntity) {
+    val configuration = LocalConfiguration.current
+    val isSmallScreen = configuration.screenWidthDp < 600
     val freqs = remember(location.frequencies) {
         try {
             val f = location.frequencies?.trim()
@@ -417,22 +429,27 @@ private fun MarkerDetailsFrequencies(location: LocationEntity) {
     if (freqs.isNotEmpty() || (!location.frequencies.isNullOrEmpty())) {
         Text(
             text = "Frequencies",
-            style = MaterialTheme.typography.titleMedium,
+            style = if (isSmallScreen) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         
         if (freqs.isNotEmpty()) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 freqs.forEach { (k, v) ->
                     AssistChip(
                         onClick = { /*noop*/ },
-                        label = { Text(text = "$k: $v") }
+                        label = { 
+                            Text(
+                                text = "$k: $v",
+                                style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium
+                            ) 
+                        }
                     )
                 }
             }
@@ -440,12 +457,13 @@ private fun MarkerDetailsFrequencies(location: LocationEntity) {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = location.frequencies ?: "",
-                    modifier = Modifier.padding(8.dp),
-                    fontFamily = FontFamily.Monospace
+                    modifier = Modifier.padding(if (isSmallScreen) 6.dp else 8.dp),
+                    fontFamily = FontFamily.Monospace,
+                    style = if (isSmallScreen) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium
                 )
             }
         }
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
     }
 }
 
@@ -454,20 +472,23 @@ private fun MarkerDetailsFrequencies(location: LocationEntity) {
  */
 @Composable
 private fun MarkerDetailsRunways(runways: List<RunwayEntity>) {
+    val configuration = LocalConfiguration.current
+    val isSmallScreen = configuration.screenWidthDp < 600
+    
     if (runways.isNotEmpty()) {
         Text(
             text = "Runways",
-            style = MaterialTheme.typography.titleMedium,
+            style = if (isSmallScreen) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 6.dp else 8.dp)) {
             runways.forEach { rw ->
-                RunwayCard(runway = rw)
+                RunwayCard(runway = rw, isSmallScreen = isSmallScreen)
             }
         }
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
     }
 }
 
@@ -475,61 +496,91 @@ private fun MarkerDetailsRunways(runways: List<RunwayEntity>) {
  * Individual runway card
  */
 @Composable
-private fun RunwayCard(runway: RunwayEntity) {
+private fun RunwayCard(runway: RunwayEntity, isSmallScreen: Boolean = false) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isSmallScreen) 1.dp else 2.dp)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.padding(if (isSmallScreen) 8.dp else 12.dp)) {
+            // Name and length row
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Text(
                     text = runway.name,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
+                    style = if (isSmallScreen) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge
                 )
                 val length = runway.lengthM?.toString() ?: runway.lengthFt?.toString() ?: "?"
                 Text(
-                    text = "$length m",
-                    style = MaterialTheme.typography.bodySmall,
+                    text = "${length}m",
+                    style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(if (isSmallScreen) 4.dp else 6.dp))
             
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Surface and heading - always horizontal
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Text(
-                    text = runway.surface ?: "unknown",
-                    style = MaterialTheme.typography.bodySmall,
+                    text = runway.surface ?: "?",
+                    style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "HDG: ${runway.headingDeg?.let { String.format("%.0f°", it) } ?: "n/a"}",
-                    style = MaterialTheme.typography.bodySmall,
+                    text = "HDG ${runway.headingDeg?.let { String.format("%.0f", it) } ?: "?"}°",
+                    style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                
-                if (!runway.ilsFrequency.isNullOrEmpty()) {
-                    AssistChip(
-                        onClick = { /*noop*/ },
-                        label = { Text(text = "ILS ${runway.ilsFrequency}") }
-                    )
-                }
-                
-                if (runway.hasLighting == 1) {
-                    AssistChip(
-                        onClick = { /*noop*/ },
-                        label = { Text(text = "Lighting") }
-                    )
+            }
+            
+            // ILS and Lighting chips - only if present
+            if (!runway.ilsFrequency.isNullOrEmpty() || runway.hasLighting == 1) {
+                Spacer(modifier = Modifier.height(if (isSmallScreen) 4.dp else 6.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.horizontalScroll(rememberScrollState())
+                ) {
+                    if (!runway.ilsFrequency.isNullOrEmpty()) {
+                        AssistChip(
+                            onClick = { /*noop*/ },
+                            label = { 
+                                Text(
+                                    text = "ILS ${runway.ilsFrequency}",
+                                    style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium
+                                ) 
+                            }
+                        )
+                    }
+                    
+                    if (runway.hasLighting == 1) {
+                        AssistChip(
+                            onClick = { /*noop*/ },
+                            label = { 
+                                Text(
+                                    text = "Lights",
+                                    style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium
+                                ) 
+                            }
+                        )
+                    }
                 }
             }
             
+            // Notes
             if (!runway.notes.isNullOrEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(if (isSmallScreen) 4.dp else 8.dp))
                 Text(
                     text = runway.notes ?: "",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = if (isSmallScreen) 2 else Int.MAX_VALUE
                 )
             }
         }
@@ -549,7 +600,10 @@ private fun MarkerDetailsActionButtons(
     onDeleteClick: () -> Unit,
     onClose: () -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    val configuration = LocalConfiguration.current
+    val isSmallScreen = configuration.screenWidthDp < 600
+    
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         // Set Route button (prominent)
         Button(
             onClick = {
@@ -559,74 +613,129 @@ private fun MarkerDetailsActionButtons(
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary
-            )
+            ),
+            contentPadding = if (isSmallScreen) PaddingValues(horizontal = 12.dp, vertical = 8.dp) else ButtonDefaults.ContentPadding
         ) {
-            Icon(Icons.Default.Flight, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(stringResource(R.string.map_set_route))
+            Icon(Icons.Default.Flight, contentDescription = null, modifier = Modifier.size(if (isSmallScreen) 18.dp else 24.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(stringResource(R.string.map_set_route), style = if (isSmallScreen) MaterialTheme.typography.labelLarge else MaterialTheme.typography.bodyLarge)
         }
         
-        // Edit / Move / Center / Delete buttons row
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // Edit button
-            OutlinedButton(
-                onClick = onEditClick,
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(Icons.Default.Edit, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(R.string.map_action_edit))
+        // Edit / Move / Center / Delete buttons - vertical on small screens, horizontal on large
+        if (isSmallScreen) {
+            // Vertical layout for small screens
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedButton(
+                    onClick = onEditClick,
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(stringResource(R.string.map_action_edit), style = MaterialTheme.typography.labelMedium)
+                }
+                
+                OutlinedButton(
+                    onClick = onCenterClick,
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.MyLocation, contentDescription = stringResource(R.string.map_center_on_map), modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(stringResource(R.string.map_action_center), style = MaterialTheme.typography.labelMedium)
+                }
             }
             
-            // Move button (only for non-static markers)
-            if (location.isStatic != 1) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (location.isStatic != 1) {
+                    OutlinedButton(
+                        onClick = onMoveClick,
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Default.OpenWith, contentDescription = stringResource(R.string.map_move_marker), modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(stringResource(R.string.map_action_move), style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+                
                 OutlinedButton(
-                    onClick = onMoveClick,
+                    onClick = onDeleteClick,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    ),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(stringResource(R.string.action_delete), style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        } else {
+            // Horizontal layout for larger screens
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Edit button
+                OutlinedButton(
+                    onClick = onEditClick,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Icon(Icons.Default.OpenWith, contentDescription = stringResource(R.string.map_move_marker))
+                    Icon(Icons.Default.Edit, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(stringResource(R.string.map_action_move))
+                    Text(stringResource(R.string.map_action_edit))
                 }
-            } else {
-                Spacer(modifier = Modifier.weight(1f))
-            }
-            
-            // Center button
-            OutlinedButton(
-                onClick = onCenterClick,
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(Icons.Default.MyLocation, contentDescription = stringResource(R.string.map_center_on_map))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(R.string.map_action_center))
-            }
-            
-            // Delete button
-            OutlinedButton(
-                onClick = onDeleteClick,
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error
-                )
-            ) {
-                Icon(Icons.Default.Delete, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(R.string.action_delete))
+                
+                // Move button (only for non-static markers)
+                if (location.isStatic != 1) {
+                    OutlinedButton(
+                        onClick = onMoveClick,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.OpenWith, contentDescription = stringResource(R.string.map_move_marker))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.map_action_move))
+                    }
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+                
+                // Center button
+                OutlinedButton(
+                    onClick = onCenterClick,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.MyLocation, contentDescription = stringResource(R.string.map_center_on_map))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.map_action_center))
+                }
+                
+                // Delete button
+                OutlinedButton(
+                    onClick = onDeleteClick,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.action_delete))
+                }
             }
         }
         
         // Back button
         OutlinedButton(
             onClick = onClose,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = if (isSmallScreen) PaddingValues(horizontal = 12.dp, vertical = 8.dp) else ButtonDefaults.ContentPadding
         ) {
-            Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.action_back))
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(stringResource(R.string.action_back))
+            Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.action_back), modifier = Modifier.size(if (isSmallScreen) 18.dp else 24.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(stringResource(R.string.action_back), style = if (isSmallScreen) MaterialTheme.typography.labelLarge else MaterialTheme.typography.bodyLarge)
         }
     }
 }

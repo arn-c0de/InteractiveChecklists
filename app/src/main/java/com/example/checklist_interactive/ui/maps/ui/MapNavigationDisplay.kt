@@ -137,6 +137,7 @@ fun MapNavigationDisplay(
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
+    val isSmallScreen = configuration.screenWidthDp < 600
 
     // Debug log for manual landing pattern changes
     LaunchedEffect(enableManualLandingPattern) {
@@ -248,7 +249,7 @@ fun MapNavigationDisplay(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(12.dp)
+                        .padding(if (isSmallScreen) 8.dp else 12.dp)
                         .clickable { onShowNavigationDetailsChange(!showNavigationDetails); saveNavigationState() },
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -264,10 +265,12 @@ fun MapNavigationDisplay(
                                     activeNavigationTarget?.name
                                         ?.replace(Regex(" PATTERN \\d+"), "")
                                         ?.replace(Regex(" RWY \\d+"), "") ?: ""),
-                                style = MaterialTheme.typography.labelMedium,
+                                style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onErrorContainer,
-                                modifier = Modifier.weight(1f, fill = false)
+                                modifier = Modifier.weight(1f, fill = false),
+                                maxLines = 1,
+                                softWrap = false
                             )
                             // Show PATTERN or RWY indicator when active (fixed, doesn't blink)
                             selectedRunwayHeading?.let { hdg ->
@@ -281,22 +284,22 @@ fun MapNavigationDisplay(
                                 indicatorText?.let {
                                     Text(
                                         text = it,
-                                        style = MaterialTheme.typography.labelSmall,
+                                        style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.padding(start = 8.dp)
+                                        modifier = Modifier.padding(start = if (isSmallScreen) 4.dp else 8.dp)
                                     )
                                 }
                             }
                         }
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            modifier = Modifier.padding(top = 4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(if (isSmallScreen) 8.dp else 16.dp),
+                            modifier = Modifier.padding(top = if (isSmallScreen) 2.dp else 4.dp)
                         ) {
                             navigationDistanceNm?.let { dist ->
                                 Text(
                                     text = stringResource(R.string.map_nav_dist_nm, dist),
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onErrorContainer
                                 )
@@ -304,7 +307,7 @@ fun MapNavigationDisplay(
                             navigationHeading?.let { hdg ->
                                 Text(
                                     text = stringResource(R.string.map_nav_hdg, hdg),
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onErrorContainer
                                 )
@@ -313,18 +316,18 @@ fun MapNavigationDisplay(
                         // Show marker altitude in second row (meters and feet)
                         activeNavigationTarget?.elevationM?.let { elevation ->
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(if (isSmallScreen) 8.dp else 16.dp),
                                 modifier = Modifier.padding(top = 2.dp)
                             ) {
                                 Text(
-                                    text = "${String.format("%.0f", elevation)} m",
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    text = "${String.format("%.0f", elevation)}m",
+                                    style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onErrorContainer
                                 )
                                 Text(
-                                    text = "${String.format("%.0f", elevation * 3.28084)} ft",
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    text = "${String.format("%.0f", elevation * 3.28084)}ft",
+                                    style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onErrorContainer
                                 )
@@ -333,17 +336,17 @@ fun MapNavigationDisplay(
                         // Show final runway heading when runway selected
                         selectedRunwayHeading?.let { rwyHdg ->
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.padding(top = 4.dp)
+                                horizontalArrangement = Arrangement.spacedBy(if (isSmallScreen) 4.dp else 8.dp),
+                                modifier = Modifier.padding(top = if (isSmallScreen) 2.dp else 4.dp)
                             ) {
                                 Text(
                                     text = stringResource(R.string.map_nav_final),
-                                    style = MaterialTheme.typography.labelSmall,
+                                    style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
                                 )
                                 Text(
                                     text = stringResource(R.string.map_nav_rwy, rwyHdg),
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    style = if (isSmallScreen) MaterialTheme.typography.labelMedium else MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onErrorContainer
                                 )
@@ -358,7 +361,7 @@ fun MapNavigationDisplay(
                                     val distanceNm = distanceMeters / 1852.0
                                     Text(
                                         text = stringResource(R.string.map_nav_dist_nm, distanceNm),
-                                        style = MaterialTheme.typography.bodyMedium,
+                                        style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodyMedium,
                                         fontWeight = FontWeight.Medium,
                                         color = MaterialTheme.colorScheme.onErrorContainer
                                     )
@@ -367,7 +370,7 @@ fun MapNavigationDisplay(
                         }
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(if (isSmallScreen) 4.dp else 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         // Compact pattern altitude + current altitude + indicator (visible when collapsed)
                         val runwayElevationFt = (originalAirportTarget?.elevationM?.times(3.28084))?.toInt() ?: 0
                         val patternAltAglCompact = customPatternAltitudeAglFt ?: patternSize.patternAltitudeAglFt
@@ -379,12 +382,12 @@ fun MapNavigationDisplay(
                         val smallTolerance = patternAltitudeSmallToleranceFt
                         val warningTol = patternAltitudeWarningToleranceFt
 
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 2.dp else 4.dp)) {
                             // Pattern altitude row (P:)
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (isSmallScreen) 3.dp else 6.dp)) {
                                 Text(
                                     text = stringResource(R.string.map_nav_pattern_alt, patternAltMslCompact),
-                                    style = MaterialTheme.typography.labelSmall,
+                                    style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onErrorContainer
                                 )
 
@@ -395,32 +398,50 @@ fun MapNavigationDisplay(
                                             color = androidx.compose.ui.graphics.Color.Black,
                                             shape = MaterialTheme.shapes.extraSmall
                                         )
-                                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                                        .padding(horizontal = if (isSmallScreen) 3.dp else 4.dp, vertical = if (isSmallScreen) 1.dp else 2.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     if (diffCompact != null) {
                                         val absDiff = kotlin.math.abs(diffCompact)
                                         when {
                                             absDiff <= smallTolerance -> {
-                                                Text(text = "≈", color = androidx.compose.ui.graphics.Color(0xFF00C853))
+                                                Text(
+                                                    text = "≈", 
+                                                    color = androidx.compose.ui.graphics.Color(0xFF00C853),
+                                                    fontSize = if (isSmallScreen) 10.sp else 12.sp
+                                                )
                                             }
                                             else -> {
                                                 val col = if (absDiff <= warningTol) androidx.compose.ui.graphics.Color(0xFFFFA000) else androidx.compose.ui.graphics.Color(0xFFD50000)
                                                 if (diffCompact < 0) {
-                                                    Icon(imageVector = Icons.Default.KeyboardArrowUp, contentDescription = stringResource(R.string.map_nav_alt_climb), tint = col)
+                                                    Icon(
+                                                        imageVector = Icons.Default.KeyboardArrowUp, 
+                                                        contentDescription = stringResource(R.string.map_nav_alt_climb), 
+                                                        tint = col,
+                                                        modifier = Modifier.size(if (isSmallScreen) 14.dp else 18.dp)
+                                                    )
                                                 } else {
-                                                    Icon(imageVector = Icons.Default.KeyboardArrowDown, contentDescription = stringResource(R.string.map_nav_alt_descend), tint = col)
+                                                    Icon(
+                                                        imageVector = Icons.Default.KeyboardArrowDown, 
+                                                        contentDescription = stringResource(R.string.map_nav_alt_descend), 
+                                                        tint = col,
+                                                        modifier = Modifier.size(if (isSmallScreen) 14.dp else 18.dp)
+                                                    )
                                                 }
                                             }
                                         }
                                     } else {
-                                        Text(text = "?", color = MaterialTheme.colorScheme.onErrorContainer)
+                                        Text(
+                                            text = "?", 
+                                            color = MaterialTheme.colorScheme.onErrorContainer,
+                                            fontSize = if (isSmallScreen) 10.sp else 12.sp
+                                        )
                                     }
                                 }
 
                                 Text(
                                     text = "C:${currentAltCompactDisplay}",
-                                    style = MaterialTheme.typography.labelSmall,
+                                    style = if (isSmallScreen) MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp) else MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.9f)
                                 )
                             }
@@ -431,10 +452,10 @@ fun MapNavigationDisplay(
                                 val markerPlayerDiff = if (currentAltCompact.isNaN()) null else currentAltCompact - markerAltFt
                                 val markerTolerance = 100.0
 
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (isSmallScreen) 3.dp else 6.dp)) {
                                     Text(
-                                        text = "M:${markerAltFt.toInt()} ft",
-                                        style = MaterialTheme.typography.labelSmall,
+                                        text = "M:${markerAltFt.toInt()}ft",
+                                        style = if (isSmallScreen) MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp) else MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary
                                     )
@@ -446,26 +467,45 @@ fun MapNavigationDisplay(
                                                 color = androidx.compose.ui.graphics.Color.Black,
                                                 shape = MaterialTheme.shapes.extraSmall
                                             )
-                                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                                            .padding(horizontal = if (isSmallScreen) 3.dp else 4.dp, vertical = if (isSmallScreen) 1.dp else 2.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         if (markerPlayerDiff != null) {
                                             val absDiff = kotlin.math.abs(markerPlayerDiff)
                                             when {
                                                 absDiff <= markerTolerance -> {
-                                                    Text(text = "→", color = androidx.compose.ui.graphics.Color(0xFF00C853), fontWeight = FontWeight.Bold)
+                                                    Text(
+                                                        text = "→", 
+                                                        color = androidx.compose.ui.graphics.Color(0xFF00C853), 
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = if (isSmallScreen) 10.sp else 12.sp
+                                                    )
                                                 }
                                                 markerPlayerDiff < 0 -> {
                                                     val col = if (absDiff <= 500.0) androidx.compose.ui.graphics.Color(0xFFFFA000) else androidx.compose.ui.graphics.Color(0xFFD50000)
-                                                    Icon(imageVector = Icons.Default.KeyboardArrowUp, contentDescription = "Climb to marker", tint = col, modifier = Modifier.size(16.dp))
+                                                    Icon(
+                                                        imageVector = Icons.Default.KeyboardArrowUp, 
+                                                        contentDescription = "Climb to marker", 
+                                                        tint = col, 
+                                                        modifier = Modifier.size(if (isSmallScreen) 12.dp else 16.dp)
+                                                    )
                                                 }
                                                 else -> {
                                                     val col = if (absDiff <= 500.0) androidx.compose.ui.graphics.Color(0xFFFFA000) else androidx.compose.ui.graphics.Color(0xFFD50000)
-                                                    Icon(imageVector = Icons.Default.KeyboardArrowDown, contentDescription = "Descend to marker", tint = col, modifier = Modifier.size(16.dp))
+                                                    Icon(
+                                                        imageVector = Icons.Default.KeyboardArrowDown, 
+                                                        contentDescription = "Descend to marker", 
+                                                        tint = col, 
+                                                        modifier = Modifier.size(if (isSmallScreen) 12.dp else 16.dp)
+                                                    )
                                                 }
                                             }
                                         } else {
-                                            Text(text = "?", color = MaterialTheme.colorScheme.onErrorContainer)
+                                            Text(
+                                                text = "?", 
+                                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                                fontSize = if (isSmallScreen) 10.sp else 12.sp
+                                            )
                                         }
                                     }
                                 }
@@ -474,12 +514,14 @@ fun MapNavigationDisplay(
 
                         // Toggle expand/collapse button
                         IconButton(
-                            onClick = { onShowNavigationDetailsChange(!showNavigationDetails); saveNavigationState() }
+                            onClick = { onShowNavigationDetailsChange(!showNavigationDetails); saveNavigationState() },
+                            modifier = Modifier.size(if (isSmallScreen) 36.dp else 48.dp)
                         ) {
                             Icon(
                                 imageVector = if (showNavigationDetails) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                                 contentDescription = if (showNavigationDetails) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
-                                tint = MaterialTheme.colorScheme.onErrorContainer
+                                tint = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.size(if (isSmallScreen) 20.dp else 24.dp)
                             )
                         }
 
@@ -528,11 +570,13 @@ fun MapNavigationDisplay(
                                     MaterialTheme.colorScheme.onPrimary
                                 else
                                     MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            ),
+                            modifier = Modifier.size(if (isSmallScreen) 36.dp else 48.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.FlightLand,
-                                contentDescription = stringResource(R.string.map_nav_approach_button)
+                                contentDescription = stringResource(R.string.map_nav_approach_button),
+                                modifier = Modifier.size(if (isSmallScreen) 20.dp else 24.dp)
                             )
                         }
 
@@ -548,13 +592,16 @@ fun MapNavigationDisplay(
                                 onSelectedRunwayHeadingChange(null)
                                 onSelectedRunwayChange(null)
                                 saveNavigationState()
-                            }
+                            },
+                            modifier = Modifier.size(if (isSmallScreen) 36.dp else 48.dp)
                         ) {
-                                                            Icon(
-                                                                imageVector = Icons.Default.Close,
-                                                                contentDescription = stringResource(R.string.map_nav_cancel_button),
-                                                                tint = MaterialTheme.colorScheme.onErrorContainer
-                                                            )                        }
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = stringResource(R.string.map_nav_cancel_button),
+                                tint = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.size(if (isSmallScreen) 20.dp else 24.dp)
+                            )
+                        }
                     }
                 }
 
