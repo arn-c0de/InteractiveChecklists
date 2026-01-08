@@ -1178,6 +1178,8 @@
     <string name="map_marker_runways">Runways</string>
     <string name="map_marker_frequencies">Frequencies</string>
     <string name="map_marker_elevation_m">%s m</string>
+    <string name="map_marker_labels_toggle">Show Airport Labels</string>
+    <string name="map_marker_labels_desc">Display airport names and runways on map</string>
     <string name="map_marker_hdg_format">HDG: %s</string>
     <string name="map_marker_ils_format">ILS %s</string>
     <string name="map_marker_lighting">Lighting</string>

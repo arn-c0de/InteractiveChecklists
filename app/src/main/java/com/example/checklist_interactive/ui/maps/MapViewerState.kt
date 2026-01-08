@@ -61,6 +61,7 @@ class MapViewerState(
     var rangeRingsMaxNm by mutableStateOf(prefsManager.getMapOverlayRangeRingsMaxNm())
     var mgrsGridEnabled by mutableStateOf(prefsManager.isMapOverlayMgrsGridEnabled())
     var flightInstrumentsEnabled by mutableStateOf(prefsManager.isMapOverlayFlightInstrumentsEnabled())
+    var showMarkerLabels by mutableStateOf(prefsManager.isMapMarkerLabelsEnabled())
     
     // Flight path tracking state
     var flightPathEnabled by mutableStateOf(prefsManager.isFlightPathEnabled())
@@ -75,6 +76,7 @@ class MapViewerState(
     var headingSpeedLineOverlay by mutableStateOf<Overlay?>(null)
     var rangeRingsOverlay by mutableStateOf<Overlay?>(null)
     var mgrsGridOverlay by mutableStateOf<Overlay?>(null)
+    var airportLabelsOverlay by mutableStateOf<AirportMarkerLabelsOverlay?>(null)
     
     // Map rotation: 0 = North-up, 1 = HDG-up (follow aircraft heading)
     var mapRotationMode by mutableStateOf(prefsManager.getMapRotationMode())

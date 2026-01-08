@@ -44,6 +44,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.WindowInsetsCompat
 import android.view.View
 import com.example.checklist_interactive.ui.maps.navigation.MarkerDetailsContent
+import com.example.checklist_interactive.ui.maps.MapViewerState
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.checklist_interactive.data.tactical.*
