@@ -609,6 +609,7 @@ private fun MarkerDetailsActionButtons(
             onClick = {
                 android.util.Log.d("MarkerDetailsButtons", "🚀 Set Route button clicked: id=${location.id}, source=${location.source}, name=${location.name}")
                 onSetRoute(location)
+                onCenterClick()
             },
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(

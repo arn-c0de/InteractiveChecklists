@@ -1,0 +1,1 @@
+python .\add_caucasus_markers.py --replace | python .\add_marianas_markers.py | python .\add_cw_germany_markers.py
