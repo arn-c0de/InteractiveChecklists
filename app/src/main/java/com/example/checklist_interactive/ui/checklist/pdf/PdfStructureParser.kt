@@ -19,6 +19,8 @@ class PdfStructureParser(private val pdfFile: File) {
     }
 
     companion object {
+        private const val MAX_STREAM_LENGTH = 20 * 1024 * 1024 // 20 MB: A safe upper limit for a single stream
+        private const val MAX_LINE_LENGTH = 4096 // Sanity limit for line length
         private val globalCache = mutableMapOf<String, PdfStructureParser>()
         // Track which file paths already had their xref parsed (global guard)
         private val parsedXrefFiles = mutableSetOf<String>()
@@ -268,10 +270,14 @@ class PdfStructureParser(private val pdfFile: File) {
 
             // Parse xref subsections
             var entryCount = 0
-            while (true) {
+            val subsectionLimit = 1000 // Sanity limit to prevent infinite loops
+            var subsectionCount = 0
+            while (subsectionCount < subsectionLimit) {
                 val line = readLine(raf).trim()
                 if (line.startsWith("trailer")) break
                 if (line.isEmpty()) continue
+
+                subsectionCount++ // Count each line we process as an attempt
 
                 val parts = line.split("\\s+".toRegex())
                 if (parts.size == 2) {
@@ -1425,8 +1431,8 @@ class PdfStructureParser(private val pdfFile: File) {
                     else -> 0
                 }
 
-                // Sanity check on length (must be positive and reasonable)
-                if (length > 0 && length < 100_000_000) {
+                // Sanity check on length to prevent OutOfMemoryErrors
+                if (length > 0 && length < MAX_STREAM_LENGTH) {
                     // Move to the start of stream data. After reading the 'stream' line,
                     // the file pointer is at the end of that line so we need to position
                     // correctly. Look for the first byte after linebreak
@@ -1472,7 +1478,7 @@ class PdfStructureParser(private val pdfFile: File) {
                             }
                         }
 
-                        val fallback = readStreamUntilEnd(raf, maxLength = 50_000_000)
+                        val fallback = readStreamUntilEnd(raf, maxLength = MAX_STREAM_LENGTH)
                         if (fallback != null) {
                             obj.streamData = fallback
                             Log.d(TAG, "Object $objNum: read stream via fallback (size=${'$'}{fallback.size})")
@@ -1483,7 +1489,7 @@ class PdfStructureParser(private val pdfFile: File) {
                         Log.w(TAG, "Object $objNum: fallback stream read error: ${'$'}{e.message}")
                     }
                 } else {
-                    Log.w(TAG, "Object $objNum: stream length unreasonably large: $length (Length=$lengthRef)")
+                    Log.w(TAG, "Object $objNum: stream length unreasonably large: $length. Max allowed: $MAX_STREAM_LENGTH")
                 }
             }
             
@@ -1740,6 +1746,7 @@ class PdfStructureParser(private val pdfFile: File) {
      */
     private fun buildPageList(raf: RandomAccessFile, catalog: PdfObject): List<Int> {
         val pages = mutableListOf<Int>()
+        val visitedNodes = mutableSetOf<Int>() // For loop detection
 
         try {
             val pagesValue = catalog.getDictValue("Pages")
@@ -1757,7 +1764,7 @@ class PdfStructureParser(private val pdfFile: File) {
             }
 
             Log.d(TAG, "Pages object dict: ${pagesObj.dictContent}")
-            collectPages(raf, pagesObj, pages)
+            collectPages(raf, pagesObj, pages, visitedNodes)
         } catch (e: Exception) {
             Log.e(TAG, "Error building page list: ${e.message}", e)
         }
@@ -1779,9 +1786,15 @@ class PdfStructureParser(private val pdfFile: File) {
     }
     
     /**
-     * Recursively collects page references from page tree
+     * Recursively collects page references from page tree, with loop detection.
      */
-    private fun collectPages(raf: RandomAccessFile, node: PdfObject, pages: MutableList<Int>) {
+    private fun collectPages(raf: RandomAccessFile, node: PdfObject, pages: MutableList<Int>, visitedNodes: MutableSet<Int>) {
+        // Loop detection: if we have visited this node before in this traversal, abort.
+        if (!visitedNodes.add(node.objNum)) {
+            Log.w(TAG, "Detected a loop in page tree at node ${node.objNum}, aborting this branch.")
+            return
+        }
+
         val type = node.getDictValue("Type") as? String
         val kids = node.dictContent["Kids"]
         Log.d(TAG, "collectPages: node ${node.objNum}, type=$type, hasKids=${kids != null}")
@@ -1796,7 +1809,7 @@ class PdfStructureParser(private val pdfFile: File) {
 
             for (kidRef in kidRefs) {
                 val kid = parseObject(raf, kidRef) ?: continue
-                collectPages(raf, kid, pages)
+                collectPages(raf, kid, pages, visitedNodes)
             }
         } else {
             // Leaf page (no Kids) - add to list
@@ -2016,8 +2029,9 @@ class PdfStructureParser(private val pdfFile: File) {
     private fun readLine(raf: RandomAccessFile): String {
         val buffer = StringBuilder()
         var c: Int
+        var lineLength = 0
 
-        while (raf.filePointer < raf.length()) {
+        while (raf.filePointer < raf.length() && lineLength < MAX_LINE_LENGTH) {
             c = raf.read()
             if (c < 0 || c == '\n'.code) break
             if (c == '\r'.code) {
@@ -2028,6 +2042,7 @@ class PdfStructureParser(private val pdfFile: File) {
                 break
             }
             buffer.append(c.toChar())
+            lineLength++
         }
 
         return buffer.toString()
@@ -2037,7 +2052,7 @@ class PdfStructureParser(private val pdfFile: File) {
      * Read raw stream bytes until the 'endstream' token is reached.
      * Returns null on timeout or if the marker could not be found within `maxLength`.
      */
-    private fun readStreamUntilEnd(raf: RandomAccessFile, maxLength: Int = 50_000_000): ByteArray? {
+    private fun readStreamUntilEnd(raf: RandomAccessFile, maxLength: Int = MAX_STREAM_LENGTH): ByteArray? {
         val pattern = "endstream".toByteArray(StandardCharsets.ISO_8859_1)
         val baos = java.io.ByteArrayOutputStream()
         var matched = 0
