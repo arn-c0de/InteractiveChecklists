@@ -19,7 +19,7 @@ data class PdfTextBlock(
 )
 
 /**
- * Extracts positioned text from PDF files using native parsing
+ * Extracts positioned text from PDF files using Apache PDFBox library
  */
 class PdfTextExtractor(private val context: Context) {
 

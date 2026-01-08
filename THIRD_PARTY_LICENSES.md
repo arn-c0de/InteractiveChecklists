@@ -23,6 +23,16 @@
 
 ---
 
+## Apache PDFBox / FontBox / PDFBox-IO
+- **License:** [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)
+- **Source:** https://pdfbox.apache.org
+- **Artifacts:**  
+  - org.apache.pdfbox:pdfbox:3.0.0  
+  - org.apache.pdfbox:fontbox:3.0.0
+  - org.apache.pdfbox:pdfbox-io:3.0.0
+- **Attribution:** © The Apache Software Foundation
+- **Usage:** Secure PDF parsing, outline extraction, and text extraction
+
 ## ZXing (Zebra Crossing)
 - **License:** [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)
 - **Source:** https://github.com/zxing/zxing
