@@ -634,10 +634,13 @@ def send_udp(payload: bytes, host: str, port: int, sock: socket.socket,
 def send_udp_multi(payload: bytes, hosts: list, port: int, sock: socket.socket,
                    session_mgr: 'SessionManager', device_id: str) -> int:
     """Send UDP packet to multiple hosts with ECDH encryption
+    
+    SMART TARGETING: If the session has a tracked client_ip, sends only to that IP.
+    Otherwise falls back to broadcasting to all hosts in the list.
 
     Args:
         payload: Data to send
-        hosts: List of destination hosts
+        hosts: List of destination hosts (fallback if no client IP tracked)
         port: Destination port
         sock: UDP socket
         session_mgr: SessionManager instance (required for ECDH mode)
@@ -646,6 +649,17 @@ def send_udp_multi(payload: bytes, hosts: list, port: int, sock: socket.socket,
     Returns:
         Number of successful sends
     """
+    # Get session to check for tracked client IP
+    session_id = session_mgr.device_sessions.get(device_id)
+    if session_id:
+        session = session_mgr.sessions.get(session_id)
+        if session and hasattr(session, 'client_ip') and session.client_ip:
+            # Use tracked client IP for targeted sending
+            if send_udp(payload, session.client_ip, port, sock, session_mgr, device_id):
+                return 1
+            return 0
+    
+    # Fallback: broadcast to all hosts (for backward compatibility or when IP not tracked)
     success_count = 0
     for host in hosts:
         if send_udp(payload, host, port, sock, session_mgr, device_id):

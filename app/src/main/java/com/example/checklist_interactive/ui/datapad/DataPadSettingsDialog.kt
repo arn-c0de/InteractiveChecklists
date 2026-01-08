@@ -472,6 +472,69 @@ fun DataPadSettingsDialog(
                 
                 HorizontalDivider()
                 
+                // Security Management Section
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "🔒 Server Key Management",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Text(
+                            text = "If the server restarts or you see 'SERVER KEY MISMATCH' errors, clear the pinned server key to reconnect.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        
+                        var showClearConfirmation by remember { mutableStateOf(false) }
+                        
+                        OutlinedButton(
+                            onClick = { showClearConfirmation = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text("🗑️ Clear Pinned Server Key")
+                        }
+                        
+                        if (showClearConfirmation) {
+                            AlertDialog(
+                                onDismissRequest = { showClearConfirmation = false },
+                                title = { Text("Clear Pinned Server Key?") },
+                                text = { 
+                                    Text("This will remove the saved server key fingerprint. You'll need to re-establish trust on next connection.\n\nUse this if the server restarted with new keys or if you're seeing MITM warnings.")
+                                },
+                                confirmButton = {
+                                    TextButton(
+                                        onClick = {
+                                            manager.clearPinnedServerKey()
+                                            showClearConfirmation = false
+                                            registrationMessage = "✅ Pinned server key cleared - reconnect to trust new key"
+                                        }
+                                    ) {
+                                        Text("Clear Key")
+                                    }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { showClearConfirmation = false }) {
+                                        Text(stringResource(R.string.action_cancel))
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+                
+                HorizontalDivider()
+                
                 // Action Buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
