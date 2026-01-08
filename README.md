@@ -115,6 +115,15 @@ python forward_parsed_udp.py --enable-pow --pow-difficulty 16 --interval 10 --ho
 # Python: Same-PC testing with handshake port
 python forward_parsed_udp.py --repeat-last --interval 3 --host 127.0.0.1 --port 5010 --handshake-port 5011 --use-handshake --authorized-devices authorized_devices.json
 
+# Single wildcard (entire subnet)
+python forward_parsed_udp.py --host 192.168.178.* --port 5010
+
+# Multiple specific hosts
+python forward_parsed_udp.py --host 192.168.178.100 --host 192.168.178.101 --port 5010
+
+# Mix of specific and wildcard
+python forward_parsed_udp.py --host 192.168.178.50 --host 192.168.178.* --port 5010
+
 # Android: Settings → DataPad → Enable "ECDH Handshake Mode" (optional: enable Server Key Pinning / configure Pre-Shared Key)
 # Add your device ID to authorized_devices.json on the server
 ```
