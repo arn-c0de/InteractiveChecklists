@@ -27,10 +27,11 @@ data class AirspaceClass(
 /**
  * Overlay for displaying airspace circles around airports
  * Shows ICAO airspace classes with labels and configurable visibility
+ * Supports multiple airports simultaneously
  */
 class AirspaceCirclesOverlay(
     private val isEnabled: () -> Boolean,
-    private val getTargetAirport: () -> LocationEntity?,
+    private val getTargetAirports: () -> Set<LocationEntity>,
     private val getEnabledAirspaces: () -> Set<String>,
     private val getFillTransparency: () -> Float
 ) : Overlay() {
@@ -139,12 +140,32 @@ class AirspaceCirclesOverlay(
         if (canvas == null || mapView == null || shadow) return
         if (!isEnabled()) return
 
-        val airport = getTargetAirport() ?: return
+        val airports = getTargetAirports()
+        if (airports.isEmpty()) return
+        
         val enabledAirspaces = getEnabledAirspaces()
         if (enabledAirspaces.isEmpty()) return
 
         canvas.save()
 
+        try {
+            // Draw airspaces for each airport
+            for (airport in airports) {
+                drawAirspacesForAirport(canvas, mapView, airport, enabledAirspaces)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error drawing airspace circles", e)
+        } finally {
+            canvas.restore()
+        }
+    }
+
+    private fun drawAirspacesForAirport(
+        canvas: Canvas,
+        mapView: MapView,
+        airport: LocationEntity,
+        enabledAirspaces: Set<String>
+    ) {
         try {
             val centerGeoPoint = GeoPoint(airport.latitude, airport.longitude)
             val centerScreenPoint = mapView.projection.toPixels(centerGeoPoint, null)
@@ -155,7 +176,6 @@ class AirspaceCirclesOverlay(
                 .sortedByDescending { it.radiusNm }
 
             if (sortedAirspaces.isEmpty()) {
-                Log.w(TAG, "No airspaces to draw (enabled: $enabledAirspaces)")
                 return
             }
 
@@ -281,9 +301,7 @@ class AirspaceCirclesOverlay(
                 )
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error drawing airspace circles", e)
-        } finally {
-            canvas.restore()
+            Log.e(TAG, "Error drawing airspaces for airport ${airport.name}", e)
         }
     }
 

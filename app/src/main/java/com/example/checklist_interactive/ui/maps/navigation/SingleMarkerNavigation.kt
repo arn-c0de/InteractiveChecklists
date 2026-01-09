@@ -1,6 +1,7 @@
 package com.example.checklist_interactive.ui.maps.navigation
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.PaddingValues
@@ -85,7 +86,10 @@ fun MarkerDetailsContent(
     onSetRoute: (LocationEntity) -> Unit = {},
     onEdit: (LocationEntity) -> Unit = {},
     onDelete: (Int) -> Unit = {},
-    onCenter: (LocationEntity) -> Unit = {}
+    onCenter: (LocationEntity) -> Unit = {},
+    onShowAirspace: (LocationEntity) -> Unit = {},
+    onAirspaceSettingsRequest: () -> Unit = {},
+    isAirspaceActive: Boolean = false
 ) {
     var showEditDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
@@ -135,7 +139,10 @@ fun MarkerDetailsContent(
                 onClose()
             },
             onDeleteClick = { showDeleteConfirm = true },
-            onClose = onClose
+            onClose = onClose,
+            onShowAirspace = onShowAirspace,
+            onAirspaceSettingsRequest = onAirspaceSettingsRequest,
+            isAirspaceActive = isAirspaceActive
         )
     }
     
@@ -598,7 +605,10 @@ private fun MarkerDetailsActionButtons(
     onMoveClick: () -> Unit,
     onCenterClick: () -> Unit,
     onDeleteClick: () -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    onShowAirspace: (LocationEntity) -> Unit,
+    onAirspaceSettingsRequest: () -> Unit,
+    isAirspaceActive: Boolean
 ) {
     val configuration = LocalConfiguration.current
     val isSmallScreen = configuration.screenWidthDp < 600
@@ -620,6 +630,34 @@ private fun MarkerDetailsActionButtons(
             Icon(Icons.Default.Flight, contentDescription = null, modifier = Modifier.size(if (isSmallScreen) 18.dp else 24.dp))
             Spacer(modifier = Modifier.width(6.dp))
             Text(stringResource(R.string.map_set_route), style = if (isSmallScreen) MaterialTheme.typography.labelLarge else MaterialTheme.typography.bodyLarge)
+        }
+        
+        // Show Airspace button (only for airports)
+        if (location.markerType == "airport") {
+            FilledTonalButton(
+                onClick = { onShowAirspace(location) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .combinedClickable(
+                        onClick = { onShowAirspace(location) },
+                        onLongClick = { onAirspaceSettingsRequest() }
+                    ),
+                contentPadding = if (isSmallScreen) PaddingValues(horizontal = 12.dp, vertical = 8.dp) else ButtonDefaults.ContentPadding,
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = if (isAirspaceActive)
+                        MaterialTheme.colorScheme.tertiary
+                    else
+                        MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = if (isAirspaceActive)
+                        MaterialTheme.colorScheme.onTertiary
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            ) {
+                Icon(Icons.Default.Public, contentDescription = null, modifier = Modifier.size(if (isSmallScreen) 18.dp else 24.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(stringResource(R.string.map_show_airspace_button), style = if (isSmallScreen) MaterialTheme.typography.labelLarge else MaterialTheme.typography.bodyLarge)
+            }
         }
         
         // Edit / Move / Center / Delete buttons - vertical on small screens, horizontal on large

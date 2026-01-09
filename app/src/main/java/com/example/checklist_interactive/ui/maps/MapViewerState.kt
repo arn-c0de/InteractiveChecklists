@@ -100,7 +100,8 @@ class MapViewerState(
     var targetRunways by mutableStateOf<List<RunwayEntity>>(emptyList())
     var runwayApproachLines by mutableStateOf<List<Polyline>>(emptyList())
     var selectedRunwayIndex by mutableStateOf<Int?>(null)
-    var originalAirportTarget by mutableStateOf<LocationEntity?>(null)
+    var originalAirportTarget by mutableStateOf<LocationEntity?>(null) // For active navigation/pattern
+    var airspaceTargets by mutableStateOf<Set<LocationEntity>>(emptySet()) // For showing multiple airspaces
     var selectedRunwayHeading by mutableStateOf<Double?>(null)
     var finalApproachDistanceNm by mutableStateOf(5.0)
     var selectedRunway by mutableStateOf<RunwayEntity?>(null)
