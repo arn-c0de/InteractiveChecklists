@@ -195,7 +195,7 @@ def caucasus_samples():
             icao="URMN",
             iata="NAL",
             elevation_m=445.0,
-            runways=[Runway(name="06/24", length_m=2200, width_m=42, heading=56.0, surface="asphalt")],
+            runways=[Runway(name="06/24", length_m=2200, width_m=42, heading=62.0, surface="asphalt")],
             frequencies={"tower":"136.0 MHz", "tower_secondary":265.0},
             country="Russia",
             tags=["airbase", "civilian"],
@@ -360,7 +360,10 @@ def main():
         cur.execute("DELETE FROM tags")
         cur.execute("DELETE FROM routes")
         cur.execute("DELETE FROM locations")
+        # Reset AUTOINCREMENT counter for locations table
+        cur.execute("DELETE FROM sqlite_sequence WHERE name='locations'")
         db.conn.commit()
+        print('AUTOINCREMENT counter reset - IDs will start from 1')
 
     samples = caucasus_samples()
     inserted = 0
