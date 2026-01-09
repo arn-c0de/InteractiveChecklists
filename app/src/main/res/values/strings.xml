@@ -1055,7 +1055,7 @@
     <string name="map_nav_select_runway">SELECT RUNWAY</string>
     <string name="map_nav_pattern_button">PATTERN</string>
     <string name="map_nav_final_dist_nm">%1$s NM Final</string>
-    <string name="map_nav_rwy_chip">RWY %1$02d (%2$d°)</string>
+    <string name="map_nav_rwy_chip">RWY %1$s (%2$d°)</string>
     <string name="map_nav_pattern_config">PATTERN CONFIGURATION</string>
     <string name="map_nav_pattern_size">Size:</string>
     <string name="map_nav_pattern_size_desc">%1$s NM • %2$d ft AGL</string>
@@ -1107,7 +1107,7 @@
     <string name="map_nav_edit_pattern_alt_error">Enter a value between 500 and 5000 ft</string>
     <string name="map_nav_edit_pattern_alt_info">Typical pattern altitudes: 1000-2000 ft AGL</string>
     <string name="map_nav_reset_to_default">Reset to Default</string>
-    <string name="map_nav_approach_target_name">%1$s RWY %2$02d</string>
+    <string name="map_nav_approach_target_name">%1$s RWY %2$s</string>
 
     <!-- FlightMiniStatusBar -->
     <string name="mini_status_bar_battery_level">Battery level %1$d percent</string>

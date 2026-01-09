@@ -1149,7 +1149,7 @@
     <string name="map_nav_select_runway">SELECCIONAR PISTA</string>
     <string name="map_nav_pattern_button">PATRÓN</string>
     <string name="map_nav_final_dist_nm">%1$s NM Final</string>
-    <string name="map_nav_rwy_chip">RWY %1$02d (%2$d°)</string>
+    <string name="map_nav_rwy_chip">RWY %1$s (%2$d°)</string>
     <string name="map_nav_pattern_config">CONFIGURACIÓN DE PATRÓN</string>
     <string name="map_nav_pattern_size">Tamaño:</string>
     <string name="map_nav_pattern_size_desc">%1$s NM • %2$d ft AGL</string>
@@ -1201,7 +1201,7 @@
     <string name="map_nav_edit_pattern_alt_error">Introduzca un valor entre 500 y 5000 ft</string>
     <string name="map_nav_edit_pattern_alt_info">Altitudes de patrón típicas: 1000-2000 ft AGL</string>
     <string name="map_nav_reset_to_default">Restaurar a Predeterminado</string>
-    <string name="map_nav_approach_target_name">%1$s RWY %2$02d</string>
+    <string name="map_nav_approach_target_name">%1$s RWY %2$s</string>
 
     
     <!-- ═══════════════════════════════════════════════════════════════════════ -->

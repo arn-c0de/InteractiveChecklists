@@ -1287,9 +1287,19 @@ fun MapViewer(
                     val endLon = lon1 + dLon
                     val endpoint = org.osmdroid.util.GeoPoint(Math.toDegrees(endLat), Math.toDegrees(endLon))
                     
+                    // Extract real runway name from database (e.g., "09/27" -> "09" or "27")
+                    // Only calculate from heading if runway name is not available
+                    val runwayName = if (mapState.selectedRunway != null) {
+                        val names = mapState.selectedRunway?.name?.split("/")?.map { it.trim() } ?: emptyList()
+                        val isDirection1 = (mapState.selectedRunwayIndex ?: 0) % 2 == 0
+                        names.getOrNull(if (isDirection1) 0 else 1) ?: (heading / 10).toInt().toString().padStart(2, '0')
+                    } else {
+                        (heading / 10).toInt().toString().padStart(2, '0')
+                    }
+                    
                     val approachTarget = target.copy(
                         id = -1,
-                        name = "${target.name} RWY ${(heading / 10).toInt().toString().padStart(2, '0')}",
+                        name = "${target.name} RWY $runwayName",
                         latitude = endpoint.latitude,
                         longitude = endpoint.longitude
                     )
