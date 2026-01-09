@@ -179,6 +179,11 @@ fun MapNavigationDisplay(
     var cardOpacity by rememberSaveable { mutableStateOf(savedOpacity.coerceIn(0.25f, 1.0f)) }
     var showOpacitySlider by remember { mutableStateOf(false) }
 
+    // Persist showNavigationDetails state across app restarts
+    LaunchedEffect(showNavigationDetails) {
+        prefs.edit().putBoolean("show_navigation_details", showNavigationDetails).apply()
+    }
+
     // Manual landing details collapse state (hoisted so other controls can sync it)
     var showManualLandingDetails by rememberSaveable { mutableStateOf(showNavigationDetails) }
 
@@ -317,7 +322,9 @@ fun MapNavigationDisplay(
                                     text = stringResource(R.string.map_nav_dist_nm, dist),
                                     style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                             }
                             navigationHeading?.let { hdg ->
@@ -325,7 +332,9 @@ fun MapNavigationDisplay(
                                     text = stringResource(R.string.map_nav_hdg, hdg),
                                     style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                             }
                         }
@@ -364,7 +373,9 @@ fun MapNavigationDisplay(
                                     text = stringResource(R.string.map_nav_rwy, rwyHdg),
                                     style = if (isSmallScreen) MaterialTheme.typography.labelMedium else MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
 
                                 // Calculate and display distance to airport
@@ -379,7 +390,9 @@ fun MapNavigationDisplay(
                                         text = stringResource(R.string.map_nav_dist_nm, distanceNm),
                                         style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodyMedium,
                                         fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                        maxLines = 1,
+                                        softWrap = false
                                     )
                                 }
                             }
@@ -407,7 +420,9 @@ fun MapNavigationDisplay(
                                 Text(
                                     text = stringResource(R.string.map_nav_pattern_alt, patternAltMslCompact),
                                     style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
 
                                 // compact indicator with black background
@@ -461,7 +476,9 @@ fun MapNavigationDisplay(
                                 Text(
                                     text = "C:${currentAltCompactDisplay}",
                                     style = if (isSmallScreen) MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp) else MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.9f)
+                                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.9f),
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                             }
 
@@ -476,7 +493,9 @@ fun MapNavigationDisplay(
                                         text = "M:${markerAltFt.toInt()}ft",
                                         style = if (isSmallScreen) MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp) else MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
+                                        color = MaterialTheme.colorScheme.primary,
+                                        maxLines = 1,
+                                        softWrap = false
                                     )
 
                                     // Marker altitude indicator with black background
@@ -793,7 +812,9 @@ fun MapNavigationDisplay(
                                                 label = {
                                                     Text(
                                                         text = stringResource(R.string.map_nav_final_dist_nm, finalApproachDistanceNm.let { if (it == it.toInt().toDouble()) it.toInt().toString() else it.toString() }),
-                                                        style = MaterialTheme.typography.labelSmall
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        maxLines = 1,
+                                                        softWrap = false
                                                     )
                                                 },
                                                 trailingIcon = {
@@ -1378,7 +1399,9 @@ fun MapNavigationDisplay(
                                                     style = MaterialTheme.typography.bodySmall,
                                                     fontFamily = FontFamily.Monospace,
                                                     fontSize = 11.sp,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    maxLines = 1,
+                                                    softWrap = false
                                                 )
                                             }
                                         }
@@ -1485,7 +1508,9 @@ fun MapNavigationDisplay(
                                                     label = {
                                                         Text(
                                                             text = stringResource(R.string.map_nav_final_dist_nm, finalApproachDistanceNm.let { if (it == it.toInt().toDouble()) it.toInt().toString() else it.toString() }),
-                                                            style = MaterialTheme.typography.labelSmall
+                                                            style = MaterialTheme.typography.labelSmall,
+                                                            maxLines = 1,
+                                                            softWrap = false
                                                         )
                                                     },
                                                     trailingIcon = {

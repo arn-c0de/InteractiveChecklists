@@ -86,6 +86,15 @@ This roadmap outlines the planned development phases and features for the app in
 
 ---
 
+### ATC Mode (Air Traffic Control)
+- Visualize, detect, and navigate all aircraft in the operational area.
+- Provide real-time data on aircraft positions, headings, speeds, and altitudes.
+- Implement functionalities to issue orders and instructions to individual aircraft or groups, visualized directly on their datapad.
+- Include tools for managing air traffic flow, conflict detection, and resolution.
+- Further expand with advanced ATC functions like flight plan management, weather integration, and emergency handling.
+
+---
+
 ### Notes & General Guidelines
 
 - Backend infrastructure (where needed) should prioritize privacy, encryption, and optional self-hosting.

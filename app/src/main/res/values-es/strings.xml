@@ -387,8 +387,8 @@
     <string name="map_waiting_for_data">Esperando datos…</string>
     <string name="map_no_datapad_connection">⚠ Sin conexión DataPad - Posición no disponible</string>
     <string name="map_waiting_for_valid_position">ℹ Esperando posición válida…</string>
-    <string name="map_auto_centering_active">🎯 Auto-centrado (toca para desactivar)</string>
-    <string name="map_auto_centering_off">Auto-centro OFF (toca para activar)</string>
+    <string name="map_auto_centering_active">🎯 Auto-Center</string>
+    <string name="map_auto_centering_off">Auto-Center</string>
     <string name="map_auto_center_enabled">🎯 Auto-centrado (toca para desactivar)</string>
     <string name="map_auto_center_disabled">Auto-centro OFF (toca para activar)</string>
     <string name="map_tip_lock_screen">tip: toca el candado para mirar alrededor</string>

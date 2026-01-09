@@ -303,8 +303,8 @@
     <string name="map_waiting_for_data">正在等待数据…</string>
     <string name="map_no_datapad_connection">⚠ 无DataPad连接 - 地图位置不可用</string>
     <string name="map_waiting_for_valid_position">ℹ 正在等待有效位置…</string>
-    <string name="map_auto_centering_active">🎯 自动居中 (点击以禁用)</string>
-    <string name="map_auto_centering_off">自动居中关闭 (点击以启用)</string>
+    <string name="map_auto_centering_active">🎯 Auto-Center</string>
+    <string name="map_auto_centering_off">Auto-Center</string>
     <string name="map_auto_center_enabled">🎯 自动居中 (点击以禁用)</string>
     <string name="map_auto_center_disabled">自动居中关闭 (点击以启用)</string>
     <string name="map_tip_lock_screen">提示：点击锁定以查看地图</string>

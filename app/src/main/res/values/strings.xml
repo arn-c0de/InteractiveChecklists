@@ -305,10 +305,10 @@
     <string name="map_waiting_for_data">Waiting for data…</string>
     <string name="map_no_datapad_connection">⚠ No DataPad connection - Map position unavailable</string>
     <string name="map_waiting_for_valid_position">ℹ Waiting for valid position data…</string>
-    <string name="map_auto_centering_active">🎯 Auto-centering (tap to disable)</string>
-    <string name="map_auto_centering_off">Auto-center OFF (tap to enable)</string>
-    <string name="map_auto_center_enabled">🎯 Auto-centering (tap to disable)</string>
-    <string name="map_auto_center_disabled">Auto-center OFF (tap to enable)</string>
+    <string name="map_auto_centering_active">🎯 Auto-Center</string>
+    <string name="map_auto_centering_off">Auto-Center</string>
+    <string name="map_auto_center_enabled">🎯 Auto-Center</string>
+    <string name="map_auto_center_disabled">Auto-Center</string>
     <string name="map_tip_lock_screen">tip: tap lock to look around the map</string>
     <string name="map_tip_tap_lock">tip: tap lock to look around the map</string>
     <string name="settings_clear_map_cache">Clear map cache</string>
