@@ -23,15 +23,13 @@
 
 ---
 
-## Apache PDFBox / FontBox / PDFBox-IO
-- **License:** [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)
-- **Source:** https://pdfbox.apache.org
+## PDFBox-Android (Tom Roush fork)
+- **License:** [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0)
+- **Source:** https://github.com/TomRoush/PdfBox-Android
 - **Artifacts:**  
-  - org.apache.pdfbox:pdfbox:3.0.0  
-  - org.apache.pdfbox:fontbox:3.0.0
-  - org.apache.pdfbox:pdfbox-io:3.0.0
-- **Attribution:** © The Apache Software Foundation
-- **Usage:** Secure PDF parsing, outline extraction, and text extraction
+  - com.tom-roush:pdfbox-android:2.0.27.0
+- **Attribution:** © Tom Roush and contributors (based on Apache PDFBox)
+- **Usage:** Secure PDF parsing, outline extraction, and text extraction (Android-friendly fork without AWT; used to avoid issues and reduce binary size on Android)
 
 ## ZXing (Zebra Crossing)
 - **License:** [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)
