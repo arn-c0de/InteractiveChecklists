@@ -124,13 +124,26 @@ python forward_parsed_udp.py --host 192.168.178.50 --host 192.168.178.* --port 5
 
 See [docs/EN/technical/ECDH_USAGE_GUIDE.md](docs/EN/technical/ECDH_USAGE_GUIDE.md) and [docs/EN/technical/DATA_FLOW_ANALYSIS.md](docs/EN/technical/DATA_FLOW_ANALYSIS.md) for setup, PSK guidance, and PoW tuning.
 
-QR-based Device Registration (v1.0.23): Generate a short-lived token:
+Device registration (recommended options):
+
+- **Recommended (easiest): QR-based registration** — generate a short-lived token on the server and scan it with the Android DataPad app. Example token generation:
 
 ```bash
 python scripts/DCS-SCRIPTS-FOLDER-Experimental/registration_token.py generate --server-ip <IP> --port 5010
 ```
 
-Or start the forwarder and press **B** within 5s to enter interactive registration (or use `--skip-qr-prompt`). After registration the device is added to `authorized_devices.json`. See [docs/EN/features/qr_registration_quickstart.md](docs/EN/features/qr_registration_quickstart.md) and [docs/EN/features/qr_registration.md](docs/EN/features/qr_registration.md) for details.
+On Windows you can also use the launcher to avoid running the command manually: start `scripts/DCS-SCRIPTS-FOLDER-Experimental\run.bat` and when the forwarder starts you'll see a short interactive prompt — press **B** within 5 seconds to automatically generate the registration token and display the QR code (this runs the same `registration_token.py generate` command inside the virtual environment). This makes registration much simpler: you do not need to open a separate shell and run the Python command manually. Use `--skip-qr-prompt` to disable the interactive prompt. A successful registration will automatically add the device to `scripts/DCS-SCRIPTS-FOLDER-Experimental/authorized_devices.json`. 
+
+- **Manual:** Alternatively, add your device entry directly to `scripts/DCS-SCRIPTS-FOLDER-Experimental/authorized_devices.json`. Manual edits are useful for scripted deployments, headless servers, or environments without QR scanning.
+
+Windows convenience scripts:
+
+For Windows servers we provide helper scripts that set up a Python virtual environment and launch the server with a configuration menu:
+
+- Run `scripts/DCS-SCRIPTS-FOLDER-Experimental\install.bat` to create and populate a venv and install dependencies.
+- Run `scripts/DCS-SCRIPTS-FOLDER-Experimental\run.bat` to open the configuration menu and start the forwarder inside the venv.
+
+The launcher exposes configuration options and can be integrated with Task Scheduler or run as a service to start at boot, which makes the server easier to run and more accessible.
 
 Entity Contacts (tactical units): Enable **Entity Tracking** and run the forwarder with entity tracking enabled to receive live markers; see [scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md](scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md) and [docs/EN/features/TACTICAL_UNITS_TRACKING.md](docs/EN/features/TACTICAL_UNITS_TRACKING.md).
 
