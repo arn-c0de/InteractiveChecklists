@@ -1261,8 +1261,8 @@
     
     <string name="flight_status_navigation">Navigation</string>
     <string name="map_openstreetmap">OpenStreetMap</string>
-    <string name="map_auto_centering_active">🎯 Auto-centering (tap to disable)</string>
-    <string name="map_auto_centering_off">Auto-center OFF (tap to enable)</string>
+    <string name="map_auto_centering_active">🎯 Auto-Center</string>
+    <string name="map_auto_centering_off">Auto-Center</string>
     <string name="map_tip_lock_screen">tip: tap lock to look around the map</string>
 
     <!-- MAP DB WIPE/REIMPORT -->

@@ -163,9 +163,9 @@ object MapViewerFABs {
             contentDescription = stringResource(R.string.fab_cd_center_on_position),
             onClick = onCenterOnPosition,
             containerColor = if (isConnected) containerColorConnected else containerColorDisconnected,
-            defaultX = 0.95f,
+            defaultX = 0.97f,
             defaultY = 0.05f,
-            defaultLandscapeX = 0.95f,
+            defaultLandscapeX = 0.97f,
             defaultLandscapeY = 0.05f,
             scope = "map"
         ),
