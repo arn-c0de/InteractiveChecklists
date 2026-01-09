@@ -859,6 +859,12 @@ fun MapNavigationDisplay(
                                         val baseHeading = runway.headingDeg ?: extractRunwayHeading(runway.name) ?: 0.0
                                         val heading1 = baseHeading.toInt()
                                         val heading2 = ((heading1 + 180) % 360)
+                                        
+                                        // Extract real runway names from database (e.g., "09/27" -> "09" and "27")
+                                        // Only calculate from heading if runway name is not available
+                                        val runwayNames = runway.name?.split("/")?.map { it.trim() } ?: emptyList()
+                                        val runwayName1 = runwayNames.getOrNull(0) ?: (heading1 / 10).toString().padStart(2, '0')
+                                        val runwayName2 = runwayNames.getOrNull(1) ?: (heading2 / 10).toString().padStart(2, '0')
 
                                         Row(
                                             modifier = Modifier
@@ -899,7 +905,7 @@ fun MapNavigationDisplay(
                                                         // Update navigation to approach endpoint (red line will auto-update)
                                                         val approachTarget = target.copy(
                                                             id = -1,
-                                                            name = context.getString(R.string.map_nav_approach_target_name, target.name, heading1 / 10),
+                                                            name = context.getString(R.string.map_nav_approach_target_name, target.name, runwayName1),
                                                             latitude = endpoint.latitude,
                                                             longitude = endpoint.longitude
                                                         )
@@ -908,7 +914,7 @@ fun MapNavigationDisplay(
                                                 },
                                                 label = {
                                                     Text(
-                                                        text = stringResource(R.string.map_nav_rwy_chip, heading1 / 10, heading1),
+                                                        text = stringResource(R.string.map_nav_rwy_chip, runwayName1, heading1),
                                                         style = MaterialTheme.typography.labelSmall
                                                     )
                                                 },
@@ -952,7 +958,7 @@ fun MapNavigationDisplay(
 
                                                         val approachTarget = target.copy(
                                                             id = -1,
-                                                            name = context.getString(R.string.map_nav_approach_target_name, target.name, heading2 / 10),
+                                                            name = context.getString(R.string.map_nav_approach_target_name, target.name, runwayName2),
                                                             latitude = endpoint.latitude,
                                                             longitude = endpoint.longitude
                                                         )
@@ -961,7 +967,7 @@ fun MapNavigationDisplay(
                                                 },
                                                 label = {
                                                     Text(
-                                                        text = stringResource(R.string.map_nav_rwy_chip, heading2 / 10, heading2),
+                                                        text = stringResource(R.string.map_nav_rwy_chip, runwayName2, heading2),
                                                         style = MaterialTheme.typography.labelSmall
                                                     )
                                                 },
