@@ -90,19 +90,13 @@ DataPad is an experimental feature that receives real-time aircraft telemetry fr
 
 ### Security Features (NEW - December 2025)
 
-**✅ ECDH Handshake Mode** - Production-ready secure communication:
-- **End-to-end encryption** with per-session AES-256-GCM keys
-- **Device authentication** via whitelist (`authorized_devices.json`)
-- **Forward secrecy** - compromising one session doesn't affect others
-- **Replay attack protection** with counter-based nonces
-- **Timestamp validation** (5-minute window)
-- **Mutual authentication** (client ↔ server)
+**✅ ECDH Handshake Mode** - Production-ready secure communication with AES-256-GCM encryption, device authentication via `authorized_devices.json`, forward secrecy, replay attack protection, and mutual authentication (client ↔ server).
 
-**🔒 Server Key Pinning (TOFU)** - Trust-On-First-Use server key pinning to detect man-in-the-middle attacks after the first successful connection (auto-pins the server key on first contact).
+**🔒 Server Key Pinning (TOFU)** - Trust-On-First-Use server key pinning detects man-in-the-middle attacks after first connection.
 
-**🔑 PSK Handshake Manager (optional)** - Optional pre-shared key (PSK) handshake manager for compatibility and scripted deployments. See the docs for guidance on generating a 32-byte (256-bit) key and secure distribution.
+**🔑 PSK Handshake Manager (optional)** - Pre-shared key mode for compatibility and scripted deployments. See docs for 32-byte key generation and distribution.
 
-**🛡️ Optional Proof-of-Work (PoW)** - Configurable anti-DoS protection for handshake requests; trade off handshake latency for robustness using `--enable-pow` and `--pow-difficulty`.
+**🛡️ Optional Proof-of-Work (PoW)** - Configurable anti-DoS protection for handshake requests using `--enable-pow` and `--pow-difficulty`.
 
 **Quick Start (Handshake & PoW):**
 ```bash
@@ -128,19 +122,23 @@ python forward_parsed_udp.py --host 192.168.178.50 --host 192.168.178.* --port 5
 # Add your device ID to authorized_devices.json on the server
 ```
 
-See [docs/EN/technical/ECDH_USAGE_GUIDE.md](docs/EN/technical/ECDH_USAGE_GUIDE.md) and [docs/EN/technical/DATA_FLOW_ANALYSIS.md](docs/EN/technical/DATA_FLOW_ANALYSIS.md) for complete setup instructions, PSK guidance, and PoW tuning and troubleshooting.
+See [docs/EN/technical/ECDH_USAGE_GUIDE.md](docs/EN/technical/ECDH_USAGE_GUIDE.md) and [docs/EN/technical/DATA_FLOW_ANALYSIS.md](docs/EN/technical/DATA_FLOW_ANALYSIS.md) for setup, PSK guidance, and PoW tuning.
 
-QR-based Device Registration (added in v1.0.23): Generate a short-lived registration token with `python scripts/DCS-SCRIPTS-FOLDER-Experimental/registration_token.py generate --server-ip <IP> --port 5010` (supports ASCII or PNG output). You can also start the forwarder and press **B** within 5 seconds to enter interactive registration mode which generates a token and listens for DeviceRegistration messages; use `--skip-qr-prompt` to skip this prompt. After successful registration the device is added to `authorized_devices.json` and the server logs the event. See [docs/EN/features/qr_registration_quickstart.md](docs/EN/features/qr_registration_quickstart.md) and [docs/EN/features/qr_registration.md](docs/EN/features/qr_registration.md) for full instructions and troubleshooting.
+QR-based Device Registration (v1.0.23): Generate a short-lived token:
 
-DataPad also supports receiving **entity contacts** (tactical units) exported from DCS. Enable **Entity Tracking** in the app to receive tactical units and display them as live markers (requires running the forwarder with entity tracking enabled). For details and setup instructions, see [scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md](scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md) and [docs/EN/features/TACTICAL_UNITS_TRACKING.md](docs/EN/features/TACTICAL_UNITS_TRACKING.md).
+```bash
+python scripts/DCS-SCRIPTS-FOLDER-Experimental/registration_token.py generate --server-ip <IP> --port 5010
+```
 
-See [docs/EN/technical/ECDH_USAGE_GUIDE.md](docs/EN/technical/ECDH_USAGE_GUIDE.md) for complete setup instructions and [docs/EN/features/DATAPAD_FEATURE.md](docs/EN/features/DATAPAD_FEATURE.md) for full usage, configuration, and troubleshooting.
+Or start the forwarder and press **B** within 5s to enter interactive registration (or use `--skip-qr-prompt`). After registration the device is added to `authorized_devices.json`. See [docs/EN/features/qr_registration_quickstart.md](docs/EN/features/qr_registration_quickstart.md) and [docs/EN/features/qr_registration.md](docs/EN/features/qr_registration.md) for details.
 
-**Phase 1 (experimental)**: This release represents Phase 1 of DataPad. Future phases will expand telemetry coverage and add visual and security improvements, including live animated aircraft visualizations and a dedicated UI redesign.
+Entity Contacts (tactical units): Enable **Entity Tracking** and run the forwarder with entity tracking enabled to receive live markers; see [scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md](scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md) and [docs/EN/features/TACTICAL_UNITS_TRACKING.md](docs/EN/features/TACTICAL_UNITS_TRACKING.md).
 
-**Next up:** 2-way communication (experimental) — enabling data flow from the app back to DCS.
+See [docs/EN/features/DATAPAD_FEATURE.md](docs/EN/features/DATAPAD_FEATURE.md) for full usage, configuration, and troubleshooting.
 
-Planned enhancements include additional telemetry (speed, vertical speed, fuel, systems), live animated aircraft visualizations, and UI/UX improvements.
+**Phase 1 (experimental)**: This is Phase 1 of DataPad — future phases will add more telemetry, visualizations, and security improvements.
+
+**Next up:** 2-way communication (experimental) to enable data flow back to DCS.
 
 ## Screenshots
 

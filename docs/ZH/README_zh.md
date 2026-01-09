@@ -113,13 +113,13 @@ python forward_parsed_udp.py --repeat-last --interval 3 --host 127.0.0.1 --port 
 
 DataPad 还支持接收从 DCS 导出的**实体接触信息**（战术单位）。在应用中启用**实体追踪**以接收战术单位并将其显示为实时标记（需要运行启用了实体追踪的转发器）。设置和详情说明请参见`../../scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md` 和 `../EN/features/TACTICAL_UNITS_TRACKING.md`。
 
-完整设置说明请参见 `../EN/technical/ECDH_USAGE_GUIDE.md`，完整的使用、配置和故障排除信息请参见 `../EN/features/DATAPAD_FEATURE.md`。
+请参阅 `../EN/technical/ECDH_USAGE_GUIDE.md` 和 `../EN/technical/DATA_FLOW_ANALYSIS.md` 以获取设置、PSK 指南和 PoW 调优。
 
-**阶段 1 (实验性)**:  此版本代表 DataPad 的第一阶段。未来阶段将扩展遥测覆盖范围，并增加视觉和安全改进，包括实时动画飞机可视化以及专用的 UI 重新设计。
+请参阅 `../EN/features/DATAPAD_FEATURE.md` 获取完整使用、配置和故障排除信息。
 
-**下一步计划:** 双向通信（实验性）——实现从应用回传到 DCS 的数据流。
+**阶段 1 (实验性)**: 这是 DataPad 的第一阶段——未来将增加更多遥测、可视化和安全改进。
 
-计划中的增强功能包括额外的遥测数据（速度、垂直速度、燃油、系统状态）、实时动画飞机可视化以及 UI/UX 改进。
+**下一步计划:** 双向通信（实验性）以实现应用向 DCS 的数据回传。
 
 ## 截图
 
