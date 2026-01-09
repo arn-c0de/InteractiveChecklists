@@ -7,7 +7,8 @@
   {
     "name": "ZXing (Zebra Crossing)",
     "website": "https://github.com/zxing/zxing",
-    "license": "Apache License 2.0 – © ZXing authors"
+    "license": "Apache License 2.0 – © ZXing authors",
+    "usage": "QR code scanning and barcode decoding"
   },
   {
   "name": "PDFBox-Android (Tom Roush fork)",
