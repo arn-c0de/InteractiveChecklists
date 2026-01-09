@@ -8,6 +8,7 @@ import json
 import os
 import sys
 import time
+import math
 import subprocess
 from pathlib import Path
 from enum import Enum
@@ -185,16 +186,135 @@ def get_key():
     return Key.UNKNOWN, None
 
 
-def get_key_with_timeout(timeout=3.0):
-    """Get key with timeout, returns (Key, char) or (None, None) on timeout"""
-    start_time = time.time()
-    
-    while (time.time() - start_time) < timeout:
-        key, char = get_key()
-        if key != Key.UNKNOWN:
-            return key, char
+def get_key_with_timeout(timeout=3.0, countdown=False, selected_mode=None):
+    """Non-blocking get key with timeout. Returns (Key, char) or (None, None) on timeout.
+
+    If countdown=True, prints a per-second countdown message (uses {selected_mode}).
+    This implementation polls for keypresses without blocking (works on Windows and Unix).
+    """
+    # Flush any pre-existing key presses so auto-start isn't cancelled by buffered input
+    if os.name == 'nt':
+        try:
+            while msvcrt.kbhit():
+                msvcrt.getch()
+        except Exception:
+            pass
+    else:
+        # On Unix, drain stdin if data is waiting
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setcbreak(fd)
+            while select.select([sys.stdin], [], [], 0)[0]:
+                sys.stdin.read(1)
+        except Exception:
+            pass
+        finally:
+            try:
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+            except Exception:
+                pass
+
+    end_time = time.time() + timeout
+    last_display = None
+
+    def _clear_countdown_line():
+        if countdown:
+            print('\r' + ' ' * 80 + '\r', end='', flush=True)
+
+    while time.time() < end_time:
+        # Update countdown display once per second when requested
+        if countdown:
+            remaining = max(0, math.ceil(end_time - time.time()))
+            if remaining != last_display:
+                msg = f"{Color.DIM}  Press any key to cancel auto-start (starting mode {selected_mode} in {remaining}s)...{Color.RESET}"
+                # Overwrite the same terminal line and pad to clear any leftover characters
+                print('\r' + msg + ' ' * 40, end='', flush=True)
+                last_display = remaining
+
+        # Check for keypress non-blocking
+        if os.name == 'nt':
+            if msvcrt.kbhit():
+                ch = msvcrt.getch()
+                # Handle arrow keys (escape sequences)
+                if ch == b'\xe0' or ch == b'\x00':
+                    ch2 = msvcrt.getch()
+                    _clear_countdown_line()
+                    if ch2 == b'H':
+                        return Key.UP, None
+                    elif ch2 == b'P':
+                        return Key.DOWN, None
+                    elif ch2 == b'K':
+                        return Key.LEFT, None
+                    elif ch2 == b'M':
+                        return Key.RIGHT, None
+                elif ch == b'\r':
+                    _clear_countdown_line()
+                    return Key.ENTER, None
+                elif ch == b'\x1b':
+                    _clear_countdown_line()
+                    return Key.ESC, None
+                elif ch == b'\x08':
+                    _clear_countdown_line()
+                    return Key.BACKSPACE, None
+                elif ch == b'\t':
+                    _clear_countdown_line()
+                    return Key.TAB, None
+                else:
+                    try:
+                        _clear_countdown_line()
+                        return Key.CHAR, ch.decode('utf-8')
+                    except Exception:
+                        _clear_countdown_line()
+                        return Key.UNKNOWN, None
+        else:
+            # Use select to see if input is available
+            if select.select([sys.stdin], [], [], 0)[0]:
+                fd = sys.stdin.fileno()
+                old_settings = termios.tcgetattr(fd)
+                try:
+                    tty.setraw(fd)
+                    ch = sys.stdin.read(1)
+                    if ch == '\x1b':  # Escape sequence
+                        # Read rest of sequence if available
+                        if select.select([sys.stdin], [], [], 0.01)[0]:
+                            ch2 = sys.stdin.read(1)
+                            if ch2 == '[' and select.select([sys.stdin], [], [], 0.01)[0]:
+                                ch3 = sys.stdin.read(1)
+                                _clear_countdown_line()
+                                if ch3 == 'A':
+                                    return Key.UP, None
+                                elif ch3 == 'B':
+                                    return Key.DOWN, None
+                                elif ch3 == 'C':
+                                    return Key.RIGHT, None
+                                elif ch3 == 'D':
+                                    return Key.LEFT, None
+                        _clear_countdown_line()
+                        return Key.ESC, None
+                    elif ch == '\r' or ch == '\n':
+                        _clear_countdown_line()
+                        return Key.ENTER, None
+                    elif ch == '\x7f' or ch == '\x08':
+                        _clear_countdown_line()
+                        return Key.BACKSPACE, None
+                    elif ch == '\t':
+                        _clear_countdown_line()
+                        return Key.TAB, None
+                    else:
+                        _clear_countdown_line()
+                        return Key.CHAR, ch
+                finally:
+                    try:
+                        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+                    except Exception:
+                        pass
+
         time.sleep(0.05)
-    
+
+    # Clear the countdown/message when we finish waiting
+    _clear_countdown_line()
+
     return None, None
 
 
@@ -545,7 +665,9 @@ def main():
     selected_mode = config.get('last_mode', 1)
     last_selected = -1
     needs_redraw = True
-    
+    # When True, suppress the automatic countdown/start for one menu cycle
+    skip_auto_start = False
+
     while True:
         # Only redraw when necessary
         if needs_redraw or last_selected != selected_mode:
@@ -553,19 +675,26 @@ def main():
             last_selected = selected_mode
             needs_redraw = False
         
-        # Auto-start with timeout
-        print(f"{Color.DIM}  Press any key to cancel auto-start (starting mode {selected_mode} in 3s)...{Color.RESET}", end='', flush=True)
-        
-        key, char = get_key_with_timeout(3.0)
-        
-        # Clear auto-start message
-        print('\r' + ' ' * 80 + '\r', end='', flush=True)
-        
-        # If timeout occurred, auto-start the selected mode
-        if key is None:
-            key = Key.ENTER
+        # If a run just finished, skip auto-start and wait for explicit user input
+        if skip_auto_start:
+            skip_auto_start = False
+            # Wait for user keypress without countdown
+            while True:
+                key, char = get_key()
+                if key != Key.UNKNOWN:
+                    break
+                time.sleep(0.05)
+        else:
+            # Auto-start with countdown and non-blocking input check
+            key, char = get_key_with_timeout(3.0, countdown=True, selected_mode=selected_mode)
+
+            # If timeout occurred, auto-start the selected mode
+            if key is None:
+                key = Key.ENTER
+                # Record that we auto-started so we don't immediately auto-start again upon returning
+                skip_auto_start = True
         # If navigation key pressed, cancel auto-start and enter interactive mode
-        elif key in (Key.UP, Key.DOWN, Key.LEFT, Key.RIGHT, Key.CHAR):
+        if key in (Key.UP, Key.DOWN, Key.LEFT, Key.RIGHT, Key.CHAR):
             # Enter interactive navigation mode until user presses ENTER/ESC/Q
             interactive = True
             needs_redraw = True
