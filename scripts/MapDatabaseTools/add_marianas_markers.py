@@ -226,7 +226,10 @@ def main():
         cur.execute("DELETE FROM tags")
         cur.execute("DELETE FROM routes")
         cur.execute("DELETE FROM locations")
+        # Reset AUTOINCREMENT counter for locations table
+        cur.execute("DELETE FROM sqlite_sequence WHERE name='locations'")
         db.conn.commit()
+        print('AUTOINCREMENT counter reset - IDs will start from 1')
 
     samples = marianas_samples()
     inserted = 0
