@@ -89,7 +89,10 @@ fun MarkerDetailsContent(
     onCenter: (LocationEntity) -> Unit = {},
     onShowAirspace: (LocationEntity) -> Unit = {},
     onAirspaceSettingsRequest: () -> Unit = {},
-    isAirspaceActive: Boolean = false
+    isAirspaceActive: Boolean = false,
+    onShowPattern: ((LocationEntity) -> Unit)? = null,
+    onPatternSettingsRequest: (() -> Unit)? = null,
+    isPatternActive: Boolean = false
 ) {
     var showEditDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
@@ -142,7 +145,10 @@ fun MarkerDetailsContent(
             onClose = onClose,
             onShowAirspace = onShowAirspace,
             onAirspaceSettingsRequest = onAirspaceSettingsRequest,
-            isAirspaceActive = isAirspaceActive
+            isAirspaceActive = isAirspaceActive,
+            onShowPattern = onShowPattern,
+            onPatternSettingsRequest = onPatternSettingsRequest,
+            isPatternActive = isPatternActive
         )
     }
     
@@ -608,7 +614,10 @@ private fun MarkerDetailsActionButtons(
     onClose: () -> Unit,
     onShowAirspace: (LocationEntity) -> Unit,
     onAirspaceSettingsRequest: () -> Unit,
-    isAirspaceActive: Boolean
+    isAirspaceActive: Boolean,
+    onShowPattern: ((LocationEntity) -> Unit)? = null,
+    onPatternSettingsRequest: (() -> Unit)? = null,
+    isPatternActive: Boolean = false
 ) {
     val configuration = LocalConfiguration.current
     val isSmallScreen = configuration.screenWidthDp < 600
@@ -657,6 +666,34 @@ private fun MarkerDetailsActionButtons(
                 Icon(Icons.Default.Public, contentDescription = null, modifier = Modifier.size(if (isSmallScreen) 18.dp else 24.dp))
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(stringResource(R.string.map_show_airspace_button), style = if (isSmallScreen) MaterialTheme.typography.labelLarge else MaterialTheme.typography.bodyLarge)
+            }
+        }
+        
+        // Show Pattern button (for all markers)
+        if (onShowPattern != null && onPatternSettingsRequest != null) {
+            FilledTonalButton(
+                onClick = { onShowPattern(location) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .combinedClickable(
+                        onClick = { onShowPattern(location) },
+                        onLongClick = { onPatternSettingsRequest() }
+                    ),
+                contentPadding = if (isSmallScreen) PaddingValues(horizontal = 12.dp, vertical = 8.dp) else ButtonDefaults.ContentPadding,
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = if (isPatternActive)
+                        MaterialTheme.colorScheme.tertiary
+                    else
+                        MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = if (isPatternActive)
+                        MaterialTheme.colorScheme.onTertiary
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            ) {
+                Icon(Icons.Default.FlightLand, contentDescription = null, modifier = Modifier.size(if (isSmallScreen) 18.dp else 24.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(stringResource(R.string.map_show_pattern_button), style = if (isSmallScreen) MaterialTheme.typography.labelLarge else MaterialTheme.typography.bodyLarge)
             }
         }
         

@@ -132,6 +132,23 @@ class MapViewerState(
     var enabledAirspaceClasses by mutableStateOf(setOf("CLASS_D", "CLASS_C_CTR")) // Default to basic CTR classes
     var airspaceFillTransparency by mutableStateOf(0.10f) // Default to 10% opacity (very transparent)
     
+    // Per-marker pattern state (marker ID -> PatternState)
+    data class MarkerPatternState(
+        var enabled: Boolean = false,
+        var patternSize: PatternSize = PatternSize.NORMAL,
+        var patternDirection: PatternDirection = PatternDirection.LEFT_HAND,
+        var finalDistanceNm: Double = 1.0,
+        var roundedCorners: Boolean = false,
+        var customAltitudeAglFt: Int? = null,
+        var selectedRunwayIndex: Int? = null,
+        var selectedRunwayHeading: Double? = null,
+        var manualHeading: String = "",
+        var showManualHeadingError: Boolean = false
+    )
+    var markerPatterns by mutableStateOf<Map<Int, MarkerPatternState>>(emptyMap())
+    var patternPolylines by mutableStateOf<Map<Int, Polyline>>(emptyMap())
+    var patternLabelOverlays by mutableStateOf<Map<Int, PatternLabelOverlay>>(emptyMap())
+    
     // Military symbol placement state
     var pendingSymbolPlacement by mutableStateOf<Pair<MilitarySymbol, SymbolAffiliation>?>(null)
     var pendingMoveTargetName by mutableStateOf<String?>(null)
@@ -168,6 +185,44 @@ class MapViewerState(
     // BUSINESS LOGIC METHODS
     // Methods extracted from LaunchedEffect blocks for better separation of concerns
     // ============================================================================
+    
+    /**
+     * Get or create pattern state for a marker
+     */
+    fun getPatternState(markerId: Int): MarkerPatternState {
+        return markerPatterns[markerId] ?: MarkerPatternState().also {
+            markerPatterns = markerPatterns + (markerId to it)
+        }
+    }
+    
+    /**
+     * Update pattern state for a marker
+     */
+    fun updatePatternState(markerId: Int, update: (MarkerPatternState) -> MarkerPatternState) {
+        val current = getPatternState(markerId)
+        markerPatterns = markerPatterns + (markerId to update(current))
+    }
+    
+    /**
+     * Toggle pattern visibility for a marker
+     */
+    fun toggleMarkerPattern(markerId: Int): Boolean {
+        val state = getPatternState(markerId)
+        val newEnabled = !state.enabled
+        updatePatternState(markerId) { it.copy(enabled = newEnabled) }
+        saveMarkerPatternState(markerId)
+        return newEnabled
+    }
+    
+    /**
+     * Clear pattern for a specific marker
+     */
+    fun clearMarkerPattern(markerId: Int) {
+        markerPatterns = markerPatterns - markerId
+        patternPolylines = patternPolylines - markerId
+        patternLabelOverlays = patternLabelOverlays - markerId
+        saveMarkerPatternState(markerId)
+    }
 
     /**
      * Initialize the TacticalDatabase.
@@ -448,6 +503,128 @@ class MapViewerState(
             Log.d(TAG, "💾 Saved navigation state: target=${activeNavigationTarget?.name}, approach=$showRunwayApproach, pattern=$showTrafficPattern, patternSize=$patternSize, navDetailsExpanded=$showNavigationDetails")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to save navigation state", e)
+        }
+    }
+    
+    /**
+     * Save pattern state for a specific marker
+     */
+    fun saveMarkerPatternState(markerId: Int) {
+        try {
+            val prefs = context.getSharedPreferences("marker_patterns_prefs", Context.MODE_PRIVATE)
+            val state = markerPatterns[markerId]
+            
+            prefs.edit().apply {
+                if (state != null && state.enabled) {
+                    // Save pattern state
+                    putBoolean("marker_${markerId}_enabled", state.enabled)
+                    putInt("marker_${markerId}_size", state.patternSize.ordinal)
+                    putBoolean("marker_${markerId}_direction_left", state.patternDirection == PatternDirection.LEFT_HAND)
+                    putFloat("marker_${markerId}_final_distance", state.finalDistanceNm.toFloat())
+                    putBoolean("marker_${markerId}_rounded", state.roundedCorners)
+                    if (state.customAltitudeAglFt != null) {
+                        putInt("marker_${markerId}_custom_alt", state.customAltitudeAglFt!!)
+                    } else {
+                        remove("marker_${markerId}_custom_alt")
+                    }
+                    if (state.selectedRunwayIndex != null) {
+                        putInt("marker_${markerId}_runway_idx", state.selectedRunwayIndex!!)
+                    } else {
+                        remove("marker_${markerId}_runway_idx")
+                    }
+                    if (state.selectedRunwayHeading != null) {
+                        putFloat("marker_${markerId}_runway_hdg", state.selectedRunwayHeading!!.toFloat())
+                    } else {
+                        remove("marker_${markerId}_runway_hdg")
+                    }
+                    putString("marker_${markerId}_manual_hdg", state.manualHeading)
+                } else {
+                    // Clear all pattern state for this marker
+                    remove("marker_${markerId}_enabled")
+                    remove("marker_${markerId}_size")
+                    remove("marker_${markerId}_direction_left")
+                    remove("marker_${markerId}_final_distance")
+                    remove("marker_${markerId}_rounded")
+                    remove("marker_${markerId}_custom_alt")
+                    remove("marker_${markerId}_runway_idx")
+                    remove("marker_${markerId}_runway_hdg")
+                    remove("marker_${markerId}_manual_hdg")
+                }
+                apply()
+            }
+            Log.d(TAG, "💾 Saved pattern state for marker $markerId: enabled=${state?.enabled}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save marker pattern state", e)
+        }
+    }
+    
+    /**
+     * Load pattern state for a specific marker
+     */
+    fun loadMarkerPatternState(markerId: Int) {
+        try {
+            val prefs = context.getSharedPreferences("marker_patterns_prefs", Context.MODE_PRIVATE)
+            val enabled = prefs.getBoolean("marker_${markerId}_enabled", false)
+            
+            if (enabled) {
+                val state = MarkerPatternState(
+                    enabled = true,
+                    patternSize = PatternSize.fromOrdinal(prefs.getInt("marker_${markerId}_size", PatternSize.NORMAL.ordinal)),
+                    patternDirection = if (prefs.getBoolean("marker_${markerId}_direction_left", true)) PatternDirection.LEFT_HAND else PatternDirection.RIGHT_HAND,
+                    finalDistanceNm = prefs.getFloat("marker_${markerId}_final_distance", 1.0f).toDouble(),
+                    roundedCorners = prefs.getBoolean("marker_${markerId}_rounded", false),
+                    customAltitudeAglFt = if (prefs.contains("marker_${markerId}_custom_alt")) prefs.getInt("marker_${markerId}_custom_alt", 1200) else null,
+                    selectedRunwayIndex = if (prefs.contains("marker_${markerId}_runway_idx")) prefs.getInt("marker_${markerId}_runway_idx", -1) else null,
+                    selectedRunwayHeading = if (prefs.contains("marker_${markerId}_runway_hdg")) prefs.getFloat("marker_${markerId}_runway_hdg", 0f).toDouble() else null,
+                    manualHeading = prefs.getString("marker_${markerId}_manual_hdg", "") ?: ""
+                )
+                markerPatterns = markerPatterns + (markerId to state)
+                Log.d(TAG, "✅ Loaded pattern state for marker $markerId: size=${state.patternSize}, direction=${state.patternDirection}")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load marker pattern state for marker $markerId", e)
+        }
+    }
+    
+    /**
+     * Load all marker pattern states from SharedPreferences
+     */
+    suspend fun loadAllMarkerPatternStates() {
+        try {
+            val prefs = context.getSharedPreferences("marker_patterns_prefs", Context.MODE_PRIVATE)
+            val allKeys = prefs.all.keys
+            val markerIds = allKeys.mapNotNull { key ->
+                if (key.startsWith("marker_") && key.endsWith("_enabled")) {
+                    key.removePrefix("marker_").removeSuffix("_enabled").toIntOrNull()
+                } else null
+            }.toSet()
+            
+            val loadedPatterns = mutableMapOf<Int, MarkerPatternState>()
+            for (markerId in markerIds) {
+                val enabled = prefs.getBoolean("marker_${markerId}_enabled", false)
+                
+                if (enabled) {
+                    val state = MarkerPatternState(
+                        enabled = true,
+                        patternSize = PatternSize.fromOrdinal(prefs.getInt("marker_${markerId}_size", PatternSize.NORMAL.ordinal)),
+                        patternDirection = if (prefs.getBoolean("marker_${markerId}_direction_left", true)) PatternDirection.LEFT_HAND else PatternDirection.RIGHT_HAND,
+                        finalDistanceNm = prefs.getFloat("marker_${markerId}_final_distance", 1.0f).toDouble(),
+                        roundedCorners = prefs.getBoolean("marker_${markerId}_rounded", false),
+                        customAltitudeAglFt = if (prefs.contains("marker_${markerId}_custom_alt")) prefs.getInt("marker_${markerId}_custom_alt", 1200) else null,
+                        selectedRunwayIndex = if (prefs.contains("marker_${markerId}_runway_idx")) prefs.getInt("marker_${markerId}_runway_idx", -1) else null,
+                        selectedRunwayHeading = if (prefs.contains("marker_${markerId}_runway_hdg")) prefs.getFloat("marker_${markerId}_runway_hdg", 0f).toDouble() else null,
+                        manualHeading = prefs.getString("marker_${markerId}_manual_hdg", "") ?: ""
+                    )
+                    loadedPatterns[markerId] = state
+                    Log.d(TAG, "✅ Loaded pattern state for marker $markerId: size=${state.patternSize}, direction=${state.patternDirection}")
+                }
+            }
+            
+            // Update the entire map at once to trigger recomposition
+            markerPatterns = loadedPatterns
+            Log.d(TAG, "✅ Loaded ${loadedPatterns.size} marker patterns from preferences")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load all marker pattern states", e)
         }
     }
 

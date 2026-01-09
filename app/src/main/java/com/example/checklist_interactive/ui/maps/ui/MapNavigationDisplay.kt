@@ -14,6 +14,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragHandle
@@ -2429,6 +2430,288 @@ fun AirspaceSettingsDialog(
         confirmButton = {
             TextButton(onClick = { onSave(selectedAirspaces, transparency) }) {
                 Text(stringResource(R.string.action_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        }
+    )
+}
+
+/**
+ * Marker Pattern Settings Dialog
+ * Allows configuring traffic pattern for any marker (not just active navigation target)
+ */
+@Composable
+fun MarkerPatternSettingsDialog(
+    location: LocationEntity,
+    runways: List<RunwayEntity>,
+    currentState: com.example.checklist_interactive.ui.maps.MapViewerState.MarkerPatternState,
+    onDismiss: () -> Unit,
+    onSave: (com.example.checklist_interactive.ui.maps.MapViewerState.MarkerPatternState) -> Unit
+) {
+    // Load last settings from currentState
+    var patternSize by remember { mutableStateOf(currentState.patternSize) }
+    var patternDirection by remember { mutableStateOf(currentState.patternDirection) }
+    var finalDistanceNm by remember { mutableStateOf(currentState.finalDistanceNm) }
+    var roundedCorners by remember { mutableStateOf(currentState.roundedCorners) }
+    var customAltitudeAglFt by remember { mutableStateOf(currentState.customAltitudeAglFt) }
+    var selectedRunwayIndex by remember { mutableStateOf(currentState.selectedRunwayIndex) }
+    var manualHeading by remember { mutableStateOf(currentState.manualHeading) }
+    var showManualHeadingError by remember { mutableStateOf(false) }
+    
+    val hasRunways = runways.isNotEmpty()
+    val isATCT = location.markerType == "atct" || location.markerType == "tactical"
+    val markerHeading = extractHeadingFromLocation(location)
+    
+    // Reset to default function
+    val resetToDefaults = {
+        patternSize = PatternSize.NORMAL
+        patternDirection = PatternDirection.LEFT_HAND
+        finalDistanceNm = 1.0
+        roundedCorners = false
+        customAltitudeAglFt = null
+        selectedRunwayIndex = null
+        manualHeading = ""
+        showManualHeadingError = false
+    }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { 
+            Column {
+                Text(stringResource(R.string.map_pattern_settings_title))
+                Text(
+                    text = location.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Runway/Heading selection section
+                if (hasRunways) {
+                    Text(
+                        text = stringResource(R.string.map_nav_select_runway),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    // Runway selection chips - show both directions for each runway
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        runways.forEachIndexed { index, runway ->
+                            // Parse runway name to get both directions (e.g., "09/27" -> "09" and "27")
+                            val runwayNames = runway.name.split("/").map { it.trim() }
+                            val runwayHeading = runway.headingDeg ?: extractRunwayHeading(runway.name) ?: 0.0
+                            
+                            // Direction 1 (e.g., "09")
+                            if (runwayNames.isNotEmpty()) {
+                                val direction1Index = index * 2
+                                val heading1 = runwayHeading.toInt()
+                                FilterChip(
+                                    selected = selectedRunwayIndex == direction1Index,
+                                    onClick = { 
+                                        selectedRunwayIndex = direction1Index
+                                        manualHeading = "" // Clear manual heading when runway selected
+                                    },
+                                    label = { Text("${runwayNames[0]} (${String.format("%03d", heading1)}°)") }
+                                )
+                            }
+                            
+                            // Direction 2 (e.g., "27")
+                            if (runwayNames.size > 1) {
+                                val direction2Index = index * 2 + 1
+                                val heading2 = ((runwayHeading + 180.0) % 360).toInt()
+                                FilterChip(
+                                    selected = selectedRunwayIndex == direction2Index,
+                                    onClick = { 
+                                        selectedRunwayIndex = direction2Index
+                                        manualHeading = "" // Clear manual heading when runway selected
+                                    },
+                                    label = { Text("${runwayNames[1]} (${String.format("%03d", heading2)}°)") }
+                                )
+                            }
+                        }
+                    }
+                } else if (isATCT && markerHeading != null) {
+                    // ATCT marker with heading - show auto-update options
+                    Text(
+                        text = stringResource(R.string.map_nav_landing_heading),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    OutlinedTextField(
+                        value = manualHeading,
+                        onValueChange = { 
+                            manualHeading = it
+                            showManualHeadingError = it.toDoubleOrNull() == null && it.isNotEmpty()
+                        },
+                        label = { Text(stringResource(R.string.map_nav_manual_heading_hint)) },
+                        isError = showManualHeadingError,
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
+                    )
+                } else {
+                    // Generic marker - manual heading input
+                    Text(
+                        text = stringResource(R.string.map_nav_landing_heading),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    OutlinedTextField(
+                        value = manualHeading,
+                        onValueChange = { 
+                            manualHeading = it
+                            showManualHeadingError = it.toDoubleOrNull() == null && it.isNotEmpty()
+                        },
+                        label = { Text(stringResource(R.string.map_nav_manual_heading_hint)) },
+                        isError = showManualHeadingError,
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
+                    )
+                }
+                
+                HorizontalDivider()
+                
+                // Pattern Size
+                Text(
+                    text = stringResource(R.string.map_nav_pattern_size),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    PatternSize.values().forEach { size ->
+                        FilterChip(
+                            selected = patternSize == size,
+                            onClick = { patternSize = size },
+                            label = { Text(size.displayName) }
+                        )
+                    }
+                }
+                
+                // Pattern Direction
+                Text(
+                    text = stringResource(R.string.map_nav_pattern_direction),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = patternDirection == PatternDirection.LEFT_HAND,
+                        onClick = { patternDirection = PatternDirection.LEFT_HAND },
+                        label = { Text(stringResource(R.string.map_nav_left_pattern)) }
+                    )
+                    FilterChip(
+                        selected = patternDirection == PatternDirection.RIGHT_HAND,
+                        onClick = { patternDirection = PatternDirection.RIGHT_HAND },
+                        label = { Text(stringResource(R.string.map_nav_right_pattern)) }
+                    )
+                }
+                
+                // Final Approach Distance
+                Text(
+                    text = stringResource(R.string.map_nav_final_distance),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = String.format("%.1f NM", finalDistanceNm),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Slider(
+                    value = finalDistanceNm.toFloat(),
+                    onValueChange = { finalDistanceNm = it.toDouble() },
+                    valueRange = 0.5f..10.0f,
+                    steps = 18
+                )
+                
+                // Rounded Corners
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.map_nav_rounded_corners),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Switch(
+                        checked = roundedCorners,
+                        onCheckedChange = { roundedCorners = it }
+                    )
+                }
+                
+                // Custom Altitude
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.map_nav_pattern_altitude),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = customAltitudeAglFt?.let { "$it ft AGL" } ?: stringResource(R.string.map_nav_use_default),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    TextButton(onClick = { customAltitudeAglFt = if (customAltitudeAglFt != null) null else 1200 }) {
+                        Text(if (customAltitudeAglFt != null) stringResource(R.string.map_nav_reset_to_default) else stringResource(R.string.map_nav_customize))
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Reset to Default button
+                OutlinedButton(
+                    onClick = { resetToDefaults() }
+                ) {
+                    Text(stringResource(R.string.map_nav_reset_to_default))
+                }
+                
+                // Save button
+                TextButton(
+                    onClick = {
+                        val newState = com.example.checklist_interactive.ui.maps.MapViewerState.MarkerPatternState(
+                            enabled = true,
+                            patternSize = patternSize,
+                            patternDirection = patternDirection,
+                            finalDistanceNm = finalDistanceNm,
+                            roundedCorners = roundedCorners,
+                            customAltitudeAglFt = customAltitudeAglFt,
+                            selectedRunwayIndex = selectedRunwayIndex,
+                            manualHeading = manualHeading,
+                            showManualHeadingError = showManualHeadingError
+                        )
+                        onSave(newState)
+                    }
+                ) {
+                    Text(stringResource(R.string.action_save))
+                }
             }
         },
         dismissButton = {
