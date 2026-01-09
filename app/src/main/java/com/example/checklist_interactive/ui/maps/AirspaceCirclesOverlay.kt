@@ -107,7 +107,7 @@ class AirspaceCirclesOverlay(
 
     private val labelBackgroundPaint = Paint().apply {
         isAntiAlias = true
-        color = Color.parseColor("#DD000000") // Semi-transparent black
+        color = Color.parseColor("#F5000000") // More opaque black (96% opacity) for better visibility
         style = Paint.Style.FILL
     }
 
@@ -115,7 +115,7 @@ class AirspaceCirclesOverlay(
         isAntiAlias = true
         color = Color.WHITE
         style = Paint.Style.STROKE
-        strokeWidth = 2f
+        strokeWidth = 3f // Thicker border so labels stand out more
     }
 
     private val labelTextPaint = Paint().apply {

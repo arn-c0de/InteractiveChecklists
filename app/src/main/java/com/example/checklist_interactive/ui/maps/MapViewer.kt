@@ -289,7 +289,9 @@ fun MapViewer(
                     getEnabledAirspaces = { mapState.enabledAirspaceClasses },
                     getFillTransparency = { mapState.airspaceFillTransparency }
                 )
-                mv.overlays.add(airspaceOverlay)
+                // Add at position 0 so airspace rings are drawn first (in background)
+                // This ensures all labels (tactical units + airports) appear on top
+                mv.overlays.add(0, airspaceOverlay)
                 mapState.airspaceCirclesOverlay = airspaceOverlay
                 mv.invalidate()
             } else {
@@ -2254,9 +2256,10 @@ fun MapViewer(
                 Log.d(TAG, "📡 Adding tactical units overlay to map and starting tracking")
 
                 // Add overlay to map if not already present
+                // Add normally so tactical unit labels appear ABOVE airspace circles
                 if (!mv.overlays.contains(overlay)) {
                     mv.overlays.add(overlay)
-                    Log.d(TAG, "📡 Tactical units overlay added to map")
+                    Log.d(TAG, "📡 Tactical units overlay added to map (above airspace)")
                 }
 
                 // Start tracking with this coroutine scope
