@@ -1,21 +1,21 @@
 
 [← Back to README](README.md) | [Documentation Index](docs/EN/docnavigation.md)
 
-# 🛡️ Security Policy
+# Security Policy
 
 InteractiveChecklists takes security seriously. We appreciate responsible disclosure and your help in keeping our users safe.
 
 ---
 
-## 🔒 Supported Versions
+## Supported Versions
 
 | Version | Supported           |
 | ------- | ------------------- |
-| 1.0  | ✅ Supported        |
+| 1.0  | Supported        |
 
 ---
 
-## 🐞 Reporting a Vulnerability
+## Reporting a Vulnerability
 
 If you discover a security issue, please report it promptly:
 
@@ -30,7 +30,7 @@ Include in your report:
 
 ---
 
-## 🤝 Our Commitment
+## Our Commitment
 
 We will:
 - Acknowledge your report within **2 business days**
@@ -40,7 +40,7 @@ We will:
 
 ---
 
-## 📢 Disclosure Policy
+## Disclosure Policy
 
 We follow **coordinated vulnerability disclosure**:
 1. **Private Notification:** Report vulnerabilities to us privately
@@ -51,7 +51,7 @@ We follow **coordinated vulnerability disclosure**:
 
 ---
 
-## 🧑‍💻 Security Best Practices for Users
+## Security Best Practices for Users
 
 - **Keep your app updated:** Always use the latest version for security patches
 - **Be cautious with external files:** Only import from trusted sources
