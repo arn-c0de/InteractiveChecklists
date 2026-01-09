@@ -1157,6 +1157,7 @@
     <string name="map_search_markers_placeholder">Search markers</string>
     <string name="map_frequency_placeholder">118.50</string>
     <string name="map_marker_manage">Manage</string>
+    <string name="map_show_airspace_button">Show Airspace</string>
 
     <string name="map_marker_type">Type</string>
     <string name="map_marker_icao">ICAO</string>

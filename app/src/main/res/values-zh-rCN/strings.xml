@@ -1148,6 +1148,7 @@
     <string name="map_search_markers_placeholder">搜索标记</string>
     <string name="map_frequency_placeholder">118.50</string>
     <string name="map_marker_manage">管理</string>
+    <string name="map_show_airspace_button">显示空域</string>
 
     <string name="map_marker_type">类型</string>
     <string name="map_marker_icao">ICAO</string>

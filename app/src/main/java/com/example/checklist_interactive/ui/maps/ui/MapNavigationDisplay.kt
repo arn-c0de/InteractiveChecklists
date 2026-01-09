@@ -322,9 +322,7 @@ fun MapNavigationDisplay(
                                     text = stringResource(R.string.map_nav_dist_nm, dist),
                                     style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onErrorContainer,
-                                    maxLines = 1,
-                                    softWrap = false
+                                    color = MaterialTheme.colorScheme.onErrorContainer
                                 )
                             }
                             navigationHeading?.let { hdg ->
@@ -332,9 +330,7 @@ fun MapNavigationDisplay(
                                     text = stringResource(R.string.map_nav_hdg, hdg),
                                     style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onErrorContainer,
-                                    maxLines = 1,
-                                    softWrap = false
+                                    color = MaterialTheme.colorScheme.onErrorContainer
                                 )
                             }
                         }

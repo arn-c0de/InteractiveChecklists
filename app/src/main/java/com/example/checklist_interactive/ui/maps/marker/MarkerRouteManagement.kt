@@ -218,7 +218,10 @@ fun MarkerRouteManagementSheet(
     onSetActiveRoute: (LocationEntity) -> Unit,
     onEditRouteWaypoints: (Int) -> Unit = {},
     initialTab: Int? = null,
-    onCenterOnMap: ((latitude: Double, longitude: Double) -> Unit)? = null
+    onCenterOnMap: ((latitude: Double, longitude: Double) -> Unit)? = null,
+    onShowAirspace: (LocationEntity) -> Unit = {},
+    onAirspaceSettingsRequest: () -> Unit = {},
+    getAirspaceActiveStatus: (LocationEntity) -> Boolean = { false }
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val markerGroups by viewModel.markerGroups.collectAsState()
@@ -539,7 +542,10 @@ fun MarkerRouteManagementSheet(
                             onCenter = { loc ->
                                 // delegate to parent sheet's onCenter behavior (only center the map)
                                 onCenter(loc)
-                            }
+                            },
+                            onShowAirspace = onShowAirspace,
+                            onAirspaceSettingsRequest = onAirspaceSettingsRequest,
+                            isAirspaceActive = getAirspaceActiveStatus(selectedMarker)
                         )
                     } else {
                         Box(

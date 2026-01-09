@@ -270,10 +270,16 @@ fun MapViewer(
     }
 
     // Manage airspace circles overlay lifecycle
-    LaunchedEffect(mapState.mapView, mapState.showAirspaceCircles, mapState.enabledAirspaceClasses, mapState.originalAirportTarget, mapState.airspaceFillTransparency) {
-        Log.d(TAG, "🌐 Airspace overlay lifecycle triggered - show=${mapState.showAirspaceCircles}, airport=${mapState.originalAirportTarget?.name}, enabled=${mapState.enabledAirspaceClasses.size} classes")
+    LaunchedEffect(mapState.mapView, mapState.showAirspaceCircles, mapState.enabledAirspaceClasses, mapState.airspaceTargets, mapState.originalAirportTarget, mapState.airspaceFillTransparency) {
+        val allTargets = buildSet {
+            addAll(mapState.airspaceTargets)
+            // Also include originalAirportTarget if present (for active navigation)
+            mapState.originalAirportTarget?.let { add(it) }
+        }
+        
+        Log.d(TAG, "🌐 Airspace overlay lifecycle triggered - show=${mapState.showAirspaceCircles}, targets=${allTargets.size}, enabled=${mapState.enabledAirspaceClasses.size} classes")
         mapState.mapView?.let { mv ->
-            if (mapState.showAirspaceCircles && mapState.originalAirportTarget != null) {
+            if (mapState.showAirspaceCircles && allTargets.isNotEmpty()) {
                 // Remove existing overlay if present (will be recreated with new settings)
                 mapState.airspaceCirclesOverlay?.let { oldOverlay ->
                     Log.d(TAG, "🌐 Removing old airspace overlay")
@@ -282,10 +288,15 @@ fun MapViewer(
                 }
 
                 // Create new overlay with current settings
-                Log.d(TAG, "🌐 Creating new airspace overlay for ${mapState.originalAirportTarget?.name}")
+                Log.d(TAG, "🌐 Creating new airspace overlay for ${allTargets.size} airports")
                 val airspaceOverlay = AirspaceCirclesOverlay(
                     isEnabled = { mapState.showAirspaceCircles },
-                    getTargetAirport = { mapState.originalAirportTarget },
+                    getTargetAirports = { 
+                        buildSet {
+                            addAll(mapState.airspaceTargets)
+                            mapState.originalAirportTarget?.let { add(it) }
+                        }
+                    },
                     getEnabledAirspaces = { mapState.enabledAirspaceClasses },
                     getFillTransparency = { mapState.airspaceFillTransparency }
                 )
@@ -3181,6 +3192,35 @@ fun MapViewer(
                         mapState.showMarkerRouteManagement = false
                         mapState.showRouteCreation = true
                     }
+                },
+                onShowAirspace = { location ->
+                    // Toggle this airport in the airspace targets set
+                    mapState.airspaceTargets = if (mapState.airspaceTargets.any { it.id == location.id }) {
+                        // Airport already in set - remove it
+                        mapState.airspaceTargets.filterNot { it.id == location.id }.toSet()
+                    } else {
+                        // Add airport to set
+                        mapState.airspaceTargets + location
+                    }
+                    
+                    // Enable airspace display if we have targets
+                    if (mapState.airspaceTargets.isNotEmpty() || mapState.originalAirportTarget != null) {
+                        mapState.showAirspaceCircles = true
+                    }
+                    
+                    Log.d(TAG, "🛩️ Toggle airspace for ${location.name} - now showing ${mapState.airspaceTargets.size} additional targets")
+                },
+                onAirspaceSettingsRequest = {
+                    // Open airspace settings - handled by expanding navigation details and showing airspace controls
+                    // Note: The actual settings UI is part of MapNavigationDisplay when airspace is active
+                    mapState.showAirspaceCircles = true
+                    mapState.showNavigationDetails = true
+                    Log.d(TAG, "⚙️ Showing airspace controls")
+                },
+                getAirspaceActiveStatus = { location ->
+                    // Check if this airport is in the airspace targets set or is the original airport target
+                    mapState.airspaceTargets.any { it.id == location.id } || 
+                    (mapState.originalAirportTarget?.id == location.id && mapState.showAirspaceCircles)
                 }
             )
         }

@@ -1,6 +1,7 @@
 package com.example.checklist_interactive.ui.maps.marker
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Flight
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material3.*
 import androidx.compose.material3.AssistChip
 import androidx.compose.ui.text.font.FontFamily
@@ -116,7 +118,10 @@ fun MapMarkerPopup(
     onManage: () -> Unit,
     onRunwayClick: (RunwayEntity) -> Unit = {},
     onSetRoute: (LocationEntity) -> Unit = {},
-    onCenter: (LocationEntity) -> Unit = {}
+    onCenter: (LocationEntity) -> Unit = {},
+    onShowAirspace: (LocationEntity) -> Unit = {},
+    onAirspaceSettingsRequest: () -> Unit = {},
+    isAirspaceActive: Boolean = false
 ) {
     val context = LocalContext.current
     // Persisted sheet fraction + opacity like DataPadPopup
@@ -631,6 +636,38 @@ fun MapMarkerPopup(
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
+
+                // Show Airspace button for airports only
+                if (location.markerType == "airport") {
+                    FilledTonalButton(
+                        onClick = { onShowAirspace(location) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .combinedClickable(
+                                onClick = { onShowAirspace(location) },
+                                onLongClick = { onAirspaceSettingsRequest() }
+                            ),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = if (isAirspaceActive)
+                                MaterialTheme.colorScheme.tertiary
+                            else
+                                MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = if (isAirspaceActive)
+                                MaterialTheme.colorScheme.onTertiary
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Public,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.map_show_airspace_button))
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = onManage, modifier = Modifier.weight(1f)) {
