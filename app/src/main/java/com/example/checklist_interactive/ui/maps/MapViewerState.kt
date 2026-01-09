@@ -77,6 +77,7 @@ class MapViewerState(
     var rangeRingsOverlay by mutableStateOf<Overlay?>(null)
     var mgrsGridOverlay by mutableStateOf<Overlay?>(null)
     var airportLabelsOverlay by mutableStateOf<AirportMarkerLabelsOverlay?>(null)
+    var airspaceCirclesOverlay by mutableStateOf<AirspaceCirclesOverlay?>(null)
     
     // Map rotation: 0 = North-up, 1 = HDG-up (follow aircraft heading)
     var mapRotationMode by mutableStateOf(prefsManager.getMapRotationMode())
@@ -124,6 +125,11 @@ class MapViewerState(
     // Small tolerance (≈) and a larger warning tolerance (yellow) used for color coding
     var patternAltitudeSmallToleranceFt by mutableStateOf(50.0)
     var patternAltitudeWarningToleranceFt by mutableStateOf(500.0)
+    
+    // Airspace display state
+    var showAirspaceCircles by mutableStateOf(false)
+    var enabledAirspaceClasses by mutableStateOf(setOf("CLASS_D", "CLASS_C_CTR")) // Default to basic CTR classes
+    var airspaceFillTransparency by mutableStateOf(0.10f) // Default to 10% opacity (very transparent)
     
     // Military symbol placement state
     var pendingSymbolPlacement by mutableStateOf<Pair<MilitarySymbol, SymbolAffiliation>?>(null)
@@ -320,6 +326,11 @@ class MapViewerState(
         } else {
             activeNavigationTacticalUnitId = null
         }
+        
+        // Restore airspace display state
+        showAirspaceCircles = prefs.getBoolean("show_airspace_circles", false)
+        enabledAirspaceClasses = prefs.getStringSet("enabled_airspace_classes", setOf("CLASS_D", "CLASS_C_CTR")) ?: setOf("CLASS_D", "CLASS_C_CTR")
+        airspaceFillTransparency = prefs.getFloat("airspace_fill_transparency", 0.10f)
 
         // Small delay before marking as restored
         delay(50)
@@ -396,6 +407,11 @@ class MapViewerState(
                 
                 // Save tactical unit tracking ID for live route updates
                 putInt("active_navigation_tactical_unit_id", activeNavigationTacticalUnitId ?: -999)
+                
+                // Save airspace display state
+                putBoolean("show_airspace_circles", showAirspaceCircles)
+                putStringSet("enabled_airspace_classes", enabledAirspaceClasses)
+                putFloat("airspace_fill_transparency", airspaceFillTransparency)
 
                 apply()
             }
