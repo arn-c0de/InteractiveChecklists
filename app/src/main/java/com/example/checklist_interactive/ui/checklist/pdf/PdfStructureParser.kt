@@ -1,26 +1,32 @@
 package com.example.checklist_interactive.ui.checklist.pdf
 
+import android.content.Context
 import android.util.Log
-import org.apache.pdfbox.Loader
-import org.apache.pdfbox.pdmodel.PDDocument
-import org.apache.pdfbox.pdmodel.interactive.documentnavigation.outline.PDOutlineItem
-import org.apache.pdfbox.text.PDFTextStripper
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
+import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.pdmodel.interactive.documentnavigation.outline.PDOutlineItem
+import com.tom_roush.pdfbox.text.PDFTextStripper
 import java.io.File
 
 /**
- * PDF parser implementation using Apache PDFBox library.
- * Provides secure and robust PDF parsing by leveraging a well-maintained library
- * instead of custom low-level PDF structure parsing.
- * 
- * This replaces the custom PdfStructureParser with library-based parsing while
- * maintaining the same API for existing high-level functions.
+ * PDF parser implementation using PDFBox-Android library.
+ * Provides Android-compatible PDF parsing without AWT dependencies.
+ *
+ * This uses PDFBox-Android (tom-roush fork), which is specifically ported for Android
+ * and has proper 16 KB page alignment for Android 15+ compatibility.
  */
-class PdfStructureParser(private val pdfFile: File) {
-    
+class PdfStructureParser(private val context: Context, private val pdfFile: File) {
+
     private val TAG = "PdfStructureParser"
 
     init {
-        android.util.Log.d(TAG, "Created PdfStructureParser for ${pdfFile.absolutePath}")
+        // Initialize PDFBox-Android (required once per application)
+        try {
+            PDFBoxResourceLoader.init(context)
+        } catch (e: Exception) {
+            // Already initialized, ignore
+        }
+        Log.d(TAG, "Created PdfStructureParser for ${pdfFile.absolutePath}")
     }
 
     companion object {
@@ -30,11 +36,11 @@ class PdfStructureParser(private val pdfFile: File) {
          * Returns a cached instance of the parser for the given file.
          * This helps avoid re-loading the same PDF multiple times.
          */
-        fun getInstance(file: File): PdfStructureParser {
+        fun getInstance(context: Context, file: File): PdfStructureParser {
             val path = file.absolutePath
             synchronized(globalCache) {
                 return globalCache.getOrPut(path) {
-                    PdfStructureParser(file)
+                    PdfStructureParser(context, file)
                 }
             }
         }
@@ -48,16 +54,16 @@ class PdfStructureParser(private val pdfFile: File) {
             }
         }
     }
-    
+
     /**
-     * Parses the PDF document outline (bookmarks/table of contents) using PDFBox.
+     * Parses the PDF document outline (bookmarks/table of contents) using PDFBox-Android.
      * Returns a list of outline items with their titles, page numbers, and hierarchical levels.
      */
     fun parseOutline(): List<PdfOutlineItem> {
         val result = mutableListOf<PdfOutlineItem>()
 
         try {
-            Loader.loadPDF(pdfFile).use { document ->
+            PDDocument.load(pdfFile).use { document ->
                 val outline = document.documentCatalog.documentOutline
                 if (outline == null) {
                     Log.d(TAG, "No outline found in ${pdfFile.name}")
@@ -66,7 +72,7 @@ class PdfStructureParser(private val pdfFile: File) {
 
                 // Recursively traverse the outline tree
                 processOutlineItem(outline.firstChild, document, result, level = 0)
-                
+
                 Log.d(TAG, "Parsed ${result.size} outline items from ${pdfFile.name}")
             }
         } catch (e: Exception) {
@@ -75,7 +81,7 @@ class PdfStructureParser(private val pdfFile: File) {
 
         return result
     }
-    
+
     /**
      * Recursively processes outline items and their children.
      */
@@ -89,25 +95,30 @@ class PdfStructureParser(private val pdfFile: File) {
         while (current != null) {
             try {
                 val title = current.title ?: "Untitled"
-                
+
                 // Get the page number (0-based index)
                 val pageNumber = try {
                     val dest = current.destination
-                    if (dest != null && dest is org.apache.pdfbox.pdmodel.interactive.documentnavigation.destination.PDPageDestination) {
-                        val page = (dest as org.apache.pdfbox.pdmodel.interactive.documentnavigation.destination.PDPageDestination).page
-                        if (page != null) {
-                            document.pages.indexOf(page)
-                        } else {
-                            -1
+                    if (dest != null) {
+                        when (dest) {
+                            is com.tom_roush.pdfbox.pdmodel.interactive.documentnavigation.destination.PDPageDestination -> {
+                                val page = dest.page
+                                if (page != null) {
+                                    document.pages.indexOf(page)
+                                } else {
+                                    -1
+                                }
+                            }
+                            else -> -1
                         }
-                    } else if (dest == null) {
+                    } else {
                         // Try action destination
                         val action = current.action
-                        if (action != null && action is org.apache.pdfbox.pdmodel.interactive.action.PDActionGoTo) {
-                            val gotoAction = action as org.apache.pdfbox.pdmodel.interactive.action.PDActionGoTo
+                        if (action != null && action is com.tom_roush.pdfbox.pdmodel.interactive.action.PDActionGoTo) {
+                            val gotoAction = action
                             val gotoDest = gotoAction.destination
-                            if (gotoDest is org.apache.pdfbox.pdmodel.interactive.documentnavigation.destination.PDPageDestination) {
-                                val page = (gotoDest as org.apache.pdfbox.pdmodel.interactive.documentnavigation.destination.PDPageDestination).page
+                            if (gotoDest is com.tom_roush.pdfbox.pdmodel.interactive.documentnavigation.destination.PDPageDestination) {
+                                val page = gotoDest.page
                                 if (page != null) {
                                     document.pages.indexOf(page)
                                 } else {
@@ -119,8 +130,6 @@ class PdfStructureParser(private val pdfFile: File) {
                         } else {
                             -1
                         }
-                    } else {
-                        -1
                     }
                 } catch (e: Exception) {
                     Log.w(TAG, "Error getting page number for outline item '$title': ${e.message}")
@@ -151,15 +160,15 @@ class PdfStructureParser(private val pdfFile: File) {
             current = current.nextSibling
         }
     }
-    
+
     /**
-     * Extracts text from a specific page using PDFBox.
+     * Extracts text from a specific page using PDFBox-Android.
      * @param pageIndex 0-based page index
      * @return The extracted text from the page
      */
     fun extractPageText(pageIndex: Int): String {
         return try {
-            Loader.loadPDF(pdfFile).use { document ->
+            PDDocument.load(pdfFile).use { document ->
                 if (pageIndex < 0 || pageIndex >= document.numberOfPages) {
                     Log.w(TAG, "Invalid page index: $pageIndex (document has ${document.numberOfPages} pages)")
                     return ""
@@ -169,7 +178,7 @@ class PdfStructureParser(private val pdfFile: File) {
                 // PDFTextStripper uses 1-based page numbers
                 stripper.startPage = pageIndex + 1
                 stripper.endPage = pageIndex + 1
-                
+
                 val text = stripper.getText(document)
                 Log.d(TAG, "Extracted ${text.length} characters from page $pageIndex")
                 text
