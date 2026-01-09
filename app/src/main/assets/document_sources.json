@@ -10,12 +10,11 @@
     "license": "Apache License 2.0 – © ZXing authors"
   },
   {
-  "name": "Apache PDFBox / FontBox",
-  "website": "https://pdfbox.apache.org",
-  "license": "Apache License 2.0 – © The Apache Software Foundation",
+  "name": "PDFBox-Android (Tom Roush fork)",
+  "website": "https://github.com/TomRoush/PdfBox-Android",
+  "license": "Apache License 2.0 – © Tom Roush and contributors (based on Apache PDFBox)",
   "artifacts": [
-    "org.apache.pdfbox:pdfbox:3.0.0",
-    "org.apache.pdfbox:fontbox:3.0.0"
+    "com.tom-roush:pdfbox-android:2.0.27.0"
   ]
 }
 

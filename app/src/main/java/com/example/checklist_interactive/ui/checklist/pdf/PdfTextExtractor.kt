@@ -19,7 +19,7 @@ data class PdfTextBlock(
 )
 
 /**
- * Extracts positioned text from PDF files using Apache PDFBox library
+ * Extracts positioned text from PDF files using PDFBox-Android (Tom Roush fork)
  */
 class PdfTextExtractor(private val context: Context) {
 
