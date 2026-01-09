@@ -161,6 +161,7 @@ See [docs/EN/features/DATAPAD_FEATURE.md](docs/EN/features/DATAPAD_FEATURE.md) f
 		<img src="images/pdf_viewer.png" alt="PDF viewer with annotation tools" width="360" />
 		<img src="images/quick_notes.png" alt="QuickNotes bottom sheet and editor" width="360" />
 		<img src="images/map_pattern_calculator.png" alt="Calculator for landing patterns" width="360" />
+		<img src="images/map_airspaces-earlyatcfeature.png" alt="First implementation parts for atc features" width="360" />
 		<img src="images/map_tacmarker_live-data.png" alt="Full tactical live data Support" width="360" />
 		<img src="images/map_flightpath.png" alt="Flight path overlay" width="360" />
 		<img src="images/map-route.png" alt="Route lines overlay with labels" width="360" />
