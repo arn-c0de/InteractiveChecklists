@@ -2719,19 +2719,10 @@ fun MapViewer(
                 if (internal != null) internal + (fd?.fuel?.external ?: 0.0) else null
             }
 
-            // Compute sensible gLoad value: prefer vertical axis (y), then z, else use vector magnitude
+            // G-Load: Use Y-axis (vertical) minus 1.0, standard aviation approach
+            // At 1g (normal): y=1.0 → display 0.0 | At 2g: y=2.0 → display 1.0 | At 0g: y=0.0 → display -1.0
             val gLoadValue: Double? = fd?.gLoad?.let { g ->
-                val y = g.y
-                val z = g.z
-                val x = g.x
-                when {
-                    kotlin.math.abs(y) >= 0.05 -> y
-                    kotlin.math.abs(z) >= 0.05 -> z
-                    else -> {
-                        val mag = Math.sqrt(x * x + y * y + z * z)
-                        if (mag > 0.05) mag else null
-                    }
-                }
+                g.y - 1.0
             }
 
             MapFlightInstruments(
@@ -3207,6 +3198,9 @@ fun MapViewer(
                     if (mapState.airspaceTargets.isNotEmpty() || mapState.originalAirportTarget != null) {
                         mapState.showAirspaceCircles = true
                     }
+                    
+                    // Save state immediately
+                    mapState.saveNavigationState()
                     
                     Log.d(TAG, "🛩️ Toggle airspace for ${location.name} - now showing ${mapState.airspaceTargets.size} additional targets")
                 },
