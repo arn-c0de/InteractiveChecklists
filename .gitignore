@@ -68,6 +68,7 @@ codeql-py-analysis.sarif
 .kotlin
 
 .vscode
+.claude
 
 
 security_audit.jsonl
