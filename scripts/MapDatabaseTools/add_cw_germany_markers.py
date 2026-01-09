@@ -699,7 +699,7 @@ def germany_samples():
             icao="",
             iata="",
             elevation_m=6.0,
-            runways=[Runway(name="05/23", length_m=2000, width_m=16, heading=54.0, surface="concrete/asphalt")],
+            runways=[Runway(name="05/23", length_m=2800, width_m=16, heading=54.0, surface="concrete/asphalt")],
             frequencies={"tower": 120.0},
             country="West Germany",
             tags=["Highway Strip", "military", "emergency airstrip", "cold war", "unused"],
@@ -839,9 +839,9 @@ def germany_samples():
             iata="CPH",
             elevation_m=5.0,
             runways=[
-                Runway(name="04L/22R", length_m=3600, width_m=45, heading=40.0, surface="concrete"),
-                Runway(name="04R/22L", length_m=3300, width_m=45, heading=40.0, surface="concrete"),
-                Runway(name="12/30", length_m=2800, width_m=45, heading=120.0, surface="concrete")
+                Runway(name="04L/22R", length_m=3600, width_m=45, heading=42.0, surface="concrete"),
+                Runway(name="04R/22L", length_m=3300, width_m=45, heading=42.0, surface="concrete"),
+                Runway(name="12/30", length_m=2800, width_m=45, heading=124.0, surface="concrete")
             ],
             frequencies={"tower": 120.0},
             country="Denmark",
