@@ -90,7 +90,7 @@ class MapViewerState(
     var navigationLine by mutableStateOf<Polyline?>(null)
     var navigationDistanceNm by mutableStateOf<Double?>(null)
     var navigationHeading by mutableStateOf<Double?>(null)
-    var showNavigationDetails by mutableStateOf(true)
+    var showNavigationDetails by mutableStateOf(false)
     
     // Tactical unit tracking for live route updates
     var activeNavigationTacticalUnitId by mutableStateOf<Int?>(null) // DCS ID of tracked tactical unit
@@ -296,7 +296,7 @@ class MapViewerState(
         finalApproachDistanceNm = prefs.getFloat("final_approach_distance_nm", 5.0f).toDouble()
 
         // Restore whether the navigation details panel was expanded or collapsed
-        showNavigationDetails = prefs.getBoolean("show_navigation_details", showNavigationDetails)
+        showNavigationDetails = prefs.getBoolean("show_navigation_details", false)
 
         val selectedRwyIdx = prefs.getInt("selected_runway_index", -1)
         if (selectedRwyIdx >= 0) {
@@ -332,6 +332,31 @@ class MapViewerState(
         showAirspaceCircles = prefs.getBoolean("show_airspace_circles", false)
         enabledAirspaceClasses = prefs.getStringSet("enabled_airspace_classes", setOf("CLASS_D", "CLASS_C_CTR")) ?: setOf("CLASS_D", "CLASS_C_CTR")
         airspaceFillTransparency = prefs.getFloat("airspace_fill_transparency", 0.10f)
+        
+        // Restore airspace targets
+        val savedAirspaceTargetIds = prefs.getStringSet("airspace_target_ids", emptySet()) ?: emptySet()
+        if (savedAirspaceTargetIds.isNotEmpty()) {
+            try {
+                val restoredTargets = mutableSetOf<LocationEntity>()
+                for (idStr in savedAirspaceTargetIds) {
+                    val id = idStr.toIntOrNull() ?: continue
+                    val location = withContext(Dispatchers.IO) {
+                        locationRepository.getLocationById(id)
+                    }
+                    if (location != null) {
+                        restoredTargets.add(location)
+                        Log.d(TAG, "✅ Restored airspace target: ${location.name} (id=$id)")
+                    } else {
+                        Log.w(TAG, "⚠️ Airspace target with ID $id not found in database")
+                    }
+                }
+                airspaceTargets = restoredTargets
+                Log.d(TAG, "Restored ${airspaceTargets.size} airspace targets")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Failed to restore airspace targets", e)
+                airspaceTargets = emptySet()
+            }
+        }
 
         // Small delay before marking as restored
         delay(50)
@@ -413,6 +438,10 @@ class MapViewerState(
                 putBoolean("show_airspace_circles", showAirspaceCircles)
                 putStringSet("enabled_airspace_classes", enabledAirspaceClasses)
                 putFloat("airspace_fill_transparency", airspaceFillTransparency)
+                
+                // Save airspace target IDs
+                val airspaceTargetIds = airspaceTargets.map { it.id.toString() }.toSet()
+                putStringSet("airspace_target_ids", airspaceTargetIds)
 
                 apply()
             }

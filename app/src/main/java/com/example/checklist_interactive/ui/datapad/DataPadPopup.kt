@@ -692,8 +692,9 @@ private fun FlightDataDisplay(data: FlightData?) {
             DataSection(title = stringResource(R.string.datapad_section_flight_performance)) {
                 DataRow(stringResource(R.string.datapad_field_angle_of_attack), stringResource(R.string.datapad_aoa_deg, aoa))
                 data.gLoad?.let { g ->
+                    // Y-axis (vertical) normalized: subtract 1.0 so 1g = 0. X/Z shown raw for lateral/longitudinal forces.
                     DataRow(stringResource(R.string.datapad_field_g_load_x), stringResource(R.string.datapad_g_load_unit, g.x))
-                    DataRow(stringResource(R.string.datapad_field_g_load_y), stringResource(R.string.datapad_g_load_unit, g.y))
+                    DataRow(stringResource(R.string.datapad_field_g_load_y), stringResource(R.string.datapad_g_load_unit, g.y - 1.0))
                     DataRow(stringResource(R.string.datapad_field_g_load_z), stringResource(R.string.datapad_g_load_unit, g.z))
                 }
             }
