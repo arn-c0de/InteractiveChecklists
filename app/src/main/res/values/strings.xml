@@ -1108,6 +1108,15 @@
     <string name="map_nav_edit_pattern_alt_info">Typical pattern altitudes: 1000-2000 ft AGL</string>
     <string name="map_nav_reset_to_default">Reset to Default</string>
     <string name="map_nav_approach_target_name">%1$s RWY %2$s</string>
+    <string name="map_nav_use_default">Use Default</string>
+    <string name="map_nav_customize">Customize</string>
+    <string name="map_nav_pattern_altitude">Pattern Altitude</string>
+    <string name="map_nav_final_distance">Final Approach Distance</string>
+    <string name="map_nav_rounded_corners">Rounded Corners</string>
+    <string name="map_nav_left_pattern">Left Hand</string>
+    <string name="map_nav_right_pattern">Right Hand</string>
+    <string name="map_nav_landing_heading">Landing Heading</string>
+    <string name="map_nav_manual_heading_hint">Enter heading (0-360°)</string>
 
     <!-- FlightMiniStatusBar -->
     <string name="mini_status_bar_battery_level">Battery level %1$d percent</string>
@@ -1158,6 +1167,9 @@
     <string name="map_frequency_placeholder">118.50</string>
     <string name="map_marker_manage">Manage</string>
     <string name="map_show_airspace_button">Show Airspace</string>
+    <string name="map_show_pattern_button">Show Pattern</string>
+    <string name="map_pattern_settings_title">Pattern Settings</string>
+    <string name="map_pattern_settings_subtitle">Configure traffic pattern for this marker</string>
 
     <string name="map_marker_type">Type</string>
     <string name="map_marker_icao">ICAO</string>

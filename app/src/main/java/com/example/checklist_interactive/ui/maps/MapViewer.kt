@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import kotlinx.coroutines.flow.combine
 import androidx.compose.ui.Modifier
@@ -218,6 +219,8 @@ fun MapViewer(
     // Restore solo navigation state from SharedPreferences
     LaunchedEffect(dbReady, locationRepository) {
         mapState.restoreNavigationState(locationRepository)
+        // Also load marker pattern states
+        mapState.loadAllMarkerPatternStates()
     }
 
     // Load runways for the selected location from the DB (only when DB is ready)
@@ -1326,6 +1329,137 @@ fun MapViewer(
             }
             mv.invalidate()
         }
+    }
+
+    // Render patterns for individual markers (separate from active navigation pattern)
+    LaunchedEffect(mapState.markerPatterns, mapState.mapView, dbReady, locationRepository) {
+        val mv = mapState.mapView ?: return@LaunchedEffect
+        if (!dbReady || locationRepository == null) {
+            Log.d(TAG, "⏳ Pattern rendering waiting for DB/repository: dbReady=$dbReady, repo=${locationRepository != null}")
+            return@LaunchedEffect
+        }
+        
+        Log.d(TAG, "🎨 Rendering patterns for ${mapState.markerPatterns.size} markers")
+        
+        // Remove all old marker pattern overlays
+        mapState.patternPolylines.values.forEach { polyline ->
+            mv.overlays.remove(polyline)
+        }
+        mapState.patternLabelOverlays.values.forEach { overlay ->
+            mv.overlays.remove(overlay)
+        }
+        
+        val newPolylines = mutableMapOf<Int, org.osmdroid.views.overlay.Polyline>()
+        val newLabelOverlays = mutableMapOf<Int, com.example.checklist_interactive.ui.maps.navigation.PatternLabelOverlay>()
+        
+        // Draw patterns for all enabled markers
+        for ((markerId, state) in mapState.markerPatterns) {
+            if (!state.enabled) continue
+            
+            // Get marker location from database
+            val location = try {
+                withContext(Dispatchers.IO) {
+                    locationRepository?.getLocationById(markerId)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to load location for marker $markerId", e)
+                null
+            } ?: continue
+            
+            // Get runways if available
+            val runways: List<com.example.checklist_interactive.data.tactical.RunwayEntity> = try {
+                withContext(Dispatchers.IO) {
+                    val db = com.example.checklist_interactive.data.tactical.TacticalDatabase.getInstance(context, useExternalPath = false)
+                    db.runwayDao().getRunwaysByLocationSync(markerId)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to load runways for marker $markerId", e)
+                emptyList()
+            }
+            
+            // Determine heading and runway properties
+            val runway = runways.getOrNull(state.selectedRunwayIndex?.div(2) ?: 0)
+            val runwayHeading: Double
+            val runwayLengthMeters: Double
+            val runwayThreshold: GeoPoint
+            val headingForPattern: Double
+            
+            if (runway != null) {
+                // Use runway data
+                runwayHeading = runway.headingDeg ?: extractRunwayHeading(runway.name) ?: 0.0
+                runwayLengthMeters = (runway.lengthM?.toDouble() ?: runway.lengthFt?.toDouble()?.times(0.3048)) ?: 2000.0
+                runwayThreshold = GeoPoint(
+                    runway.touchdownStartLat ?: location.latitude,
+                    runway.touchdownStartLon ?: location.longitude
+                )
+                val isDirection1 = (state.selectedRunwayIndex ?: 0) % 2 == 0
+                headingForPattern = if (isDirection1) runwayHeading else (runwayHeading + 180.0) % 360
+            } else if (state.selectedRunwayHeading != null) {
+                // Use stored runway heading
+                runwayHeading = state.selectedRunwayHeading!!
+                runwayLengthMeters = 2000.0
+                runwayThreshold = GeoPoint(location.latitude, location.longitude)
+                headingForPattern = runwayHeading
+            } else if (state.manualHeading.isNotEmpty()) {
+                // Use manual heading
+                val heading = state.manualHeading.toDoubleOrNull() ?: continue
+                runwayHeading = heading
+                runwayLengthMeters = 2000.0
+                runwayThreshold = GeoPoint(location.latitude, location.longitude)
+                headingForPattern = heading
+            } else {
+                // No heading available
+                continue
+            }
+            
+            // Generate pattern
+            val (patternPoints, cornerPositions, segmentHeadings) = TrafficPatternGenerator.generateTrafficPatternWithCorners(
+                runwayThreshold = runwayThreshold,
+                runwayHeading = headingForPattern,
+                runwayLengthMeters = runwayLengthMeters,
+                patternSize = state.patternSize,
+                direction = state.patternDirection,
+                finalDistanceNm = state.finalDistanceNm,
+                roundedCorners = state.roundedCorners
+            )
+            
+            // Create polyline (use different color to distinguish from active navigation pattern)
+            val polyline = TrafficPatternGenerator.createPatternPolyline(
+                points = patternPoints,
+                color = 0xFF00BFFF.toInt(), // Deep Sky Blue for marker patterns
+                width = 4f
+            )
+            mv.overlays.add(polyline)
+            newPolylines[markerId] = polyline
+            
+            // Create labels
+            val runwayElevationFt = (location.elevationM?.times(3.28084))?.toInt() ?: 0
+            val labels = TrafficPatternGenerator.generatePatternLabels(
+                points = patternPoints,
+                direction = state.patternDirection,
+                runwayHeading = headingForPattern,
+                patternSize = state.patternSize,
+                runwayElevationFt = runwayElevationFt,
+                customAltitudeAglFt = state.customAltitudeAglFt,
+                cornerPositions = cornerPositions,
+                segmentHeadings = segmentHeadings
+            )
+            val currentMapRotation = mv.mapOrientation
+            val labelOverlay = PatternLabelOverlay(labels, currentMapRotation)
+            mv.overlays.add(labelOverlay)
+            newLabelOverlays[markerId] = labelOverlay
+            
+            Log.d(TAG, "✈️ Rendered pattern for marker ${location.name} (id=$markerId)")
+        }
+        
+        mapState.patternPolylines = newPolylines
+        mapState.patternLabelOverlays = newLabelOverlays
+        
+        if (newPolylines.isNotEmpty()) {
+            Log.d(TAG, "✅ Successfully rendered ${newPolylines.size} marker patterns")
+        }
+        
+        mv.invalidate()
     }
 
     // Update position marker when flight data changes (throttled to prevent UI blocking)
@@ -3051,6 +3185,9 @@ fun MapViewer(
         DataPadPopup(onDismiss = { mapState.showDataPad = false })
     }
     
+    // Marker Pattern Settings Dialog state
+    var showMarkerPatternSettings by remember { mutableStateOf<com.example.checklist_interactive.data.tactical.LocationEntity?>(null) }
+    
     // Military Symbol Picker Dialog
     if (mapState.showMilitarySymbolPicker) {
         MilitarySymbolPickerDialog(
@@ -3215,9 +3352,56 @@ fun MapViewer(
                     // Check if this airport is in the airspace targets set or is the original airport target
                     mapState.airspaceTargets.any { it.id == location.id } || 
                     (mapState.originalAirportTarget?.id == location.id && mapState.showAirspaceCircles)
+                },
+                onShowPattern = { location ->
+                    // Check if pattern is already active
+                    val isCurrentlyActive = mapState.markerPatterns[location.id]?.enabled ?: false
+                    
+                    if (isCurrentlyActive) {
+                        // Pattern is active - toggle it off
+                        mapState.toggleMarkerPattern(location.id)
+                        Log.d(TAG, "🛬 Pattern disabled for ${location.name} (id=${location.id})")
+                    } else {
+                        // Pattern is not active - show settings dialog first
+                        showMarkerPatternSettings = location
+                        Log.d(TAG, "⚙️ Opening pattern configuration for ${location.name}")
+                    }
+                },
+                onPatternSettingsRequest = { location ->
+                    // Show pattern settings dialog for this marker (long-press)
+                    showMarkerPatternSettings = location
+                    Log.d(TAG, "⚙️ Showing pattern settings for ${location.name}")
+                },
+                getPatternActiveStatus = { location ->
+                    // Check if pattern is enabled for this marker
+                    mapState.markerPatterns[location.id]?.enabled ?: false
                 }
             )
         }
+    }
+    
+    // Show Pattern Settings Dialog when requested
+    showMarkerPatternSettings?.let { location ->
+        val runways by produceState<List<com.example.checklist_interactive.data.tactical.RunwayEntity>>(initialValue = emptyList(), location.id) {
+            val db = com.example.checklist_interactive.data.tactical.TacticalDatabase.getInstance(context, useExternalPath = false)
+            db.runwayDao().getRunwaysByLocation(location.id).collect { value = it }
+        }
+        
+        val currentState = mapState.getPatternState(location.id)
+        
+        com.example.checklist_interactive.ui.maps.ui.MarkerPatternSettingsDialog(
+            location = location,
+            runways = runways,
+            currentState = currentState,
+            onDismiss = { showMarkerPatternSettings = null },
+            onSave = { newState ->
+                // Update and enable pattern with new settings
+                mapState.updatePatternState(location.id) { newState.copy(enabled = true) }
+                mapState.saveMarkerPatternState(location.id)
+                showMarkerPatternSettings = null
+                Log.d(TAG, "💾 Saved and enabled pattern for ${location.name}")
+            }
+        )
     }
     
     // Route Creation Sheet

@@ -221,7 +221,10 @@ fun MarkerRouteManagementSheet(
     onCenterOnMap: ((latitude: Double, longitude: Double) -> Unit)? = null,
     onShowAirspace: (LocationEntity) -> Unit = {},
     onAirspaceSettingsRequest: () -> Unit = {},
-    getAirspaceActiveStatus: (LocationEntity) -> Boolean = { false }
+    getAirspaceActiveStatus: (LocationEntity) -> Boolean = { false },
+    onShowPattern: ((LocationEntity) -> Unit)? = null,
+    onPatternSettingsRequest: ((LocationEntity) -> Unit)? = null,
+    getPatternActiveStatus: ((LocationEntity) -> Boolean)? = null
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val markerGroups by viewModel.markerGroups.collectAsState()
@@ -545,7 +548,12 @@ fun MarkerRouteManagementSheet(
                             },
                             onShowAirspace = onShowAirspace,
                             onAirspaceSettingsRequest = onAirspaceSettingsRequest,
-                            isAirspaceActive = getAirspaceActiveStatus(selectedMarker)
+                            isAirspaceActive = getAirspaceActiveStatus(selectedMarker),
+                            onShowPattern = onShowPattern,
+                            onPatternSettingsRequest = if (onPatternSettingsRequest != null) {
+                                { onPatternSettingsRequest(selectedMarker) }
+                            } else null,
+                            isPatternActive = getPatternActiveStatus?.invoke(selectedMarker) ?: false
                         )
                     } else {
                         Box(
