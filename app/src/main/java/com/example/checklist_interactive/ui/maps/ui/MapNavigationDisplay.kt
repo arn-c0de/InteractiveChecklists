@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.FlightLand
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Opacity
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -140,7 +141,14 @@ fun MapNavigationDisplay(
     manualLandingHeading: String,
     onManualLandingHeadingChange: (String) -> Unit,
     showManualHeadingError: Boolean,
-    onShowManualHeadingErrorChange: (Boolean) -> Unit
+    onShowManualHeadingErrorChange: (Boolean) -> Unit,
+    // Airspace display state
+    showAirspaceCircles: Boolean,
+    onShowAirspaceCirclesChange: (Boolean) -> Unit,
+    enabledAirspaceClasses: Set<String>,
+    onEnabledAirspaceClassesChange: (Set<String>) -> Unit,
+    airspaceFillTransparency: Float,
+    onAirspaceFillTransparencyChange: (Float) -> Unit
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -379,6 +387,9 @@ fun MapNavigationDisplay(
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(if (isSmallScreen) 4.dp else 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        // Airspace settings dialog state
+                        var showAirspaceSettings by remember { mutableStateOf(false) }
+                        
                         // Compact pattern altitude + current altitude + indicator (visible when collapsed)
                         val runwayElevationFt = (originalAirportTarget?.elevationM?.times(3.28084))?.toInt() ?: 0
                         val patternAltAglCompact = customPatternAltitudeAglFt ?: patternSize.patternAltitudeAglFt
@@ -585,6 +596,71 @@ fun MapNavigationDisplay(
                                 imageVector = Icons.Default.FlightLand,
                                 contentDescription = stringResource(R.string.map_nav_approach_button),
                                 modifier = Modifier.size(if (isSmallScreen) 20.dp else 24.dp)
+                            )
+                        }
+
+                        // Airspace button (show/hide airspace circles) - supports long-press for settings
+                        var airspaceButtonPressStartTime by remember { mutableLongStateOf(0L) }
+
+                        Box(
+                            modifier = Modifier
+                                .size(if (isSmallScreen) 36.dp else 48.dp)
+                                .background(
+                                    color = if (showAirspaceCircles)
+                                        MaterialTheme.colorScheme.tertiary
+                                    else
+                                        MaterialTheme.colorScheme.surfaceVariant,
+                                    shape = CircleShape
+                                )
+                                .pointerInput(showAirspaceCircles) {
+                                    detectTapGestures(
+                                        onPress = {
+                                            airspaceButtonPressStartTime = System.currentTimeMillis()
+                                            val released = tryAwaitRelease()
+                                            if (released) {
+                                                val pressDuration = System.currentTimeMillis() - airspaceButtonPressStartTime
+                                                if (pressDuration < 500) {
+                                                    // Short press - toggle airspace
+                                                    // Capture current state value at the moment of the press
+                                                    val currentState = showAirspaceCircles
+                                                    val newState = !currentState
+                                                    Log.d("MapNavigationDisplay", "🌐 Airspace button pressed - toggling from $currentState to $newState")
+                                                    onShowAirspaceCirclesChange(newState)
+                                                    saveNavigationState()
+                                                } else {
+                                                    // Long press - show settings
+                                                    Log.d("MapNavigationDisplay", "🌐 Airspace button long-pressed - showing settings")
+                                                    showAirspaceSettings = true
+                                                }
+                                            }
+                                        }
+                                    )
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Public,
+                                contentDescription = "Airspace",
+                                tint = if (showAirspaceCircles)
+                                    MaterialTheme.colorScheme.onTertiary
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(if (isSmallScreen) 20.dp else 24.dp)
+                            )
+                        }
+
+                        // Airspace settings dialog
+                        if (showAirspaceSettings) {
+                            AirspaceSettingsDialog(
+                                enabledAirspaces = enabledAirspaceClasses,
+                                fillTransparency = airspaceFillTransparency,
+                                onDismiss = { showAirspaceSettings = false },
+                                onSave = { newEnabled, newTransparency ->
+                                    onEnabledAirspaceClassesChange(newEnabled)
+                                    onAirspaceFillTransparencyChange(newTransparency)
+                                    showAirspaceSettings = false
+                                    saveNavigationState()
+                                }
                             )
                         }
 
@@ -2200,6 +2276,132 @@ fun PatternAltitudeEditDialog(
                 ) {
                     Text(stringResource(R.string.action_save))
                 }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        }
+    )
+}
+
+/**
+ * Airspace settings dialog - allows selecting which airspace classes to display
+ */
+@Composable
+fun AirspaceSettingsDialog(
+    enabledAirspaces: Set<String>,
+    fillTransparency: Float,
+    onDismiss: () -> Unit,
+    onSave: (Set<String>, Float) -> Unit
+) {
+    var selectedAirspaces by remember { mutableStateOf(enabledAirspaces) }
+    var transparency by remember { mutableStateOf(fillTransparency) }
+
+    // Available airspace classes
+    val airspaceOptions = listOf(
+        "CLASS_D" to "Class D (CTR) - 5 NM",
+        "CLASS_C_CTR" to "Class C (CTR) - 5 NM",
+        "CLASS_C_TMA" to "Class C (TMA) - 15 NM",
+        "CLASS_B" to "Class B - 30 NM",
+        "CLASS_E" to "Class E - 10 NM",
+        "CLASS_G" to "Class G - 8 NM"
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Airspace Display Settings") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = "Select airspace classes to display:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                airspaceOptions.forEach { (key, label) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                selectedAirspaces = if (selectedAirspaces.contains(key)) {
+                                    selectedAirspaces - key
+                                } else {
+                                    selectedAirspaces + key
+                                }
+                            }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = selectedAirspaces.contains(key),
+                            onCheckedChange = { checked ->
+                                selectedAirspaces = if (checked) {
+                                    selectedAirspaces + key
+                                } else {
+                                    selectedAirspaces - key
+                                }
+                            }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+
+                // Transparency slider
+                Text(
+                    text = "Background Transparency:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "${(transparency * 100).toInt()}%",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "(Borders remain visible)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Slider(
+                    value = transparency,
+                    onValueChange = { transparency = it },
+                    valueRange = 0.05f..0.5f,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+
+                Text(
+                    text = "Lower = More transparent (better map visibility)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(selectedAirspaces, transparency) }) {
+                Text(stringResource(R.string.action_save))
             }
         },
         dismissButton = {

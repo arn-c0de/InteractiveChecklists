@@ -119,6 +119,8 @@ private fun createPlaneDrawable(ctx: Context, sizeDp: Float, color: Int): Bitmap
     return BitmapDrawable(ctx.resources, bitmap)
 }
 
+private const val TAG = "MapViewer"
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapViewer(
@@ -261,6 +263,41 @@ fun MapViewer(
                     overlay.cleanup()
                     mv.overlays.remove(overlay)
                     mapState.airportLabelsOverlay = null
+                    mv.invalidate()
+                }
+            }
+        }
+    }
+
+    // Manage airspace circles overlay lifecycle
+    LaunchedEffect(mapState.mapView, mapState.showAirspaceCircles, mapState.enabledAirspaceClasses, mapState.originalAirportTarget, mapState.airspaceFillTransparency) {
+        Log.d(TAG, "🌐 Airspace overlay lifecycle triggered - show=${mapState.showAirspaceCircles}, airport=${mapState.originalAirportTarget?.name}, enabled=${mapState.enabledAirspaceClasses.size} classes")
+        mapState.mapView?.let { mv ->
+            if (mapState.showAirspaceCircles && mapState.originalAirportTarget != null) {
+                // Remove existing overlay if present (will be recreated with new settings)
+                mapState.airspaceCirclesOverlay?.let { oldOverlay ->
+                    Log.d(TAG, "🌐 Removing old airspace overlay")
+                    mv.overlays.remove(oldOverlay)
+                    mapState.airspaceCirclesOverlay = null
+                }
+
+                // Create new overlay with current settings
+                Log.d(TAG, "🌐 Creating new airspace overlay for ${mapState.originalAirportTarget?.name}")
+                val airspaceOverlay = AirspaceCirclesOverlay(
+                    isEnabled = { mapState.showAirspaceCircles },
+                    getTargetAirport = { mapState.originalAirportTarget },
+                    getEnabledAirspaces = { mapState.enabledAirspaceClasses },
+                    getFillTransparency = { mapState.airspaceFillTransparency }
+                )
+                mv.overlays.add(airspaceOverlay)
+                mapState.airspaceCirclesOverlay = airspaceOverlay
+                mv.invalidate()
+            } else {
+                // Remove overlay if present
+                mapState.airspaceCirclesOverlay?.let { overlay ->
+                    Log.d(TAG, "🌐 Disabling airspace - removing overlay")
+                    mv.overlays.remove(overlay)
+                    mapState.airspaceCirclesOverlay = null
                     mv.invalidate()
                 }
             }
@@ -681,8 +718,7 @@ fun MapViewer(
     val lastUserTouch = remember { mutableStateOf(0L) }
     // When user presses the center button but the MapView isn't attached yet, store the requested center
     val pendingCenter = remember { mutableStateOf<GeoPoint?>(null) }
-    val TAG = "MapViewer"
-    
+
     // Initialize osmdroid configuration
     LaunchedEffect(Unit) {
         mapState.initializeOsmdroidConfig()
@@ -2401,7 +2437,17 @@ fun MapViewer(
             manualLandingHeading = mapState.manualLandingHeading,
             onManualLandingHeadingChange = { mapState.manualLandingHeading = it },
             showManualHeadingError = mapState.showManualHeadingError,
-            onShowManualHeadingErrorChange = { mapState.showManualHeadingError = it }
+            onShowManualHeadingErrorChange = { mapState.showManualHeadingError = it },
+            // Airspace display state
+            showAirspaceCircles = mapState.showAirspaceCircles,
+            onShowAirspaceCirclesChange = {
+                Log.d(TAG, "🌐 State change requested: showAirspaceCircles = ${mapState.showAirspaceCircles} -> $it")
+                mapState.showAirspaceCircles = it
+            },
+            enabledAirspaceClasses = mapState.enabledAirspaceClasses,
+            onEnabledAirspaceClassesChange = { mapState.enabledAirspaceClasses = it },
+            airspaceFillTransparency = mapState.airspaceFillTransparency,
+            onAirspaceFillTransparencyChange = { mapState.airspaceFillTransparency = it }
         )
 
         // DB loading/error indicators only (DataPad status moved to FlightMiniStatusBar)
