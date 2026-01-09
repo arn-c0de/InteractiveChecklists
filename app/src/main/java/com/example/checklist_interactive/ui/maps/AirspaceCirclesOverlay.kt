@@ -149,8 +149,6 @@ class AirspaceCirclesOverlay(
             val centerGeoPoint = GeoPoint(airport.latitude, airport.longitude)
             val centerScreenPoint = mapView.projection.toPixels(centerGeoPoint, null)
 
-            Log.d(TAG, "Drawing airspaces for airport: ${airport.name}, enabled: $enabledAirspaces")
-
             // Sort enabled airspaces by radius (largest first) so smaller ones appear on top
             val sortedAirspaces = airspaceClasses
                 .filter { enabledAirspaces.contains(it.name) }
@@ -172,8 +170,6 @@ class AirspaceCirclesOverlay(
             )
 
             val airspaceCircles = sortedAirspaces.map { airspace ->
-                Log.d(TAG, "Preparing airspace: ${airspace.name} (${airspace.displayName}) - radius: ${airspace.radiusNm} NM")
-
                 val radiusMeters = airspace.radiusNm * 1852.0 // 1 NM = 1852 meters
                 val edgeGeoPoint = GeoPoint(airport.latitude, airport.longitude)
                     .destinationPoint(radiusMeters, 90.0) // Point to the east
@@ -195,10 +191,16 @@ class AirspaceCirclesOverlay(
                 )
             }
 
-            // PHASE 1: Draw all fills (largest to smallest)
+            // PHASE 1: Draw all fills with masking (largest to smallest)
+            // Each circle masks out all smaller circles to create ring/donut effect
             val transparency = getFillTransparency().coerceIn(0.05f, 0.5f)
-            for (circle in airspaceCircles) {
-                // Apply user-configured transparency to the fill color
+            for (i in airspaceCircles.indices) {
+                val circle = airspaceCircles[i]
+
+                // Create a layer for this airspace circle
+                val layerId = canvas.saveLayer(null, null)
+
+                // Draw the filled circle
                 val baseColor = circle.airspace.color
                 val adjustedColor = Color.argb(
                     (transparency * 255).toInt(),
@@ -207,12 +209,29 @@ class AirspaceCirclesOverlay(
                     Color.blue(baseColor)
                 )
                 fillPaint.color = adjustedColor
+                fillPaint.xfermode = null
                 canvas.drawCircle(
                     centerScreenPoint.x.toFloat(),
                     centerScreenPoint.y.toFloat(),
                     circle.radiusPixels,
                     fillPaint
                 )
+
+                // Mask out all smaller circles (all circles after this one in the sorted list)
+                fillPaint.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_OUT)
+                for (j in (i + 1) until airspaceCircles.size) {
+                    val innerCircle = airspaceCircles[j]
+                    canvas.drawCircle(
+                        centerScreenPoint.x.toFloat(),
+                        centerScreenPoint.y.toFloat(),
+                        innerCircle.radiusPixels,
+                        fillPaint
+                    )
+                }
+
+                // Restore the layer
+                fillPaint.xfermode = null
+                canvas.restoreToCount(layerId)
             }
 
             // PHASE 2: Draw all borders with offset for same-radius airspaces
