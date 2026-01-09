@@ -39,22 +39,6 @@ android {
     buildFeatures {
         compose = true
     }
-
-    packagingOptions {
-        resources {
-            // Avoid duplicate META-INF files coming from PDFBox and its submodules
-            // Exclude the DEPENDENCIES file (caused the current failure)
-            excludes += "META-INF/DEPENDENCIES"
-
-            // Some other common metadata files can also collide across jars — keep the first occurrence
-            pickFirsts += listOf(
-                "META-INF/LICENSE",
-                "META-INF/LICENSE.txt",
-                "META-INF/NOTICE",
-                "META-INF/NOTICE.txt"
-            )
-        }
-    }
 }
 
 dependencies {
@@ -72,9 +56,9 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.serialization.json)
     implementation("androidx.documentfile:documentfile:1.0.1")
-    // PDFBox libraries for robust PDF parsing
-    implementation("org.apache.pdfbox:pdfbox:3.0.0")
-    implementation("org.apache.pdfbox:fontbox:3.0.0")
+
+    // PDFBox-Android for PDF parsing (Android fork with no AWT dependencies, 16KB aligned)
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
 
     // OpenStreetMap for aviation map display
     implementation("org.osmdroid:osmdroid-android:6.1.20")

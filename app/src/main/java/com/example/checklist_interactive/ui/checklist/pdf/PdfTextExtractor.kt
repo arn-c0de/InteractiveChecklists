@@ -49,7 +49,7 @@ class PdfTextExtractor(private val context: Context) {
 
         try {
             // Reuse cached parser to avoid rebuilding page list on every extraction
-            val parser = PdfStructureParser.getInstance(pdfFile)
+            val parser = PdfStructureParser.getInstance(context, pdfFile)
             android.util.Log.d(TAG, "Using PdfStructureParser instance for ${pdfFile.absolutePath}")
             val pageText = parser.extractPageText(pageIndex)
             
@@ -79,7 +79,7 @@ class PdfTextExtractor(private val context: Context) {
     suspend fun extractPageText(pdfFile: File, pageIndex: Int): String = withContext(Dispatchers.IO) {
         try {
             // Reuse cached parser to avoid rebuilding page list on every extraction
-            val parser = PdfStructureParser.getInstance(pdfFile)
+            val parser = PdfStructureParser.getInstance(context, pdfFile)
             android.util.Log.d(TAG, "Using PdfStructureParser instance for ${pdfFile.absolutePath}")
             parser.extractPageText(pageIndex)
         } catch (e: Exception) {
