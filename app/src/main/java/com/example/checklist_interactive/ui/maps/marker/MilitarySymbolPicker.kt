@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import android.content.Context
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,8 +72,12 @@ fun MilitarySymbolPickerDialog(
     onDismiss: () -> Unit,
     onSymbolSelected: (MilitarySymbol, SymbolAffiliation) -> Unit
 ) {
-    var selectedCategory by remember { mutableStateOf(SymbolCategory.GROUND_UNITS) }
-    var selectedAffiliation by remember { mutableStateOf(SymbolAffiliation.UNKNOWN) }
+    // Store as ordinal (Int) since Enum can't be saved directly
+    var selectedCategoryOrdinal by rememberSaveable { mutableIntStateOf(SymbolCategory.GROUND_UNITS.ordinal) }
+    var selectedAffiliationOrdinal by rememberSaveable { mutableIntStateOf(SymbolAffiliation.UNKNOWN.ordinal) }
+
+    val selectedCategory = SymbolCategory.entries[selectedCategoryOrdinal]
+    val selectedAffiliation = SymbolAffiliation.entries[selectedAffiliationOrdinal]
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -119,10 +124,10 @@ fun MilitarySymbolPickerDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    SymbolAffiliation.values().forEach { affiliation ->
+                    SymbolAffiliation.entries.forEach { affiliation ->
                         FilterChip(
                             selected = selectedAffiliation == affiliation,
-                            onClick = { selectedAffiliation = affiliation },
+                            onClick = { selectedAffiliationOrdinal = affiliation.ordinal },
                             label = { Text(stringResource(affiliation.displayNameResId)) },
                             leadingIcon = {
                                 Box(
@@ -146,13 +151,13 @@ fun MilitarySymbolPickerDialog(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 ScrollableTabRow(
-                    selectedTabIndex = selectedCategory.ordinal,
+                    selectedTabIndex = selectedCategoryOrdinal,
                     edgePadding = 0.dp
                 ) {
-                    SymbolCategory.values().forEach { category ->
+                    SymbolCategory.entries.forEach { category ->
                         Tab(
                             selected = selectedCategory == category,
-                            onClick = { selectedCategory = category },
+                            onClick = { selectedCategoryOrdinal = category.ordinal },
                             text = { Text(stringResource(category.displayNameResId)) }
                         )
                     }

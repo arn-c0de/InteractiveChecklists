@@ -4,7 +4,7 @@
     android:height="24dp"
     android:viewportWidth="600"
     android:viewportHeight="600">
-    
+
     <!-- Background circle -->
     <path
         android:fillColor="#FFFF80"
@@ -17,15 +17,15 @@
         android:fillColor="#00000000"
         android:pathData="M300,50 A250,250 0 1,0 299.999,50 Z"/>
 
-    <!-- Fighter Aircraft (simplified) -->
+    <!-- SPIKE ATGM -->
     <group android:translateY="140">
-        <!-- fuselage -->
-        <path android:fillColor="#000000" android:pathData="M290,200h20v100h-20z"/>
+        <!-- tripod base -->
+        <path android:strokeColor="#000000" android:strokeWidth="8" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M300,290l-30,20 M300,290l30,20 M300,290v20"/>
 
-        <!-- main wings -->
-        <path android:fillColor="#000000" android:pathData="M150,250h300v25h-300z"/>
+        <!-- launcher box -->
+        <path android:fillColor="#000000" android:pathData="M250,260h100v30h-100z"/>
 
-        <!-- tail -->
-        <path android:fillColor="#000000" android:pathData="M285,300h30v15h-30z"/>
+        <!-- missile tube -->
+        <path android:strokeColor="#000000" android:strokeWidth="12" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M220,275h60"/>
     </group>
 </vector>
