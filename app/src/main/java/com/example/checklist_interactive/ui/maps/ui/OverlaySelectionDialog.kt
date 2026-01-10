@@ -2,12 +2,15 @@ package com.example.checklist_interactive.ui.maps.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.checklist_interactive.R
+import com.example.checklist_interactive.ui.maps.BorderEpoch
+import com.example.checklist_interactive.ui.maps.CountryBordersOverlay
 
 /**
  * Dialog for managing map overlay visibility settings
@@ -18,6 +21,7 @@ import com.example.checklist_interactive.R
  * - MGRS grid overlay
  * - Flight path tracking and recording
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OverlaySelectionDialog(
     compassEnabled: Boolean,
@@ -25,6 +29,7 @@ fun OverlaySelectionDialog(
     rangeRingsMaxNm: Int,
     mgrsGridEnabled: Boolean,
     countryBordersEnabled: Boolean,
+    borderEpoch: BorderEpoch,
     flightInstrumentsEnabled: Boolean,
     markerLabelsEnabled: Boolean,
     flightPathEnabled: Boolean,
@@ -37,6 +42,7 @@ fun OverlaySelectionDialog(
     onChangeRangeRingsMaxNm: (Int) -> Unit,
     onToggleMgrsGrid: (Boolean) -> Unit,
     onToggleCountryBorders: (Boolean) -> Unit,
+    onChangeBorderEpoch: (BorderEpoch) -> Unit,
     onToggleFlightInstruments: (Boolean) -> Unit,
     onToggleMarkerLabels: (Boolean) -> Unit,
     onToggleFlightPath: (Boolean) -> Unit,
@@ -95,6 +101,56 @@ fun OverlaySelectionDialog(
                         Text(stringResource(R.string.map_overlay_country_borders_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(checked = countryBordersEnabled, onCheckedChange = onToggleCountryBorders)
+                }
+
+                // Border Epoch Dropdown (shown when country borders are enabled)
+                if (countryBordersEnabled) {
+                    val context = LocalContext.current
+                    val availableEpochs = remember { CountryBordersOverlay.getAvailableEpochs(context) }
+                    var epochDropdownExpanded by remember { mutableStateOf(false) }
+
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            stringResource(R.string.map_overlay_border_epoch_label),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        ExposedDropdownMenuBox(
+                            expanded = epochDropdownExpanded,
+                            onExpandedChange = { epochDropdownExpanded = it }
+                        ) {
+                            OutlinedTextField(
+                                value = borderEpoch.displayName,
+                                onValueChange = {},
+                                readOnly = true,
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = epochDropdownExpanded) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor(),
+                                colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
+                            )
+                            ExposedDropdownMenu(
+                                expanded = epochDropdownExpanded,
+                                onDismissRequest = { epochDropdownExpanded = false }
+                            ) {
+                                availableEpochs.forEach { epoch ->
+                                    DropdownMenuItem(
+                                        text = { Text(epoch.displayName) },
+                                        onClick = {
+                                            onChangeBorderEpoch(epoch)
+                                            epochDropdownExpanded = false
+                                        },
+                                        contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                                    )
+                                }
+                            }
+                        }
+                        Text(
+                            stringResource(R.string.map_overlay_border_epoch_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
