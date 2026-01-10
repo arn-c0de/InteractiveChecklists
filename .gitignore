@@ -70,6 +70,7 @@ codeql-py-analysis.sarif
 .vscode
 .claude
 
+scripts\MapDatabaseTools\ecdh_device.json
 
 security_audit.jsonl
 security_audit.key

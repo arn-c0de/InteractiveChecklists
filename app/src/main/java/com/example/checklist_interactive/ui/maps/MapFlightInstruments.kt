@@ -47,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalConfiguration
 import com.example.checklist_interactive.R
 import kotlin.math.cos
 import kotlin.math.sin
@@ -97,6 +98,32 @@ fun MapFlightInstruments(
 
     if (!enabled) return
 
+    // Get screen configuration for responsive sizing
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+
+    // Calculate responsive instrument sizes
+    // Primary row: 3 instruments (120dp + 220dp + 120dp = 460dp) + spacing (2 * 12dp = 24dp) = 484dp
+    // Secondary row: 7 instruments (7 * 64dp = 448dp) + spacing (6 * 8dp = 48dp) = 496dp
+    // We need to fit the wider of these (496dp) into available width with padding
+
+    val horizontalPadding = 10.dp
+    val availableWidth = screenWidth - (horizontalPadding * 2)
+
+    // Calculate scale factor based on secondary row (wider row)
+    val secondaryRowWidth = (64 * 7 + 8 * 6).dp
+    val primaryRowWidth = (120 + 220 + 120 + 12 * 2).dp
+    val maxRequiredWidth = maxOf(secondaryRowWidth, primaryRowWidth)
+
+    val scaleFactor = (availableWidth / maxRequiredWidth).coerceIn(0.4f, 1.0f)
+
+    // Calculate scaled sizes
+    val primarySmallSize = (120.dp * scaleFactor).coerceAtLeast(60.dp)
+    val primaryLargeSize = (220.dp * scaleFactor).coerceAtLeast(110.dp)
+    val secondarySize = (64.dp * scaleFactor).coerceAtLeast(32.dp)
+    val primarySpacing = (12.dp * scaleFactor).coerceAtLeast(6.dp)
+    val secondarySpacing = (8.dp * scaleFactor).coerceAtLeast(4.dp)
+
     // Horizontal panel at bottom center
     Box(
         modifier = modifier.fillMaxSize(),
@@ -113,27 +140,27 @@ fun MapFlightInstruments(
             // Use a Box so we can overlay a "NO DATA" indicator when no flight data exists
             Box {
                 Column(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                    modifier = Modifier.padding(horizontal = horizontalPadding, vertical = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // Primary flight instruments (top row)
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(primarySpacing),
                         verticalAlignment = Alignment.Bottom
                     ) {
                         // Airspeed Indicator
                         AirspeedIndicator(
                             airspeed = airspeed ?: 0.0,
                             mach = mach,
-                            size = 120.dp
+                            size = primarySmallSize
                         )
 
                         // Attitude Indicator (larger, centered) with HUD Altitude and Speed Overlays
                         AttitudeIndicator(
                             pitch = pitch,
                             bank = bank,
-                            size = 220.dp,
+                            size = primaryLargeSize,
                             altitude = altitude,
                             terrainElevation = terrainElevation,
                             verticalSpeed = verticalSpeed,
@@ -143,59 +170,59 @@ fun MapFlightInstruments(
                         // Vertical Speed Indicator
                         VerticalSpeedIndicator(
                             verticalSpeed = verticalSpeed ?: 0.0,
-                            size = 120.dp
+                            size = primarySmallSize
                         )
                     }
 
                     // Secondary instruments (bottom row - compact)
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(secondarySpacing),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Heading Indicator
                         HeadingIndicator(
                             heading = heading ?: 0.0,
-                            size = 64.dp
+                            size = secondarySize
                         )
 
                         // Angle of Attack
                         AoAIndicator(
                             aoa = angleOfAttack ?: 0.0,
-                            size = 64.dp
+                            size = secondarySize
                         )
 
                         // G-Meter (left side)
                         GMeterIndicator(
                             gLoad = gLoad ?: 1.0,
-                            size = 64.dp
+                            size = secondarySize
                         )
 
                         // Engine RPM Indicator (center-right)
                         EngineRPMIndicator(
                             rpmLeft = engineRpmLeft ?: 0.0,
                             rpmRight = engineRpmRight,
-                            size = 64.dp
+                            size = secondarySize
                         )
 
                         // Fuel Indicator (right side)
                         FuelIndicator(
                             fuelRemaining = fuelRemaining ?: 0.0,
                             fuelTotal = fuelTotal ?: 1.0,
-                            size = 64.dp
+                            size = secondarySize
                         )
 
                         // Wind Indicator
                         WindIndicator(
                             windSpeed = windSpeed ?: 0.0,
                             windDirection = windDirection ?: 0.0,
-                            size = 64.dp
+                            size = secondarySize
                         )
 
                         // Countermeasures Indicator
                         CountermeasuresIndicator(
                             flareCount = flareCount ?: 0,
                             chaffCount = chaffCount ?: 0,
-                            size = 64.dp
+                            size = secondarySize
                         )
                     }
                 }
@@ -237,6 +264,10 @@ fun AttitudeIndicator(
 ) {
     // Debug log for visibility
     // Debug logging removed to reduce log spam
+
+    // Calculate HUD overlay sizes proportional to attitude indicator size
+    // Base size is 220dp, overlays are 70dp x 160dp and 70dp x 70dp
+    val overlayScale = (size / 220.dp).coerceIn(0.5f, 1.0f)
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -301,17 +332,19 @@ fun AttitudeIndicator(
                 altitude = altitude ?: 0.0,
                 terrainElevation = terrainElevation,
                 verticalSpeed = verticalSpeed,
+                scale = overlayScale,
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
-                    .padding(end = 4.dp)
+                    .padding(end = 4.dp * overlayScale)
             )
 
             // HUD Speed Overlay (top left) - positioned OVER the attitude indicator
             HUDSpeedOverlay(
                 airspeed = airspeed ?: 0.0,
+                scale = overlayScale,
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(start = 4.dp, top = 20.dp)
+                    .padding(start = 4.dp * overlayScale, top = 20.dp * overlayScale)
             )
         }
 
@@ -333,7 +366,8 @@ fun HUDAltitudeOverlay(
     altitude: Double,
     terrainElevation: Double?,
     verticalSpeed: Double?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    scale: Float = 1.0f
 ) {
     // Ground height and warning height settings (persisted in SharedPreferences)
     val context = LocalContext.current
@@ -383,7 +417,7 @@ fun HUDAltitudeOverlay(
         }
     }
 
-    // Cached Paint objects
+    // Cached Paint objects with scaled text sizes
     val tapePaint = remember {
         android.graphics.Paint().apply {
             isAntiAlias = true
@@ -392,21 +426,21 @@ fun HUDAltitudeOverlay(
         }
     }
 
-    val textPaint = remember {
+    val textPaint = remember(scale) {
         android.graphics.Paint().apply {
             isAntiAlias = true
             color = android.graphics.Color.argb(0xFF, 0x00, 0xFF, 0x00)
-            textSize = 22f
+            textSize = 22f * scale
             textAlign = android.graphics.Paint.Align.RIGHT
             typeface = android.graphics.Typeface.MONOSPACE
         }
     }
 
-    val textShadowPaint = remember {
+    val textShadowPaint = remember(scale) {
         android.graphics.Paint().apply {
             isAntiAlias = true
             color = android.graphics.Color.argb(0xAA, 0x00, 0x00, 0x00)
-            textSize = 22f
+            textSize = 22f * scale
             textAlign = android.graphics.Paint.Align.RIGHT
             typeface = android.graphics.Typeface.MONOSPACE
         }
@@ -414,7 +448,7 @@ fun HUDAltitudeOverlay(
 
     Box(
         modifier = modifier
-            .size(width = 70.dp, height = 160.dp)
+            .size(width = 70.dp * scale, height = 160.dp * scale)
     ) {
         Canvas(modifier = Modifier
             .fillMaxSize()
@@ -537,7 +571,7 @@ fun HUDAltitudeOverlay(
 
             // Draw current altitude box (clickable area handled by modifier)
             drawIntoCanvas { canvas ->
-                val boxHeight = 45f
+                val boxHeight = 45f * scale
                 val boxWidth = width * 0.95f
                 val boxLeft = width - boxWidth
                 val boxTop = centerY - boxHeight / 2f
@@ -554,8 +588,8 @@ fun HUDAltitudeOverlay(
                     boxTop,
                     width,
                     boxTop + boxHeight,
-                    4f,
-                    4f,
+                    4f * scale,
+                    4f * scale,
                     boxPaint
                 )
 
@@ -564,7 +598,7 @@ fun HUDAltitudeOverlay(
                     isAntiAlias = true
                     color = aglColor.value.toInt()
                     style = android.graphics.Paint.Style.STROKE
-                    strokeWidth = 2f
+                    strokeWidth = 2f * scale
                 }
 
                 canvas.nativeCanvas.drawRoundRect(
@@ -572,8 +606,8 @@ fun HUDAltitudeOverlay(
                     boxTop,
                     width,
                     boxTop + boxHeight,
-                    4f,
-                    4f,
+                    4f * scale,
+                    4f * scale,
                     boxStrokePaint
                 )
 
@@ -588,7 +622,7 @@ fun HUDAltitudeOverlay(
                 val altTextPaint = android.graphics.Paint().apply {
                     isAntiAlias = true
                     color = altTextColor
-                    textSize = 26f
+                    textSize = 26f * scale
                     textAlign = android.graphics.Paint.Align.CENTER
                     typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
                 }
@@ -596,7 +630,7 @@ fun HUDAltitudeOverlay(
                 canvas.nativeCanvas.drawText(
                     altText,
                     boxLeft + boxWidth / 2f,
-                    centerY + 10f,
+                    centerY + 10f * scale,
                     altTextPaint
                 )
             }
@@ -612,14 +646,14 @@ fun HUDAltitudeOverlay(
                 val vsPaint = android.graphics.Paint().apply {
                     isAntiAlias = true
                     color = vsColor
-                    textSize = 18f
+                    textSize = 18f * scale
                     textAlign = android.graphics.Paint.Align.LEFT
                     typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
                 }
 
                 val vsInt = vsFpm.roundToInt()
                 val vsText = if (vsInt > 0) "+$vsInt" else "$vsInt"
-                canvas.nativeCanvas.drawText(vsText, 8f, 20f, vsPaint)
+                canvas.nativeCanvas.drawText(vsText, 8f * scale, 20f * scale, vsPaint)
             }
 
             // Draw AGL readout at bottom
@@ -629,7 +663,7 @@ fun HUDAltitudeOverlay(
                     val aglPaint = android.graphics.Paint().apply {
                         isAntiAlias = true
                         color = aglColor.value.toInt()
-                        textSize = 20f
+                        textSize = 20f * scale
                         textAlign = android.graphics.Paint.Align.CENTER
                         typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
                     }
@@ -637,7 +671,7 @@ fun HUDAltitudeOverlay(
                     canvas.nativeCanvas.drawText(
                         aglText,
                         width / 2f,
-                        height - 12f,
+                        height - 12f * scale,
                         aglPaint
                     )
                 }
@@ -726,7 +760,8 @@ fun HUDAltitudeOverlay(
 @Composable
 fun HUDSpeedOverlay(
     airspeed: Double, // in m/s
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    scale: Float = 1.0f
 ) {
     // Convert m/s to km/h and knots
     val speedKmh by remember(airspeed) {
@@ -738,7 +773,7 @@ fun HUDSpeedOverlay(
         derivedStateOf { (airspeed * 1.943844).coerceIn(0.0, 999.0) }
     }
 
-    // Cached Paint objects
+    // Cached Paint objects with scaled text sizes
     val bgPaint = remember {
         android.graphics.Paint().apply {
             isAntiAlias = true
@@ -747,31 +782,31 @@ fun HUDSpeedOverlay(
         }
     }
 
-    val kmhTextPaint = remember {
+    val kmhTextPaint = remember(scale) {
         android.graphics.Paint().apply {
             isAntiAlias = true
             color = android.graphics.Color.argb(0xFF, 0x00, 0xFF, 0x00)
-            textSize = 24f
+            textSize = 24f * scale
             textAlign = android.graphics.Paint.Align.CENTER
             typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
         }
     }
 
-    val ktsTextPaint = remember {
+    val ktsTextPaint = remember(scale) {
         android.graphics.Paint().apply {
             isAntiAlias = true
             color = android.graphics.Color.argb(0xFF, 0x00, 0xFF, 0xFF) // Cyan
-            textSize = 18f
+            textSize = 18f * scale
             textAlign = android.graphics.Paint.Align.CENTER
             typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
         }
     }
 
-    val labelPaint = remember {
+    val labelPaint = remember(scale) {
         android.graphics.Paint().apply {
             isAntiAlias = true
             color = android.graphics.Color.argb(0xAA, 0xFF, 0xFF, 0xFF)
-            textSize = 12f
+            textSize = 12f * scale
             textAlign = android.graphics.Paint.Align.CENTER
             typeface = android.graphics.Typeface.MONOSPACE
         }
@@ -779,7 +814,7 @@ fun HUDSpeedOverlay(
 
     Box(
         modifier = modifier
-            .size(width = 70.dp, height = 70.dp)
+            .size(width = 70.dp * scale, height = 70.dp * scale)
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val width = this.size.width
@@ -794,8 +829,8 @@ fun HUDSpeedOverlay(
                     0f,
                     width,
                     height,
-                    8f,
-                    8f,
+                    8f * scale,
+                    8f * scale,
                     bgPaint
                 )
             }
@@ -806,7 +841,7 @@ fun HUDSpeedOverlay(
                 canvas.nativeCanvas.drawText(
                     kmhText,
                     width / 2f,
-                    height / 2f - 5f,
+                    height / 2f - 5f * scale,
                     kmhTextPaint
                 )
 
@@ -814,7 +849,7 @@ fun HUDSpeedOverlay(
                 canvas.nativeCanvas.drawText(
                     "km/h",
                     width / 2f,
-                    height / 2f + 10f,
+                    height / 2f + 10f * scale,
                     labelPaint
                 )
 
@@ -823,7 +858,7 @@ fun HUDSpeedOverlay(
                 canvas.nativeCanvas.drawText(
                     ktsText,
                     width / 2f,
-                    height / 2f + 28f,
+                    height / 2f + 28f * scale,
                     ktsTextPaint
                 )
 
@@ -831,7 +866,7 @@ fun HUDSpeedOverlay(
                 canvas.nativeCanvas.drawText(
                     "kts",
                     width / 2f,
-                    height / 2f + 40f,
+                    height / 2f + 40f * scale,
                     labelPaint
                 )
             }
