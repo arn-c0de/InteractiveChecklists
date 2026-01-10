@@ -24,6 +24,7 @@ fun OverlaySelectionDialog(
     rangeRingsEnabled: Boolean,
     rangeRingsMaxNm: Int,
     mgrsGridEnabled: Boolean,
+    countryBordersEnabled: Boolean,
     flightInstrumentsEnabled: Boolean,
     markerLabelsEnabled: Boolean,
     flightPathEnabled: Boolean,
@@ -35,6 +36,7 @@ fun OverlaySelectionDialog(
     onToggleRangeRings: (Boolean) -> Unit,
     onChangeRangeRingsMaxNm: (Int) -> Unit,
     onToggleMgrsGrid: (Boolean) -> Unit,
+    onToggleCountryBorders: (Boolean) -> Unit,
     onToggleFlightInstruments: (Boolean) -> Unit,
     onToggleMarkerLabels: (Boolean) -> Unit,
     onToggleFlightPath: (Boolean) -> Unit,
@@ -85,6 +87,14 @@ fun OverlaySelectionDialog(
                         Text(stringResource(R.string.map_overlay_mgrs_grid_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(checked = mgrsGridEnabled, onCheckedChange = onToggleMgrsGrid)
+                }
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Column {
+                        Text(stringResource(R.string.map_overlay_country_borders), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.map_overlay_country_borders_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = countryBordersEnabled, onCheckedChange = onToggleCountryBorders)
                 }
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {

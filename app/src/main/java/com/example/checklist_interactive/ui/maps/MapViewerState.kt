@@ -60,6 +60,7 @@ class MapViewerState(
     var rangeRingsEnabled by mutableStateOf(prefsManager.isMapOverlayRangeRingsEnabled())
     var rangeRingsMaxNm by mutableStateOf(prefsManager.getMapOverlayRangeRingsMaxNm())
     var mgrsGridEnabled by mutableStateOf(prefsManager.isMapOverlayMgrsGridEnabled())
+    var countryBordersEnabled by mutableStateOf(prefsManager.isMapOverlayCountryBordersEnabled())
     var flightInstrumentsEnabled by mutableStateOf(prefsManager.isMapOverlayFlightInstrumentsEnabled())
     var showMarkerLabels by mutableStateOf(prefsManager.isMapMarkerLabelsEnabled())
     
@@ -76,6 +77,7 @@ class MapViewerState(
     var headingSpeedLineOverlay by mutableStateOf<Overlay?>(null)
     var rangeRingsOverlay by mutableStateOf<Overlay?>(null)
     var mgrsGridOverlay by mutableStateOf<Overlay?>(null)
+    var countryBordersOverlay by mutableStateOf<Overlay?>(null)
     var airportLabelsOverlay by mutableStateOf<AirportMarkerLabelsOverlay?>(null)
     var airspaceCirclesOverlay by mutableStateOf<AirspaceCirclesOverlay?>(null)
     
