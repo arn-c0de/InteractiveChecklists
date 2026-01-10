@@ -2170,10 +2170,16 @@ fun MapViewer(
                         markerToLocation.clear()
 
                         // Filter markers by visible maps from preferences
+                        // Always show tactical markers (user-placed symbols) regardless of map filters
                         val visibleMaps = prefsManager.getVisibleMaps()
                         val filteredMarkers = markers.filter { marker ->
-                            val markerMap = marker.map?.takeIf { it.isNotEmpty() } ?: "Unknown"
-                            visibleMaps.any { it.equals(markerMap, ignoreCase = true) }
+                            // Always show tactical_military markers (user-placed symbols) regardless of map filter
+                            if (marker.markerType == "tactical_military" || marker.map.isNullOrEmpty()) {
+                                true
+                            } else {
+                                val markerMap = marker.map!!
+                                visibleMaps.any { it.equals(markerMap, ignoreCase = true) }
+                            }
                         }
 
                         // Add markers to map

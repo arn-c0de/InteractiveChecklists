@@ -4,7 +4,7 @@
     android:height="24dp"
     android:viewportWidth="600"
     android:viewportHeight="600">
-    
+
     <!-- Background circle -->
     <path
         android:fillColor="#FFFF80"
@@ -17,15 +17,18 @@
         android:fillColor="#00000000"
         android:pathData="M300,50 A250,250 0 1,0 299.999,50 Z"/>
 
-    <!-- Fighter Aircraft (simplified) -->
+    <!-- Radar -->
     <group android:translateY="140">
-        <!-- fuselage -->
-        <path android:fillColor="#000000" android:pathData="M290,200h20v100h-20z"/>
+        <!-- base -->
+        <path android:fillColor="#000000" android:pathData="M250,290h100v20h-100z"/>
 
-        <!-- main wings -->
-        <path android:fillColor="#000000" android:pathData="M150,250h300v25h-300z"/>
+        <!-- tower -->
+        <path android:fillColor="#000000" android:pathData="M285,250h30v40h-30z"/>
 
-        <!-- tail -->
-        <path android:fillColor="#000000" android:pathData="M285,300h30v15h-30z"/>
+        <!-- radar dish -->
+        <path android:strokeColor="#000000" android:strokeWidth="8" android:fillColor="#00000000" android:pathData="M270,230a30,40 0 0,1 60,0"/>
+
+        <!-- support -->
+        <path android:strokeColor="#000000" android:strokeWidth="6" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M300,230v20"/>
     </group>
 </vector>
