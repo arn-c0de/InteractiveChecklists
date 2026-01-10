@@ -51,6 +51,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_MAP_OVERLAY_RINGS = "map_overlay_rings"
         private const val KEY_MAP_OVERLAY_RINGS_MAX_NM = "map_overlay_rings_max_nm"
         private const val KEY_MAP_OVERLAY_MGRS_GRID = "map_overlay_mgrs_grid"
+        private const val KEY_MAP_OVERLAY_COUNTRY_BORDERS = "map_overlay_country_borders"
         private const val KEY_MAP_OVERLAY_FLIGHT_INSTRUMENTS = "map_overlay_flight_instruments"
         private const val KEY_MAP_MARKER_LABELS = "map_marker_labels"
         private const val KEY_FLIGHT_PATH_INTERVAL_SECONDS = "flight_path_interval_seconds"
@@ -441,6 +442,14 @@ class PreferencesManager(context: Context) {
 
     fun isMapOverlayMgrsGridEnabled(): Boolean {
         return prefs.getBoolean(KEY_MAP_OVERLAY_MGRS_GRID, false)
+    }
+
+    fun setMapOverlayCountryBordersEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_MAP_OVERLAY_COUNTRY_BORDERS, enabled).apply()
+    }
+
+    fun isMapOverlayCountryBordersEnabled(): Boolean {
+        return prefs.getBoolean(KEY_MAP_OVERLAY_COUNTRY_BORDERS, false)
     }
 
     fun setMapOverlayFlightInstrumentsEnabled(enabled: Boolean) {

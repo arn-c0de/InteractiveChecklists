@@ -3000,10 +3000,17 @@ fun MapViewer(
                 }
                 if (mapState.mgrsGridEnabled && mapState.mgrsGridOverlay == null) {
                     val mg = MgrsGridOverlay()
-                    mv.overlays.add(mg)
+                    // Add at position 0 so grid is drawn in background behind all labels/icons
+                    mv.overlays.add(0, mg)
                     mapState.mgrsGridOverlay = mg
                 }
-                
+                if (mapState.countryBordersEnabled && mapState.countryBordersOverlay == null) {
+                    val cb = CountryBordersOverlay(context)
+                    // Add at position 0 so borders are drawn in background behind all labels/icons
+                    mv.overlays.add(0, cb)
+                    mapState.countryBordersOverlay = cb
+                }
+
                 // Airport labels overlay
                 if (mapState.showMarkerLabels && mapState.airportLabelsOverlay == null && locationRepository != null && mapState.tacticalDb != null) {
                     val labelsOverlay = AirportMarkerLabelsOverlay(
@@ -3055,6 +3062,7 @@ fun MapViewer(
             rangeRingsEnabled = mapState.rangeRingsEnabled,
             rangeRingsMaxNm = mapState.rangeRingsMaxNm,
             mgrsGridEnabled = mapState.mgrsGridEnabled,
+            countryBordersEnabled = mapState.countryBordersEnabled,
             flightInstrumentsEnabled = mapState.flightInstrumentsEnabled,
             markerLabelsEnabled = mapState.showMarkerLabels,
             flightPathEnabled = mapState.flightPathEnabled,
@@ -3124,8 +3132,24 @@ fun MapViewer(
                     mapState.mgrsGridOverlay = null
                     if (enabled) {
                         val mg = MgrsGridOverlay()
-                        mv.overlays.add(mg)
+                        // Add at position 0 so grid is drawn in background behind all labels/icons
+                        mv.overlays.add(0, mg)
                         mapState.mgrsGridOverlay = mg
+                    }
+                    mv.invalidate()
+                }
+            },
+            onToggleCountryBorders = { enabled ->
+                mapState.countryBordersEnabled = enabled
+                prefsManager.setMapOverlayCountryBordersEnabled(enabled)
+                mapState.mapView?.let { mv ->
+                    mapState.countryBordersOverlay?.let { mv.overlays.remove(it) }
+                    mapState.countryBordersOverlay = null
+                    if (enabled) {
+                        val cb = CountryBordersOverlay(context)
+                        // Add at position 0 so borders are drawn in background behind all labels/icons
+                        mv.overlays.add(0, cb)
+                        mapState.countryBordersOverlay = cb
                     }
                     mv.invalidate()
                 }

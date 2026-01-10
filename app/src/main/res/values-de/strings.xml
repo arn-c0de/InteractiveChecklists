@@ -1113,13 +1113,15 @@
     <string name="map_drawing_save">Save</string>
     <string name="map_drawing_color_selected_cd">Selected</string>
 
-    
+
     <string name="map_overlay_mgrs_grid">MGRS Grid</string>
     <string name="map_overlay_mgrs_grid_desc">Military Grid Reference System overlay</string>
+    <string name="map_overlay_country_borders">Ländergrenzen</string>
+    <string name="map_overlay_country_borders_desc">Politische und administrative Grenzen hervorheben</string>
     <string name="map_overlay_flight_instruments">Flight Instruments</string>
     <string name="map_overlay_flight_instruments_desc">Live attitude and turn indicators (drag to reposition)</string>
 
-    
+
     <string name="map_search_markers_placeholder">Search markers</string>
     <string name="map_frequency_placeholder">118.50</string>
     <string name="map_marker_manage">Manage</string>
