@@ -17,6 +17,14 @@
   "artifacts": [
     "com.tom-roush:pdfbox-android:2.0.27.0"
   ]
+},
+{
+  "name": "CShapes",
+  "website": "https://icr.ethz.ch/data/cshapes/",
+  "license": "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA)",
+  "usage": "Historical country borders (derived Cold War 1980 snapshot)",
+  "included_file": "app/src/main/assets/borders/borders_cold_war.geojson",
+  "notes": "Non-commercial use only; attribution and ShareAlike required"
 }
 
 ]

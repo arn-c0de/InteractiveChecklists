@@ -21,6 +21,13 @@
 - **Source:** https://www.openstreetmap.org
 - **Attribution:** © OpenStreetMap contributors
 
+## CShapes (historical borders)
+- **License:** [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+- **Source:** https://icr.ethz.ch/data/cshapes/
+- **Usage:** Historical country borders (Cold War snapshot, 1980) — used under CC BY‑NC‑SA; attribution required; derivatives must be shared under the same license.
+- **Included file:** `app/src/main/assets/borders/borders_cold_war.geojson`
+- **Note:** This app is non-commercial; usage complies with CC BY‑NC‑SA.
+
 ---
 
 ## PDFBox-Android (Tom Roush fork)

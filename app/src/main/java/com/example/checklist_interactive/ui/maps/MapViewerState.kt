@@ -61,6 +61,9 @@ class MapViewerState(
     var rangeRingsMaxNm by mutableStateOf(prefsManager.getMapOverlayRangeRingsMaxNm())
     var mgrsGridEnabled by mutableStateOf(prefsManager.isMapOverlayMgrsGridEnabled())
     var countryBordersEnabled by mutableStateOf(prefsManager.isMapOverlayCountryBordersEnabled())
+    var borderEpoch by mutableStateOf(
+        BorderEpoch.values().getOrElse(prefsManager.getMapOverlayBorderEpoch()) { BorderEpoch.MODERN }
+    )
     var flightInstrumentsEnabled by mutableStateOf(prefsManager.isMapOverlayFlightInstrumentsEnabled())
     var showMarkerLabels by mutableStateOf(prefsManager.isMapMarkerLabelsEnabled())
     

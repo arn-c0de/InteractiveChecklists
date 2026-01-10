@@ -1,0 +1,15 @@
+CShapes 2.0 dataset (subset used: snapshots for historical borders)
+
+Source:
+  CShapes, International Conflict Research group, ETH Zurich
+  https://icr.ethz.ch/data/cshapes/
+
+License:
+  Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)
+
+Notes:
+  - This dataset is used under the CC BY-NC-SA license. The app is non-commercial, so this usage is permitted.
+  - If you redistribute these borders, you must provide attribution and share any derivatives under the same license.
+  - Citation recommendation (from CShapes project):
+    Schvitz, Guy, Seraina Rüegger, Luc Girardin, Lars-Erik Cederman, Nils Weidmann,
+    and Kristian Skrede Gleditsch. 2022. "Mapping The International System, 1886-2017: The CShapes 2.0 Dataset." Journal of Conflict Resolution 66(1): 144–61.
