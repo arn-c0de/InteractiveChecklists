@@ -4,7 +4,7 @@
     android:height="24dp"
     android:viewportWidth="600"
     android:viewportHeight="600">
-    
+
     <!-- Background circle -->
     <path
         android:fillColor="#FFFF80"
@@ -17,15 +17,15 @@
         android:fillColor="#00000000"
         android:pathData="M300,50 A250,250 0 1,0 299.999,50 Z"/>
 
-    <!-- Fighter Aircraft (simplified) -->
+    <!-- MANPADS (Man-Portable Air Defense) -->
     <group android:translateY="140">
-        <!-- fuselage -->
-        <path android:fillColor="#000000" android:pathData="M290,200h20v100h-20z"/>
+        <!-- shoulder launcher tube -->
+        <path android:strokeColor="#000000" android:strokeWidth="14" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M230,270h140"/>
 
-        <!-- main wings -->
-        <path android:fillColor="#000000" android:pathData="M150,250h300v25h-300z"/>
+        <!-- grip -->
+        <path android:fillColor="#000000" android:pathData="M290,270h20v25h-20z"/>
 
-        <!-- tail -->
-        <path android:fillColor="#000000" android:pathData="M285,300h30v15h-30z"/>
+        <!-- antenna -->
+        <path android:strokeColor="#000000" android:strokeWidth="6" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M300,260v-20"/>
     </group>
 </vector>

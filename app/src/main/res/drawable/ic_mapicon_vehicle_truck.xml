@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="600"
+    android:viewportHeight="600">
+
+    <!-- Background circle -->
+    <path
+        android:fillColor="#FFFF80"
+        android:pathData="M300,50 A250,250 0 1,0 299.999,50 Z"/>
+
+    <!-- Circle frame -->
+    <path
+        android:strokeColor="#000000"
+        android:strokeWidth="10"
+        android:fillColor="#00000000"
+        android:pathData="M300,50 A250,250 0 1,0 299.999,50 Z"/>
+
+    <!-- Truck (simplified) -->
+    <group android:translateY="140">
+        <!-- cargo bed -->
+        <path android:fillColor="#000000" android:pathData="M220,230h200v60h-200z"/>
+
+        <!-- cab -->
+        <path android:fillColor="#000000" android:pathData="M240,200h80v30h-80z"/>
+
+        <!-- wheels (4) -->
+        <path android:fillColor="#000000" android:pathData="M240,300a20,20 0 1,0 40,0a20,20 0 1,0 -40,0"/>
+        <path android:fillColor="#000000" android:pathData="M290,300a20,20 0 1,0 40,0a20,20 0 1,0 -40,0"/>
+        <path android:fillColor="#000000" android:pathData="M350,300a20,20 0 1,0 40,0a20,20 0 1,0 -40,0"/>
+        <path android:fillColor="#000000" android:pathData="M400,300a20,20 0 1,0 40,0a20,20 0 1,0 -40,0"/>
+    </group>
+</vector>

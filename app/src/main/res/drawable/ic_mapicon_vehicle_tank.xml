@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="600"
+    android:viewportHeight="600">
+
+    <!-- Background circle -->
+    <path
+        android:fillColor="#FFFF80"
+        android:pathData="M300,50 A250,250 0 1,0 299.999,50 Z"/>
+
+    <!-- Circle frame -->
+    <path
+        android:strokeColor="#000000"
+        android:strokeWidth="10"
+        android:fillColor="#00000000"
+        android:pathData="M300,50 A250,250 0 1,0 299.999,50 Z"/>
+
+    <!-- Tank (simplified) -->
+    <group android:translateY="140">
+        <!-- hull -->
+        <path android:fillColor="#000000" android:pathData="M150,220h300v70h-300z"/>
+
+        <!-- turret -->
+        <path android:fillColor="#000000" android:pathData="M250,190h100v30h-100z"/>
+
+        <!-- barrel -->
+        <path android:strokeColor="#000000" android:strokeWidth="10" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M350,205h80"/>
+
+        <!-- wheels (4) -->
+        <path android:fillColor="#000000" android:pathData="M180,300a20,20 0 1,0 40,0a20,20 0 1,0 -40,0"/>
+        <path android:fillColor="#000000" android:pathData="M260,300a20,20 0 1,0 40,0a20,20 0 1,0 -40,0"/>
+        <path android:fillColor="#000000" android:pathData="M340,300a20,20 0 1,0 40,0a20,20 0 1,0 -40,0"/>
+        <path android:fillColor="#000000" android:pathData="M420,300a20,20 0 1,0 40,0a20,20 0 1,0 -40,0"/>
+    </group>
+</vector>

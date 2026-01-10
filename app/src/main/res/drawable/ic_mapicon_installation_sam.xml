@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="600"
+    android:viewportHeight="600">
+
+    <!-- Background circle -->
+    <path
+        android:fillColor="#FFFF80"
+        android:pathData="M300,50 A250,250 0 1,0 299.999,50 Z"/>
+
+    <!-- Circle frame -->
+    <path
+        android:strokeColor="#000000"
+        android:strokeWidth="10"
+        android:fillColor="#00000000"
+        android:pathData="M300,50 A250,250 0 1,0 299.999,50 Z"/>
+
+    <!-- SAM (Surface-to-Air Missile) -->
+    <group android:translateY="140">
+        <!-- launcher base -->
+        <path android:fillColor="#000000" android:pathData="M200,280h200v30h-200z"/>
+
+        <!-- 4 missiles -->
+        <path android:strokeColor="#000000" android:strokeWidth="12" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M240,210v70"/>
+        <path android:strokeColor="#000000" android:strokeWidth="12" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M300,210v70"/>
+        <path android:strokeColor="#000000" android:strokeWidth="12" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M360,210v70"/>
+        <path android:strokeColor="#000000" android:strokeWidth="12" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M420,230v50"/>
+
+        <!-- radar dish -->
+        <path android:strokeColor="#000000" android:strokeWidth="8" android:fillColor="#00000000" android:pathData="M160,250a20,30 0 0,1 40,0"/>
+    </group>
+</vector>
