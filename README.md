@@ -41,9 +41,6 @@ InteractiveChecklists is an Android application for viewing and interacting with
 
 > **Note:** A preview APK for version 1.1 is planned. If you are not familiar with Android Studio or building apps from source, please wait for the official preview release to test the app.
 
-> **Important — Fresh install required (v1.0.21)** ⚠️  
-> The pre-packaged map database (`assets/databases/map_data.db`) was reset to **version 1** in **v1.0.21**. If you are upgrading from an earlier build, you **must fully uninstall the app (including app data)** and then install the new APK to avoid schema mismatch errors and potential data loss. Back up any local database files if you need to preserve custom markers.
-
 
 **Table of Contents**
 
