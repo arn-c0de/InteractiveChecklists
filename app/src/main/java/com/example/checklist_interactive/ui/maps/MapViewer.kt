@@ -3005,7 +3005,8 @@ fun MapViewer(
                     mapState.mgrsGridOverlay = mg
                 }
                 if (mapState.countryBordersEnabled && mapState.countryBordersOverlay == null) {
-                    val cb = CountryBordersOverlay(context)
+                    val cb = CountryBordersOverlay(context, mapState.borderEpoch)
+                    cb.preload() // Preload data in background
                     // Add at position 0 so borders are drawn in background behind all labels/icons
                     mv.overlays.add(0, cb)
                     mapState.countryBordersOverlay = cb
@@ -3063,6 +3064,7 @@ fun MapViewer(
             rangeRingsMaxNm = mapState.rangeRingsMaxNm,
             mgrsGridEnabled = mapState.mgrsGridEnabled,
             countryBordersEnabled = mapState.countryBordersEnabled,
+            borderEpoch = mapState.borderEpoch,
             flightInstrumentsEnabled = mapState.flightInstrumentsEnabled,
             markerLabelsEnabled = mapState.showMarkerLabels,
             flightPathEnabled = mapState.flightPathEnabled,
@@ -3146,12 +3148,28 @@ fun MapViewer(
                     mapState.countryBordersOverlay?.let { mv.overlays.remove(it) }
                     mapState.countryBordersOverlay = null
                     if (enabled) {
-                        val cb = CountryBordersOverlay(context)
+                        val cb = CountryBordersOverlay(context, mapState.borderEpoch)
+                        cb.preload() // Preload data in background
                         // Add at position 0 so borders are drawn in background behind all labels/icons
                         mv.overlays.add(0, cb)
                         mapState.countryBordersOverlay = cb
                     }
                     mv.invalidate()
+                }
+            },
+            onChangeBorderEpoch = { epoch ->
+                mapState.borderEpoch = epoch
+                prefsManager.setMapOverlayBorderEpoch(epoch.ordinal)
+                // Update existing overlay or create new one with new epoch
+                mapState.mapView?.let { mv ->
+                    mapState.countryBordersOverlay?.let { mv.overlays.remove(it) }
+                    if (mapState.countryBordersEnabled) {
+                        val cb = CountryBordersOverlay(context, epoch)
+                        cb.preload() // Preload data in background
+                        mv.overlays.add(0, cb)
+                        mapState.countryBordersOverlay = cb
+                        mv.invalidate()
+                    }
                 }
             },
             onToggleFlightInstruments = { enabled ->

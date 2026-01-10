@@ -1151,6 +1151,8 @@
     <string name="map_overlay_mgrs_grid_desc">Military Grid Reference System overlay</string>
     <string name="map_overlay_country_borders">Country Borders</string>
     <string name="map_overlay_country_borders_desc">Highlight political and administrative boundaries</string>
+    <string name="map_overlay_border_epoch_label">Historical Period</string>
+    <string name="map_overlay_border_epoch_desc">Select which historical borders to display</string>
     <string name="map_overlay_flight_instruments">Flight Instruments</string>
     <string name="map_overlay_flight_instruments_desc">Live attitude and turn indicators (drag to reposition)</string>
     <string name="map_overlay_flight_path">Flight Path</string>
