@@ -765,12 +765,14 @@ fun HUDSpeedOverlay(
 ) {
     // Convert m/s to km/h and knots
     val speedKmh by remember(airspeed) {
-                // Allow values above 999 km/h (e.g., high-speed aircraft)
-                derivedStateOf { (airspeed * 3.6).coerceIn(0.0, 9999.0) }
+        derivedStateOf { (airspeed * 3.6).coerceIn(0.0, 9999.0) }
+    }
+
     // Show airspeed in knots rather than mph
     val speedKts by remember(airspeed) {
-                // Allow higher knot values too
-                derivedStateOf { (airspeed * 1.943844).coerceIn(0.0, 9999.0) }
+        derivedStateOf { (airspeed * 1.943844).coerceIn(0.0, 9999.0) }
+    }
+
     // Cached Paint objects with scaled text sizes
     val bgPaint = remember {
         android.graphics.Paint().apply {
@@ -835,7 +837,7 @@ fun HUDSpeedOverlay(
 
             // Draw km/h value
             drawIntoCanvas { canvas ->
-                val kmhText = String.format("%d", speedKmh.toInt())
+                val kmhText = speedKmh.toInt().toString()
                 canvas.nativeCanvas.drawText(
                     kmhText,
                     width / 2f,
@@ -852,7 +854,7 @@ fun HUDSpeedOverlay(
                 )
 
                 // kts value (smaller, below)
-                val ktsText = String.format("%d", speedKts.toInt())
+                val ktsText = speedKts.toInt().toString()
                 canvas.nativeCanvas.drawText(
                     ktsText,
                     width / 2f,
