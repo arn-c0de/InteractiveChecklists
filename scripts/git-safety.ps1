@@ -32,7 +32,7 @@ if ($env:SKIP_CODEQL_SCAN -eq '1') {
                 
                 # We use -ErrorAction Continue because codeql.exe exits with a non-zero status code (2)
                 # when it finds results, which would otherwise be a terminating error.
-                codeql database analyze codeql-db --format=sarif-latest --output=codeql-results.sarif codeql/python-queries codeql/kotlin-queries -j 0 -ErrorAction Continue
+                codeql database analyze codeql-db --format=sarif-latest --output=codeql-results.sarif -j 0 -ErrorAction Continue
         
         $sarif = $null
         try {

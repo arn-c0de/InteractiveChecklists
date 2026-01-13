@@ -39,8 +39,8 @@ else
     # which would otherwise terminate the script. We want the Python script below to
     # parse the results and decide if the exit code should be 1.
     # Analyze each sub-database separately and merge results
-    codeql database analyze codeql-db/python --format=sarif-latest --output=codeql-py-analysis.sarif codeql/python-queries -j 0 || true
-    codeql database analyze codeql-db/java --format=sarif-latest --output=codeql-kt-analysis.sarif codeql/kotlin-queries -j 0 || true
+    codeql database analyze codeql-db/python --format=sarif-latest --output=codeql-py-analysis.sarif -j 0 || true
+    codeql database analyze codeql-db/java --format=sarif-latest --output=codeql-kt-analysis.sarif -j 0 || true
 
     if python - <<'PY'
 import json, sys
