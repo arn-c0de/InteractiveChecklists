@@ -153,20 +153,73 @@ See [docs/EN/features/DATAPAD_FEATURE.md](docs/EN/features/DATAPAD_FEATURE.md) f
 ## Screenshots
 
 <p align="center">
-		<img src="images/FileExplorer.png" alt="File explorer - list of files and folders" width="360" />
-		<img src="images/md_viewer.png" alt="Markdown viewer showing interactive checklists" width="360" />
-		<img src="images/pdf_viewer.png" alt="PDF viewer with annotation tools" width="360" />
-		<img src="images/quick_notes.png" alt="QuickNotes bottom sheet and editor" width="360" />
-		<img src="images/map_pattern_calculator.png" alt="Calculator for landing patterns" width="360" />
-		<img src="images/map_airspaces-earlyatcfeature.png" alt="First implementation parts for atc features" width="360" />
-		<img src="images/map_tacmarker_live-data.png" alt="Full tactical live data Support" width="360" />
-		<img src="images/map_flightpath.png" alt="Flight path overlay" width="360" />
-		<img src="images/map-route.png" alt="Route lines overlay with labels" width="360" />
-		<img src="images/routeplanner.png" alt="Route planner - line preview" width="360" />
-		<img src="images/landingroute-planner.png" alt="Create Route sheet" width="360" />
-		<img src="images/datapad.png" alt="DataPad live telemetry panel" width="360" />
-		<img src="images/settings_menu.png" alt="Settings and preferences" width="360" />
-		<img src="images/datapad-server-udp_forwarder.png" alt="DataPad server (launcher)" width="360" />
+	<img src="images/FileExplorer.png" alt="File explorer - list of files and folders" width="360" /><br/>
+	<em>File explorer showing the hierarchical file and folder structure</em>
+</p>
+
+<p align="center">
+	<img src="images/md_viewer.png" alt="Markdown viewer showing interactive checklists" width="360" /><br/>
+	<em>Interactive Markdown checklist with stateful checkboxes</em>
+</p>
+
+<p align="center">
+	<img src="images/pdf_viewer.png" alt="PDF viewer with annotation tools" width="360" /><br/>
+	<em>PDF viewer with drawing, highlighting and annotation capabilities</em>
+</p>
+
+<p align="center">
+	<img src="images/quick_notes.png" alt="QuickNotes bottom sheet and editor" width="360" /><br/>
+	<em>QuickNotes editor with markdown support and autosave</em>
+</p>
+
+<p align="center">
+	<img src="images/map_pattern_calculator.png" alt="Calculator for landing patterns" width="360" /><br/>
+	<em>Landing pattern calculator displaying flight path calculations</em>
+</p>
+
+<p align="center">
+	<img src="images/map_airspaces-earlyatcfeature.png" alt="First implementation parts for atc features" width="360" /><br/>
+	<em>Early ATC features showing airspace visualization</em>
+</p>
+
+<p align="center">
+	<img src="images/map_tacmarker_live-data.png" alt="Full tactical live data Support" width="360" /><br/>
+	<em>Live tactical markers displaying real-time unit positions</em>
+</p>
+
+<p align="center">
+	<img src="images/map_flightpath.png" alt="Flight path overlay" width="360" /><br/>
+	<em>Flight path tracking overlay on the aviation map</em>
+</p>
+
+<p align="center">
+	<img src="images/map-route.png" alt="Route lines overlay with labels" width="360" /><br/>
+	<em>Route planning with labeled waypoints and flight paths</em>
+</p>
+
+<p align="center">
+	<img src="images/routeplanner.png" alt="Route planner - line preview" width="360" /><br/>
+	<em>Route planner interface with live preview</em>
+</p>
+
+<p align="center">
+	<img src="images/landingroute-planner.png" alt="Create Route sheet" width="360" /><br/>
+	<em>Landing route creation sheet with configuration options</em>
+</p>
+
+<p align="center">
+	<img src="images/datapad.png" alt="DataPad live telemetry panel" width="360" /><br/>
+	<em>DataPad displaying live aircraft telemetry from DCS World</em>
+</p>
+
+<p align="center">
+	<img src="images/settings_menu.png" alt="Settings and preferences" width="360" /><br/>
+	<em>Application settings and configuration panel</em>
+</p>
+
+<p align="center">
+	<img src="images/datapad-server-udp_forwarder.png" alt="DataPad server (launcher)" width="360" /><br/>
+	<em>DataPad server launcher with configuration menu</em>
 </p>
 
 

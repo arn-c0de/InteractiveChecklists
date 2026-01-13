@@ -124,17 +124,58 @@ DataPad 还支持接收从 DCS 导出的**实体接触信息**（战术单位）
 ## 截图
 
 <p align="center">
-		<img src="../../images/FileExplorer.png" alt="File explorer - list of files and folders" width="360" />
-		<img src="../../images/md_viewer.png" alt="Markdown viewer showing interactive checklists" width="360" />
-		<img src="../../images/pdf_viewer.png" alt="PDF viewer with annotation tools" width="360" />
-		<img src="../../images/quick_notes.png" alt="QuickNotes bottom sheet and editor" width="360" />
-		<img src="../../images/map_pattern_calculator.png" alt="Calculator for landing patterns" width="360" />
-		<img src="../../images/map_flightpath.png" alt="Flight path overlay" width="360" />
-		<img src="../../images/map-route.png" alt="Route lines overlay with labels" width="360" />
-		<img src="../../images/routeplanner.png" alt="Route planner - line preview" width="360" />
-		<img src="../../images/landingroute-planner.png" alt="Create Route sheet" width="360" />
-		<img src="../../images/datapad.png" alt="DataPad live telemetry panel" width="360" />
-		<img src="../../images/settings_menu.png" alt="Settings and preferences" width="360" />
+	<img src="../../images/FileExplorer.png" alt="File explorer - list of files and folders" width="360" /><br/>
+	<em>文件浏览器显示层次化的文件和文件夹结构</em>
+</p>
+
+<p align="center">
+	<img src="../../images/md_viewer.png" alt="Markdown viewer showing interactive checklists" width="360" /><br/>
+	<em>带有状态复选框的交互式 Markdown 清单</em>
+</p>
+
+<p align="center">
+	<img src="../../images/pdf_viewer.png" alt="PDF viewer with annotation tools" width="360" /><br/>
+	<em>支持绘制、高亮和标注功能的 PDF 查看器</em>
+</p>
+
+<p align="center">
+	<img src="../../images/quick_notes.png" alt="QuickNotes bottom sheet and editor" width="360" /><br/>
+	<em>支持 Markdown 和自动保存的快速笔记编辑器</em>
+</p>
+
+<p align="center">
+	<img src="../../images/map_pattern_calculator.png" alt="Calculator for landing patterns" width="360" /><br/>
+	<em>着陆模式计算器显示飞行路径计算结果</em>
+</p>
+
+<p align="center">
+	<img src="../../images/map_flightpath.png" alt="Flight path overlay" width="360" /><br/>
+	<em>航空地图上的飞行路径追踪覆盖层</em>
+</p>
+
+<p align="center">
+	<img src="../../images/map-route.png" alt="Route lines overlay with labels" width="360" /><br/>
+	<em>带有标记航点和飞行路径的航线规划</em>
+</p>
+
+<p align="center">
+	<img src="../../images/routeplanner.png" alt="Route planner - line preview" width="360" /><br/>
+	<em>航线规划器界面与实时预览</em>
+</p>
+
+<p align="center">
+	<img src="../../images/landingroute-planner.png" alt="Create Route sheet" width="360" /><br/>
+	<em>着陆航线创建面板与配置选项</em>
+</p>
+
+<p align="center">
+	<img src="../../images/datapad.png" alt="DataPad live telemetry panel" width="360" /><br/>
+	<em>DataPad 显示来自 DCS World 的实时飞机遥测数据</em>
+</p>
+
+<p align="center">
+	<img src="../../images/settings_menu.png" alt="Settings and preferences" width="360" /><br/>
+	<em>应用程序设置和配置面板</em>
 </p>
 
 
