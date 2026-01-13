@@ -44,8 +44,49 @@ except ImportError:
 DEFAULT_FILE = os.path.expanduser(r"~\Saved Games\DCS\Scripts\player_aircraft_parsed.jsonl")
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 5010
+STATUS_FILE = "forwarder_status.json"
 
 # PSK mode removed - ECDH only
+
+# Global status tracking
+_forwarder_status = {
+    "status": "Starting",
+    "last_update": None,
+    "file_path": None,
+    "connected_devices": 0,
+    "errors": []
+}
+
+
+def write_status(status: str, file_path: str = None, connected_devices: int = 0, error: str = None):
+    """Write forwarder status to a JSON file for monitoring.
+
+    Args:
+        status: Current status (e.g., "Running", "Waiting for file", "Error", "Shutdown")
+        file_path: Path to the file being monitored
+        connected_devices: Number of connected devices
+        error: Optional error message
+    """
+    global _forwarder_status
+    _forwarder_status["status"] = status
+    _forwarder_status["last_update"] = datetime.now().isoformat()
+    if file_path is not None:
+        _forwarder_status["file_path"] = file_path
+    _forwarder_status["connected_devices"] = connected_devices
+
+    if error:
+        # Keep last 10 errors
+        _forwarder_status["errors"].append({
+            "timestamp": datetime.now().isoformat(),
+            "message": error
+        })
+        _forwarder_status["errors"] = _forwarder_status["errors"][-10:]
+
+    try:
+        with open(STATUS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(_forwarder_status, f, indent=2)
+    except Exception as e:
+        logger.debug(f"Failed to write status file: {e}")
 
 
 def find_dcs_scripts_folder() -> str | None:
@@ -626,8 +667,14 @@ def send_udp(payload: bytes, host: str, port: int, sock: socket.socket,
 
         sock.sendto(encrypted, (host, port))
         return True
+    except OSError as e:
+        # Network errors (host unreachable, network down, etc.)
+        # Log but don't crash - device may reconnect later
+        logger.debug(f"Network error sending to {host}:{port} (device {device_id[:8]}...): {e}")
+        return False
     except Exception as e:
-        print(f"Send error: {e}", file=sys.stderr)
+        # Unexpected errors - log with more detail
+        logger.warning(f"Unexpected send error to {host}:{port} (device {device_id[:8]}...): {e}")
         return False
 
 
@@ -665,6 +712,36 @@ def send_udp_multi(payload: bytes, hosts: list, port: int, sock: socket.socket,
         if send_udp(payload, host, port, sock, session_mgr, device_id):
             success_count += 1
     return success_count
+
+
+def send_offline_message(hosts: list, port: int, sock: socket.socket, session_mgr: 'SessionManager'):
+    """Send offline notification to all connected clients during shutdown.
+
+    Args:
+        hosts: List of destination hosts
+        port: Destination port
+        sock: UDP socket
+        session_mgr: SessionManager instance
+    """
+    offline_data = {
+        "type": "server_offline",
+        "timestamp": datetime.now().isoformat() + 'Z',
+        "message": "Server shutting down"
+    }
+    offline_json = json.dumps(offline_data).encode('utf-8')
+
+    # Send to all active sessions
+    sent_count = 0
+    for device_id in list(session_mgr.device_sessions.keys()):
+        try:
+            if send_udp_multi(offline_json, hosts, port, sock,
+                            session_mgr=session_mgr, device_id=device_id):
+                sent_count += 1
+                logger.info(f"📴 Offline notification sent to device {device_id[:8]}...")
+        except Exception as e:
+            logger.debug(f"Failed to send offline message to {device_id[:8]}...: {e}")
+
+    return sent_count
 
 
 def extract_json_from_line(line: str) -> str | None:
@@ -1620,6 +1697,14 @@ def tail_and_send(path: str, hosts: list, port: int, session_mgr: 'SessionManage
             # This ensures fast player updates without massive JSON payloads every frame
 
     finally:
+        # Send offline notification to connected clients before cleanup
+        try:
+            if session_mgr and sock:
+                send_offline_message(hosts, port, sock, session_mgr)
+        except Exception as e:
+            logger.debug(f"Failed to send offline messages during shutdown: {e}")
+
+        # Close all file handles
         try:
             f.close()
         except Exception:
@@ -1684,7 +1769,12 @@ def tail_and_send(path: str, hosts: list, port: int, session_mgr: 'SessionManage
                 f_entity_12.close()
         except Exception:
             pass
-        sock.close()
+
+        # Close socket
+        try:
+            sock.close()
+        except Exception:
+            pass
         # handshake_sock is same as sock in ECDH mode, don't close twice
 
 
@@ -1995,7 +2085,18 @@ def repeat_last_line(path: str, hosts: list, port: int, session_mgr: 'SessionMan
             except Exception as e:
                 print(f"Error reading/sending: {e}", file=sys.stderr)
     finally:
-        sock.close()
+        # Send offline notification to connected clients before cleanup
+        try:
+            if session_mgr and sock:
+                send_offline_message(hosts, port, sock, session_mgr)
+        except Exception as e:
+            logger.debug(f"Failed to send offline messages during shutdown: {e}")
+
+        # Close socket
+        try:
+            sock.close()
+        except Exception:
+            pass
         # handshake_sock is same as sock in ECDH mode, don't close twice
 
 
@@ -2380,21 +2481,38 @@ def main(argv=None):
         else:
             hosts_str = f"{len(target_hosts)} host(s)" if len(target_hosts) > 1 else target_hosts[0]
             print(f"Forwarding {args.file} to {hosts_str}:{args.port} (forward only new lines) ({enc_status})")
+            write_status("Running", file_path=args.file, connected_devices=0)
+            file_missing = False
             while True:
                 try:
+                    if file_missing:
+                        logger.info(f"✅ DCS log file found, resuming forwarding...")
+                        write_status("Running", file_path=args.file,
+                                   connected_devices=len(session_mgr.device_sessions))
+                        file_missing = False
                     tail_and_send(args.file, target_hosts, args.port, session_mgr, send_existing=False, once=False,
                                 interval=interval_seconds, verbose=args.verbose, show_env=args.show_env,
                                 handshake_port=args.handshake_port, bind_ip=args.bind_ip)
                 except KeyboardInterrupt:
                     raise
                 except FileNotFoundError:
-                    print(f"File not found: {args.file}")
+                    if not file_missing:
+                        logger.warning(f"⚠️  DCS log file not found: {args.file}")
+                        logger.info(f"Waiting for file to appear (retrying every 5 seconds)...")
+                        write_status("Waiting for file", file_path=args.file,
+                                   connected_devices=len(session_mgr.device_sessions),
+                                   error=f"File not found: {args.file}")
+                        file_missing = True
                     time.sleep(5)
                     continue
-                except Exception:
+                except Exception as e:
                     import traceback
-                    print("Unhandled error in tail_and_send, restarting in 5s:", file=sys.stderr)
+                    error_msg = f"Unhandled error: {str(e)}"
+                    print(f"{error_msg}, restarting in 5s:", file=sys.stderr)
                     traceback.print_exc()
+                    write_status("Error", file_path=args.file,
+                               connected_devices=len(session_mgr.device_sessions),
+                               error=error_msg)
                     time.sleep(5)
                     continue
     except FileNotFoundError:
@@ -2402,7 +2520,12 @@ def main(argv=None):
         return 2
     except KeyboardInterrupt:
         print("Interrupted")
+        write_status("Shutdown", file_path=args.file if 'args' in locals() else None,
+                   connected_devices=len(session_mgr.device_sessions) if session_mgr else 0)
     finally:
+        # Write final shutdown status
+        write_status("Shutdown", file_path=args.file if 'args' in locals() else None,
+                   connected_devices=len(session_mgr.device_sessions) if session_mgr else 0)
         # Cleanup session manager
         if session_mgr:
             session_mgr.stop_cleanup_thread()
