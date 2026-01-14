@@ -1266,7 +1266,8 @@ fun FilterDialog(
     onToggleCategory: (String) -> Unit,
     onToggleCoalition: (Int) -> Unit,
     onToggleActiveOnly: (Boolean) -> Unit,
-    onClearFilters: () -> Unit
+    onClearFilters: () -> Unit,
+    onClearAllHighlights: () -> Unit
 ) {
     val dataPadManager = LocalDataPadManager.current
     val context = LocalContext.current
@@ -1517,6 +1518,26 @@ fun FilterDialog(
                                     enabled = true,
                                     onCheckedChange = { dataPadManager.toggleAutoHighlightWeapon() }
                                 )
+
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                                // Clear All Highlights Button
+                                Button(
+                                    onClick = onClearAllHighlights,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.HighlightOff,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Clear All Highlights")
+                                }
                             }
                         }
                     }
