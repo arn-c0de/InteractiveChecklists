@@ -144,6 +144,15 @@ fun TacticalUnitsContent(
                     onDismissRequest = { showCleanupMenu = false }
                 ) {
                     DropdownMenuItem(
+                        text = { Text("Clear All Highlights", style = MaterialTheme.typography.bodySmall) },
+                        onClick = {
+                            showCleanupMenu = false
+                            viewModel.clearAllHighlights()
+                        },
+                        leadingIcon = { Icon(Icons.Default.HighlightOff, null, modifier = Modifier.size(16.dp)) }
+                    )
+                    HorizontalDivider()
+                    DropdownMenuItem(
                         text = { Text(stringResource(R.string.tactical_unhide_all_units), style = MaterialTheme.typography.bodySmall) },
                         onClick = {
                             showCleanupMenu = false
@@ -388,6 +397,15 @@ fun TacticalUnitsListScreen(
                                 expanded = showCleanupMenu,
                                 onDismissRequest = { showCleanupMenu = false }
                             ) {
+                                DropdownMenuItem(
+                                    text = { Text("Clear All Highlights") },
+                                    onClick = {
+                                        showCleanupMenu = false
+                                        viewModel.clearAllHighlights()
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.HighlightOff, null) }
+                                )
+                                HorizontalDivider()
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.tactical_unhide_all_units)) },
                                     onClick = {
