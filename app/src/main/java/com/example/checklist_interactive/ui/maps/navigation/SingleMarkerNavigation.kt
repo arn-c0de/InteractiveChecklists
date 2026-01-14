@@ -92,18 +92,76 @@ fun MarkerDetailsContent(
     isAirspaceActive: Boolean = false,
     onShowPattern: ((LocationEntity) -> Unit)? = null,
     onPatternSettingsRequest: (() -> Unit)? = null,
-    isPatternActive: Boolean = false
+    isPatternActive: Boolean = false,
+    onToggleRangeRings: (() -> Unit)? = null,
+    isRangeRingsActive: Boolean = false
 ) {
     var showEditDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    
+
+    // AA System Detection (for tactical ground units)
+    val aaSystem = remember(location) {
+        // Check if this is a tactical ground unit with AA capability
+        if (location.markerType == "tactical_unit") {
+            // Try to get unit type from metadata or name
+            val unitName = location.name
+            val unitType = try {
+                location.metadata?.let { meta ->
+                    org.json.JSONObject(meta).optString("unit_type", "")
+                } ?: ""
+            } catch (e: Exception) {
+                ""
+            }
+
+            com.example.checklist_interactive.ui.maps.AARangeDatabase.getSystemByUnitType(unitName)
+                ?: com.example.checklist_interactive.ui.maps.AARangeDatabase.getSystemByUnitType(unitType)
+        } else null
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(vertical = 8.dp)
     ) {
+        // AA Detection Card (if AA system found)
+        if (aaSystem != null) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "⚠️ AA System",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Text(
+                            text = aaSystem.displayName,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Range: ${aaSystem.engagementRangeKm.toInt()}km • Alt: ${(aaSystem.maxAltitudeM / 1000).toInt()}k ft",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
         // Header with location name and coordinates
         MarkerDetailsHeader(location)
         
@@ -148,7 +206,9 @@ fun MarkerDetailsContent(
             isAirspaceActive = isAirspaceActive,
             onShowPattern = onShowPattern,
             onPatternSettingsRequest = onPatternSettingsRequest,
-            isPatternActive = isPatternActive
+            isPatternActive = isPatternActive,
+            onToggleRangeRings = if (aaSystem != null) onToggleRangeRings else null,
+            isRangeRingsActive = isRangeRingsActive
         )
     }
     
@@ -617,7 +677,9 @@ private fun MarkerDetailsActionButtons(
     isAirspaceActive: Boolean,
     onShowPattern: ((LocationEntity) -> Unit)? = null,
     onPatternSettingsRequest: (() -> Unit)? = null,
-    isPatternActive: Boolean = false
+    isPatternActive: Boolean = false,
+    onToggleRangeRings: (() -> Unit)? = null,
+    isRangeRingsActive: Boolean = false
 ) {
     val configuration = LocalConfiguration.current
     val isSmallScreen = configuration.screenWidthDp < 600
@@ -696,7 +758,33 @@ private fun MarkerDetailsActionButtons(
                 Text(stringResource(R.string.map_show_pattern_button), style = if (isSmallScreen) MaterialTheme.typography.labelLarge else MaterialTheme.typography.bodyLarge)
             }
         }
-        
+
+        // Show Range Rings button (only for AA systems)
+        if (onToggleRangeRings != null) {
+            FilledTonalButton(
+                onClick = onToggleRangeRings,
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = if (isSmallScreen) PaddingValues(horizontal = 12.dp, vertical = 8.dp) else ButtonDefaults.ContentPadding,
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = if (isRangeRingsActive)
+                        MaterialTheme.colorScheme.errorContainer
+                    else
+                        MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = if (isRangeRingsActive)
+                        MaterialTheme.colorScheme.onErrorContainer
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            ) {
+                Icon(Icons.Default.RadioButtonChecked, contentDescription = null, modifier = Modifier.size(if (isSmallScreen) 18.dp else 24.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (isRangeRingsActive) "Hide Range Rings" else "Show Range Rings",
+                    style = if (isSmallScreen) MaterialTheme.typography.labelLarge else MaterialTheme.typography.bodyLarge
+                )
+            }
+        }
+
         // Edit / Move / Center / Delete buttons - vertical on small screens, horizontal on large
         if (isSmallScreen) {
             // Vertical layout for small screens
