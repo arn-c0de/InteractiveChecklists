@@ -320,6 +320,10 @@ fun MapViewer(
         }
     }
 
+    // Cache AA units to avoid expensive DB queries on every draw
+    val cachedAAUnits = remember { mutableStateOf<List<com.example.checklist_interactive.data.tactical.TacticalUnitEntity>>(emptyList()) }
+    val cachedUnitRangeVisibility = remember { mutableStateOf<Map<Int, Boolean>>(emptyMap()) }
+
     // Manage AA Range Rings overlay lifecycle
     LaunchedEffect(mapState.mapView, mapState.showAllAARange, mapState.aaRangeFillTransparency, tacticalUnitsRepository) {
         Log.d(TAG, "🎯 AA Range Rings overlay lifecycle triggered - show=${mapState.showAllAARange}")
@@ -332,33 +336,29 @@ fun MapViewer(
                     mapState.aaRangeOverlay = null
                 }
 
-                // Create new overlay with current settings
+                // Start collecting ground units in background (non-blocking)
+                launch {
+                    tacticalUnitsRepository.getGroundUnits().collect { units ->
+                        cachedAAUnits.value = units
+                        // Update visibility cache
+                        val visibilityMap = units.associate { it.id to (it.showRangeRings == 1) }
+                        cachedUnitRangeVisibility.value = visibilityMap
+                    }
+                }
+
+                // Create new overlay with current settings (using cached data)
                 Log.d(TAG, "🎯 Creating new AA range overlay")
                 val aaRangeOverlay = AARangeRingsOverlay(
                     isEnabled = { true }, // Always enabled, visibility controlled by unit settings
                     getAAUnits = {
-                        // Get all ground units and filter for those with AA capability or show_range_rings=1
-                        try {
-                            kotlinx.coroutines.runBlocking {
-                                tacticalUnitsRepository.getGroundUnits().first()
-                            }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Failed to get ground units for AA range", e)
-                            emptyList()
-                        }
+                        // Return cached units (no DB query!)
+                        cachedAAUnits.value
                     },
                     getFillTransparency = { mapState.aaRangeFillTransparency },
                     getShowAllAARange = { mapState.showAllAARange },
                     getUnitRangeVisibility = { unitId ->
-                        // Check if specific unit has range rings enabled
-                        try {
-                            kotlinx.coroutines.runBlocking {
-                                val unit = tacticalUnitsRepository.getUnitById(unitId)
-                                unit?.showRangeRings == 1
-                            }
-                        } catch (e: Exception) {
-                            false
-                        }
+                        // Return cached visibility (no DB query!)
+                        cachedUnitRangeVisibility.value[unitId] ?: false
                     }
                 )
                 // Add at position 1 (after airspace but before other overlays)
