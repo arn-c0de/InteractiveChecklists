@@ -224,7 +224,8 @@ fun MarkerRouteManagementSheet(
     getAirspaceActiveStatus: (LocationEntity) -> Boolean = { false },
     onShowPattern: ((LocationEntity) -> Unit)? = null,
     onPatternSettingsRequest: ((LocationEntity) -> Unit)? = null,
-    getPatternActiveStatus: ((LocationEntity) -> Boolean)? = null
+    getPatternActiveStatus: ((LocationEntity) -> Boolean)? = null,
+    onToggleRangeRings: ((Int) -> Unit)? = null
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val markerGroups by viewModel.markerGroups.collectAsState()
@@ -553,7 +554,28 @@ fun MarkerRouteManagementSheet(
                             onPatternSettingsRequest = if (onPatternSettingsRequest != null) {
                                 { onPatternSettingsRequest(selectedMarker) }
                             } else null,
-                            isPatternActive = getPatternActiveStatus?.invoke(selectedMarker) ?: false
+                            isPatternActive = getPatternActiveStatus?.invoke(selectedMarker) ?: false,
+                            onToggleRangeRings = if (selectedMarker.markerType == "tactical_unit") {
+                                {
+                                    // Toggle range rings for this tactical unit
+                                    try {
+                                        val metadata = selectedMarker.metadata?.let { org.json.JSONObject(it) } ?: org.json.JSONObject()
+                                        val unitId = metadata.optInt("tactical_unit_id", -1)
+                                        if (unitId > 0) {
+                                            android.util.Log.d("MarkerRouteManagement", "🎯 Toggling range rings for unit ID: $unitId")
+                                            onToggleRangeRings?.invoke(unitId)
+                                        }
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("MarkerRouteManagement", "Failed to toggle range rings", e)
+                                    }
+                                }
+                            } else null,
+                            isRangeRingsActive = try {
+                                val metadata = selectedMarker.metadata?.let { org.json.JSONObject(it) } ?: org.json.JSONObject()
+                                metadata.optInt("show_range_rings", 0) == 1
+                            } catch (e: Exception) {
+                                false
+                            }
                         )
                     } else {
                         Box(

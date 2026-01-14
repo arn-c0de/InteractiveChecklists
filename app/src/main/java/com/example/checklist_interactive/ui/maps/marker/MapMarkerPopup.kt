@@ -121,7 +121,9 @@ fun MapMarkerPopup(
     onCenter: (LocationEntity) -> Unit = {},
     onShowAirspace: (LocationEntity) -> Unit = {},
     onAirspaceSettingsRequest: () -> Unit = {},
-    isAirspaceActive: Boolean = false
+    isAirspaceActive: Boolean = false,
+    onToggleRangeRings: (() -> Unit)? = null,
+    isRangeRingsActive: Boolean = false
 ) {
     val context = LocalContext.current
     // Persisted sheet fraction + opacity like DataPadPopup
@@ -378,6 +380,62 @@ fun MapMarkerPopup(
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
+
+                // AA System Detection (for tactical ground units)
+                val aaSystem = remember(location) {
+                    // Check if this is a tactical ground unit with AA capability
+                    if (location.markerType == "tactical_unit") {
+                        // Try to get unit type from metadata or name
+                        val unitName = location.name
+                        val unitType = try {
+                            location.metadata?.let { meta ->
+                                org.json.JSONObject(meta).optString("unit_type", "")
+                            } ?: ""
+                        } catch (e: Exception) {
+                            ""
+                        }
+
+                        com.example.checklist_interactive.ui.maps.AARangeDatabase.getSystemByUnitType(unitName)
+                            ?: com.example.checklist_interactive.ui.maps.AARangeDatabase.getSystemByUnitType(unitType)
+                    } else null
+                }
+
+                // Show AA Detection Card if AA system found
+                if (aaSystem != null) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "⚠️ AA System",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                Text(
+                                    text = aaSystem.displayName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Range: ${aaSystem.engagementRangeKm.toInt()}km • Alt: ${(aaSystem.maxAltitudeM / 1000).toInt()}k ft",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
 
                 // Extract string resources before remember block
                 val strMarkerType = stringResource(R.string.map_marker_type)
@@ -665,6 +723,38 @@ fun MapMarkerPopup(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(stringResource(R.string.map_show_airspace_button))
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                // Show Range Rings button (only for AA systems)
+                if (aaSystem != null && onToggleRangeRings != null) {
+                    FilledTonalButton(
+                        onClick = onToggleRangeRings,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = if (isRangeRingsActive)
+                                MaterialTheme.colorScheme.errorContainer
+                            else
+                                MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = if (isRangeRingsActive)
+                                MaterialTheme.colorScheme.onErrorContainer
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Public, // Using Public icon, can be changed
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            if (isRangeRingsActive)
+                                "Hide Range Rings"
+                            else
+                                "Show Range Rings"
+                        )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                 }

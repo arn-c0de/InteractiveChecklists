@@ -550,7 +550,10 @@ data class TacticalUnitEntity(
     
     @ColumnInfo(name = "is_highlighted", defaultValue = "0")
     val isHighlighted: Int = 0,  // 1=highlighted on map (larger icon), 0=normal size
-    
+
+    @ColumnInfo(name = "show_range_rings", defaultValue = "0")
+    val showRangeRings: Int = 0,  // 1=show AA range rings on map, 0=hide
+
     @ColumnInfo(name = "first_seen_at")
     val firstSeenAt: String,  // ISO 8601 timestamp
     

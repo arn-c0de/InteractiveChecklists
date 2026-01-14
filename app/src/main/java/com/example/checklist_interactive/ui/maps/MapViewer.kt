@@ -320,6 +320,65 @@ fun MapViewer(
         }
     }
 
+    // Manage AA Range Rings overlay lifecycle
+    LaunchedEffect(mapState.mapView, mapState.showAllAARange, mapState.aaRangeFillTransparency, tacticalUnitsRepository) {
+        Log.d(TAG, "🎯 AA Range Rings overlay lifecycle triggered - show=${mapState.showAllAARange}")
+        mapState.mapView?.let { mv ->
+            if (tacticalUnitsRepository != null) {
+                // Remove existing overlay if present (will be recreated with new settings)
+                mapState.aaRangeOverlay?.let { oldOverlay ->
+                    Log.d(TAG, "🎯 Removing old AA range overlay")
+                    mv.overlays.remove(oldOverlay)
+                    mapState.aaRangeOverlay = null
+                }
+
+                // Create new overlay with current settings
+                Log.d(TAG, "🎯 Creating new AA range overlay")
+                val aaRangeOverlay = AARangeRingsOverlay(
+                    isEnabled = { true }, // Always enabled, visibility controlled by unit settings
+                    getAAUnits = {
+                        // Get all ground units and filter for those with AA capability or show_range_rings=1
+                        try {
+                            kotlinx.coroutines.runBlocking {
+                                tacticalUnitsRepository.getGroundUnits().first()
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to get ground units for AA range", e)
+                            emptyList()
+                        }
+                    },
+                    getFillTransparency = { mapState.aaRangeFillTransparency },
+                    getShowAllAARange = { mapState.showAllAARange },
+                    getUnitRangeVisibility = { unitId ->
+                        // Check if specific unit has range rings enabled
+                        try {
+                            kotlinx.coroutines.runBlocking {
+                                val unit = tacticalUnitsRepository.getUnitById(unitId)
+                                unit?.showRangeRings == 1
+                            }
+                        } catch (e: Exception) {
+                            false
+                        }
+                    }
+                )
+                // Add at position 1 (after airspace but before other overlays)
+                // This ensures range rings appear above airspace but below units
+                mv.overlays.add(if (mv.overlays.size > 0) 1 else 0, aaRangeOverlay)
+                mapState.aaRangeOverlay = aaRangeOverlay
+                mv.invalidate()
+                Log.d(TAG, "🎯 AA Range Rings overlay created and added")
+            } else {
+                // Remove overlay if repository not available
+                mapState.aaRangeOverlay?.let { overlay ->
+                    Log.d(TAG, "🎯 Repository not available - removing AA range overlay")
+                    mv.overlays.remove(overlay)
+                    mapState.aaRangeOverlay = null
+                    mv.invalidate()
+                }
+            }
+        }
+    }
+
     // Listen for show tactical unit details events from MapActionBus
     LaunchedEffect(Unit) {
         MapActionBus.showTacticalUnitDetailsEvent.collect { tacticalUnit ->
@@ -2335,7 +2394,7 @@ fun MapViewer(
                     updateIntervalSecondsFlow = dataPadManager.tacticalUnitsMapUpdateInterval,
                     getMapView = { mapState.mapView },
                     onUnitClick = { tacticalUnit ->
-                        // Convert TacticalUnitEntity to temporary LocationEntity for navigation
+                        // Convert TacticalUnitEntity to temporary LocationEntity for display
                         val tempLocation = com.example.checklist_interactive.data.tactical.LocationEntity(
                             id = 0, // Temporary, no DB ID
                             name = "${tacticalUnit.name} (${tacticalUnit.category})",
@@ -2356,7 +2415,7 @@ fun MapViewer(
                             },
                             isStatic = 1,
                             source = "tactical_tracking",
-                            updatedAt = tacticalUnit.lastSeenAt, // Add last seen timestamp
+                            updatedAt = tacticalUnit.lastSeenAt,
                             metadata = org.json.JSONObject().apply {
                                 // Store tactical unit DB ID for live tracking
                                 put("tactical_unit_id", tacticalUnit.id)
@@ -2364,14 +2423,16 @@ fun MapViewer(
                                 tacticalUnit.heading?.let { put("heading", it) }
                                 // Store highlight status
                                 put("is_highlighted", tacticalUnit.isHighlighted)
+                                // Store range rings status
+                                put("show_range_rings", tacticalUnit.showRangeRings)
                             }.toString()
                         )
 
-                        // Set selected location and show route management
+                        // Set selected location and show marker popup
                         mapState.selectedLocation = tempLocation
                         mapState.showMarkerRouteManagement = true
 
-                        // Center on marker
+                        // Center on unit
                         mapState.mapView?.let { mv ->
                             (context as? android.app.Activity)?.runOnUiThread {
                                 try {
@@ -3423,6 +3484,39 @@ fun MapViewer(
                 getPatternActiveStatus = { location ->
                     // Check if pattern is enabled for this marker
                     mapState.markerPatterns[location.id]?.enabled ?: false
+                },
+                onToggleRangeRings = { unitId ->
+                    // Toggle range rings for tactical unit
+                    scope.launch {
+                        tacticalUnitsRepository?.let { repo ->
+                            val unit = repo.getUnitById(unitId)
+                            if (unit != null) {
+                                val newState = unit.showRangeRings != 1
+                                repo.toggleUnitRangeRings(unitId, newState)
+
+                                // Trigger overlay refresh
+                                val oldTransparency = mapState.aaRangeFillTransparency
+                                mapState.aaRangeFillTransparency = oldTransparency + 0.001f
+                                kotlinx.coroutines.delay(50)
+                                mapState.aaRangeFillTransparency = oldTransparency
+
+                                // Update the selected location metadata
+                                mapState.selectedLocation = mapState.selectedLocation?.copy(
+                                    metadata = mapState.selectedLocation?.metadata?.let { meta ->
+                                        try {
+                                            val obj = org.json.JSONObject(meta)
+                                            obj.put("show_range_rings", if (newState) 1 else 0)
+                                            obj.toString()
+                                        } catch (e: Exception) {
+                                            meta
+                                        }
+                                    }
+                                )
+
+                                Log.d(TAG, "🎯 Toggled range rings for unit $unitId: $newState")
+                            }
+                        }
+                    }
                 }
             )
         }
@@ -3483,7 +3577,7 @@ fun MapViewer(
             )
         }
     }
-    
+
     DisposableEffect(Unit) {
         onDispose {
             // Clear navigation line

@@ -136,7 +136,12 @@ class MapViewerState(
     var showAirspaceCircles by mutableStateOf(false)
     var enabledAirspaceClasses by mutableStateOf(setOf("CLASS_D", "CLASS_C_CTR")) // Default to basic CTR classes
     var airspaceFillTransparency by mutableStateOf(0.10f) // Default to 10% opacity (very transparent)
-    
+
+    // AA Range Rings display state
+    var showAllAARange by mutableStateOf(false) // Show all AA ranges automatically
+    var aaRangeFillTransparency by mutableStateOf(0.15f) // Default to 15% opacity for AA rings
+    var aaRangeOverlay by mutableStateOf<AARangeRingsOverlay?>(null)
+
     // Per-marker pattern state (marker ID -> PatternState)
     data class MarkerPatternState(
         var enabled: Boolean = false,
@@ -165,7 +170,7 @@ class MapViewerState(
     // Selected location state
     var selectedLocation by mutableStateOf<LocationEntity?>(null)
     var selectedRunways by mutableStateOf<List<RunwayEntity>>(emptyList())
-    
+
     // Radial menu state
     var radialMenuVisible by mutableStateOf(false)
     var radialMenuX by mutableStateOf(0)
@@ -392,7 +397,11 @@ class MapViewerState(
         showAirspaceCircles = prefs.getBoolean("show_airspace_circles", false)
         enabledAirspaceClasses = prefs.getStringSet("enabled_airspace_classes", setOf("CLASS_D", "CLASS_C_CTR")) ?: setOf("CLASS_D", "CLASS_C_CTR")
         airspaceFillTransparency = prefs.getFloat("airspace_fill_transparency", 0.10f)
-        
+
+        // Restore AA Range Rings display state
+        showAllAARange = prefs.getBoolean("show_all_aa_range", false)
+        aaRangeFillTransparency = prefs.getFloat("aa_range_fill_transparency", 0.15f)
+
         // Restore airspace targets
         val savedAirspaceTargetIds = prefs.getStringSet("airspace_target_ids", emptySet()) ?: emptySet()
         if (savedAirspaceTargetIds.isNotEmpty()) {
@@ -498,10 +507,14 @@ class MapViewerState(
                 putBoolean("show_airspace_circles", showAirspaceCircles)
                 putStringSet("enabled_airspace_classes", enabledAirspaceClasses)
                 putFloat("airspace_fill_transparency", airspaceFillTransparency)
-                
+
                 // Save airspace target IDs
                 val airspaceTargetIds = airspaceTargets.map { it.id.toString() }.toSet()
                 putStringSet("airspace_target_ids", airspaceTargetIds)
+
+                // Save AA Range Rings display state
+                putBoolean("show_all_aa_range", showAllAARange)
+                putFloat("aa_range_fill_transparency", aaRangeFillTransparency)
 
                 apply()
             }

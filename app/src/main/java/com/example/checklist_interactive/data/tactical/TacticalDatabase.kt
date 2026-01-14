@@ -27,7 +27,7 @@ import java.io.File
         TacticalUnitEntity::class,
         TacticalUnitHistoryEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class TacticalDatabase : RoomDatabase() {
@@ -184,7 +184,7 @@ abstract class TacticalDatabase : RoomDatabase() {
                 TacticalDatabase::class.java,
                 DATABASE_NAME
             )
-                .createFromAsset("databases/$DATABASE_NAME")                .addMigrations(MIGRATION_1_2)
+                .createFromAsset("databases/$DATABASE_NAME")                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             if (allowDestructiveMigration) {
                 builder.fallbackToDestructiveMigration()
             }
@@ -244,6 +244,15 @@ abstract class TacticalDatabase : RoomDatabase() {
         private val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
             override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE tactical_units ADD COLUMN is_highlighted INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        /**
+         * Migration from version 2 to 3: Add show_range_rings column to tactical_units
+         */
+        private val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE tactical_units ADD COLUMN show_range_rings INTEGER NOT NULL DEFAULT 0")
             }
         }
     }
