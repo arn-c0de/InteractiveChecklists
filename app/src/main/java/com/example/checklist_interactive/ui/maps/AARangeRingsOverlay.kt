@@ -63,6 +63,10 @@ class AARangeRingsOverlay(
 
     private val textBounds = Rect()
 
+    // Cache AA system specs to avoid expensive lookups on every draw
+    private val aaSystemCache = mutableMapOf<String, AASystemSpec?>()
+    private var lastLoggedMissingUnit = ""
+
     override fun draw(canvas: Canvas?, mapView: MapView?, shadow: Boolean) {
         if (canvas == null || mapView == null || shadow) return
         if (!isEnabled()) return
@@ -111,12 +115,19 @@ class AARangeRingsOverlay(
         aaUnit: TacticalUnitEntity
     ) {
         try {
-            // Get AA system specification by unit name/type
-            val aaSystem = AARangeDatabase.getSystemByUnitType(aaUnit.name)
-                ?: AARangeDatabase.getSystemByUnitType(aaUnit.type)
+            // Get AA system specification by unit name/type (with caching to avoid repeated lookups)
+            val cacheKey = "${aaUnit.name}:${aaUnit.type}"
+            val aaSystem = aaSystemCache.getOrPut(cacheKey) {
+                AARangeDatabase.getSystemByUnitType(aaUnit.name)
+                    ?: AARangeDatabase.getSystemByUnitType(aaUnit.type)
+            }
 
             if (aaSystem == null) {
-                Log.d(TAG, "No AA system spec found for unit: ${aaUnit.name} (type: ${aaUnit.type})")
+                // Only log once per unique unit to avoid log spam
+                if (lastLoggedMissingUnit != cacheKey) {
+                    Log.d(TAG, "No AA system spec found for unit: ${aaUnit.name} (type: ${aaUnit.type})")
+                    lastLoggedMissingUnit = cacheKey
+                }
                 return
             }
 
