@@ -183,6 +183,11 @@ See [docs/EN/features/DATAPAD_FEATURE.md](docs/EN/features/DATAPAD_FEATURE.md) f
 </p>
 
 <p align="center">
+	<img src="images/map_AA-Range-Rings.png" alt="AA map range rings visualization" width="360" /><br/>
+	<em>AA range rings visualization</em>
+</p>
+
+<p align="center">
 	<img src="images/map_tacmarker_live-data.png" alt="Full tactical live data Support" width="360" /><br/>
 	<em>Live tactical markers displaying real-time unit positions</em>
 </p>
