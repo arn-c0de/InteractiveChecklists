@@ -260,7 +260,8 @@ fun TacticalUnitsContent(
                 onToggleCategory = { viewModel.toggleCategory(it) },
                 onToggleCoalition = { viewModel.toggleCoalition(it) },
                 onToggleActiveOnly = { viewModel.setShowActiveOnly(it) },
-                onClearFilters = { viewModel.clearFilters() }
+                onClearFilters = { viewModel.clearFilters() },
+                onClearAllHighlights = { viewModel.clearAllHighlights() }
             )
         }
 
@@ -493,7 +494,8 @@ fun TacticalUnitsListScreen(
                 onToggleCategory = { viewModel.toggleCategory(it) },
                 onToggleCoalition = { viewModel.toggleCoalition(it) },
                 onToggleActiveOnly = { viewModel.setShowActiveOnly(it) },
-                onClearFilters = { viewModel.clearFilters() }
+                onClearFilters = { viewModel.clearFilters() },
+                onClearAllHighlights = { viewModel.clearAllHighlights() }
             )
         }
 
