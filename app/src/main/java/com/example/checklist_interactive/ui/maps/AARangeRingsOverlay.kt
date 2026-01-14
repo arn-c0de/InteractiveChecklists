@@ -70,11 +70,26 @@ class AARangeRingsOverlay(
         val aaUnits = getAAUnits()
         if (aaUnits.isEmpty()) return
 
+        // Get current map bounds to only draw visible units
+        val boundingBox = mapView.boundingBox
+        val minLat = boundingBox.latSouth
+        val maxLat = boundingBox.latNorth
+        val minLon = boundingBox.lonWest
+        val maxLon = boundingBox.lonEast
+
         canvas.save()
 
         try {
             // Draw range rings for each AA unit
             for (aaUnit in aaUnits) {
+                // Skip units outside visible bounds (with buffer for range rings)
+                // Add ~50km buffer to account for large range rings
+                val bufferDegrees = 0.5 // ~50km latitude buffer
+                if (aaUnit.latitude < minLat - bufferDegrees || aaUnit.latitude > maxLat + bufferDegrees ||
+                    aaUnit.longitude < minLon - bufferDegrees || aaUnit.longitude > maxLon + bufferDegrees) {
+                    continue
+                }
+
                 // Check if this unit should show range rings
                 val showAllAA = getShowAllAARange()
                 val showThisUnit = getUnitRangeVisibility(aaUnit.id)

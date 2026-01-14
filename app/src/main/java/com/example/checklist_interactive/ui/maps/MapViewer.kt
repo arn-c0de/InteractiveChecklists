@@ -273,7 +273,7 @@ fun MapViewer(
     }
 
     // Manage airspace circles overlay lifecycle
-    LaunchedEffect(mapState.mapView, mapState.showAirspaceCircles, mapState.enabledAirspaceClasses, mapState.airspaceTargets, mapState.originalAirportTarget, mapState.airspaceFillTransparency) {
+    LaunchedEffect(mapState.mapView, mapState.showAirspaceCircles, mapState.enabledAirspaceClasses, mapState.airspaceTargets, mapState.originalAirportTarget?.id, mapState.airspaceFillTransparency) {
         val allTargets = buildSet {
             addAll(mapState.airspaceTargets)
             // Also include originalAirportTarget if present (for active navigation)
@@ -921,9 +921,19 @@ fun MapViewer(
 
             repo.observeLocationById(targetId).collect { updatedLocation ->
                 if (updatedLocation != null) {
-                    // Update originalAirportTarget with fresh data from database
-                    mapState.originalAirportTarget = updatedLocation
-                    Log.d(TAG, "🔄 Updated originalAirportTarget: ${updatedLocation.name} at (${updatedLocation.latitude}, ${updatedLocation.longitude})")
+                    // Check if position has meaningfully changed to avoid recomposition spam
+                    val currentTarget = mapState.originalAirportTarget
+                    val elevationChanged = (currentTarget?.elevationM ?: 0.0) - (updatedLocation.elevationM ?: 0.0)
+                    val positionChanged = currentTarget == null ||
+                        kotlin.math.abs(currentTarget.latitude - updatedLocation.latitude) > 0.00001 || // ~1 meter
+                        kotlin.math.abs(currentTarget.longitude - updatedLocation.longitude) > 0.00001 ||
+                        kotlin.math.abs(elevationChanged) > 1.0 // 1 meter altitude
+
+                    if (positionChanged) {
+                        // Update originalAirportTarget with fresh data from database
+                        mapState.originalAirportTarget = updatedLocation
+                        Log.d(TAG, "🔄 Updated originalAirportTarget: ${updatedLocation.name} at (${updatedLocation.latitude}, ${updatedLocation.longitude})")
+                    }
                 }
             }
         }
@@ -940,38 +950,48 @@ fun MapViewer(
             // Observe the tactical unit by ID and update navigation target when it changes
             repo.getUnitByIdFlow(tacticalUnitId).collect { tacticalUnit ->
                 if (tacticalUnit != null) {
-                    // Update the navigation target with the new position
-                    val updatedLocation = com.example.checklist_interactive.data.tactical.LocationEntity(
-                        id = 0, // Temporary, no DB ID
-                        name = "${tacticalUnit.name} (${tacticalUnit.category})",
-                        latitude = tacticalUnit.latitude,
-                        longitude = tacticalUnit.longitude,
-                        elevationM = tacticalUnit.altitude,
-                        markerType = "tactical_unit",
-                        description = buildString {
-                            append("Coalition: ")
-                            append(when (tacticalUnit.coalition) {
-                                0 -> "Neutral"
-                                1 -> "Red"
-                                2 -> "Blue"
-                                else -> "Unknown"
-                            })
-                            tacticalUnit.groupName?.let { append("\nGroup: $it") }
-                            tacticalUnit.pilotName?.let { append("\nPilot: $it") }
-                        },
-                        isStatic = 1,
-                        source = "tactical_tracking",
-                        metadata = org.json.JSONObject().apply {
-                            put("tactical_unit_id", tacticalUnit.id)
-                            tacticalUnit.heading?.let { put("heading", it) }
-                        }.toString()
-                    )
+                    // Check if position has meaningfully changed to avoid recomposition spam
+                    val currentTarget = mapState.activeNavigationTarget
+                    val elevationChanged = (currentTarget?.elevationM ?: 0.0) - tacticalUnit.altitude
+                    val positionChanged = currentTarget == null ||
+                        kotlin.math.abs(currentTarget.latitude - tacticalUnit.latitude) > 0.00001 || // ~1 meter
+                        kotlin.math.abs(currentTarget.longitude - tacticalUnit.longitude) > 0.00001 ||
+                        kotlin.math.abs(elevationChanged) > 1.0 // 1 meter altitude
 
-                    // Update navigation target (this will trigger the navigation line update)
-                    mapState.activeNavigationTarget = updatedLocation
-                    // Also update originalAirportTarget to trigger pattern recalculation
-                    mapState.originalAirportTarget = updatedLocation
-                    Log.d(TAG, "🔄 Updated navigation target position: ${tacticalUnit.name} at (${tacticalUnit.latitude}, ${tacticalUnit.longitude})")
+                    if (positionChanged) {
+                        // Update the navigation target with the new position
+                        val updatedLocation = com.example.checklist_interactive.data.tactical.LocationEntity(
+                            id = 0, // Temporary, no DB ID
+                            name = "${tacticalUnit.name} (${tacticalUnit.category})",
+                            latitude = tacticalUnit.latitude,
+                            longitude = tacticalUnit.longitude,
+                            elevationM = tacticalUnit.altitude,
+                            markerType = "tactical_unit",
+                            description = buildString {
+                                append("Coalition: ")
+                                append(when (tacticalUnit.coalition) {
+                                    0 -> "Neutral"
+                                    1 -> "Red"
+                                    2 -> "Blue"
+                                    else -> "Unknown"
+                                })
+                                tacticalUnit.groupName?.let { append("\nGroup: $it") }
+                                tacticalUnit.pilotName?.let { append("\nPilot: $it") }
+                            },
+                            isStatic = 1,
+                            source = "tactical_tracking",
+                            metadata = org.json.JSONObject().apply {
+                                put("tactical_unit_id", tacticalUnit.id)
+                                tacticalUnit.heading?.let { put("heading", it) }
+                            }.toString()
+                        )
+
+                        // Update navigation target (this will trigger the navigation line update)
+                        mapState.activeNavigationTarget = updatedLocation
+                        // Also update originalAirportTarget to trigger pattern recalculation
+                        mapState.originalAirportTarget = updatedLocation
+                        Log.d(TAG, "🔄 Updated navigation target position: ${tacticalUnit.name} at (${tacticalUnit.latitude}, ${tacticalUnit.longitude})")
+                    }
                 } else {
                     // Tactical unit no longer exists - clear navigation
                     Log.w(TAG, "⚠️ Tactical unit $tacticalUnitId no longer exists, clearing navigation")
@@ -995,7 +1015,7 @@ fun MapViewer(
     LaunchedEffect(
         mapState.showRunwayApproach,
         mapState.targetRunways,
-        mapState.originalAirportTarget,
+        mapState.originalAirportTarget?.id,
         mapState.originalAirportTarget?.latitude,
         mapState.originalAirportTarget?.longitude,
         mapState.mapView,
@@ -1220,7 +1240,7 @@ fun MapViewer(
         mapState.mapView,
         mapState.patternSize,
         mapState.patternDirection,
-        mapState.originalAirportTarget,
+        mapState.originalAirportTarget?.id,
         mapState.originalAirportTarget?.latitude,
         mapState.originalAirportTarget?.longitude,
         mapState.originalAirportTarget?.elevationM,

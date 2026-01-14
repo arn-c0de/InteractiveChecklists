@@ -259,8 +259,21 @@ class TacticalUnitsMapOverlay(
         val projection = mapView.projection
         val mapRotation = mapView.mapOrientation // Map rotation in degrees
 
-        // Pre-calculate all screen positions once for better performance
+        // Get current map bounds to only draw visible units
+        val boundingBox = mapView.boundingBox
+        val minLat = boundingBox.latSouth
+        val maxLat = boundingBox.latNorth
+        val minLon = boundingBox.lonWest
+        val maxLon = boundingBox.lonEast
+
+        // Pre-calculate screen positions ONLY for visible units
         val unitPositions = units.values.mapNotNull { unit ->
+            // Skip units outside visible bounds
+            if (unit.latitude < minLat || unit.latitude > maxLat ||
+                unit.longitude < minLon || unit.longitude > maxLon) {
+                return@mapNotNull null
+            }
+
             val geoPoint = GeoPoint(unit.latitude, unit.longitude)
             val screenPoint = projection.toPixels(geoPoint, null)
             unit to screenPoint
