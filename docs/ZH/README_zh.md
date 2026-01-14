@@ -154,6 +154,11 @@ DataPad 还支持接收从 DCS 导出的**实体接触信息**（战术单位）
 </p>
 
 <p align="center">
+	<img src="../../images/map_AA-Range-Rings.png" alt="AA 射程环可视化" width="360" /><br/>
+	<em>AA 射程环可视化</em>
+</p>
+
+<p align="center">
 	<img src="../../images/map-route.png" alt="Route lines overlay with labels" width="360" /><br/>
 	<em>带有标记航点和飞行路径的航线规划</em>
 </p>
