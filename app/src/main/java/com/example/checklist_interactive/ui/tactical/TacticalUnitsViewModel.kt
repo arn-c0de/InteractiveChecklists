@@ -51,6 +51,8 @@ class TacticalUnitsViewModel(
                 val allUnits = values[7] as List<TacticalUnitEntity>
                 
                 // Update highlight status for each unit based on rules
+                // IMPORTANT: Only SET highlights when auto-highlight is enabled
+                // Never CLEAR highlights when auto-highlight is disabled (preserves manual highlights)
                 allUnits.forEach { unit ->
                     val shouldHighlight = when {
                         highlightAll -> true
@@ -62,10 +64,11 @@ class TacticalUnitsViewModel(
                         unit.category.equals("weapon", ignoreCase = true) && highlightWeapon -> true
                         else -> false
                     }
-                    
-                    val newHighlightStatus = if (shouldHighlight) 1 else 0
-                    if (unit.isHighlighted != newHighlightStatus) {
-                        repository.toggleUnitHighlight(unit.id, shouldHighlight)
+
+                    // Only set highlight to 1 when auto-highlight is enabled
+                    // Never set to 0 (this preserves manual highlights)
+                    if (shouldHighlight && unit.isHighlighted != 1) {
+                        repository.toggleUnitHighlight(unit.id, true)
                     }
                 }
             }.collect()
@@ -230,6 +233,12 @@ class TacticalUnitsViewModel(
     fun unhideAllUnits() {
         viewModelScope.launch {
             repository.unhideAllUnits()
+        }
+    }
+
+    fun clearAllHighlights() {
+        viewModelScope.launch {
+            repository.clearAllHighlights()
         }
     }
 
