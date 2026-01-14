@@ -13,6 +13,8 @@ All relevant changes are summarized here by version.
 - **Fixes & polish:** Fixed ClassCastException and layout issues in camera preview, ensured the scanner stops after scan, improved UX in DataPad settings (scan flow, field validation), and added `--skip-qr-prompt` for non-interactive startup.
 - **Maps & Navigation (UI fixes):** Prevent NM labels from wrapping vertically in the collapsed navigation panel; persist collapsed/expanded navigation panel state across app restarts; shorten Auto‑Center labels for a compact display; adjust Center FAB position to reduce overlap; add optional airspace rings displayed at navigation targets for better situational awareness. (Files: `app/src/main/java/com/example/checklist_interactive/ui/common/FABOverlay.kt`, `app/src/main/java/com/example/checklist_interactive/ui/maps/MapViewer.kt`, `app/src/main/java/com/example/checklist_interactive/ui/maps/ui/MapNavigationDisplay.kt`, `app/src/main/res/values/strings.xml` and localized variants.)
 
+- **Other notable:** Added AA-map range visualisation (phase 1) and historical border/MapBorders overlays; switched to `PDFBox-Android` to fix PDF rendering crashes; forwarder improvements (multi-host/wildcard support, resilient file tailing, status reporting) and a simplified installer/launcher; added export Lua detection (e.g., SA-11) and HUD speed formatting >999. These items were consolidated from recent commits on `1.0.23`.
+
 ### Files of note
 - Added: `scripts/registration_token.py`, `scripts/tests/test_qr_registration.py`, `app/.../data/datapad/QrRegistrationManager.kt`
 - Modified: `scripts/forward_parsed_udp.py`, `scripts/crypto_handshake.py`, `app/.../ui/datapad/QrCodeScannerComposable.kt`, docs and quickstart files.
