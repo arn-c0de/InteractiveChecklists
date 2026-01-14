@@ -26,7 +26,7 @@ pcall(function()
 	local lastWrite = 0
 	local lastCommandCheck = 0
 	local COMMAND_CHECK_INTERVAL = 2.0 -- check for command file every 2 seconds
-	local STREAMER_VERSION = "1.0.11"
+	local STREAMER_VERSION = "1.0.12"
 	-- Maximum number of JSON lines to keep in the output file. Set to 0 to disable trimming.
 	local MAX_JSON_LINES = 20  -- Keep only last 20 lines (2 seconds @ 10 Hz) - MINIMAL buffer
 	local MAX_ENTITY_LINES = 2  -- Keep only last 2 lines for entity contacts (FAST load, minimal backlog)
@@ -231,7 +231,7 @@ pcall(function()
 
 					-- First: Check for weapon names (override Type for misclassified weapons)
 					-- Use more specific patterns that match at start of name
-					local isWeaponByName = 
+					local isWeaponByName =
 					   -- US/NATO missiles and bombs
 					   unitName:match('^AIM[-_]') or
 					   unitName:match('^GBU[-_]') or
@@ -263,6 +263,11 @@ pcall(function()
 					   unitName:match('^RBK') or
 					   unitName:match('^KMGU') or
 					   unitName:match('^ZB[-_]') or  -- Incendiary bombs
+					   -- SAM missiles (Surface-to-Air Missiles)
+					   unitName:match('^9M%d') or  -- Russian SAM missiles: 9M38 (SA-11), 9M31 (SA-9), 9M330 (Tor), etc.
+					   unitName:match('^5V%d') or  -- S-300/S-400 missiles: 5V55, etc.
+					   unitName:match('^48N%d') or  -- S-300/S-400 missiles: 48N6
+					   unitName:match('^SA[-_]%d') or  -- SA-X designations
 					   -- European weapons
 					   unitName:match('^MICA') or
 					   unitName:match('^Magic') or
