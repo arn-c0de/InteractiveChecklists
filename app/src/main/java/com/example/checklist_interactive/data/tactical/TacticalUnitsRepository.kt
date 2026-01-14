@@ -255,7 +255,36 @@ class TacticalUnitsRepository(private val context: Context) {
      */
     suspend fun clearAllHighlights() {
         unitsDao.clearAllHighlights()
-    }    
+    }
+
+    /**
+     * Toggle range rings display for a unit
+     */
+    suspend fun toggleUnitRangeRings(unitId: Int, showRange: Boolean) {
+        unitsDao.setUnitRangeRings(unitId, if (showRange) 1 else 0)
+    }
+
+    /**
+     * Set range rings display for a unit
+     */
+    suspend fun setUnitRangeRings(unitId: Int, showRange: Boolean) {
+        unitsDao.setUnitRangeRings(unitId, if (showRange) 1 else 0)
+    }
+
+    /**
+     * Clear all range rings
+     */
+    suspend fun clearAllRangeRings() {
+        unitsDao.clearAllRangeRings()
+    }
+
+    /**
+     * Get all ground units (potential AA units)
+     */
+    fun getGroundUnits(): Flow<List<TacticalUnitEntity>> {
+        return getUnitsByCategory("ground")
+    }
+
     /**
      * Delete all history entries
      */
