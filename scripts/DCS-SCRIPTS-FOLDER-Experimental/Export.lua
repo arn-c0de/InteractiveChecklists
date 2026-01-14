@@ -229,7 +229,7 @@ pcall(function()
 					local categoryName = 'unknown'
 					local unitName = objData.Name or ''
 
-					-- First: Check for weapon names (override Type for misclassified weapons)
+					-- Weapon name patterns for override detection
 					-- Use more specific patterns that match at start of name
 					local isWeaponByName =
 					   -- US/NATO missiles and bombs
@@ -264,10 +264,12 @@ pcall(function()
 					   unitName:match('^KMGU') or
 					   unitName:match('^ZB[-_]') or  -- Incendiary bombs
 					   -- SAM missiles (Surface-to-Air Missiles)
-					   unitName:match('^9M%d') or  -- Russian SAM missiles: 9M38 (SA-11), 9M31 (SA-9), 9M330 (Tor), etc.
+					   unitName:match('^9M%d') or  -- Russian SAM missiles: 9M38, 9M31, 9M330, etc.
+					   unitName:match('^SA%d+M%d') or  -- SA-11 missiles: SA9M38M1, SA11M38, etc.
+					   unitName:match('9M%d') or  -- Fallback: 9M missiles anywhere in name
 					   unitName:match('^5V%d') or  -- S-300/S-400 missiles: 5V55, etc.
 					   unitName:match('^48N%d') or  -- S-300/S-400 missiles: 48N6
-					   unitName:match('^SA[-_]%d') or  -- SA-X designations
+					   unitName:match('^SA[-_]%d') or  -- SA-X designations with separator
 					   -- European weapons
 					   unitName:match('^MICA') or
 					   unitName:match('^Magic') or
@@ -275,32 +277,15 @@ pcall(function()
 					   unitName:match('^Brimstone') or
 					   unitName:match('^Exocet')
 
-					-- Check for countermeasures (flares/chaffs) - these are aircraft without a name
-					local isCountermeasure = false
+					-- First: Type-based categorization (most reliable)
 					if objData.Type and type(objData.Type) == 'table' then
 						local level1 = objData.Type.level1 or 0
 						local level3 = objData.Type.level3 or 0
-						-- Aircraft type (level1==1) without a proper name = countermeasure
+
+						-- Check for countermeasures (aircraft without proper name)
 						if level1 == 1 and (unitName == '' or unitName == 'Unknown' or unitName == nil) then
-							isCountermeasure = true
-						end
-					end
-
-					if isCountermeasure then
-						categoryName = 'countermeasure'
-					elseif isWeaponByName then
-						categoryName = 'weapon'
-					-- Name-based heuristics for structures
-					elseif unitName:find('HELIPAD') or unitName:find('FARP') or unitName:find('Invisible FARP') then
-						categoryName = 'structure'
-					elseif unitName:find('Bunker') or unitName:find('house') or unitName:find('Building') then
-						categoryName = 'structure'
-					-- Type-based categorization (most reliable for non-weapons)
-					elseif objData.Type and type(objData.Type) == 'table' then
-						local level1 = objData.Type.level1 or 0
-						local level3 = objData.Type.level3 or 0
-
-						if level1 == 1 then
+							categoryName = 'countermeasure'
+						elseif level1 == 1 then
 							if level3 == 1 then
 								categoryName = 'aircraft'
 							elseif level3 == 6 then
@@ -318,6 +303,22 @@ pcall(function()
 							categoryName = 'weapon'
 						elseif level1 == 0 then
 							categoryName = 'structure'  -- Default for level1 == 0
+						end
+					end
+
+					-- Then: Name-based overrides for misclassified weapons
+					-- Override ONLY if the Type is structure (level1==4), weapon (level1==5), or unknown
+					-- Do NOT override ground vehicles (level1==2) even if their name contains weapon patterns
+					if (categoryName == 'structure' or categoryName == 'weapon' or categoryName == 'unknown') and isWeaponByName then
+						categoryName = 'weapon'
+					end
+
+					-- Name-based heuristics for structures (only if not already categorized)
+					if categoryName == 'unknown' or categoryName == 'structure' then
+						if unitName:find('HELIPAD') or unitName:find('FARP') or unitName:find('Invisible FARP') then
+							categoryName = 'structure'
+						elseif unitName:find('Bunker') or unitName:find('house') or unitName:find('Building') then
+							categoryName = 'structure'
 						end
 					end
 					
