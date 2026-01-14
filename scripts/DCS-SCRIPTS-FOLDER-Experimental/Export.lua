@@ -26,7 +26,7 @@ pcall(function()
 	local lastWrite = 0
 	local lastCommandCheck = 0
 	local COMMAND_CHECK_INTERVAL = 2.0 -- check for command file every 2 seconds
-	local STREAMER_VERSION = "1.0.12"
+	local STREAMER_VERSION = "1.0.13"
 	-- Maximum number of JSON lines to keep in the output file. Set to 0 to disable trimming.
 	local MAX_JSON_LINES = 20  -- Keep only last 20 lines (2 seconds @ 10 Hz) - MINIMAL buffer
 	local MAX_ENTITY_LINES = 2  -- Keep only last 2 lines for entity contacts (FAST load, minimal backlog)
@@ -229,6 +229,11 @@ pcall(function()
 					local categoryName = 'unknown'
 					local unitName = objData.Name or ''
 
+					-- Check for exclusions FIRST (structures/launchers that should NEVER be weapons)
+					local isFARP = unitName:find('FARP') or unitName:find('HELIPAD')
+					local isLauncher = unitName:find(' ln') or unitName:find(' lr') or unitName:find('launcher') or
+					                   unitName:find('TEL') or unitName:find('TELAR') or unitName:find(' str')
+
 					-- Weapon name patterns for override detection
 					-- Use more specific patterns that match at start of name
 					local isWeaponByName =
@@ -266,6 +271,7 @@ pcall(function()
 					   -- SAM missiles (Surface-to-Air Missiles)
 					   unitName:match('^9M%d') or  -- Russian SAM missiles: 9M38, 9M31, 9M330, etc.
 					   unitName:match('^SA%d+M%d') or  -- SA-11 missiles: SA9M38M1, SA11M38, etc.
+					   unitName:match('^SA%d+[A-Z]%d') or  -- SA-5 missiles: SA5B55, SA5A55, etc.
 					   unitName:match('9M%d') or  -- Fallback: 9M missiles anywhere in name
 					   unitName:match('^5V%d') or  -- S-300/S-400 missiles: 5V55, etc.
 					   unitName:match('^48N%d') or  -- S-300/S-400 missiles: 48N6
@@ -306,18 +312,19 @@ pcall(function()
 						end
 					end
 
+					-- Enforce FARP/Structure exclusions (these should ALWAYS be structure, never weapon)
+					if isFARP then
+						categoryName = 'structure'
 					-- Then: Name-based overrides for misclassified weapons
 					-- Override ONLY if the Type is structure (level1==4), weapon (level1==5), or unknown
-					-- Do NOT override ground vehicles (level1==2) even if their name contains weapon patterns
-					if (categoryName == 'structure' or categoryName == 'weapon' or categoryName == 'unknown') and isWeaponByName then
+					-- Do NOT override ground vehicles (level1==2), launchers, or FARP structures
+					elseif (categoryName == 'structure' or categoryName == 'weapon' or categoryName == 'unknown') and isWeaponByName and not isLauncher then
 						categoryName = 'weapon'
 					end
 
 					-- Name-based heuristics for structures (only if not already categorized)
 					if categoryName == 'unknown' or categoryName == 'structure' then
-						if unitName:find('HELIPAD') or unitName:find('FARP') or unitName:find('Invisible FARP') then
-							categoryName = 'structure'
-						elseif unitName:find('Bunker') or unitName:find('house') or unitName:find('Building') then
+						if unitName:find('Bunker') or unitName:find('house') or unitName:find('Building') then
 							categoryName = 'structure'
 						end
 					end
