@@ -41,13 +41,16 @@ class TacticalUnitsMapOverlay(
     // Cache arrow bitmaps by coalition color (only 4 bitmaps needed for all units!)
     private val arrowBitmapCache = mutableMapOf<Int, Bitmap>()
 
-    private var updateJob: Job? = null
     private var dataCollectorJob: Job? = null
 
     // Log statistics (rate limiting) - reduce log spam
     private var lastLogTime = 0L
     private var dbUpdateCount = 0
     private val LOG_INTERVAL_MS = 5000L // Log summary every 5 seconds
+
+    // Throttle map redraws to prevent excessive invalidate() calls
+    private var lastInvalidateTime = 0L
+    private val MIN_INVALIDATE_INTERVAL_MS = 33L // Max ~30 FPS redraws (33ms = 1000/30)
 
     // Reusable Paint objects to avoid creating them on every draw
     private val circleFillPaint = Paint().apply {
@@ -163,45 +166,21 @@ class TacticalUnitsMapOverlay(
                     updateUnit(unit)
                 }
 
-                // Immediately redraw map to reflect changes (especially important for deletions)
-                withContext(Dispatchers.Main) {
-                    getMapView()?.invalidate()
-                }
-            }
-        }
-
-        // Job 2: Update map at user-defined interval
-        updateJob = scope.launch {
-            // Wait for initial data
-            var retryCount = 0
-            Log.d(TAG, "📡 Waiting for initial tactical units data...")
-            while (lastUnits.isEmpty() && retryCount < 50 && isActive) {
-                delay(100)
-                retryCount++
-            }
-
-            if (lastUnits.isEmpty()) {
-                Log.w(TAG, "📡 No tactical units data after 5 seconds wait")
-            } else {
-                Log.d(TAG, "📡 Initial data loaded: ${lastUnits.size} units")
-            }
-
-            while (isActive) {
-                val updateIntervalSeconds = updateIntervalSecondsFlow.value
-
-                if (lastUnits.isNotEmpty()) {
-                    Log.d(TAG, "📡 Updating ${lastUnits.size} tactical units on map (interval: ${updateIntervalSeconds}s)")
-
-                    // Trigger map redraw
+                // Throttle map redraws to prevent excessive invalidate() calls
+                // DB sends ~6 updates/second, but we only need to redraw at display refresh rate (~30-60 FPS)
+                val currentTime = System.currentTimeMillis()
+                if (currentTime - lastInvalidateTime >= MIN_INVALIDATE_INTERVAL_MS) {
+                    lastInvalidateTime = currentTime
                     withContext(Dispatchers.Main) {
                         getMapView()?.invalidate()
                     }
                 }
-
-                // Wait for next update cycle
-                delay((updateIntervalSeconds * 1000f).toLong())
             }
         }
+
+        // Note: Periodic redraws removed - dataCollectorJob already calls invalidate()
+        // immediately when data changes (line 168), making periodic invalidates wasteful
+        // The updateIntervalSecondsFlow is no longer used for map redraws
     }
 
     /**
@@ -209,7 +188,6 @@ class TacticalUnitsMapOverlay(
      */
     fun stopTracking() {
         Log.d(TAG, "📡 Stopping tactical units tracking")
-        updateJob?.cancel()
         dataCollectorJob?.cancel()
         units.clear()
         arrowBitmapCache.clear()
@@ -278,6 +256,9 @@ class TacticalUnitsMapOverlay(
             val screenPoint = projection.toPixels(geoPoint, null)
             unit to screenPoint
         }
+
+        // Log viewport culling effectiveness (only if debugging performance)
+        // Log.v(TAG, "🎨 Drawing ${unitPositions.size} / ${units.size} visible units")
 
         // BATCH 1: Draw all heading arrows together
         unitPositions.forEach { (unit, screenPoint) ->
