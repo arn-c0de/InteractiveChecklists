@@ -142,15 +142,30 @@ class AirspaceCirclesOverlay(
 
         val airports = getTargetAirports()
         if (airports.isEmpty()) return
-        
+
         val enabledAirspaces = getEnabledAirspaces()
         if (enabledAirspaces.isEmpty()) return
+
+        // Get current map bounds to only draw visible airports
+        val boundingBox = mapView.boundingBox
+        val minLat = boundingBox.latSouth
+        val maxLat = boundingBox.latNorth
+        val minLon = boundingBox.lonWest
+        val maxLon = boundingBox.lonEast
 
         canvas.save()
 
         try {
             // Draw airspaces for each airport
             for (airport in airports) {
+                // Skip airports outside visible bounds (with buffer for large airspace circles)
+                // Add ~50km buffer to account for large airspace circles (Class B = 30nm)
+                val bufferDegrees = 0.5 // ~50km latitude buffer
+                if (airport.latitude < minLat - bufferDegrees || airport.latitude > maxLat + bufferDegrees ||
+                    airport.longitude < minLon - bufferDegrees || airport.longitude > maxLon + bufferDegrees) {
+                    continue
+                }
+
                 drawAirspacesForAirport(canvas, mapView, airport, enabledAirspaces)
             }
         } catch (e: Exception) {
