@@ -326,7 +326,7 @@ class TacticalUnitsRepository(private val context: Context) {
             "structure" -> "Structure"
             "weapon" -> "Weapon"
             "countermeasure" -> "Countermeasure"
-            else -> category.capitalize()
+            else -> category.replaceFirstChar { it.uppercase() }
         }
     }
 }

@@ -17,7 +17,6 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     version = 2,
     exportSchema = false
 )
-@TypeConverters(LinkedDocumentConverter::class)
 abstract class QuickNoteDatabase : RoomDatabase() {
     abstract fun quickNoteDao(): QuickNoteDao
 
