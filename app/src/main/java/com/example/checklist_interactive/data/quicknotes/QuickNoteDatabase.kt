@@ -14,7 +14,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  */
 @Database(
     entities = [QuickNoteEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class QuickNoteDatabase : RoomDatabase() {
@@ -31,6 +31,28 @@ abstract class QuickNoteDatabase : RoomDatabase() {
             }
         }
 
+        // Migration from version 2 to 3: add 'lastModified' column
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Check if column already exists to avoid duplicate column error
+                val cursor = database.query("PRAGMA table_info(quick_notes)")
+                var columnExists = false
+                while (cursor.moveToNext()) {
+                    val columnName = cursor.getString(cursor.getColumnIndex("name"))
+                    if (columnName == "lastModified") {
+                        columnExists = true
+                        break
+                    }
+                }
+                cursor.close()
+
+                // Only add column if it doesn't exist
+                if (!columnExists) {
+                    database.execSQL("ALTER TABLE quick_notes ADD COLUMN lastModified INTEGER NOT NULL DEFAULT ${System.currentTimeMillis()}")
+                }
+            }
+        }
+
         fun getDatabase(context: Context): QuickNoteDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -39,7 +61,7 @@ abstract class QuickNoteDatabase : RoomDatabase() {
                     "quick_notes_database"
                 )
                         // Try an additive migration first to preserve user data
-                        .addMigrations(MIGRATION_1_2)
+                        .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                         // Keep destructive fallback only as a last resort during development
                         .fallbackToDestructiveMigration()
                     .build()
