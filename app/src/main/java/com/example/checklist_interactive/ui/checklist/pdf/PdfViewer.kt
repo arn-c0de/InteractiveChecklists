@@ -1517,8 +1517,6 @@ fun PdfViewer(
                     
                     FABOverlay(
                         prefsManager = prefsManager,
-                        screenWidthPx = screenWidthPx,
-                        screenHeightPx = screenHeightPx,
                         fabs = PdfViewerFABs.create(
                             onZoomReset = {
                                 pageScales[currentPage] = 1f

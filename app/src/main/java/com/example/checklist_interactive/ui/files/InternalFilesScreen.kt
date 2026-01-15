@@ -744,8 +744,6 @@ fun InternalFilesScreen(
 
             FABOverlay(
                 prefsManager = prefsManager,
-                screenWidthPx = screenWidthPx,
-                screenHeightPx = screenHeightPx,
                 fabs = InternalFilesScreenFABs.create(
                     onDataPadOpen = { if (datapadEnabled) showDataPad = true },
                     onQuickAccessOpen = { showQuickAccess = true },
