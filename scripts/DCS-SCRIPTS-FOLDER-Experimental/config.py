@@ -424,9 +424,10 @@ def update_main_selection(old_id: int, new_id: int, config: dict):
 
 def edit_setting_inline(prompt, current_value, validator=None):
     """Edit a setting value inline with live feedback"""
+    clear_screen()
     print(f"\n{prompt}")
     print(f"{Color.DIM}Current: {Color.GREEN}{current_value}{Color.RESET}")
-    print(f"{Color.DIM}New value (Enter to keep current): {Color.RESET}", end='', flush=True)
+    print(f"\n{Color.DIM}New value (Enter to keep current): {Color.RESET}", end='', flush=True)
     
     user_input = ""
     while True:
