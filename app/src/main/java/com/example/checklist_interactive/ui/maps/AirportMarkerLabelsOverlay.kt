@@ -7,6 +7,10 @@ import com.example.checklist_interactive.data.tactical.LocationEntity
 import com.example.checklist_interactive.data.tactical.LocationRepository
 import com.example.checklist_interactive.data.tactical.RunwayEntity
 import com.example.checklist_interactive.data.tactical.TacticalDatabase
+import com.example.checklist_interactive.ui.common.calculateMapOverlayScale
+import com.example.checklist_interactive.ui.common.getScaledTextSize
+import com.example.checklist_interactive.ui.common.getScaledStrokeWidth
+import com.example.checklist_interactive.ui.common.getScaledLabelOffset
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import org.osmdroid.util.GeoPoint
@@ -36,6 +40,9 @@ class AirportMarkerLabelsOverlay(
     private var updateJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
+    // Calculate overlay scale once during initialization
+    private val overlayScale = calculateMapOverlayScale(context)
+
     // Paint for label background
     private val labelBackgroundPaint = Paint().apply {
         isAntiAlias = true
@@ -48,14 +55,14 @@ class AirportMarkerLabelsOverlay(
         isAntiAlias = true
         color = Color.WHITE
         style = Paint.Style.STROKE
-        strokeWidth = 2f
+        strokeWidth = getScaledStrokeWidth(2f, context)
     }
 
     // Paint for label text
     private val labelTextPaint = Paint().apply {
         isAntiAlias = true
         color = Color.WHITE
-        textSize = 16f
+        textSize = getScaledTextSize(16f, context)
         textAlign = Paint.Align.LEFT
         isFakeBoldText = true
     }
@@ -64,7 +71,7 @@ class AirportMarkerLabelsOverlay(
     private val runwayTextPaint = Paint().apply {
         isAntiAlias = true
         color = Color.parseColor("#BBBBBB") // Light gray
-        textSize = 13f
+        textSize = getScaledTextSize(13f, context)
         textAlign = Paint.Align.LEFT
         isFakeBoldText = false
     }
@@ -192,9 +199,9 @@ class AirportMarkerLabelsOverlay(
                     totalHeight += runwayHeight + 4f // Additional height + spacing
                 }
 
-                // Position label below and to the right of the marker
-                val labelX = screenPoint.x.toFloat() + 20f
-                val labelY = screenPoint.y.toFloat() + 10f
+                // Position label below and to the right of the marker (with responsive offset)
+                val labelX = screenPoint.x.toFloat() + getScaledLabelOffset(20f, context)
+                val labelY = screenPoint.y.toFloat() + getScaledLabelOffset(10f, context)
                 
                 val padding = 8f
                 val labelWidth = maxWidth + (padding * 2)
