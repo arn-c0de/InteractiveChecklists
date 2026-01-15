@@ -81,6 +81,35 @@ InteractiveChecklists is an Android application for viewing and interacting with
 | Marianas | Supported | Marker set available in DB |
 | Germany (CW) | mostly Supported | Marker addition in progress |
 
+## Responsive Design & Device Compatibility
+
+InteractiveChecklists is designed to work seamlessly across multiple device form factors and orientations:
+
+### Supported Devices
+- ✅ **Phones** (320-599dp width) - Portrait and landscape
+- ✅ **Tablets** (600dp+ width) - Portrait and landscape
+- ✅ **Foldables** - Adaptive layouts for folded/unfolded states
+- ✅ **Multi-window Mode** - Split-screen and picture-in-picture support
+
+### Key Responsive Features
+- **Adaptive Layouts:** UI automatically adjusts to screen size using Material 3 WindowSizeClass
+- **Touch Target Optimization:** Minimum 48dp touch targets for all interactive elements
+- **Responsive Grids:** Military symbol picker, tactical units, and other grids adapt column count based on available space
+- **Smart Dialog Sizing:** Dialogs scale appropriately for phones (320-400dp) to tablets (600dp+)
+- **Map Overlay Scaling:** Markers, labels, and flight instruments scale based on screen density
+- **State Preservation:** Full state persistence across orientation changes and configuration updates
+
+### Testing & Quality Assurance
+For detailed device compatibility information and QA procedures, see:
+- **[Device Compatibility Matrix](DEVICE_COMPATIBILITY_MATRIX.md)** - Supported devices, testing matrix, and known limitations
+- **[Responsive Design QA Checklist](RESPONSIVE_DESIGN_QA.md)** - Comprehensive testing scenarios and procedures
+- **[Responsive Design Inventory](RESPONSIVE_DESIGN_INVENTORY.md)** - Implementation status and component inventory
+
+### Minimum Requirements
+- **Screen Size:** 320dp width minimum (small phones supported with optimized layouts)
+- **Android Version:** 8.0 (API 26) or higher
+- **Orientation:** Both portrait and landscape fully supported
+
 ## Experimental: DataPad (Live Flight Telemetry)
 
 DataPad is an experimental feature that receives real-time aircraft telemetry from DCS World via UDP (default port **5010**). It is intended for advanced users and requires running the `forward_parsed_udp.py` script to forward telemetry to your device.

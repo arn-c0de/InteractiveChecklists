@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Overlay
+import com.example.checklist_interactive.ui.common.*
 
 private const val TAG = "TacticalUnitsOverlay"
 
@@ -52,6 +53,9 @@ class TacticalUnitsMapOverlay(
     private var lastInvalidateTime = 0L
     private val MIN_INVALIDATE_INTERVAL_MS = 33L // Max ~30 FPS redraws (33ms = 1000/30)
 
+    // Responsive scaling based on screen size
+    private val overlayScale = calculateMapOverlayScale(context)
+
     // Reusable Paint objects to avoid creating them on every draw
     private val circleFillPaint = Paint().apply {
         isAntiAlias = true
@@ -62,13 +66,13 @@ class TacticalUnitsMapOverlay(
         isAntiAlias = true
         color = Color.WHITE
         style = Paint.Style.STROKE
-        strokeWidth = 3f
+        strokeWidth = getScaledStrokeWidth(3f, context)
     }
 
     private val textPaint = Paint().apply {
         isAntiAlias = true
         color = Color.WHITE
-        textSize = 18f
+        textSize = getScaledTextSize(18f, context)
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
     }
@@ -79,7 +83,7 @@ class TacticalUnitsMapOverlay(
     // Paint for debug info
     private val debugPaint = Paint().apply {
         color = Color.WHITE
-        textSize = 12f
+        textSize = getScaledTextSize(12f, context)
         isAntiAlias = true
         style = Paint.Style.FILL
     }
@@ -95,7 +99,7 @@ class TacticalUnitsMapOverlay(
     private val labelTextPaint = Paint().apply {
         isAntiAlias = true
         color = Color.WHITE
-        textSize = 14f
+        textSize = getScaledTextSize(14f, context)
         textAlign = Paint.Align.LEFT
         isFakeBoldText = false
     }
@@ -332,9 +336,9 @@ class TacticalUnitsMapOverlay(
         
         // Counter-rotate to keep label upright
         canvas.rotate(-mapRotation)
-        
+
         // Position label above marker (offset by marker radius + gap)
-        val labelY = -30f - labelHeight
+        val labelY = -getScaledLabelOffset(30f, context) - labelHeight
         
         // Draw label background
         val labelRect = RectF(
@@ -362,7 +366,7 @@ class TacticalUnitsMapOverlay(
      */
     private fun drawCircleMarker(canvas: Canvas, point: Point, unit: TacticalUnitEntity, mapRotation: Float) {
         val coalitionColor = getCoalitionColor(unit.coalition)
-        val radius = 16f // default size / 3f where size = 48f
+        val radius = getScaledMarkerRadius(16f, context) // Scaled marker radius
 
         // Update fill paint color for this unit
         circleFillPaint.color = coalitionColor
@@ -431,9 +435,9 @@ class TacticalUnitsMapOverlay(
      * Create arrow bitmap for heading indicator with coalition color
      */
     private fun createArrowBitmap(color: Int): Bitmap {
-        // Slightly larger arrow for better visibility
-        val width = 44
-        val height = 66
+        // Slightly larger arrow for better visibility - scaled for screen size
+        val width = (44 * overlayScale).toInt()
+        val height = (66 * overlayScale).toInt()
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
 
