@@ -35,6 +35,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -166,7 +167,8 @@ fun MapNavigationDisplay(
     val KEY_HEIGHT_FRACTION = "nav_display_height_fraction"
     val savedFraction = prefs.getFloat(KEY_HEIGHT_FRACTION, 0.35f)
     val heightMin = 0.15f
-    val heightMax = 0.7f
+    // Reduce max height on smartphones to keep more screen visible
+    val heightMax = if (isSmallScreen) 0.5f else 0.7f
     var heightFraction by rememberSaveable { mutableStateOf(savedFraction.coerceIn(heightMin, heightMax)) }
     
     // Persist height when changed
@@ -251,9 +253,15 @@ fun MapNavigationDisplay(
     }
 
     val cardHeightDp = (configuration.screenHeightDp.toFloat() * heightFraction).dp
-    
+
+    // Limit card width on smartphones to avoid overlapping with FAB buttons
+    val maxCardWidth = if (isSmallScreen) 320.dp else 500.dp
+
     if (activeNavigationTarget != null) {
-        Box(modifier = modifier.widthIn(max = 500.dp)) {
+        Box(modifier = modifier
+            .widthIn(max = maxCardWidth)
+            .zIndex(101f) // Ensure card is above FAB buttons (which are at zIndex 100f)
+        ) {
             Card(
                 modifier = Modifier
                     // When details are visible, use the persisted height as a maximum so the card can shrink if content is smaller; otherwise let the card wrap to content
@@ -271,7 +279,7 @@ fun MapNavigationDisplay(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(if (isSmallScreen) 8.dp else 12.dp)
+                        .padding(if (isSmallScreen) 6.dp else 12.dp)
                         .clickable { onShowNavigationDetailsChange(!showNavigationDetails); saveNavigationState() },
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -287,7 +295,7 @@ fun MapNavigationDisplay(
                                     activeNavigationTarget?.name
                                         ?.replace(Regex(" PATTERN \\d+"), "")
                                         ?.replace(Regex(" RWY \\d+"), "") ?: ""),
-                                style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
+                                style = if (isSmallScreen) MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp) else MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onErrorContainer,
                                 modifier = Modifier.weight(1f, fill = false),
@@ -315,13 +323,13 @@ fun MapNavigationDisplay(
                             }
                         }
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(if (isSmallScreen) 8.dp else 16.dp),
-                            modifier = Modifier.padding(top = if (isSmallScreen) 2.dp else 4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(if (isSmallScreen) 6.dp else 16.dp),
+                            modifier = Modifier.padding(top = if (isSmallScreen) 1.dp else 4.dp)
                         ) {
                             navigationDistanceNm?.let { dist ->
                                 Text(
                                     text = stringResource(R.string.map_nav_dist_nm, dist),
-                                    style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodyMedium,
+                                    style = if (isSmallScreen) MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp) else MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onErrorContainer,
                                     maxLines = 1,
@@ -331,7 +339,7 @@ fun MapNavigationDisplay(
                             navigationHeading?.let { hdg ->
                                 Text(
                                     text = stringResource(R.string.map_nav_hdg, hdg),
-                                    style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodyMedium,
+                                    style = if (isSmallScreen) MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp) else MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onErrorContainer,
                                     maxLines = 1,
@@ -342,12 +350,12 @@ fun MapNavigationDisplay(
                         // Show marker altitude in second row (meters and feet)
                         activeNavigationTarget?.elevationM?.let { elevation ->
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(if (isSmallScreen) 8.dp else 16.dp),
-                                modifier = Modifier.padding(top = 2.dp)
+                                horizontalArrangement = Arrangement.spacedBy(if (isSmallScreen) 6.dp else 16.dp),
+                                modifier = Modifier.padding(top = if (isSmallScreen) 1.dp else 2.dp)
                             ) {
                                 Text(
                                     text = "${String.format("%.0f", elevation)}m",
-                                    style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodyMedium,
+                                    style = if (isSmallScreen) MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp) else MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onErrorContainer,
                                     maxLines = 1,
@@ -355,7 +363,7 @@ fun MapNavigationDisplay(
                                 )
                                 Text(
                                     text = "${String.format("%.0f", elevation * 3.28084)}ft",
-                                    style = if (isSmallScreen) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodyMedium,
+                                    style = if (isSmallScreen) MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp) else MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onErrorContainer,
                                     maxLines = 1,
@@ -558,13 +566,13 @@ fun MapNavigationDisplay(
                         // Toggle expand/collapse button
                         IconButton(
                             onClick = { onShowNavigationDetailsChange(!showNavigationDetails); saveNavigationState() },
-                            modifier = Modifier.size(if (isSmallScreen) 36.dp else 48.dp)
+                            modifier = Modifier.size(if (isSmallScreen) 32.dp else 48.dp)
                         ) {
                             Icon(
                                 imageVector = if (showNavigationDetails) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                                 contentDescription = if (showNavigationDetails) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
                                 tint = MaterialTheme.colorScheme.onErrorContainer,
-                                modifier = Modifier.size(if (isSmallScreen) 20.dp else 24.dp)
+                                modifier = Modifier.size(if (isSmallScreen) 18.dp else 24.dp)
                             )
                         }
 
@@ -614,12 +622,12 @@ fun MapNavigationDisplay(
                                 else
                                     MaterialTheme.colorScheme.onSurfaceVariant
                             ),
-                            modifier = Modifier.size(if (isSmallScreen) 36.dp else 48.dp)
+                            modifier = Modifier.size(if (isSmallScreen) 32.dp else 48.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.FlightLand,
                                 contentDescription = stringResource(R.string.map_nav_approach_button),
-                                modifier = Modifier.size(if (isSmallScreen) 20.dp else 24.dp)
+                                modifier = Modifier.size(if (isSmallScreen) 18.dp else 24.dp)
                             )
                         }
 
@@ -628,7 +636,7 @@ fun MapNavigationDisplay(
 
                         Box(
                             modifier = Modifier
-                                .size(if (isSmallScreen) 36.dp else 48.dp)
+                                .size(if (isSmallScreen) 32.dp else 48.dp)
                                 .background(
                                     color = if (showAirspaceCircles)
                                         MaterialTheme.colorScheme.tertiary
@@ -669,7 +677,7 @@ fun MapNavigationDisplay(
                                     MaterialTheme.colorScheme.onTertiary
                                 else
                                     MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(if (isSmallScreen) 20.dp else 24.dp)
+                                modifier = Modifier.size(if (isSmallScreen) 18.dp else 24.dp)
                             )
                         }
 
@@ -701,13 +709,13 @@ fun MapNavigationDisplay(
                                 onSelectedRunwayChange(null)
                                 saveNavigationState()
                             },
-                            modifier = Modifier.size(if (isSmallScreen) 36.dp else 48.dp)
+                            modifier = Modifier.size(if (isSmallScreen) 32.dp else 48.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = stringResource(R.string.map_nav_cancel_button),
                                 tint = MaterialTheme.colorScheme.onErrorContainer,
-                                modifier = Modifier.size(if (isSmallScreen) 20.dp else 24.dp)
+                                modifier = Modifier.size(if (isSmallScreen) 18.dp else 24.dp)
                             )
                         }
                     }
