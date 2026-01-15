@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import android.content.res.Configuration
 import com.example.checklist_interactive.R
 import com.example.checklist_interactive.data.prefs.PreferencesManager
@@ -74,7 +75,10 @@ fun FABOverlay(
         android.util.Log.d("FABOverlay", "Screen size changed: isLandscape=$isLandscape, screenWidth=$screenWidthPx, screenHeight=$screenHeightPx")
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier
+        .fillMaxSize()
+        .zIndex(100f) // Ensure FABs are always on top
+    ) {
         fabs.filter { it.visible }.forEach { fabConfig ->
             // Use landscape positions if available and device is in landscape
             val effectiveDefaultX = if (isLandscape && fabConfig.defaultLandscapeX != null) {
@@ -156,7 +160,16 @@ object MapViewerFABs {
         containerColorTertiary: Color,
         containerColorPrimary: Color,
         containerColorSurface: Color
-    ): List<FABConfig> = listOf(
+    ): List<FABConfig> {
+        // Detect if device is a tablet (>= 600dp width)
+        val configuration = LocalConfiguration.current
+        val isTablet = configuration.screenWidthDp >= 600
+
+        // On smartphones, position DataPad and QuickAccess FABs higher to avoid flight instruments
+        val datapadY = if (isTablet) 0.80f else 0.55f
+        val quickAccessY = if (isTablet) 0.85f else 0.60f
+
+        return listOf(
         FABConfig(
             id = "map_center",
             icon = Icons.Default.MyLocation,
@@ -290,7 +303,7 @@ object MapViewerFABs {
             visible = datapadEnabled,
             containerColor = containerColorTertiary,
             defaultX = 0.95f,
-            defaultY = 0.80f,
+            defaultY = datapadY,
             defaultLandscapeX = 0.95f,
             defaultLandscapeY = 0.05f,
             scope = "map"
@@ -302,12 +315,13 @@ object MapViewerFABs {
             onClick = onQuickAccessOpen,
             containerColor = containerColorPrimary,
             defaultX = 0.95f,
-            defaultY = 0.85f,
+            defaultY = quickAccessY,
             defaultLandscapeX = 0.95f,
             defaultLandscapeY = 0.95f,
             scope = "map"
         )
-    )
+        )
+    }
 }
 
 /**
