@@ -1,0 +1,18 @@
+{
+  "Preset1": {
+    "state": {
+      "enable_pow": true,
+      "pow_difficulty": 16,
+      "repeat_last": true,
+      "verbose": true,
+      "interval": 10,
+      "host": "192.168.178.*",
+      "port": 5010,
+      "bind_ip": "192.168.178.100",
+      "handshake_port": 5011,
+      "authorized_devices": "authorized_devices.json",
+      "extra_args": ""
+    },
+    "command": "python forward_parsed_udp.py --enable-pow --pow-difficulty 16 --repeat-last --verbose --host 192.168.178.* --port 5010 --bind-ip 192.168.178.100 --handshake-port 5011 --interval 10 --authorized-devices authorized_devices.json"
+  }
+}
