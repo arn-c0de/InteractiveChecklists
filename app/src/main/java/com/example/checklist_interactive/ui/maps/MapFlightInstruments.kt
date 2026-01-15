@@ -325,18 +325,8 @@ private fun InstrumentContent(
                     }
                 }
 
-                if (!dataAvailable && isTablet) {
-                    // Semi-transparent overlay with a small notice to indicate lack of live data
-                    // Only show on tablet, on smartphone we want clicks to pass through
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .background(Color(0x88000000)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(text = stringResource(R.string.map_flight_instrument_no_data), color = Color.Yellow, fontSize = 12.sp)
-                    }
-                }
+                // Removed black background overlay for tablets when no data available
+                // Now tablets behave the same as smartphones - instruments always visible without overlay
             }
 }
 
