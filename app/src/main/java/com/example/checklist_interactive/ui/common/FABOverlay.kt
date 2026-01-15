@@ -3,7 +3,10 @@ package com.example.checklist_interactive.ui.common
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.automirrored.filled.NoteAdd
+import androidx.compose.material.icons.automirrored.filled.RotateRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -239,7 +242,7 @@ object MapViewerFABs {
         ),
         FABConfig(
             id = "map_marker_route",
-            icon = Icons.Default.List,
+            icon = Icons.AutoMirrored.Filled.List,
             contentDescription = stringResource(R.string.fab_cd_markers_routes),
             onClick = onMarkerRouteManagement,
             containerColor = if (repositoriesReady) containerColorTertiary else containerColorSurface,
@@ -276,7 +279,7 @@ object MapViewerFABs {
         ),
         FABConfig(
             id = "map_rotation_gesture",
-            icon = Icons.Default.RotateRight,
+            icon = Icons.AutoMirrored.Filled.RotateRight,
             contentDescription = stringResource(R.string.fab_cd_toggle_rotation_gesture),
             onClick = onToggleRotationGesture,
             containerColor = if (rotationGestureEnabled) containerColorPrimary else containerColorSurface,
@@ -384,7 +387,7 @@ object QuickAccessFABs {
     ): List<FABConfig> = listOf(
         FABConfig(
             id = "quick_access",
-            icon = Icons.Default.Note,
+            icon = Icons.AutoMirrored.Filled.Note,
             contentDescription = stringResource(R.string.quick_access_title),
             onClick = onQuickAccessOpen,
             containerColor = containerColor,
