@@ -164,7 +164,8 @@ fun MapFlightInstruments(
                             altitude = altitude,
                             terrainElevation = terrainElevation,
                             verticalSpeed = verticalSpeed,
-                            airspeed = airspeed
+                            airspeed = airspeed,
+                            heading = heading
                         )
 
                         // Vertical Speed Indicator
@@ -260,7 +261,8 @@ fun AttitudeIndicator(
     altitude: Double? = null,
     terrainElevation: Double? = null,
     verticalSpeed: Double? = null,
-    airspeed: Double? = null
+    airspeed: Double? = null,
+    heading: Double? = null
 ) {
     // Debug log for visibility
     // Debug logging removed to reduce log spam
@@ -346,6 +348,36 @@ fun AttitudeIndicator(
                     .align(Alignment.TopStart)
                     .padding(start = 4.dp * overlayScale, top = 20.dp * overlayScale)
             )
+
+            // Heading Display (top center) - small number above bank angle indicator
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 0.dp)
+            ) {
+                val headingText = if (heading != null) {
+                    val headingDeg = if (heading > 6.28) heading else Math.toDegrees(heading)
+                    val normalizedHeading = ((headingDeg % 360) + 360) % 360
+                    "${normalizedHeading.toInt().toString().padStart(3, '0')}°"
+                } else {
+                    "000°"
+                }
+
+                Text(
+                    text = headingText,
+                    fontSize = (10.sp * overlayScale),
+                    color = Color.Yellow,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        shadow = androidx.compose.ui.graphics.Shadow(
+                            color = Color.Black,
+                            offset = androidx.compose.ui.geometry.Offset(1f, 1f),
+                            blurRadius = 3f
+                        )
+                    )
+                )
+            }
         }
 
         Text(
