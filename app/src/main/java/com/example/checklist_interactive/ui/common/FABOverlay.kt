@@ -54,31 +54,34 @@ data class FABConfig(
 fun FABOverlay(
     prefsManager: PreferencesManager,
     fabs: List<FABConfig>,
-    screenWidthPx: Int,
-    screenHeightPx: Int,
     marginPx: Int = 0,
     modifier: Modifier = Modifier
 ) {
-    // Get the FAB size from preferences
-    val fabSizeDp = prefsManager.getFabSizeDp()
     val density = LocalDensity.current
-    val fabSizePx = with(density) { fabSizeDp.dp.toPx().toInt() }
 
-    // Detect orientation from actual screen dimensions (more reliable)
-    val isLandscape = screenWidthPx > screenHeightPx
-
-    // Track all FAB positions for collision detection
-    val fabPositions = remember { mutableStateMapOf<String, Pair<Float, Float>>() }
-
-    // Log orientation change
-    LaunchedEffect(screenWidthPx, screenHeightPx, isLandscape) {
-        android.util.Log.d("FABOverlay", "=== ORIENTATION CHANGED === isLandscape=$isLandscape, screenWidth=$screenWidthPx, screenHeight=$screenHeightPx, fabCount=${fabs.size}")
-    }
-
-    Box(modifier = modifier
+    // Use BoxWithConstraints to get the true available size at layout time,
+    // which is more robust against configuration change race conditions.
+    BoxWithConstraints(modifier = modifier
         .fillMaxSize()
         .zIndex(100f) // Ensure FABs are always on top
     ) {
+        val screenWidthPx = with(density) { maxWidth.toPx().toInt() }
+        val screenHeightPx = with(density) { maxHeight.toPx().toInt() }
+
+        // Get the FAB size from preferences
+        val fabSizeDp = prefsManager.getFabSizeDp()
+
+        // Detect orientation from actual screen dimensions (more reliable)
+        val isLandscape = screenWidthPx > screenHeightPx
+
+        // Track all FAB positions for collision detection
+        val fabPositions = remember { mutableStateMapOf<String, Pair<Float, Float>>() }
+
+        // Log orientation change
+        LaunchedEffect(screenWidthPx, screenHeightPx, isLandscape) {
+            android.util.Log.d("FABOverlay", "=== RECOMPOSITION === isLandscape=$isLandscape, screenWidth=$screenWidthPx, screenHeight=$screenHeightPx, fabCount=${fabs.size}")
+        }
+
         fabs.filter { it.visible }.forEach { fabConfig ->
             // Use landscape positions if available and device is in landscape
             val effectiveDefaultX = if (isLandscape && fabConfig.defaultLandscapeX != null) {

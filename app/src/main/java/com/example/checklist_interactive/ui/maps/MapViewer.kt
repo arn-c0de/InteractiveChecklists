@@ -1747,14 +1747,10 @@ fun MapViewer(
             }
     }
     
-    // Compute layout metrics so map and FABs are bounded correctly (exclude TabBar height)
-    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val screenWidthPx = with(density) { configuration.screenWidthDp.dp.roundToPx() }
-    val screenHeightPx = with(density) { configuration.screenHeightDp.dp.roundToPx() }
-    val tabBarHeightPx = with(density) { 40.dp.roundToPx() } // matches TabBar height
-    val effectiveScreenHeightPx = (screenHeightPx - tabBarHeightPx).coerceAtLeast(1)
-    val fabSizePx = with(density) { 56.dp.roundToPx() }
+    // fabMarginPx is the horizontal margin on both sides for FABs.
     val fabMarginPx = with(density) { 12.dp.roundToPx() }
+    // Manually defined TabBar height for padding the map view.
+    val tabBarHeightPx = with(density) { 40.dp.roundToPx() } // matches TabBar height
 
     // Determine initial center/zoom: prefer last valid player position, then saved values, fall back to latest flightData, then default
     val initialCenter: GeoPoint? = mapState.lastValidPlayerPosition
@@ -2528,8 +2524,6 @@ fun MapViewer(
         // Use centralized FAB overlay system
         FABOverlay(
             prefsManager = prefsManager,
-            screenWidthPx = screenWidthPx,
-            screenHeightPx = effectiveScreenHeightPx,
             marginPx = fabMarginPx,
             fabs = MapViewerFABs.create(
                 onCenterOnPosition = {

@@ -232,8 +232,6 @@ fun MarkdownViewerScreen(
 
             FABOverlay(
                 prefsManager = prefsManager,
-                screenWidthPx = screenWidthPx,
-                screenHeightPx = effectiveScreenHeightPx,
                 fabs = MarkdownViewerFABs.create(
                     onMenuOpen = onShowFileList,
                     onDataPadOpen = { if (datapadEnabled) showDataPad = true },
