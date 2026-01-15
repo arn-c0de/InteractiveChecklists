@@ -64,20 +64,38 @@ fun DraggableFab(
     val availableWidth = (screenWidthPx - fabSizePx - marginPx * 2).coerceAtLeast(1)
     val availableHeight = (screenHeightPx - fabSizePx - marginPx * 2).coerceAtLeast(1)
 
-    // Track last orientation to detect changes
-    var lastWasLandscape by remember { mutableStateOf(isLandscape) }
+    // State for FAB position
+    var offsetX by remember { mutableStateOf(0f) }
+    var offsetY by remember { mutableStateOf(0f) }
 
-    // Load saved position or use defaults (normalized to the available area excluding margins)
-    val (savedXPercent, savedYPercent) = remember(name, scope) {
-        prefsManager.getFabPosition(if (scope.isBlank()) null else scope, name, defaultX, defaultY)
-    }
+    // Load and apply saved position when orientation or screen size changes
+    // Only depend on isLandscape and screen dimensions, not defaultX/Y which may change on every recompose
+    LaunchedEffect(isLandscape, screenWidthPx, screenHeightPx) {
+        android.util.Log.d("DraggableFAB", "$name: LaunchedEffect triggered - isLandscape=$isLandscape, screenW=$screenWidthPx, screenH=$screenHeightPx, availW=$availableWidth, availH=$availableHeight, defaultX=$defaultX, defaultY=$defaultY")
 
-    // Convert percentage to pixels and offset by left margin
-    var offsetX by remember(savedXPercent, availableWidth) {
-        mutableStateOf((marginPx + (savedXPercent * availableWidth)).coerceIn(marginPx.toFloat(), (marginPx + availableWidth).toFloat()))
-    }
-    var offsetY by remember(savedYPercent, availableHeight) {
-        mutableStateOf((marginPx + (savedYPercent * availableHeight)).coerceIn(marginPx.toFloat(), (marginPx + availableHeight).toFloat()))
+        val (savedXPercent, savedYPercent) = prefsManager.getFabPosition(
+            if (scope.isBlank()) null else scope,
+            name,
+            defaultX,
+            defaultY,
+            isLandscape
+        )
+
+        android.util.Log.d("DraggableFAB", "$name: Loaded from prefs - savedX%=$savedXPercent, savedY%=$savedYPercent")
+
+        val newOffsetX = (marginPx + (savedXPercent * availableWidth)).coerceIn(
+            marginPx.toFloat(),
+            (marginPx + availableWidth).toFloat()
+        )
+        val newOffsetY = (marginPx + (savedYPercent * availableHeight)).coerceIn(
+            marginPx.toFloat(),
+            (marginPx + availableHeight).toFloat()
+        )
+
+        android.util.Log.d("DraggableFAB", "$name: Setting position - x=$newOffsetX, y=$newOffsetY")
+
+        offsetX = newOffsetX
+        offsetY = newOffsetY
     }
 
     // Report current position to overlay
@@ -134,44 +152,7 @@ fun DraggableFab(
         )
     }
 
-    // When orientation changes, reset to default position for that orientation
-    LaunchedEffect(isLandscape) {
-        android.util.Log.d("DraggableFAB", "$name: LaunchedEffect triggered - isLandscape=$isLandscape, lastWas=$lastWasLandscape")
-        if (isLandscape != lastWasLandscape) {
-            android.util.Log.d("DraggableFAB", "$name: ORIENTATION CHANGED! Resetting to defaults X=$defaultX Y=$defaultY")
-            lastWasLandscape = isLandscape
-            // Reset to default position for new orientation
-            offsetX = (marginPx + (defaultX * availableWidth)).coerceIn(marginPx.toFloat(), (marginPx + availableWidth).toFloat())
-            offsetY = (marginPx + (defaultY * availableHeight)).coerceIn(marginPx.toFloat(), (marginPx + availableHeight).toFloat())
-            android.util.Log.d("DraggableFAB", "$name: New position: offsetX=$offsetX, offsetY=$offsetY")
-        }
-    }
-
-    // Clamp any positions that might be outside the available area (e.g., due to layout/padding changes)
-    // and persist corrected values so old off-screen positions are fixed automatically.
-    LaunchedEffect(name, availableWidth, availableHeight) {
-        val minX = marginPx.toFloat()
-        val maxX = (marginPx + availableWidth).toFloat()
-        val minY = marginPx.toFloat()
-        val maxY = (marginPx + availableHeight).toFloat()
-
-        val clampedX = offsetX.coerceIn(minX, maxX)
-        val clampedY = offsetY.coerceIn(minY, maxY)
-        if (clampedX != offsetX || clampedY != offsetY) {
-            offsetX = clampedX
-            offsetY = clampedY
-            // Save corrected normalized values (relative to available area)
-            val xPercent = if (availableWidth > 0) ((offsetX - marginPx) / availableWidth) else 0f
-            val yPercent = if (availableHeight > 0) ((offsetY - marginPx) / availableHeight) else 0f
-            coroutineScope.launch {
-                try {
-                    prefsManager.setFabPosition(if (scope.isBlank()) null else scope, name, xPercent, yPercent)
-                } catch (e: Exception) {
-                    android.util.Log.w("DraggableFab", "Failed to persist clamped FAB position: ${e.message}")
-                }
-            }
-        }
-    }
+    // Clamping is now handled in the position loading LaunchedEffect above
     
     var isDragging by remember { mutableStateOf(false) }
     var longPressTriggered by remember { mutableStateOf(false) }
@@ -213,7 +194,7 @@ fun DraggableFab(
                                 val yPercent = if (availableHeight > 0) ((offsetY - marginPx) / availableHeight) else 0f
 
                                 coroutineScope.launch {
-                                    prefsManager.setFabPosition(if (scope.isBlank()) null else scope, name, xPercent, yPercent)
+                                    prefsManager.setFabPosition(if (scope.isBlank()) null else scope, name, xPercent, yPercent, isLandscape)
                                 }
                             }
                             isDragging = false
@@ -262,7 +243,7 @@ fun DraggableFab(
                                 val yPercent = if (availableHeight > 0) ((offsetY - marginPx) / availableHeight) else 0f
 
                                 coroutineScope.launch {
-                                    prefsManager.setFabPosition(if (scope.isBlank()) null else scope, name, xPercent, yPercent)
+                                    prefsManager.setFabPosition(if (scope.isBlank()) null else scope, name, xPercent, yPercent, isLandscape)
                                 }
                             }
                             isDragging = false

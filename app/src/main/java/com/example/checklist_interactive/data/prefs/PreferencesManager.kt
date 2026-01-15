@@ -561,41 +561,76 @@ class PreferencesManager(context: Context) {
     }
 
     // Generic FAB positions API (scoped by screen name): stored as percentage (0..1) of available area
-    private fun makeFabKey(screen: String?, name: String, axis: String): String {
+    // Now includes orientation to store separate positions for portrait and landscape
+    private fun makeFabKey(screen: String?, name: String, axis: String, isLandscape: Boolean = false): String {
+        val orientation = if (isLandscape) "landscape" else "portrait"
         return if (!screen.isNullOrBlank()) {
-            "${KEY_FAB_PREFIX}${screen}_${name}_$axis"
+            "${KEY_FAB_PREFIX}${screen}_${name}_${orientation}_$axis"
         } else {
             // fallback to legacy pdf-based key for compatibility
-            "${KEY_PDF_FAB_PREFIX}${name}_$axis"
+            "${KEY_PDF_FAB_PREFIX}${name}_${orientation}_$axis"
         }
     }
 
-    fun setFabPosition(screen: String?, name: String, xPercent: Float, yPercent: Float) {
+    fun setFabPosition(screen: String?, name: String, xPercent: Float, yPercent: Float, isLandscape: Boolean = false) {
         prefs.edit()
-            .putFloat(makeFabKey(screen, name, "x"), xPercent.coerceIn(0f, 1f))
-            .putFloat(makeFabKey(screen, name, "y"), yPercent.coerceIn(0f, 1f))
+            .putFloat(makeFabKey(screen, name, "x", isLandscape), xPercent.coerceIn(0f, 1f))
+            .putFloat(makeFabKey(screen, name, "y", isLandscape), yPercent.coerceIn(0f, 1f))
             .apply()
     }
 
-    fun getFabPosition(screen: String?, name: String, defaultX: Float, defaultY: Float): Pair<Float, Float> {
-        // Try new scoped key first, then fall back to legacy pdf-prefixed key for compatibility
-        val xKey = makeFabKey(screen, name, "x")
-        val yKey = makeFabKey(screen, name, "y")
-        val legacyXKey = "${KEY_PDF_FAB_PREFIX}${name}_x"
-        val legacyYKey = "${KEY_PDF_FAB_PREFIX}${name}_y"
+    fun getFabPosition(screen: String?, name: String, defaultX: Float, defaultY: Float, isLandscape: Boolean = false): Pair<Float, Float> {
+        // Try new scoped key with orientation first
+        val xKey = makeFabKey(screen, name, "x", isLandscape)
+        val yKey = makeFabKey(screen, name, "y", isLandscape)
+
+        // Check if we have orientation-specific position
+        val hasOrientationSpecific = prefs.contains(xKey) && prefs.contains(yKey)
+
+        // Legacy keys without orientation (for backwards compatibility)
+        // Only use legacy keys if no orientation-specific position exists
+        val legacyXKey = if (!hasOrientationSpecific) {
+            if (!screen.isNullOrBlank()) {
+                "${KEY_FAB_PREFIX}${screen}_${name}_x"
+            } else {
+                "${KEY_PDF_FAB_PREFIX}${name}_x"
+            }
+        } else {
+            null
+        }
+        val legacyYKey = if (!hasOrientationSpecific) {
+            if (!screen.isNullOrBlank()) {
+                "${KEY_FAB_PREFIX}${screen}_${name}_y"
+            } else {
+                "${KEY_PDF_FAB_PREFIX}${name}_y"
+            }
+        } else {
+            null
+        }
 
         val x = when {
             prefs.contains(xKey) -> prefs.getFloat(xKey, defaultX)
-            prefs.contains(legacyXKey) -> prefs.getFloat(legacyXKey, defaultX)
+            legacyXKey != null && prefs.contains(legacyXKey) -> {
+                // Migrate legacy position to new orientation-specific format
+                val legacyX = prefs.getFloat(legacyXKey, defaultX)
+                android.util.Log.d("PreferencesManager", "Migrating legacy FAB position for $name: x=$legacyX")
+                legacyX
+            }
             else -> defaultX
         }.coerceIn(0f, 1f)
 
         val y = when {
             prefs.contains(yKey) -> prefs.getFloat(yKey, defaultY)
-            prefs.contains(legacyYKey) -> prefs.getFloat(legacyYKey, defaultY)
+            legacyYKey != null && prefs.contains(legacyYKey) -> {
+                // Migrate legacy position to new orientation-specific format
+                val legacyY = prefs.getFloat(legacyYKey, defaultY)
+                android.util.Log.d("PreferencesManager", "Migrating legacy FAB position for $name: y=$legacyY")
+                legacyY
+            }
             else -> defaultY
         }.coerceIn(0f, 1f)
 
+        android.util.Log.d("PreferencesManager", "getFabPosition($name, landscape=$isLandscape) -> x=$x, y=$y (default: $defaultX, $defaultY)")
         return Pair(x, y)
     }
 
