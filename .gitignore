@@ -52,6 +52,7 @@ scripts/DCS-SCRIPTS-FOLDER-Experimental/ip_blacklist.json
 
 # QR Registration tokens (sensitive, single-use authentication tokens)
 scripts/DCS-SCRIPTS-FOLDER-Experimental/registration_tokens.json
+scripts/DCS-SCRIPTS-FOLDER-Experimental/forwarder_status.json
 
 # CodeQL local analysis files
 .codeql/
@@ -76,3 +77,5 @@ security_audit.jsonl
 security_audit.key
 
 scripts/DCS-SCRIPTS-FOLDER-Experimental/authorized_devices.json.bak
+
+
