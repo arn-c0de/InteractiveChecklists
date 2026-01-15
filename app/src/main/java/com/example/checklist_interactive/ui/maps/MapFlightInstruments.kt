@@ -139,14 +139,105 @@ fun MapFlightInstruments(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.BottomCenter
     ) {
-        androidx.compose.material3.Surface(
-            modifier = Modifier
-                .padding(bottom = if (isTablet) 12.dp else 0.dp)
-                .wrapContentSize(),
-            tonalElevation = 4.dp,
-            shape = MaterialTheme.shapes.large,
-            color = Color.Transparent // make outer panel transparent so instrument circles stand out
-        ) {
+        if (isTablet) {
+            // Tablet: Use Surface with elevation
+            androidx.compose.material3.Surface(
+                modifier = Modifier
+                    .padding(bottom = 12.dp)
+                    .wrapContentSize(),
+                tonalElevation = 4.dp,
+                shape = MaterialTheme.shapes.large,
+                color = Color.Transparent // make outer panel transparent so instrument circles stand out
+            ) {
+                InstrumentContent(
+                    isTablet = isTablet,
+                    horizontalPadding = horizontalPadding,
+                    primarySpacing = primarySpacing,
+                    primarySmallSize = primarySmallSize,
+                    primaryLargeSize = primaryLargeSize,
+                    secondarySpacing = secondarySpacing,
+                    secondarySize = secondarySize,
+                    pitch = pitch,
+                    bank = bank,
+                    altitude = altitude,
+                    terrainElevation = terrainElevation,
+                    verticalSpeed = verticalSpeed,
+                    airspeed = airspeed,
+                    heading = heading,
+                    mach = mach,
+                    angleOfAttack = angleOfAttack,
+                    gLoad = gLoad,
+                    engineRpmLeft = engineRpmLeft,
+                    engineRpmRight = engineRpmRight,
+                    windSpeed = windSpeed,
+                    windDirection = windDirection,
+                    flareCount = flareCount,
+                    chaffCount = chaffCount,
+                    dataAvailable = dataAvailable
+                )
+            }
+        } else {
+            // Smartphone: No Surface, just Box so clicks pass through to map
+            InstrumentContent(
+                isTablet = isTablet,
+                horizontalPadding = horizontalPadding,
+                primarySpacing = primarySpacing,
+                primarySmallSize = primarySmallSize,
+                primaryLargeSize = primaryLargeSize,
+                secondarySpacing = secondarySpacing,
+                secondarySize = secondarySize,
+                pitch = pitch,
+                bank = bank,
+                altitude = altitude,
+                terrainElevation = terrainElevation,
+                verticalSpeed = verticalSpeed,
+                airspeed = airspeed,
+                heading = heading,
+                mach = mach,
+                angleOfAttack = angleOfAttack,
+                gLoad = gLoad,
+                engineRpmLeft = engineRpmLeft,
+                engineRpmRight = engineRpmRight,
+                windSpeed = windSpeed,
+                windDirection = windDirection,
+                flareCount = flareCount,
+                chaffCount = chaffCount,
+                dataAvailable = dataAvailable
+            )
+        }
+    }
+}
+
+/**
+ * Instrument content layout
+ */
+@Composable
+private fun InstrumentContent(
+    isTablet: Boolean,
+    horizontalPadding: androidx.compose.ui.unit.Dp,
+    primarySpacing: androidx.compose.ui.unit.Dp,
+    primarySmallSize: androidx.compose.ui.unit.Dp,
+    primaryLargeSize: androidx.compose.ui.unit.Dp,
+    secondarySpacing: androidx.compose.ui.unit.Dp,
+    secondarySize: androidx.compose.ui.unit.Dp,
+    pitch: Double,
+    bank: Double,
+    altitude: Double?,
+    terrainElevation: Double?,
+    verticalSpeed: Double?,
+    airspeed: Double?,
+    heading: Double?,
+    mach: Double?,
+    angleOfAttack: Double?,
+    gLoad: Double?,
+    engineRpmLeft: Double?,
+    engineRpmRight: Double?,
+    windSpeed: Double?,
+    windDirection: Double?,
+    flareCount: Int?,
+    chaffCount: Int?,
+    dataAvailable: Boolean
+) {
             // Use a Box so we can overlay a "NO DATA" indicator when no flight data exists
             Box {
                 Column(
@@ -234,8 +325,9 @@ fun MapFlightInstruments(
                     }
                 }
 
-                if (!dataAvailable) {
+                if (!dataAvailable && isTablet) {
                     // Semi-transparent overlay with a small notice to indicate lack of live data
+                    // Only show on tablet, on smartphone we want clicks to pass through
                     Box(
                         modifier = Modifier
                             .matchParentSize()
@@ -246,8 +338,6 @@ fun MapFlightInstruments(
                     }
                 }
             }
-        }
-    }
 }
 
 /**
