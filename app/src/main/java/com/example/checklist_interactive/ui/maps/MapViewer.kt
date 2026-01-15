@@ -293,8 +293,9 @@ fun MapViewer(
                 // Create new overlay with current settings
                 Log.d(TAG, "🌐 Creating new airspace overlay for ${allTargets.size} airports")
                 val airspaceOverlay = AirspaceCirclesOverlay(
+                    context = context,
                     isEnabled = { mapState.showAirspaceCircles },
-                    getTargetAirports = { 
+                    getTargetAirports = {
                         buildSet {
                             addAll(mapState.airspaceTargets)
                             mapState.originalAirportTarget?.let { add(it) }
@@ -349,6 +350,7 @@ fun MapViewer(
                 // Create new overlay with current settings (using cached data)
                 Log.d(TAG, "🎯 Creating new AA range overlay")
                 val aaRangeOverlay = AARangeRingsOverlay(
+                    context = context,
                     isEnabled = { true }, // Always enabled, visibility controlled by unit settings
                     getAAUnits = {
                         // Return cached units (no DB query!)
