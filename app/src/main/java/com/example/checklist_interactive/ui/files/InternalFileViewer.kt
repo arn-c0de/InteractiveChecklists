@@ -258,8 +258,6 @@ fun InternalFileViewer(
 
                     FABOverlay(
                         prefsManager = prefsManager,
-                        screenWidthPx = screenWidthPx,
-                        screenHeightPx = effectiveScreenHeightPx,
                         fabs = InternalFileViewerFABs.create(
                             onMenuOpen = onShowFileList,
                             onDataPadOpen = { if (datapadEnabled) showDataPad = true },
