@@ -3,6 +3,9 @@
 
 All relevant changes are summarized here by version.
 
+## [1.0.24] - 2026-01-15
+
+
 ## [1.0.23] - 2026-01-08
 
 ### Summary
@@ -12,12 +15,12 @@ All relevant changes are summarized here by version.
 - **Tests & docs:** Added `test_qr_registration.py` integration tests and updated docs (`docs/EN/features/qr_registration.md`, `.../qr_registration_quickstart.md`) to reflect implemented behavior and troubleshooting (cryptography/cffi note).
 - **Fixes & polish:** Fixed ClassCastException and layout issues in camera preview, ensured the scanner stops after scan, improved UX in DataPad settings (scan flow, field validation), and added `--skip-qr-prompt` for non-interactive startup.
 - **Maps & Navigation (UI fixes):** Prevent NM labels from wrapping vertically in the collapsed navigation panel; persist collapsed/expanded navigation panel state across app restarts; shorten Auto‑Center labels for a compact display; adjust Center FAB position to reduce overlap; add optional airspace rings displayed at navigation targets for better situational awareness. (Files: `app/src/main/java/com/example/checklist_interactive/ui/common/FABOverlay.kt`, `app/src/main/java/com/example/checklist_interactive/ui/maps/MapViewer.kt`, `app/src/main/java/com/example/checklist_interactive/ui/maps/ui/MapNavigationDisplay.kt`, `app/src/main/res/values/strings.xml` and localized variants.)
-
+- **Flight Instruments improvements:** Added heading display (yellow number) at top of Attitude Indicator; removed Fuel Indicator; responsive layout for smartphone vs tablet (smaller instruments, no background on phones for map clickthrough); disabled OSMdroid zoom buttons; optimized FAB positioning (DataPad/QuickAccess higher on phones, z-index added for proper layering).
 - **Other notable:** Added AA-map range visualisation (phase 1) and historical border/MapBorders overlays; switched to `PDFBox-Android` to fix PDF rendering crashes; forwarder improvements (multi-host/wildcard support, resilient file tailing, status reporting) and a simplified installer/launcher; added export Lua detection (e.g., SA-11) and HUD speed formatting >999. These items were consolidated from recent commits on `1.0.23`.
 
 ### Files of note
 - Added: `scripts/registration_token.py`, `scripts/tests/test_qr_registration.py`, `app/.../data/datapad/QrRegistrationManager.kt`
-- Modified: `scripts/forward_parsed_udp.py`, `scripts/crypto_handshake.py`, `app/.../ui/datapad/QrCodeScannerComposable.kt`, docs and quickstart files.
+- Modified: `scripts/forward_parsed_udp.py`, `scripts/crypto_handshake.py`, `app/.../ui/datapad/QrCodeScannerComposable.kt`, `app/.../ui/maps/MapFlightInstruments.kt`, `app/.../ui/maps/MapViewer.kt`, `app/.../ui/common/FABOverlay.kt`, docs and quickstart files.
 
 ## [1.0.22] - 2026-01-06
 
