@@ -72,7 +72,7 @@ fun FABOverlay(
 
     // Log orientation change
     LaunchedEffect(screenWidthPx, screenHeightPx, isLandscape) {
-        android.util.Log.d("FABOverlay", "Screen size changed: isLandscape=$isLandscape, screenWidth=$screenWidthPx, screenHeight=$screenHeightPx")
+        android.util.Log.d("FABOverlay", "=== ORIENTATION CHANGED === isLandscape=$isLandscape, screenWidth=$screenWidthPx, screenHeight=$screenHeightPx, fabCount=${fabs.size}")
     }
 
     Box(modifier = modifier
@@ -279,8 +279,8 @@ object MapViewerFABs {
             containerColor = if (rotationGestureEnabled) containerColorPrimary else containerColorSurface,
             defaultX = 0.95f,
             defaultY = 0.45f,
-            defaultLandscapeX = 0.95f,
-            defaultLandscapeY = 0.85f,
+            defaultLandscapeX = 0.92f,
+            defaultLandscapeY = 0.60f,
             scope = "map"
         ),
         FABConfig(
@@ -291,8 +291,8 @@ object MapViewerFABs {
             containerColor = if (isDrawingMode) containerColorPrimary else containerColorTertiary,
             defaultX = 0.95f,
             defaultY = 0.50f,
-            defaultLandscapeX = 0.95f,
-            defaultLandscapeY = 0.95f,
+            defaultLandscapeX = 0.92f,
+            defaultLandscapeY = 0.70f,
             scope = "map"
         ),
         FABConfig(
@@ -316,8 +316,8 @@ object MapViewerFABs {
             containerColor = containerColorPrimary,
             defaultX = 0.95f,
             defaultY = quickAccessY,
-            defaultLandscapeX = 0.95f,
-            defaultLandscapeY = 0.95f,
+            defaultLandscapeX = 0.92f,
+            defaultLandscapeY = 0.80f,
             scope = "map"
         )
         )
