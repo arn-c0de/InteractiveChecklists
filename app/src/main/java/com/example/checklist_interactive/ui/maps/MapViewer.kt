@@ -122,6 +122,14 @@ private fun createPlaneDrawable(ctx: Context, sizeDp: Float, color: Int): Bitmap
 
 private const val TAG = "MapViewer"
 
+// Helper function to extract runway heading from runway name
+private fun extractRunwayHeading(runwayName: String): Double? {
+    // Parse runway name like "12/30", "09/27", "13L/31R"
+    // Extract first number before "/" and multiply by 10
+    val match = runwayName.trim().split("/").firstOrNull()?.trim()
+    return match?.replace(Regex("[LCR]"), "")?.toIntOrNull()?.times(10)?.toDouble()
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapViewer(
@@ -1004,190 +1012,8 @@ fun MapViewer(
         }
     }
 
-    // Helper function to extract runway heading from runway name
-    fun extractRunwayHeading(runwayName: String): Double? {
-        // Parse runway name like "12/30", "09/27", "13L/31R"
-        // Extract first number before "/" and multiply by 10
-        val match = runwayName.trim().split("/").firstOrNull()?.trim()
-        return match?.replace(Regex("[LCR]"), "")?.toIntOrNull()?.times(10)?.toDouble()
-    }
-
-    // Draw runway approach lines when enabled (supports both runways and manual heading)
-    // Include target position (lat/lon) to auto-update when marker moves
-    LaunchedEffect(
-        mapState.showRunwayApproach,
-        mapState.targetRunways,
-        mapState.originalAirportTarget?.id,
-        mapState.originalAirportTarget?.latitude,
-        mapState.originalAirportTarget?.longitude,
-        mapState.mapView,
-        mapState.finalApproachDistanceNm,
-        mapState.selectedRunwayHeading
-    ) {
-        val map = mapState.mapView
-        val target = mapState.originalAirportTarget
-
-        Log.d(TAG, "🛬 Approach Lines Effect: showApproach=${mapState.showRunwayApproach}, target=${target?.name}, map=${map != null}, runways=${mapState.targetRunways.size}, heading=${mapState.selectedRunwayHeading}")
-
-        // Remove existing approach lines
-        mapState.runwayApproachLines.forEach { line ->
-            map?.overlays?.remove(line)
-        }
-        mapState.runwayApproachLines = emptyList()
-
-        if (mapState.showRunwayApproach && target != null && map != null) {
-            val newLines = mutableListOf<org.osmdroid.views.overlay.Polyline>()
-
-            // Case 1: Runways are available - draw approach for each runway
-            if (mapState.targetRunways.isNotEmpty()) {
-                Log.d(TAG, "🛬 Drawing ${mapState.targetRunways.size} runway approach lines")
-                mapState.targetRunways.forEach { runway ->
-                val heading = runway.headingDeg ?: extractRunwayHeading(runway.name) ?: 0.0
-                val center = GeoPoint(target.latitude, target.longitude)
-
-                // Calculate final approach distance in meters
-                val distanceMeters = mapState.finalApproachDistanceNm * 1852.0
-                
-                // Get runway length in meters
-                val runwayLengthMeters = (runway.lengthM?.toDouble() ?: runway.lengthFt?.toDouble()?.times(0.3048)) ?: 2000.0
-                val halfRunwayLength = runwayLengthMeters / 2.0
-
-                // Direction 1: heading
-                val rad1 = Math.toRadians(heading)
-                val lat1 = Math.toRadians(center.latitude)
-                val lon1 = Math.toRadians(center.longitude)
-                val dLat1 = distanceMeters * Math.cos(rad1) / 6371000.0
-                val dLon1 = distanceMeters * Math.sin(rad1) / (6371000.0 * Math.cos(lat1))
-                val endLat1 = lat1 + dLat1
-                val endLon1 = lon1 + dLon1
-                val endpoint1 = GeoPoint(Math.toDegrees(endLat1), Math.toDegrees(endLon1))
-
-                // Direction 2: opposite heading
-                val heading2 = (heading + 180) % 360
-                val rad2 = Math.toRadians(heading2)
-                val dLat2 = distanceMeters * Math.cos(rad2) / 6371000.0
-                val dLon2 = distanceMeters * Math.sin(rad2) / (6371000.0 * Math.cos(lat1))
-                val endLat2 = lat1 + dLat2
-                val endLon2 = lon1 + dLon2
-                val endpoint2 = GeoPoint(Math.toDegrees(endLat2), Math.toDegrees(endLon2))
-
-                // Calculate runway start/end points (half length in each direction from center)
-                val dLatStart = halfRunwayLength * Math.cos(rad1) / 6371000.0
-                val dLonStart = halfRunwayLength * Math.sin(rad1) / (6371000.0 * Math.cos(lat1))
-                val runwayStart = GeoPoint(Math.toDegrees(lat1 + dLatStart), Math.toDegrees(lon1 + dLonStart))
-                
-                val dLatEnd = halfRunwayLength * Math.cos(rad2) / 6371000.0
-                val dLonEnd = halfRunwayLength * Math.sin(rad2) / (6371000.0 * Math.cos(lat1))
-                val runwayEnd = GeoPoint(Math.toDegrees(lat1 + dLatEnd), Math.toDegrees(lon1 + dLonEnd))
-
-                // Calculate perpendicular heading (90 degrees to runway heading)
-                val perpHeading = (heading + 90) % 360
-                val perpRad = Math.toRadians(perpHeading)
-                val perpDistance = 100.0 // 100 meters width for threshold markers
-                
-                // Helper function to calculate perpendicular line endpoints
-                fun getPerpendicularPoints(point: GeoPoint): Pair<GeoPoint, GeoPoint> {
-                    val latRad = Math.toRadians(point.latitude)
-                    val lonRad = Math.toRadians(point.longitude)
-                    
-                    // One side
-                    val dLat1 = perpDistance * Math.cos(perpRad) / 6371000.0
-                    val dLon1 = perpDistance * Math.sin(perpRad) / (6371000.0 * Math.cos(latRad))
-                    val side1 = GeoPoint(Math.toDegrees(latRad + dLat1), Math.toDegrees(lonRad + dLon1))
-                    
-                    // Other side (opposite direction)
-                    val perpHeading2 = (perpHeading + 180) % 360
-                    val perpRad2 = Math.toRadians(perpHeading2)
-                    val dLat2 = perpDistance * Math.cos(perpRad2) / 6371000.0
-                    val dLon2 = perpDistance * Math.sin(perpRad2) / (6371000.0 * Math.cos(latRad))
-                    val side2 = GeoPoint(Math.toDegrees(latRad + dLat2), Math.toDegrees(lonRad + dLon2))
-                    
-                    return Pair(side1, side2)
-                }
-
-                // Create lines for both directions
-                val line1 = org.osmdroid.views.overlay.Polyline(map).apply {
-                    outlinePaint.color = android.graphics.Color.argb(128, 255, 255, 0) // 50% transparent yellow
-                    outlinePaint.strokeWidth = 8f
-                    outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
-                    setPoints(listOf(center, endpoint1))
-                    map.overlays.add(this)
-                }
-
-                val line2 = org.osmdroid.views.overlay.Polyline(map).apply {
-                    outlinePaint.color = android.graphics.Color.argb(128, 255, 255, 0) // 50% transparent yellow
-                    outlinePaint.strokeWidth = 8f
-                    outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
-                    setPoints(listOf(center, endpoint2))
-                    map.overlays.add(this)
-                }
-
-                newLines.add(line1)
-                newLines.add(line2)
-                
-                // Add perpendicular threshold markers at runway start and end
-                val (startSide1, startSide2) = getPerpendicularPoints(runwayStart)
-                val thresholdLine1 = org.osmdroid.views.overlay.Polyline(map).apply {
-                    outlinePaint.color = android.graphics.Color.argb(180, 255, 255, 0) // Slightly more opaque
-                    outlinePaint.strokeWidth = 6f
-                    outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
-                    setPoints(listOf(startSide1, startSide2))
-                    map.overlays.add(this)
-                }
-                newLines.add(thresholdLine1)
-                
-                val (endSide1, endSide2) = getPerpendicularPoints(runwayEnd)
-                val thresholdLine2 = org.osmdroid.views.overlay.Polyline(map).apply {
-                    outlinePaint.color = android.graphics.Color.argb(180, 255, 255, 0) // Slightly more opaque
-                    outlinePaint.strokeWidth = 6f
-                    outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
-                    setPoints(listOf(endSide1, endSide2))
-                    map.overlays.add(this)
-                }
-                newLines.add(thresholdLine2)
-            }
-            }
-            // Case 2: No runways but manual heading is set - draw single approach line
-            else if (mapState.selectedRunwayHeading != null) {
-                Log.d(TAG, "🛬 Drawing manual approach line with heading ${mapState.selectedRunwayHeading}")
-                val heading = mapState.selectedRunwayHeading!!
-                val center = GeoPoint(target.latitude, target.longitude)
-                val distanceMeters = mapState.finalApproachDistanceNm * 1852.0
-
-                val rad = Math.toRadians(heading)
-                val lat1 = Math.toRadians(center.latitude)
-                val lon1 = Math.toRadians(center.longitude)
-                val dLat = distanceMeters * Math.cos(rad) / 6371000.0
-                val dLon = distanceMeters * Math.sin(rad) / (6371000.0 * Math.cos(lat1))
-                val endLat = lat1 + dLat
-                val endLon = lon1 + dLon
-                val endpoint = GeoPoint(Math.toDegrees(endLat), Math.toDegrees(endLon))
-
-                Log.d(TAG, "🛬 Approach line from ${center.latitude},${center.longitude} to ${endpoint.latitude},${endpoint.longitude}")
-
-                val line = org.osmdroid.views.overlay.Polyline(map).apply {
-                    outlinePaint.color = android.graphics.Color.argb(128, 255, 255, 0) // 50% transparent yellow
-                    outlinePaint.strokeWidth = 8f
-                    outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
-                    setPoints(listOf(center, endpoint))
-                    map.overlays.add(this)
-                }
-
-                newLines.add(line)
-                Log.d(TAG, "🛬 Approach line added to map, total lines: ${newLines.size}")
-            } else {
-                Log.d(TAG, "🛬 No runways and no manual heading - cannot draw approach")
-            }
-
-            if (newLines.isNotEmpty()) {
-                mapState.runwayApproachLines = newLines
-                map.invalidate()
-                Log.d(TAG, "🛬 Map invalidated with ${newLines.size} approach lines")
-            }
-        } else {
-            Log.d(TAG, "🛬 Conditions not met: showApproach=${mapState.showRunwayApproach}, target=${target != null}, map=${map != null}")
-        }
-    }
+    // Draw runway approach lines when enabled (extracted for performance)
+    RunwayApproachLinesEffect(mapState = mapState, context = context)
 
     // Recalculate approach point when final approach distance changes
     // Include target position (lat/lon) to auto-update when marker moves
@@ -1234,183 +1060,8 @@ fun MapViewer(
         }
     }
 
-    // Generate and draw traffic pattern when enabled (supports both runways and manual heading)
-    // Include target position (lat/lon), elevation, and metadata to auto-update when marker moves
-    LaunchedEffect(
-        mapState.showTrafficPattern,
-        mapState.selectedRunway,
-        mapState.mapView,
-        mapState.patternSize,
-        mapState.patternDirection,
-        mapState.originalAirportTarget?.id,
-        mapState.originalAirportTarget?.latitude,
-        mapState.originalAirportTarget?.longitude,
-        mapState.originalAirportTarget?.elevationM,
-        mapState.originalAirportTarget?.metadata,
-        mapState.patternFinalDistanceNm,
-        mapState.customPatternAltitudeAglFt,
-        mapState.selectedRunwayHeading,
-        mapState.roundedPatternCorners
-    ) {
-        val mv = mapState.mapView ?: return@LaunchedEffect
-        val target = mapState.originalAirportTarget ?: return@LaunchedEffect
-        
-        Log.d(TAG, "✈️ Pattern Effect: show=${mapState.showTrafficPattern}, runway=${mapState.selectedRunway?.name}, heading=${mapState.selectedRunwayHeading}")
-        
-        if (mapState.showTrafficPattern) {
-            // Remove old pattern overlays
-            mapState.trafficPatternPolyline?.let { mv.overlays.remove(it) }
-            mapState.trafficPatternLabelOverlay?.let { mv.overlays.remove(it) }
-            
-            // Determine heading and runway properties (runway or manual)
-            val runway = mapState.selectedRunway
-            val runwayHeading: Double
-            val runwayLengthMeters: Double
-            val runwayThreshold: GeoPoint
-            val headingForPattern: Double
-            
-            if (runway != null) {
-                Log.d(TAG, "✈️ Using runway ${runway.name} for pattern")
-                // Case 1: Runway is available - use runway data
-                runwayHeading = runway.headingDeg ?: extractRunwayHeading(runway.name) ?: 0.0
-                runwayLengthMeters = (runway.lengthM?.toDouble() ?: runway.lengthFt?.toDouble()?.times(0.3048)) ?: 2000.0
-                runwayThreshold = GeoPoint(
-                    runway.touchdownStartLat ?: target.latitude,
-                    runway.touchdownStartLon ?: target.longitude
-                )
-                // Generate pattern points (use selected runway index to decide which runway end is active)
-                val isDirection1 = (mapState.selectedRunwayIndex ?: 0) % 2 == 0
-                headingForPattern = if (isDirection1) runwayHeading else (runwayHeading + 180.0) % 360
-            } else if (mapState.selectedRunwayHeading != null) {
-                Log.d(TAG, "✈️ Using manual heading ${mapState.selectedRunwayHeading} for pattern")
-                // Case 2: Manual heading is set (no runway) - use manual heading
-                runwayHeading = mapState.selectedRunwayHeading!!
-                runwayLengthMeters = 2000.0 // Default 2km runway length for tactical units
-                runwayThreshold = GeoPoint(target.latitude, target.longitude)
-                headingForPattern = runwayHeading
-            } else {
-                Log.d(TAG, "✈️ No runway and no manual heading - cannot draw pattern")
-                // No heading available - cannot draw pattern
-                return@LaunchedEffect
-            }
-
-            // Generate pattern directly with correct heading and direction
-            // The headingForPattern already accounts for runway direction (07 vs 25)
-            // The direction parameter handles LEFT_HAND vs RIGHT_HAND
-            // No post-generation mirroring needed - the generator creates the pattern correctly
-            Log.d(TAG, "✈️ Generating pattern: heading=$headingForPattern, size=${mapState.patternSize}, dir=${mapState.patternDirection}, rounded=${mapState.roundedPatternCorners}")
-            
-            // Use the new function that returns corner positions and headings for labels
-            // Always use generateTrafficPatternWithCorners to get proper headings for labels
-            val (patternPoints, cornerPositions, segmentHeadings) = TrafficPatternGenerator.generateTrafficPatternWithCorners(
-                runwayThreshold = runwayThreshold,
-                runwayHeading = headingForPattern,
-                runwayLengthMeters = runwayLengthMeters,
-                patternSize = mapState.patternSize,
-                direction = mapState.patternDirection,
-                finalDistanceNm = mapState.patternFinalDistanceNm,
-                roundedCorners = mapState.roundedPatternCorners
-            )
-            Log.d(TAG, "✈️ Pattern generated with ${patternPoints.size} points, headings provided: ${segmentHeadings != null}")
-
-            // Create and add pattern polyline
-            val polyline = TrafficPatternGenerator.createPatternPolyline(
-                points = patternPoints,
-                color = 0xFF00FF00.toInt(), // Green for pattern
-                width = 5f
-            )
-            mv.overlays.add(polyline)
-            mapState.trafficPatternPolyline = polyline
-            Log.d(TAG, "✈️ Pattern polyline added to map")
-
-            // Create and add pattern labels with distance and heading information
-            val runwayElevationFt = (target.elevationM?.times(3.28084))?.toInt() ?: 0
-            val labels = TrafficPatternGenerator.generatePatternLabels(
-                points = patternPoints,
-                direction = mapState.patternDirection,
-                runwayHeading = headingForPattern,
-                patternSize = mapState.patternSize,
-                runwayElevationFt = runwayElevationFt,
-                customAltitudeAglFt = mapState.customPatternAltitudeAglFt,
-                cornerPositions = cornerPositions,
-                segmentHeadings = segmentHeadings
-            )
-            // Pass current map rotation so labels stay upright when map rotates
-            val currentMapRotation = mv.mapOrientation
-            val labelOverlay = PatternLabelOverlay(labels, currentMapRotation)
-            mv.overlays.add(labelOverlay)
-            mapState.trafficPatternLabelOverlay = labelOverlay
-            
-            // Set navigation target to runway threshold (landing point)
-            // This creates a red line from current position to the pattern landing point
-            val patternTarget = target.copy(
-                id = -2, // Special ID for pattern navigation
-                name = target.name, // Keep original name, PATTERN indicator shown in UI
-                latitude = runwayThreshold.latitude,
-                longitude = runwayThreshold.longitude
-            )
-            mapState.activeNavigationTarget = patternTarget
-            // Respect the user's saved navigation panel state; do NOT force it open when restoring/generating a pattern
-            // Persist pattern/navigation state (but do not change showNavigationDetails here)
-            mapState.saveNavigationState()
-
-            mv.invalidate()
-        } else {
-            // Remove pattern overlays when disabled
-            mapState.trafficPatternPolyline?.let { 
-                mv.overlays.remove(it)
-                mapState.trafficPatternPolyline = null
-            }
-            mapState.trafficPatternLabelOverlay?.let {
-                mv.overlays.remove(it)
-                mapState.trafficPatternLabelOverlay = null
-            }
-            // Restore navigation to original target if pattern navigation was active (id = -2)
-            if (mapState.activeNavigationTarget?.id == -2) {
-                // If showRunwayApproach is still active, restore to approach point
-                if (mapState.showRunwayApproach && mapState.originalAirportTarget != null && mapState.selectedRunwayHeading != null) {
-                    // Recreate approach target with selected runway heading
-                    val target = mapState.originalAirportTarget!!
-                    val heading = mapState.selectedRunwayHeading!!
-                    val distanceMeters = mapState.finalApproachDistanceNm * 1852.0
-                    val rad = Math.toRadians(heading)
-                    val lat1 = Math.toRadians(target.latitude)
-                    val lon1 = Math.toRadians(target.longitude)
-                    val dLat = distanceMeters * Math.cos(rad) / 6371000.0
-                    val dLon = distanceMeters * Math.sin(rad) / (6371000.0 * Math.cos(lat1))
-                    val endLat = lat1 + dLat
-                    val endLon = lon1 + dLon
-                    val endpoint = org.osmdroid.util.GeoPoint(Math.toDegrees(endLat), Math.toDegrees(endLon))
-                    
-                    // Extract real runway name from database (e.g., "09/27" -> "09" or "27")
-                    // Only calculate from heading if runway name is not available
-                    val runwayName = if (mapState.selectedRunway != null) {
-                        val names = mapState.selectedRunway?.name?.split("/")?.map { it.trim() } ?: emptyList()
-                        val isDirection1 = (mapState.selectedRunwayIndex ?: 0) % 2 == 0
-                        names.getOrNull(if (isDirection1) 0 else 1) ?: (heading / 10).toInt().toString().padStart(2, '0')
-                    } else {
-                        (heading / 10).toInt().toString().padStart(2, '0')
-                    }
-                    
-                    val approachTarget = target.copy(
-                        id = -1,
-                        name = "${target.name} RWY $runwayName",
-                        latitude = endpoint.latitude,
-                        longitude = endpoint.longitude
-                    )
-                    mapState.activeNavigationTarget = approachTarget
-                } else {
-                    // Otherwise restore to original airport target or clear if none
-                    mapState.activeNavigationTarget = mapState.originalAirportTarget
-                    // Only clear tactical unit ID if we're completely clearing navigation
-                    if (mapState.originalAirportTarget == null) {
-                        mapState.activeNavigationTacticalUnitId = null
-                    }
-                }
-            }
-            mv.invalidate()
-        }
-    }
+    // Generate and draw traffic pattern when enabled (extracted for performance)
+    TrafficPatternEffect(mapState = mapState)
 
     // Render patterns for individual markers (separate from active navigation pattern)
     LaunchedEffect(mapState.markerPatterns, mapState.mapView, dbReady, locationRepository) {
@@ -3659,6 +3310,366 @@ fun MapViewer(
                 // ignore
             }
             mapState.mapView?.onDetach()
+        }
+    }
+}
+
+// ========== EXTRACTED COMPOSABLE EFFECTS FOR PERFORMANCE ==========
+
+/**
+ * Handles runway approach lines drawing
+ */
+@Composable
+private fun RunwayApproachLinesEffect(
+    mapState: MapViewerState,
+    context: Context
+) {
+    LaunchedEffect(
+        mapState.showRunwayApproach,
+        mapState.targetRunways,
+        mapState.originalAirportTarget?.id,
+        mapState.originalAirportTarget?.latitude,
+        mapState.originalAirportTarget?.longitude,
+        mapState.mapView,
+        mapState.finalApproachDistanceNm,
+        mapState.selectedRunwayHeading
+    ) {
+        val map = mapState.mapView
+        val target = mapState.originalAirportTarget
+
+        Log.d(TAG, "🛬 Approach Lines Effect: showApproach=${mapState.showRunwayApproach}, target=${target?.name}, map=${map != null}, runways=${mapState.targetRunways.size}, heading=${mapState.selectedRunwayHeading}")
+
+        // Remove existing approach lines
+        mapState.runwayApproachLines.forEach { line ->
+            map?.overlays?.remove(line)
+        }
+        mapState.runwayApproachLines = emptyList()
+
+        if (mapState.showRunwayApproach && target != null && map != null) {
+            val newLines = mutableListOf<org.osmdroid.views.overlay.Polyline>()
+
+            // Case 1: Runways are available - draw approach for each runway
+            if (mapState.targetRunways.isNotEmpty()) {
+                Log.d(TAG, "🛬 Drawing ${mapState.targetRunways.size} runway approach lines")
+                mapState.targetRunways.forEach { runway ->
+                val heading = runway.headingDeg ?: extractRunwayHeading(runway.name) ?: 0.0
+                val center = GeoPoint(target.latitude, target.longitude)
+
+                // Calculate final approach distance in meters
+                val distanceMeters = mapState.finalApproachDistanceNm * 1852.0
+
+                // Get runway length in meters
+                val runwayLengthMeters = (runway.lengthM?.toDouble() ?: runway.lengthFt?.toDouble()?.times(0.3048)) ?: 2000.0
+                val halfRunwayLength = runwayLengthMeters / 2.0
+
+                // Direction 1: heading
+                val rad1 = Math.toRadians(heading)
+                val lat1 = Math.toRadians(center.latitude)
+                val lon1 = Math.toRadians(center.longitude)
+                val dLat1 = distanceMeters * Math.cos(rad1) / 6371000.0
+                val dLon1 = distanceMeters * Math.sin(rad1) / (6371000.0 * Math.cos(lat1))
+                val endLat1 = lat1 + dLat1
+                val endLon1 = lon1 + dLon1
+                val endpoint1 = GeoPoint(Math.toDegrees(endLat1), Math.toDegrees(endLon1))
+
+                // Direction 2: opposite heading
+                val heading2 = (heading + 180) % 360
+                val rad2 = Math.toRadians(heading2)
+                val dLat2 = distanceMeters * Math.cos(rad2) / 6371000.0
+                val dLon2 = distanceMeters * Math.sin(rad2) / (6371000.0 * Math.cos(lat1))
+                val endLat2 = lat1 + dLat2
+                val endLon2 = lon1 + dLon2
+                val endpoint2 = GeoPoint(Math.toDegrees(endLat2), Math.toDegrees(endLon2))
+
+                // Calculate runway start/end points (half length in each direction from center)
+                val dLatStart = halfRunwayLength * Math.cos(rad1) / 6371000.0
+                val dLonStart = halfRunwayLength * Math.sin(rad1) / (6371000.0 * Math.cos(lat1))
+                val runwayStart = GeoPoint(Math.toDegrees(lat1 + dLatStart), Math.toDegrees(lon1 + dLonStart))
+
+                val dLatEnd = halfRunwayLength * Math.cos(rad2) / 6371000.0
+                val dLonEnd = halfRunwayLength * Math.sin(rad2) / (6371000.0 * Math.cos(lat1))
+                val runwayEnd = GeoPoint(Math.toDegrees(lat1 + dLatEnd), Math.toDegrees(lon1 + dLonEnd))
+
+                // Calculate perpendicular heading (90 degrees to runway heading)
+                val perpHeading = (heading + 90) % 360
+                val perpRad = Math.toRadians(perpHeading)
+                val perpDistance = 100.0 // 100 meters width for threshold markers
+
+                // Helper function to calculate perpendicular line endpoints
+                fun getPerpendicularPoints(point: GeoPoint): Pair<GeoPoint, GeoPoint> {
+                    val latRad = Math.toRadians(point.latitude)
+                    val lonRad = Math.toRadians(point.longitude)
+
+                    // One side
+                    val dLat1 = perpDistance * Math.cos(perpRad) / 6371000.0
+                    val dLon1 = perpDistance * Math.sin(perpRad) / (6371000.0 * Math.cos(latRad))
+                    val side1 = GeoPoint(Math.toDegrees(latRad + dLat1), Math.toDegrees(lonRad + dLon1))
+
+                    // Other side (opposite direction)
+                    val perpHeading2 = (perpHeading + 180) % 360
+                    val perpRad2 = Math.toRadians(perpHeading2)
+                    val dLat2 = perpDistance * Math.cos(perpRad2) / 6371000.0
+                    val dLon2 = perpDistance * Math.sin(perpRad2) / (6371000.0 * Math.cos(latRad))
+                    val side2 = GeoPoint(Math.toDegrees(latRad + dLat2), Math.toDegrees(lonRad + dLon2))
+
+                    return Pair(side1, side2)
+                }
+
+                // Create lines for both directions
+                val line1 = org.osmdroid.views.overlay.Polyline(map).apply {
+                    outlinePaint.color = android.graphics.Color.argb(128, 255, 255, 0) // 50% transparent yellow
+                    outlinePaint.strokeWidth = 8f
+                    outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                    setPoints(listOf(center, endpoint1))
+                    map.overlays.add(this)
+                }
+
+                val line2 = org.osmdroid.views.overlay.Polyline(map).apply {
+                    outlinePaint.color = android.graphics.Color.argb(128, 255, 255, 0) // 50% transparent yellow
+                    outlinePaint.strokeWidth = 8f
+                    outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                    setPoints(listOf(center, endpoint2))
+                    map.overlays.add(this)
+                }
+
+                newLines.add(line1)
+                newLines.add(line2)
+
+                // Add perpendicular threshold markers at runway start and end
+                val (startSide1, startSide2) = getPerpendicularPoints(runwayStart)
+                val thresholdLine1 = org.osmdroid.views.overlay.Polyline(map).apply {
+                    outlinePaint.color = android.graphics.Color.argb(180, 255, 255, 0) // Slightly more opaque
+                    outlinePaint.strokeWidth = 6f
+                    outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                    setPoints(listOf(startSide1, startSide2))
+                    map.overlays.add(this)
+                }
+                newLines.add(thresholdLine1)
+
+                val (endSide1, endSide2) = getPerpendicularPoints(runwayEnd)
+                val thresholdLine2 = org.osmdroid.views.overlay.Polyline(map).apply {
+                    outlinePaint.color = android.graphics.Color.argb(180, 255, 255, 0) // Slightly more opaque
+                    outlinePaint.strokeWidth = 6f
+                    outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                    setPoints(listOf(endSide1, endSide2))
+                    map.overlays.add(this)
+                }
+                newLines.add(thresholdLine2)
+            }
+            }
+            // Case 2: No runways but manual heading is set - draw single approach line
+            else if (mapState.selectedRunwayHeading != null) {
+                Log.d(TAG, "🛬 Drawing manual approach line with heading ${mapState.selectedRunwayHeading}")
+                val heading = mapState.selectedRunwayHeading!!
+                val center = GeoPoint(target.latitude, target.longitude)
+                val distanceMeters = mapState.finalApproachDistanceNm * 1852.0
+
+                val rad = Math.toRadians(heading)
+                val lat1 = Math.toRadians(center.latitude)
+                val lon1 = Math.toRadians(center.longitude)
+                val dLat = distanceMeters * Math.cos(rad) / 6371000.0
+                val dLon = distanceMeters * Math.sin(rad) / (6371000.0 * Math.cos(lat1))
+                val endLat = lat1 + dLat
+                val endLon = lon1 + dLon
+                val endpoint = GeoPoint(Math.toDegrees(endLat), Math.toDegrees(endLon))
+
+                Log.d(TAG, "🛬 Approach line from ${center.latitude},${center.longitude} to ${endpoint.latitude},${endpoint.longitude}")
+
+                val line = org.osmdroid.views.overlay.Polyline(map).apply {
+                    outlinePaint.color = android.graphics.Color.argb(128, 255, 255, 0) // 50% transparent yellow
+                    outlinePaint.strokeWidth = 8f
+                    outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                    setPoints(listOf(center, endpoint))
+                    map.overlays.add(this)
+                }
+
+                newLines.add(line)
+                Log.d(TAG, "🛬 Approach line added to map, total lines: ${newLines.size}")
+            } else {
+                Log.d(TAG, "🛬 No runways and no manual heading - cannot draw approach")
+            }
+
+            if (newLines.isNotEmpty()) {
+                mapState.runwayApproachLines = newLines
+                map.invalidate()
+                Log.d(TAG, "🛬 Map invalidated with ${newLines.size} approach lines")
+            }
+        } else {
+            Log.d(TAG, "🛬 Conditions not met: showApproach=${mapState.showRunwayApproach}, target=${target != null}, map=${map != null}")
+        }
+    }
+}
+
+/**
+ * Handles traffic pattern drawing and navigation
+ */
+@Composable
+private fun TrafficPatternEffect(mapState: MapViewerState) {
+    LaunchedEffect(
+        mapState.showTrafficPattern,
+        mapState.selectedRunway,
+        mapState.mapView,
+        mapState.patternSize,
+        mapState.patternDirection,
+        mapState.originalAirportTarget?.id,
+        mapState.originalAirportTarget?.latitude,
+        mapState.originalAirportTarget?.longitude,
+        mapState.originalAirportTarget?.elevationM,
+        mapState.originalAirportTarget?.metadata,
+        mapState.patternFinalDistanceNm,
+        mapState.customPatternAltitudeAglFt,
+        mapState.selectedRunwayHeading,
+        mapState.roundedPatternCorners
+    ) {
+        val mv = mapState.mapView ?: return@LaunchedEffect
+        val target = mapState.originalAirportTarget ?: return@LaunchedEffect
+
+        Log.d(TAG, "✈️ Pattern Effect: show=${mapState.showTrafficPattern}, runway=${mapState.selectedRunway?.name}, heading=${mapState.selectedRunwayHeading}")
+
+        if (mapState.showTrafficPattern) {
+            // Remove old pattern overlays
+            mapState.trafficPatternPolyline?.let { mv.overlays.remove(it) }
+            mapState.trafficPatternLabelOverlay?.let { mv.overlays.remove(it) }
+
+            // Determine heading and runway properties (runway or manual)
+            val runway = mapState.selectedRunway
+            val runwayHeading: Double
+            val runwayLengthMeters: Double
+            val runwayThreshold: GeoPoint
+            val headingForPattern: Double
+
+            if (runway != null) {
+                Log.d(TAG, "✈️ Using runway ${runway.name} for pattern")
+                // Case 1: Runway is available - use runway data
+                runwayHeading = runway.headingDeg ?: extractRunwayHeading(runway.name) ?: 0.0
+                runwayLengthMeters = (runway.lengthM?.toDouble() ?: runway.lengthFt?.toDouble()?.times(0.3048)) ?: 2000.0
+                runwayThreshold = GeoPoint(
+                    runway.touchdownStartLat ?: target.latitude,
+                    runway.touchdownStartLon ?: target.longitude
+                )
+                // Generate pattern points (use selected runway index to decide which runway end is active)
+                val isDirection1 = (mapState.selectedRunwayIndex ?: 0) % 2 == 0
+                headingForPattern = if (isDirection1) runwayHeading else (runwayHeading + 180.0) % 360
+            } else if (mapState.selectedRunwayHeading != null) {
+                Log.d(TAG, "✈️ Using manual heading ${mapState.selectedRunwayHeading} for pattern")
+                // Case 2: Manual heading is set (no runway) - use manual heading
+                runwayHeading = mapState.selectedRunwayHeading!!
+                runwayLengthMeters = 2000.0 // Default 2km runway length for tactical units
+                runwayThreshold = GeoPoint(target.latitude, target.longitude)
+                headingForPattern = runwayHeading
+            } else {
+                Log.d(TAG, "✈️ No runway and no manual heading - cannot draw pattern")
+                // No heading available - cannot draw pattern
+                return@LaunchedEffect
+            }
+
+            // Generate pattern directly with correct heading and direction
+            Log.d(TAG, "✈️ Generating pattern: heading=$headingForPattern, size=${mapState.patternSize}, dir=${mapState.patternDirection}, rounded=${mapState.roundedPatternCorners}")
+
+            // Use the new function that returns corner positions and headings for labels
+            val (patternPoints, cornerPositions, segmentHeadings) = TrafficPatternGenerator.generateTrafficPatternWithCorners(
+                runwayThreshold = runwayThreshold,
+                runwayHeading = headingForPattern,
+                runwayLengthMeters = runwayLengthMeters,
+                patternSize = mapState.patternSize,
+                direction = mapState.patternDirection,
+                finalDistanceNm = mapState.patternFinalDistanceNm,
+                roundedCorners = mapState.roundedPatternCorners
+            )
+            Log.d(TAG, "✈️ Pattern generated with ${patternPoints.size} points, headings provided: ${segmentHeadings != null}")
+
+            // Create and add pattern polyline
+            val polyline = TrafficPatternGenerator.createPatternPolyline(
+                points = patternPoints,
+                color = 0xFF00FF00.toInt(), // Green for pattern
+                width = 5f
+            )
+            mv.overlays.add(polyline)
+            mapState.trafficPatternPolyline = polyline
+            Log.d(TAG, "✈️ Pattern polyline added to map")
+
+            // Create and add pattern labels with distance and heading information
+            val runwayElevationFt = (target.elevationM?.times(3.28084))?.toInt() ?: 0
+            val labels = TrafficPatternGenerator.generatePatternLabels(
+                points = patternPoints,
+                direction = mapState.patternDirection,
+                runwayHeading = headingForPattern,
+                patternSize = mapState.patternSize,
+                runwayElevationFt = runwayElevationFt,
+                customAltitudeAglFt = mapState.customPatternAltitudeAglFt,
+                cornerPositions = cornerPositions,
+                segmentHeadings = segmentHeadings
+            )
+            // Pass current map rotation so labels stay upright when map rotates
+            val currentMapRotation = mv.mapOrientation
+            val labelOverlay = PatternLabelOverlay(labels, currentMapRotation)
+            mv.overlays.add(labelOverlay)
+            mapState.trafficPatternLabelOverlay = labelOverlay
+
+            // Set navigation target to runway threshold (landing point)
+            val patternTarget = target.copy(
+                id = -2, // Special ID for pattern navigation
+                name = target.name, // Keep original name, PATTERN indicator shown in UI
+                latitude = runwayThreshold.latitude,
+                longitude = runwayThreshold.longitude
+            )
+            mapState.activeNavigationTarget = patternTarget
+            mapState.saveNavigationState()
+
+            mv.invalidate()
+        } else {
+            // Remove pattern overlays when disabled
+            mapState.trafficPatternPolyline?.let {
+                mv.overlays.remove(it)
+                mapState.trafficPatternPolyline = null
+            }
+            mapState.trafficPatternLabelOverlay?.let {
+                mv.overlays.remove(it)
+                mapState.trafficPatternLabelOverlay = null
+            }
+            // Restore navigation to original target if pattern navigation was active (id = -2)
+            if (mapState.activeNavigationTarget?.id == -2) {
+                // If showRunwayApproach is still active, restore to approach point
+                if (mapState.showRunwayApproach && mapState.originalAirportTarget != null && mapState.selectedRunwayHeading != null) {
+                    // Recreate approach target with selected runway heading
+                    val target = mapState.originalAirportTarget!!
+                    val heading = mapState.selectedRunwayHeading!!
+                    val distanceMeters = mapState.finalApproachDistanceNm * 1852.0
+                    val rad = Math.toRadians(heading)
+                    val lat1 = Math.toRadians(target.latitude)
+                    val lon1 = Math.toRadians(target.longitude)
+                    val dLat = distanceMeters * Math.cos(rad) / 6371000.0
+                    val dLon = distanceMeters * Math.sin(rad) / (6371000.0 * Math.cos(lat1))
+                    val endLat = lat1 + dLat
+                    val endLon = lon1 + dLon
+                    val endpoint = org.osmdroid.util.GeoPoint(Math.toDegrees(endLat), Math.toDegrees(endLon))
+
+                    // Extract real runway name from database
+                    val runwayName = if (mapState.selectedRunway != null) {
+                        val names = mapState.selectedRunway?.name?.split("/")?.map { it.trim() } ?: emptyList()
+                        val isDirection1 = (mapState.selectedRunwayIndex ?: 0) % 2 == 0
+                        names.getOrNull(if (isDirection1) 0 else 1) ?: (heading / 10).toInt().toString().padStart(2, '0')
+                    } else {
+                        (heading / 10).toInt().toString().padStart(2, '0')
+                    }
+
+                    val approachTarget = target.copy(
+                        id = -1,
+                        name = "${target.name} RWY $runwayName",
+                        latitude = endpoint.latitude,
+                        longitude = endpoint.longitude
+                    )
+                    mapState.activeNavigationTarget = approachTarget
+                } else {
+                    // Otherwise restore to original airport target or clear if none
+                    mapState.activeNavigationTarget = mapState.originalAirportTarget
+                    // Only clear tactical unit ID if we're completely clearing navigation
+                    if (mapState.originalAirportTarget == null) {
+                        mapState.activeNavigationTacticalUnitId = null
+                    }
+                }
+            }
+            mv.invalidate()
         }
     }
 }
