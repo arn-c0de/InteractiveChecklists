@@ -366,22 +366,17 @@ class DataPadManager(private val context: Context) {
                 // Log network info
                 val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
                 // Use NetworkCapabilities on modern APIs to avoid deprecated NetworkInfo
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                    val activeNet = cm.activeNetwork
-                    val nc = cm.getNetworkCapabilities(activeNet)
-                    val connected = nc != null && nc.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                    val transport = when {
-                        nc?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) == true -> "WIFI"
-                        nc?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "CELLULAR"
-                        nc?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) == true -> "ETHERNET"
-                        nc?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_BLUETOOTH) == true -> "BLUETOOTH"
-                        else -> "UNKNOWN"
-                    }
-                    udpLogD("Active network: $transport, connected: $connected")
-                } else {
-                    val activeNetwork = cm.activeNetworkInfo
-                    udpLogD("Active network: ${activeNetwork?.typeName}, connected: ${activeNetwork?.isConnected}")
+                val activeNet = cm.activeNetwork
+                val nc = cm.getNetworkCapabilities(activeNet)
+                val connected = nc != null && nc.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                val transport = when {
+                    nc?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) == true -> "WIFI"
+                    nc?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "CELLULAR"
+                    nc?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) == true -> "ETHERNET"
+                    nc?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_BLUETOOTH) == true -> "BLUETOOTH"
+                    else -> "UNKNOWN"
                 }
+                udpLogD("Active network: $transport, connected: $connected")
 
                 udpLogD("Socket local address: ${udpSocket?.localAddress?.hostAddress}")
                 udpLogD("Socket local port: ${udpSocket?.localPort}")

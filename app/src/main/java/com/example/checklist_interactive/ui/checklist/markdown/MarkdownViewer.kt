@@ -145,7 +145,7 @@ fun MarkdownViewer(
                 if (checklist != null) {
                     android.util.Log.d("MarkdownViewer", "checklist sections: ${checklist.sections.size}, total items: ${checklist.sections.sumOf { it.items.size }}")
                 }
-                if (hasItems && checklist != null && onCheckboxChange != null) {
+                if (hasItems && onCheckboxChange != null) {
                     // Interactive view with checkboxes
                     android.util.Log.d("MarkdownViewer", "Using InteractiveMarkdownView, resetTrigger=$resetTrigger, expandAll=$expandAllState")
                     InteractiveMarkdownView(
