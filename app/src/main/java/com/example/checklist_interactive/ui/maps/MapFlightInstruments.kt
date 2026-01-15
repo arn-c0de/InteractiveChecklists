@@ -101,28 +101,38 @@ fun MapFlightInstruments(
     // Get screen configuration for responsive sizing
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
+    val isTablet = configuration.screenWidthDp >= 600
 
     // Calculate responsive instrument sizes
-    // Primary row: 3 instruments (120dp + 220dp + 120dp = 460dp) + spacing (2 * 12dp = 24dp) = 484dp
-    // Secondary row: 7 instruments (7 * 64dp = 448dp) + spacing (6 * 8dp = 48dp) = 496dp
-    // We need to fit the wider of these (496dp) into available width with padding
-
     val horizontalPadding = 10.dp
     val availableWidth = screenWidth - (horizontalPadding * 2)
 
-    // Calculate scale factor based on secondary row (wider row)
-    val secondaryRowWidth = (64 * 7 + 8 * 6).dp
-    val primaryRowWidth = (120 + 220 + 120 + 12 * 2).dp
-    val maxRequiredWidth = maxOf(secondaryRowWidth, primaryRowWidth)
+    val primarySmallSize: androidx.compose.ui.unit.Dp
+    val primaryLargeSize: androidx.compose.ui.unit.Dp
+    val secondarySize: androidx.compose.ui.unit.Dp
+    val primarySpacing: androidx.compose.ui.unit.Dp
+    val secondarySpacing: androidx.compose.ui.unit.Dp
 
-    val scaleFactor = (availableWidth / maxRequiredWidth).coerceIn(0.4f, 1.0f)
+    if (isTablet) {
+        // Tablet: Keep current layout
+        val secondaryRowWidth = (64 * 6 + 8 * 5).dp // 6 instruments now
+        val primaryRowWidth = (120 + 220 + 120 + 12 * 2).dp
+        val maxRequiredWidth = maxOf(secondaryRowWidth, primaryRowWidth)
+        val scaleFactor = (availableWidth / maxRequiredWidth).coerceIn(0.4f, 1.0f)
 
-    // Calculate scaled sizes
-    val primarySmallSize = (120.dp * scaleFactor).coerceAtLeast(60.dp)
-    val primaryLargeSize = (220.dp * scaleFactor).coerceAtLeast(110.dp)
-    val secondarySize = (64.dp * scaleFactor).coerceAtLeast(32.dp)
-    val primarySpacing = (12.dp * scaleFactor).coerceAtLeast(6.dp)
-    val secondarySpacing = (8.dp * scaleFactor).coerceAtLeast(4.dp)
+        primarySmallSize = (120.dp * scaleFactor).coerceAtLeast(60.dp)
+        primaryLargeSize = (220.dp * scaleFactor).coerceAtLeast(110.dp)
+        secondarySize = (64.dp * scaleFactor).coerceAtLeast(32.dp)
+        primarySpacing = (12.dp * scaleFactor).coerceAtLeast(6.dp)
+        secondarySpacing = (8.dp * scaleFactor).coerceAtLeast(4.dp)
+    } else {
+        // Smartphone: Smaller instruments
+        primarySmallSize = 80.dp // Airspeed and VerticalSpeed smaller
+        primaryLargeSize = 160.dp // Attitude indicator
+        secondarySize = 40.dp // Much smaller secondary instruments
+        primarySpacing = 8.dp
+        secondarySpacing = 6.dp
+    }
 
     // Horizontal panel at bottom center
     Box(
@@ -131,7 +141,7 @@ fun MapFlightInstruments(
     ) {
         androidx.compose.material3.Surface(
             modifier = Modifier
-                .padding(bottom = 12.dp)
+                .padding(bottom = if (isTablet) 12.dp else 0.dp)
                 .wrapContentSize(),
             tonalElevation = 4.dp,
             shape = MaterialTheme.shapes.large,
@@ -140,8 +150,11 @@ fun MapFlightInstruments(
             // Use a Box so we can overlay a "NO DATA" indicator when no flight data exists
             Box {
                 Column(
-                    modifier = Modifier.padding(horizontal = horizontalPadding, vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.padding(
+                        horizontal = horizontalPadding,
+                        vertical = if (isTablet) 4.dp else 2.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(if (isTablet) 2.dp else 1.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // Primary flight instruments (top row)
@@ -202,13 +215,6 @@ fun MapFlightInstruments(
                         EngineRPMIndicator(
                             rpmLeft = engineRpmLeft ?: 0.0,
                             rpmRight = engineRpmRight,
-                            size = secondarySize
-                        )
-
-                        // Fuel Indicator (right side)
-                        FuelIndicator(
-                            fuelRemaining = fuelRemaining ?: 0.0,
-                            fuelTotal = fuelTotal ?: 1.0,
                             size = secondarySize
                         )
 
