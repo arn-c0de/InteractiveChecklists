@@ -1816,6 +1816,10 @@ fun MapViewer(
                     setTileSource(initialTileSource)
                     setMultiTouchControls(true)
 
+                    // Disable built-in zoom buttons (we use multi-touch zoom instead)
+                    // This prevents zoom buttons from appearing behind flight instruments
+                    zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
+
                     // Set padding so map content doesn't hide under the TabBar
                     setPadding(0, tabBarHeightPx, 0, 0)
 
