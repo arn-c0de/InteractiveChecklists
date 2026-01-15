@@ -19,11 +19,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.platform.LocalContext
 import com.example.checklist_interactive.R
 import androidx.annotation.StringRes
 import androidx.compose.ui.res.stringResource
+import com.example.checklist_interactive.ui.common.rememberWindowSize
+import com.example.checklist_interactive.ui.common.rememberResponsiveDimensions
+import com.example.checklist_interactive.ui.common.WindowWidthSizeClass
 
 /**
  * Military Symbol Definition
@@ -79,20 +83,37 @@ fun MilitarySymbolPickerDialog(
     val selectedCategory = SymbolCategory.entries[selectedCategoryOrdinal]
     val selectedAffiliation = SymbolAffiliation.entries[selectedAffiliationOrdinal]
 
+    // Responsive sizing
+    val windowSize = rememberWindowSize()
+    val dimensions = rememberResponsiveDimensions(windowSize)
+
+    // Dialog dimensions based on screen size
+    val dialogWidth = when (windowSize.widthSizeClass) {
+        WindowWidthSizeClass.COMPACT -> if (windowSize.widthDp < 360) 300.dp else dimensions.dialogWidth
+        WindowWidthSizeClass.MEDIUM -> 480.dp
+        WindowWidthSizeClass.EXPANDED -> 600.dp
+    }
+
+    val dialogHeightFraction = when {
+        windowSize.isVerticallyConstrained -> 0.95f  // Maximize height in landscape phones
+        windowSize.isCompact -> 0.9f
+        else -> 0.85f
+    }
+
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.9f)
-                .widthIn(min = 600.dp, max = 900.dp),
-            shape = RoundedCornerShape(16.dp),
+                .fillMaxWidth(if (windowSize.isCompact) 0.95f else 0.9f)
+                .fillMaxHeight(dialogHeightFraction)
+                .widthIn(max = dialogWidth),
+            shape = RoundedCornerShape(if (windowSize.isCompact) 12.dp else 16.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 8.dp
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp)
+                    .padding(dimensions.contentPadding)
             ) {
                 // Header
                 Row(
@@ -102,15 +123,26 @@ fun MilitarySymbolPickerDialog(
                 ) {
                     Text(
                         text = stringResource(R.string.military_symbols_title),
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = if (windowSize.isCompact) {
+                            MaterialTheme.typography.titleLarge
+                        } else {
+                            MaterialTheme.typography.headlineSmall
+                        },
                         fontWeight = FontWeight.Bold
                     )
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.military_symbols_close))
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(dimensions.minTouchTarget)
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = stringResource(R.string.military_symbols_close),
+                            modifier = Modifier.size(dimensions.iconSize)
+                        )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(dimensions.elementSpacing))
 
                 // Affiliation Selector
                 Text(
@@ -163,22 +195,35 @@ fun MilitarySymbolPickerDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(dimensions.elementSpacing))
 
                 // Symbol Grid
                 val symbols = getSymbolsForCategory(LocalContext.current, selectedCategory)
-                
+
+                // Adaptive grid sizing based on screen size
+                val gridMinSize = when (windowSize.widthSizeClass) {
+                    WindowWidthSizeClass.COMPACT -> when {
+                        windowSize.widthDp < 360 -> 70.dp  // Small phones: 2-3 columns
+                        windowSize.widthDp < 420 -> 80.dp  // Standard phones: 3-4 columns
+                        else -> 90.dp                       // Large phones: 4 columns
+                    }
+                    WindowWidthSizeClass.MEDIUM -> 100.dp  // Tablets: 4-5 columns
+                    WindowWidthSizeClass.EXPANDED -> 110.dp // Large tablets: 5-6 columns
+                }
+
                 LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 80.dp),
-                    contentPadding = PaddingValues(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    columns = GridCells.Adaptive(minSize = gridMinSize),
+                    contentPadding = PaddingValues(dimensions.elementSpacing / 2),
+                    horizontalArrangement = Arrangement.spacedBy(dimensions.elementSpacing),
+                    verticalArrangement = Arrangement.spacedBy(dimensions.elementSpacing),
                     modifier = Modifier.weight(1f)
                 ) {
                     items(symbols) { symbol ->
                         SymbolCard(
                             symbol = symbol,
                             affiliationColor = selectedAffiliation.color,
+                            windowSize = windowSize,
+                            dimensions = dimensions,
                             onClick = {
                                 onSymbolSelected(symbol, selectedAffiliation)
                                 onDismiss()
@@ -195,41 +240,64 @@ fun MilitarySymbolPickerDialog(
 private fun SymbolCard(
     symbol: MilitarySymbol,
     affiliationColor: Color,
+    windowSize: com.example.checklist_interactive.ui.common.WindowSize,
+    dimensions: com.example.checklist_interactive.ui.common.ResponsiveDimensions,
     onClick: () -> Unit
 ) {
+    // Responsive icon sizing
+    val iconBoxSize = when (windowSize.widthSizeClass) {
+        WindowWidthSizeClass.COMPACT -> when {
+            windowSize.widthDp < 360 -> 40.dp  // Very small phones
+            windowSize.widthDp < 420 -> 44.dp  // Small phones
+            else -> 48.dp                       // Standard phones
+        }
+        WindowWidthSizeClass.MEDIUM -> 52.dp   // Tablets
+        WindowWidthSizeClass.EXPANDED -> 56.dp // Large tablets
+    }
+
+    val iconSize = iconBoxSize * 0.85f  // Icon is 85% of box size
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .heightIn(min = dimensions.minTouchTarget),  // Ensure minimum touch target
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp),
+                .padding(dimensions.elementSpacing / 2),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             // Symbol Icon with affiliation color background
             Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .background(affiliationColor.copy(alpha = 0.3f), RoundedCornerShape(8.dp)),
+                    .size(iconBoxSize)
+                    .background(
+                        affiliationColor.copy(alpha = 0.3f),
+                        RoundedCornerShape(if (windowSize.isCompact) 6.dp else 8.dp)
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     painter = painterResource(id = symbol.iconResId),
                     contentDescription = symbol.name,
-                    modifier = Modifier.size(40.dp),
+                    modifier = Modifier.size(iconSize),
                     tint = MaterialTheme.colorScheme.onSurface
                 )
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(dimensions.elementSpacing / 2))
 
             Text(
                 text = symbol.name,
-                style = MaterialTheme.typography.labelSmall,
+                style = if (windowSize.isCompact && windowSize.widthDp < 360) {
+                    MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp)
+                } else {
+                    MaterialTheme.typography.labelSmall
+                },
                 maxLines = 2,
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
