@@ -21,22 +21,8 @@ data class QuickNote(
     val id: String,
     val title: String = "",
     val content: String = "",
-    val linkedDocuments: List<LinkedDocument> = emptyList(), // Kept for backward compatibility during migration
     // JSON serialized strokes (nullable)
     val drawing: String? = null,
-    val timestamp: Long = System.currentTimeMillis()
-)
-
-/**
- * Represents a linked document (deprecated - replaced by markdown links in content)
- * Kept only for backward compatibility during migration
- */
-@Deprecated("Use markdown links in note content instead")
-data class LinkedDocument(
-    val id: String,
-    val filePath: String,
-    val fileName: String,
-    val pageNumber: Int? = null,
     val timestamp: Long = System.currentTimeMillis()
 )
 
@@ -243,7 +229,6 @@ class QuickNoteManager(private val context: Context) {
                         id = obj.getString("id"),
                         title = obj.optString("title", ""),
                         content = obj.optString("content", ""),
-                        linkedDocuments = emptyList(), // Clear legacy linked documents
                         drawing = if (obj.has("drawing")) obj.optString("drawing", null) else null,
                         timestamp = obj.optLong("timestamp", System.currentTimeMillis())
                     )
@@ -260,8 +245,7 @@ class QuickNoteManager(private val context: Context) {
             val note = QuickNote(
                 id = "note_${System.currentTimeMillis()}",
                 title = context.getString(com.example.checklist_interactive.R.string.quick_notes_default_title_notes),
-                content = oldContent,
-                linkedDocuments = emptyList()
+                content = oldContent
             )
             return listOf(note)
         }
@@ -421,21 +405,6 @@ class QuickNoteManager(private val context: Context) {
      */
     fun clearNote() {
         clearActiveNote()
-    }
-
-    /**
-     * Add a linked document to the active note (deprecated - now adds markdown link to content)
-     * Kept for backward compatibility with existing UI code
-     */
-    @Deprecated("Use markdown links directly in note content", ReplaceWith("addMarkdownLink(filePath, fileName, pageNumber)"))
-    fun addLinkedDocument(
-        filePath: String,
-        fileName: String,
-        pageNumber: Int? = null,
-        noteId: String? = null
-    ) {
-        // Backwards-compatible wrapper - forward to the new API
-        addMarkdownLink(filePath = filePath, fileName = fileName, pageNumber = pageNumber, noteId = noteId)
     }
 
     /**

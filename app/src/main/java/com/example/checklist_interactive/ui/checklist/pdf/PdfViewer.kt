@@ -2361,7 +2361,7 @@ private fun PdfPageWithAnnotations(
                             }
                         },
                         onDrag = { change, _ ->
-                            if (eraseMode && isCurrentPage) {
+                            if (eraseMode) {
                                 val offset = change.position
                                 eraserPosition = offset
                                 val toErase = strokes.filter { stroke ->
@@ -2383,7 +2383,7 @@ private fun PdfPageWithAnnotations(
                                 return@detectDragGestures
                             }
 
-                            if (annotateMode && isCurrentPage) {
+                            if (annotateMode) {
                                 change.consume()
                                 val offset = change.position
                                 brushPosition = offset
@@ -2401,10 +2401,10 @@ private fun PdfPageWithAnnotations(
                             }
                         },
                         onDragEnd = {
-                            if (eraseMode && isCurrentPage) {
+                            if (eraseMode) {
                                 eraserPosition = null
                             }
-                            if (annotateMode && isCurrentPage) {
+                            if (annotateMode) {
                                 brushPosition = null
                                 // Now add to the list after drawing
                                 currentStroke?.let { onStrokeAdd(it) }
