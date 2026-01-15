@@ -78,4 +78,5 @@ security_audit.key
 
 scripts/DCS-SCRIPTS-FOLDER-Experimental/authorized_devices.json.bak
 
+scripts/DCS-SCRIPTS-FOLDER-Experimental/forwarder_status.json
 
