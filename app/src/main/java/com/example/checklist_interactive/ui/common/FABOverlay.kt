@@ -161,9 +161,9 @@ object MapViewerFABs {
         containerColorPrimary: Color,
         containerColorSurface: Color
     ): List<FABConfig> {
-        // Detect if device is a tablet (>= 600dp width)
-        val configuration = LocalConfiguration.current
-        val isTablet = configuration.screenWidthDp >= 600
+        // Use responsive utilities instead of raw dp checks
+        val windowSize = rememberWindowSize()
+        val isTablet = windowSize.isTablet
 
         // On smartphones, position DataPad and QuickAccess FABs higher to avoid flight instruments
         val datapadY = if (isTablet) 0.80f else 0.55f
