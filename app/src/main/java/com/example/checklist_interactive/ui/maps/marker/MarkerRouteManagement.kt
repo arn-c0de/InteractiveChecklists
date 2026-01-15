@@ -45,6 +45,8 @@ import androidx.core.view.WindowInsetsCompat
 import android.view.View
 import com.example.checklist_interactive.ui.maps.navigation.MarkerDetailsContent
 import com.example.checklist_interactive.ui.maps.MapViewerState
+import com.example.checklist_interactive.ui.common.rememberWindowSize
+import com.example.checklist_interactive.ui.common.rememberResponsiveDimensions
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.checklist_interactive.data.tactical.*
@@ -1209,12 +1211,37 @@ fun LocationEditDialog(
         )
     }
     
+    val windowSize = rememberWindowSize()
+    val dimensions = rememberResponsiveDimensions(windowSize)
+
+    // Responsive dialog width based on device class
+    val dialogWidth = when {
+        windowSize.widthDp < 360 -> 0.98f  // Very small phones: almost full width
+        windowSize.widthDp < 600 -> 0.95f  // Phones: 95% width
+        windowSize.widthDp < 840 -> 0.85f  // Tablets: 85% width
+        else -> 0.75f                       // Large tablets: 75% width
+    }
+
+    // Maximum width constraints by device class
+    val maxDialogWidth = when {
+        windowSize.widthDp < 600 -> 500.dp  // Phones: max 500dp
+        windowSize.widthDp < 840 -> 800.dp  // Medium tablets: max 800dp
+        else -> 1100.dp                      // Large tablets: max 1100dp
+    }
+
+    // Adjust height for landscape phones (constrained vertical space)
+    val dialogHeight = if (windowSize.isVerticallyConstrained) {
+        0.98f  // Use almost full height in landscape
+    } else {
+        0.95f
+    }
+
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.95f)
-                .widthIn(min = 700.dp, max = 1100.dp),
+                .fillMaxWidth(dialogWidth)
+                .fillMaxHeight(dialogHeight)
+                .widthIn(max = maxDialogWidth),
             shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp

@@ -1,8 +1,11 @@
 package com.example.checklist_interactive.ui.maps
 
+import android.content.Context
 import android.graphics.*
 import android.util.Log
 import com.example.checklist_interactive.data.tactical.TacticalUnitEntity
+import com.example.checklist_interactive.ui.common.getScaledTextSize
+import com.example.checklist_interactive.ui.common.getScaledStrokeWidth
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Overlay
@@ -16,6 +19,7 @@ private const val TAG = "AARangeRingsOverlay"
  * Supports multiple AA units simultaneously
  */
 class AARangeRingsOverlay(
+    private val context: Context,
     private val isEnabled: () -> Boolean,
     private val getAAUnits: () -> List<TacticalUnitEntity>,
     private val getFillTransparency: () -> Float,
@@ -43,13 +47,13 @@ class AARangeRingsOverlay(
         isAntiAlias = true
         color = Color.RED
         style = Paint.Style.STROKE
-        strokeWidth = 2f
+        strokeWidth = getScaledStrokeWidth(2f, context)
     }
 
     private val labelTextPaint = Paint().apply {
         isAntiAlias = true
         color = Color.WHITE
-        textSize = 13f
+        textSize = getScaledTextSize(13f, context)
         textAlign = Paint.Align.LEFT
         isFakeBoldText = true
     }
@@ -57,7 +61,7 @@ class AARangeRingsOverlay(
     private val labelSubTextPaint = Paint().apply {
         isAntiAlias = true
         color = Color.parseColor("#FFCCCC") // Light red
-        textSize = 10f
+        textSize = getScaledTextSize(10f, context)
         textAlign = Paint.Align.LEFT
     }
 

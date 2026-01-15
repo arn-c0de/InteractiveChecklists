@@ -1,8 +1,11 @@
 package com.example.checklist_interactive.ui.maps
 
+import android.content.Context
 import android.graphics.*
 import android.util.Log
 import com.example.checklist_interactive.data.tactical.LocationEntity
+import com.example.checklist_interactive.ui.common.getScaledTextSize
+import com.example.checklist_interactive.ui.common.getScaledStrokeWidth
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Overlay
@@ -30,6 +33,7 @@ data class AirspaceClass(
  * Supports multiple airports simultaneously
  */
 class AirspaceCirclesOverlay(
+    private val context: Context,
     private val isEnabled: () -> Boolean,
     private val getTargetAirports: () -> Set<LocationEntity>,
     private val getEnabledAirspaces: () -> Set<String>,
@@ -98,7 +102,7 @@ class AirspaceCirclesOverlay(
     private val circlePaint = Paint().apply {
         isAntiAlias = true
         style = Paint.Style.STROKE
-        strokeWidth = 3f
+        strokeWidth = getScaledStrokeWidth(3f, context)
     }
 
     private val fillPaint = Paint().apply {
@@ -116,13 +120,13 @@ class AirspaceCirclesOverlay(
         isAntiAlias = true
         color = Color.WHITE
         style = Paint.Style.STROKE
-        strokeWidth = 3f // Thicker border so labels stand out more
+        strokeWidth = getScaledStrokeWidth(3f, context) // Thicker border so labels stand out more
     }
 
     private val labelTextPaint = Paint().apply {
         isAntiAlias = true
         color = Color.WHITE
-        textSize = 14f
+        textSize = getScaledTextSize(14f, context)
         textAlign = Paint.Align.LEFT
         isFakeBoldText = true
     }
@@ -130,7 +134,7 @@ class AirspaceCirclesOverlay(
     private val labelSubTextPaint = Paint().apply {
         isAntiAlias = true
         color = Color.parseColor("#CCCCCC")
-        textSize = 11f
+        textSize = getScaledTextSize(11f, context)
         textAlign = Paint.Align.LEFT
     }
 
@@ -286,7 +290,7 @@ class AirspaceCirclesOverlay(
                 }
 
                 circlePaint.color = adjustAlpha(circle.airspace.color, 255)
-                circlePaint.strokeWidth = 5f
+                circlePaint.strokeWidth = getScaledStrokeWidth(5f, context)
 
                 // Use different dash patterns for overlapping airspaces
                 circlePaint.pathEffect = if (circle.airspace.isLayered) {

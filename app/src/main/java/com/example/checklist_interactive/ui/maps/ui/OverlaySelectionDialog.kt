@@ -11,6 +11,8 @@ import androidx.compose.ui.unit.dp
 import com.example.checklist_interactive.R
 import com.example.checklist_interactive.ui.maps.BorderEpoch
 import com.example.checklist_interactive.ui.maps.CountryBordersOverlay
+import com.example.checklist_interactive.ui.common.rememberWindowSize
+import com.example.checklist_interactive.ui.common.rememberResponsiveDimensions
 
 /**
  * Dialog for managing map overlay visibility settings
@@ -51,9 +53,20 @@ fun OverlaySelectionDialog(
     onClearFlightPath: () -> Unit,
     onChangeFlightPathInterval: (Int) -> Unit
 ) {
+    val windowSize = rememberWindowSize()
+
+    // Responsive dialog width based on device class
+    val maxDialogWidth = when {
+        windowSize.widthDp < 360 -> 350.dp   // Very small phones
+        windowSize.widthDp < 600 -> 450.dp   // Phones
+        windowSize.widthDp < 840 -> 600.dp   // Medium tablets
+        else -> 700.dp                        // Large tablets
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.map_overlays_dialog_title)) },
+        modifier = Modifier.widthIn(max = maxDialogWidth),
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
