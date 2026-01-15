@@ -234,7 +234,8 @@ fun TacticalUnitsContent(
                     .weight(1f)
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(8.dp)
             ) {
                 items(
                     items = displayUnits,
