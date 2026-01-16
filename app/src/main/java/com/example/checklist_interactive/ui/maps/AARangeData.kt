@@ -79,6 +79,19 @@ object AARangeDatabase {
             category = "Long-range",
             notes = "S-300VM - Anti-ballistic/ABM capable"
         ),
+        AASystemSpec(
+            name = "SA-5",
+            displayName = "SA-5 Gammon (S-200)",
+            detectionRangeKm = 300.0,
+            engagementRangeKm = 250.0,
+            minEngagementRangeKm = 7.0,
+            maxAltitudeM = 40000.0,
+            minAltitudeM = 300.0,
+            searchRadarRangeKm = 300.0,
+            trackRadarRangeKm = 270.0,
+            category = "Long-range",
+            notes = "S-200 - Very long-range high-altitude SAM"
+        ),
 
         // Medium-range SAM systems
         AASystemSpec(
@@ -368,11 +381,22 @@ object AARangeDatabase {
             minAltitudeM = 0.0,
             category = "AAA",
             notes = "ZU-23 - Towed 23mm AAA"
+        ),
+        AASystemSpec(
+            name = "ZSU-57-2",
+            displayName = "ZSU-57-2",
+            detectionRangeKm = 4.0,
+            engagementRangeKm = 4.0,
+            minEngagementRangeKm = 0.0,
+            maxAltitudeM = 1500.0,
+            minAltitudeM = 0.0,
+            category = "AAA",
+            notes = "ZSU-57-2 - Soviet 57mm SPAAG"
         )
     )
 
     /**
-     * Get system specification by name (case-insensitive partial match)
+     * Get system specification by name (case-insensitive, strict matching only)
      */
     fun getSystemByName(name: String): AASystemSpec? {
         val normalized = name.lowercase()
@@ -380,26 +404,27 @@ object AARangeDatabase {
         systems.firstOrNull { it.name.lowercase() == normalized }?.let { return it }
         // Try display name match
         systems.firstOrNull { it.displayName.lowercase() == normalized }?.let { return it }
-        // Try partial match
-        return systems.firstOrNull {
-            it.name.lowercase().contains(normalized) ||
-            it.displayName.lowercase().contains(normalized) ||
-            normalized.contains(it.name.lowercase())
-        }
+        // No partial matching to avoid false positives (e.g., helicopters matching AA systems)
+        return null
     }
 
     /**
      * Get system by DCS unit type name (handles various formats)
      */
     fun getSystemByUnitType(unitType: String): AASystemSpec? {
-        val normalized = unitType.lowercase()
+        val normalized = unitType.lowercase().trim()
+
+        if (normalized.isEmpty()) return null
 
         // Direct mappings for common DCS unit types
         val mappings = mapOf(
             "s-300ps" to "SA-10",
             "s-300pmu" to "SA-20",
+            "s-200" to "SA-5",
+            "s-200_launcher" to "SA-5",
             "sa-10" to "SA-10",
             "sa-20" to "SA-20",
+            "sa-5" to "SA-5",
             "buk" to "SA-11",
             "sa-11" to "SA-11",
             "sa-17" to "SA-17",
@@ -420,26 +445,42 @@ object AARangeDatabase {
             "rapier" to "Rapier",
             "avenger" to "Avenger",
             "stinger" to "FIM-92",
+            "stinger manpads" to "FIM-92",
             "shilka" to "ZSU-23-4",
             "zsu-23-4" to "ZSU-23-4",
+            "zsu-23" to "ZSU-23-4",
+            "zsu-57-2" to "ZSU-57-2",
+            "zsu-57" to "ZSU-57-2",
+            "zsu_57_2" to "ZSU-57-2",
             "gepard" to "Gepard",
             "vulcan" to "Vulcan",
-            "zu-23" to "ZU-23"
+            "m163" to "Vulcan",
+            "m163 vulcan" to "Vulcan",
+            "zu-23" to "ZU-23",
+            "2s6" to "SA-19",
+            "2s6 tunguska" to "SA-19",
+            "kub" to "SA-6",
+            "sa-6" to "SA-6",
+            "osa" to "SA-8",
+            "sa-8" to "SA-8"
         )
 
-        // Try direct mapping
+        // Try direct mapping (exact match only)
         mappings[normalized]?.let { systemName ->
             return systems.firstOrNull { it.name == systemName }
         }
 
-        // Try partial match in mappings keys
-        mappings.entries.firstOrNull { (key, _) ->
-            normalized.contains(key) || key.contains(normalized)
-        }?.let { (_, systemName) ->
-            return systems.firstOrNull { it.name == systemName }
+        // Try stricter partial match: only if the unit name contains a complete mapping key as a word/token
+        // This prevents false positives like "MI-8MT" matching "MIM" or other short substrings
+        for ((key, systemName) in mappings.entries) {
+            // Only match if the key appears as a distinct word/token (surrounded by spaces, hyphens, or string boundaries)
+            val pattern = Regex("(^|[\\s-])${Regex.escape(key)}([\\s-]|$)")
+            if (pattern.containsMatchIn(normalized)) {
+                return systems.firstOrNull { it.name == systemName }
+            }
         }
 
-        // Fallback to name search
+        // Fallback to exact name search only (no partial matching)
         return getSystemByName(unitType)
     }
 

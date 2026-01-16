@@ -3171,6 +3171,9 @@ fun MapViewer(
                                 kotlinx.coroutines.delay(50)
                                 mapState.aaRangeFillTransparency = oldTransparency
 
+                                // Force map redraw to show/hide range rings immediately
+                                mapState.mapView?.invalidate()
+
                                 // Update the selected location metadata
                                 mapState.selectedLocation = mapState.selectedLocation?.copy(
                                     metadata = mapState.selectedLocation?.metadata?.let { meta ->
