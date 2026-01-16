@@ -383,7 +383,10 @@ fun MapNavigationDisplay(
                                 val speedKnots = airspeedMs * 1.943844
                                 val timeHours = navigationDistanceNm / speedKnots
                                 val minutes = timeHours * 60.0
-                                if (minutes < 60) {
+                                if (minutes < 1) {
+                                    val seconds = (minutes * 60).toInt()
+                                    "ETA: ${seconds}s"
+                                } else if (minutes < 60) {
                                     "ETA: ${String.format("%.0f", minutes)}min"
                                 } else {
                                     val hours = (minutes / 60).toInt()
