@@ -323,13 +323,13 @@ fun MapNavigationDisplay(
                             }
                         }
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(if (isSmallScreen) 6.dp else 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(if (isSmallScreen) 4.dp else 12.dp),
                             modifier = Modifier.padding(top = if (isSmallScreen) 1.dp else 4.dp)
                         ) {
                             navigationDistanceNm?.let { dist ->
                                 Text(
                                     text = stringResource(R.string.map_nav_dist_nm, dist),
-                                    style = if (isSmallScreen) MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp) else MaterialTheme.typography.bodyMedium,
+                                    style = if (isSmallScreen) MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp) else MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onErrorContainer,
                                     maxLines = 1,
@@ -339,7 +339,7 @@ fun MapNavigationDisplay(
                             navigationHeading?.let { hdg ->
                                 Text(
                                     text = stringResource(R.string.map_nav_hdg, hdg),
-                                    style = if (isSmallScreen) MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp) else MaterialTheme.typography.bodyMedium,
+                                    style = if (isSmallScreen) MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp) else MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onErrorContainer,
                                     maxLines = 1,
@@ -370,6 +370,37 @@ fun MapNavigationDisplay(
                                     softWrap = false
                                 )
                             }
+                        }
+                        // Show estimated time based on distance and aircraft speed (unter altitude)
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(if (isSmallScreen) 4.dp else 12.dp),
+                            modifier = Modifier.padding(top = if (isSmallScreen) 1.dp else 2.dp)
+                        ) {
+                            // Calculate ETA - will recalculate when flightData or navigationDistanceNm changes
+                            val airspeedMs = flightData?.indicatedAirspeed ?: flightData?.trueAirspeed ?: flightData?.groundSpeed
+                            val estimatedTimeText = if (navigationDistanceNm != null && airspeedMs != null && airspeedMs > 0.5) {
+                                // Convert m/s to knots (1 m/s = 1.943844 knots)
+                                val speedKnots = airspeedMs * 1.943844
+                                val timeHours = navigationDistanceNm / speedKnots
+                                val minutes = timeHours * 60.0
+                                if (minutes < 60) {
+                                    "ETA: ${String.format("%.0f", minutes)}min"
+                                } else {
+                                    val hours = (minutes / 60).toInt()
+                                    val mins = (minutes % 60).toInt()
+                                    "ETA: ${hours}h${mins}m"
+                                }
+                            } else {
+                                "ETA: --"
+                            }
+                            Text(
+                                text = estimatedTimeText,
+                                style = if (isSmallScreen) MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp) else MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                maxLines = 1,
+                                softWrap = false
+                            )
                         }
                         // Show final runway heading when runway selected
                         selectedRunwayHeading?.let { rwyHdg ->
