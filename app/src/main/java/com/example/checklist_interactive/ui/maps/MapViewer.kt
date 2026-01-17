@@ -836,90 +836,133 @@ fun MapViewer(
         }
     }
     
-    // Separate effect for map rotation to prevent flicker from frequent data updates
-    LaunchedEffect(mapState.mapRotationMode, flightData?.heading) {
+    // Separate effect for map rotation with throttling to reduce updates
+    LaunchedEffect(mapState.mapRotationMode, mapState.mapView) {
         val map = mapState.mapView ?: return@LaunchedEffect
         val rotationMode = mapState.mapRotationMode
-        val fd = flightData // local copy to allow safe smart-cast
 
         // When mode changes to North-up, reset orientation once
         if (rotationMode == 0) {
             try {
                 map.setMapOrientation(0f)
-                // Update pattern labels to stay upright
                 mapState.trafficPatternLabelOverlay?.updateMapRotation(0f)
                 map.invalidate()
             } catch (_: Throwable) {}
         }
 
-        // In HDG-up mode, update rotation based on heading
+        // In HDG-up mode, track heading changes with throttling
         if (rotationMode == 1) {
-            val heading = fd?.heading
-            if (heading != null) {
-                try {
-                    val rotation = -Math.toDegrees(heading).toFloat()
-                    map.setMapOrientation(rotation)
-                    // Update pattern labels to stay upright
-                    mapState.trafficPatternLabelOverlay?.updateMapRotation(rotation)
-                    map.invalidate()
-                } catch (_: Throwable) {}
-            }
+            var lastRotation: Float? = null
+            val MIN_ROTATION_CHANGE = 1.0f // Only update if rotation changes by >1°
+
+            snapshotFlow { flightData?.heading }
+                .collect { heading ->
+                    if (heading != null) {
+                        try {
+                            val rotation = -Math.toDegrees(heading).toFloat()
+                            val lastRot = lastRotation
+
+                            // Only update if rotation changed significantly or first update
+                            if (lastRot == null || kotlin.math.abs(rotation - lastRot) > MIN_ROTATION_CHANGE) {
+                                map.setMapOrientation(rotation)
+                                mapState.trafficPatternLabelOverlay?.updateMapRotation(rotation)
+                                map.invalidate()
+                                lastRotation = rotation
+                            }
+                        } catch (_: Throwable) {}
+                    }
+                }
         }
     }
 
-    // Update live navigation line when flight data or target changes
+    // Update live navigation line with throttling to reduce CPU load
     // Include target position (lat/lon) to auto-update when marker moves
     LaunchedEffect(
-        flightData,
         mapState.activeNavigationTarget,
         mapState.activeNavigationTarget?.latitude,
-        mapState.activeNavigationTarget?.longitude
+        mapState.activeNavigationTarget?.longitude,
+        mapState.mapView
     ) {
-        val data = flightData
         val target = mapState.activeNavigationTarget
         val map = mapState.mapView
 
-        if (data != null && target != null && map != null && data.latitude != 0.0 && data.longitude != 0.0) {
-            val playerPos = GeoPoint(data.latitude, data.longitude)
-            val targetPos = GeoPoint(target.latitude, target.longitude)
-            
-            // Calculate distance and heading
-            val distanceMeters = playerPos.distanceToAsDouble(targetPos)
-            val distanceNm = distanceMeters / 1852.0
-            mapState.navigationDistanceNm = distanceNm
-            
-            // Calculate bearing/heading
-            val lat1 = Math.toRadians(playerPos.latitude)
-            val lat2 = Math.toRadians(targetPos.latitude)
-            val lon1 = Math.toRadians(playerPos.longitude)
-            val lon2 = Math.toRadians(targetPos.longitude)
-            val dLon = lon2 - lon1
-            val y = Math.sin(dLon) * Math.cos(lat2)
-            val x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon)
-            val bearing = (Math.toDegrees(Math.atan2(y, x)) + 360) % 360
-            mapState.navigationHeading = bearing
-            
-            // Update or create red navigation line
-            scope.launch {
-                val line = mapState.navigationLine ?: org.osmdroid.views.overlay.Polyline(map).apply {
-                    outlinePaint.color = android.graphics.Color.argb(128, 255, 0, 0) // 50% transparent red
-                    outlinePaint.strokeWidth = 10f
-                    outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
-                    map.overlays.add(this)
-                    mapState.navigationLine = this
-                }
-                line.setPoints(listOf(playerPos, targetPos))
-                map.invalidate()
-            }
-        } else if (target == null && mapState.navigationLine != null) {
+        if (target == null) {
             // Remove navigation line if target cleared
-            scope.launch {
-                mapState.mapView?.overlays?.remove(mapState.navigationLine)
-                mapState.navigationLine = null
-                mapState.navigationDistanceNm = null
-                mapState.navigationHeading = null
-                mapState.mapView?.invalidate()
-            }
+            mapState.mapView?.overlays?.remove(mapState.navigationLine)
+            mapState.navigationLine = null
+            mapState.navigationDistanceNm = null
+            mapState.navigationHeading = null
+            mapState.mapView?.invalidate()
+        } else if (map != null) {
+            // Track flight data changes with throttling
+            var lastUpdateTime = 0L
+            var lastPlayerLat = 0.0
+            var lastPlayerLon = 0.0
+            val MIN_UPDATE_INTERVAL_MS = 100L // Max 10 updates/second
+            val MIN_DISTANCE_CHANGE_METERS = 50.0 // Only update if moved >50m
+
+            // Reusable GeoPoints to avoid allocations (reduce GC pressure)
+            val reusablePlayerPos = GeoPoint(0.0, 0.0)
+            val reusableTargetPos = GeoPoint(target.latitude, target.longitude)
+            val reusableLastPos = GeoPoint(0.0, 0.0)
+            val reusableLinePoints = mutableListOf(reusablePlayerPos, reusableTargetPos)
+
+            snapshotFlow { flightData }
+                .collect { data ->
+                    if (data != null && data.latitude != 0.0 && data.longitude != 0.0) {
+                        val now = System.currentTimeMillis()
+                        reusablePlayerPos.latitude = data.latitude
+                        reusablePlayerPos.longitude = data.longitude
+                        reusableTargetPos.latitude = target.latitude
+                        reusableTargetPos.longitude = target.longitude
+
+                        // Calculate if position changed significantly
+                        val distanceMoved = if (lastPlayerLat != 0.0 && lastPlayerLon != 0.0) {
+                            reusableLastPos.latitude = lastPlayerLat
+                            reusableLastPos.longitude = lastPlayerLon
+                            reusablePlayerPos.distanceToAsDouble(reusableLastPos)
+                        } else {
+                            Double.MAX_VALUE // First update
+                        }
+
+                        // Only update if enough time passed OR position changed significantly
+                        if (now - lastUpdateTime >= MIN_UPDATE_INTERVAL_MS || distanceMoved >= MIN_DISTANCE_CHANGE_METERS) {
+                            lastUpdateTime = now
+                            lastPlayerLat = data.latitude
+                            lastPlayerLon = data.longitude
+
+                            // Calculate distance and heading
+                            val distanceMeters = reusablePlayerPos.distanceToAsDouble(reusableTargetPos)
+                            val distanceNm = distanceMeters / 1852.0
+                            mapState.navigationDistanceNm = distanceNm
+
+                            // Calculate bearing/heading
+                            val lat1 = Math.toRadians(reusablePlayerPos.latitude)
+                            val lat2 = Math.toRadians(reusableTargetPos.latitude)
+                            val lon1 = Math.toRadians(reusablePlayerPos.longitude)
+                            val lon2 = Math.toRadians(reusableTargetPos.longitude)
+                            val dLon = lon2 - lon1
+                            val y = Math.sin(dLon) * Math.cos(lat2)
+                            val x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon)
+                            val bearing = (Math.toDegrees(Math.atan2(y, x)) + 360) % 360
+                            mapState.navigationHeading = bearing
+
+                            // Update or create red navigation line (reuse existing points list)
+                            scope.launch {
+                                val line = mapState.navigationLine ?: org.osmdroid.views.overlay.Polyline(map).apply {
+                                    outlinePaint.color = android.graphics.Color.argb(128, 255, 0, 0) // 50% transparent red
+                                    outlinePaint.strokeWidth = 10f
+                                    outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                                    map.overlays.add(this)
+                                    mapState.navigationLine = this
+                                }
+                                // Reuse the mutable list instead of creating a new one
+                                line.setPoints(reusableLinePoints)
+                                map.invalidate()
+                            }
+                        }
+                    }
+                }
         }
     }
 
@@ -1206,7 +1249,9 @@ fun MapViewer(
     LaunchedEffect(Unit) {
         var lastUpdateTime = 0L
         val minUpdateIntervalMs = 20L // Allow up to 50 Hz updates (interpolation handles smoothing)
-        
+        var lastOverlayUpdateTime = 0L
+        val minOverlayUpdateIntervalMs = 100L // Update overlays max 10x/sec (same as navigation line)
+
         // Position interpolation state
         var interpolationStartPos: GeoPoint? = null
         var interpolationTargetPos: GeoPoint? = null
@@ -1214,64 +1259,77 @@ fun MapViewer(
         var interpolationDuration = 0L
         var interpolationTargetHeading = 0f
         var interpolationStartHeading = 0f
-        
+
+        // Reusable GeoPoint for interpolation to avoid allocations (reduce GC pressure)
+        val reusableInterpPos = GeoPoint(0.0, 0.0)
+
         // Launch interpolation job that runs at higher frequency
         val interpolationJob = launch {
             val interpolationFps = 30 // 30 FPS for smooth animation
             val interpolationIntervalMs = 1000L / interpolationFps
-            
+            var lastInvalidateTime = 0L
+            val minInvalidateInterval = 33L // Max 30 FPS invalidate (same as TacticalUnitsOverlay)
+
             while (isActive) {
                 delay(interpolationIntervalMs)
-                
+
                 val marker = mapState.positionMarker
                 val map = mapState.mapView
-                
+
                 if (marker == null || map == null || interpolationStartPos == null || interpolationTargetPos == null) {
                     continue
                 }
-                
+
                 val elapsed = System.currentTimeMillis() - interpolationStartTime
                 if (elapsed >= interpolationDuration) {
                     // Interpolation complete, snap to target
                     marker.position = interpolationTargetPos!!
                     marker.rotation = interpolationTargetHeading
-                    
+
                     // Clear interpolation state
                     interpolationStartPos = null
                     interpolationTargetPos = null
+
+                    // Final invalidate for this interpolation
+                    map.invalidate()
+                    lastInvalidateTime = System.currentTimeMillis()
                     continue
                 }
-                
+
                 // Linear interpolation factor (0.0 to 1.0)
                 val t = elapsed.toFloat() / interpolationDuration.toFloat()
-                
-                // Interpolate position
+
+                // Interpolate position (reuse GeoPoint to avoid allocation)
                 val startLat = interpolationStartPos!!.latitude
                 val startLon = interpolationStartPos!!.longitude
                 val targetLat = interpolationTargetPos!!.latitude
                 val targetLon = interpolationTargetPos!!.longitude
-                
-                val interpLat = startLat + (targetLat - startLat) * t
-                val interpLon = startLon + (targetLon - startLon) * t
-                val interpPos = GeoPoint(interpLat, interpLon)
-                
+
+                reusableInterpPos.latitude = startLat + (targetLat - startLat) * t
+                reusableInterpPos.longitude = startLon + (targetLon - startLon) * t
+
                 // Interpolate heading (handle 360° wrap-around)
                 var headingDelta = interpolationTargetHeading - interpolationStartHeading
                 if (headingDelta > 180f) headingDelta -= 360f
                 if (headingDelta < -180f) headingDelta += 360f
                 val interpHeading = (interpolationStartHeading + headingDelta * t + 360f) % 360f
-                
+
                 // Update marker
-                marker.position = interpPos
+                marker.position = reusableInterpPos
                 marker.rotation = interpHeading
-                
+
                 // Auto-center if enabled
                 if (mapState.autoCenter) {
                     lastProgrammaticMove.value = System.currentTimeMillis()
-                    map.controller.setCenter(interpPos)
+                    map.controller.setCenter(reusableInterpPos)
                 }
-                
-                map.invalidate()
+
+                // Throttle invalidate calls to prevent blocking touch events
+                val now = System.currentTimeMillis()
+                if (now - lastInvalidateTime >= minInvalidateInterval) {
+                    map.invalidate()
+                    lastInvalidateTime = now
+                }
             }
         }
         
@@ -1374,28 +1432,49 @@ fun MapViewer(
                     // NOTE: Auto-center is now handled by interpolation job above
                     // (no need to set center here as it would interfere with smooth interpolation)
 
-                    // Update overlays efficiently (batch updates)
-                    try {
-                        (mapState.compassOverlay as? CompassOverlay)?.let { co ->
-                            co.center = GeoPoint(lat, lon)
-                            co.heading = headingDeg
+                    // Update overlays with throttling to reduce CPU load (max 10 updates/sec)
+                    if (now - lastOverlayUpdateTime >= minOverlayUpdateIntervalMs) {
+                        lastOverlayUpdateTime = now
+                        try {
+                            // Mutate existing GeoPoints directly to avoid allocations (reduce GC pressure)
+                            (mapState.compassOverlay as? CompassOverlay)?.let { co ->
+                                val centerPoint = co.center
+                                if (centerPoint != null) {
+                                    centerPoint.latitude = lat
+                                    centerPoint.longitude = lon
+                                } else {
+                                    co.center = GeoPoint(lat, lon)
+                                }
+                                co.heading = headingDeg
+                            }
+                            (mapState.headingSpeedLineOverlay as? HeadingSpeedLineOverlay)?.let { hsl ->
+                                val centerPoint = hsl.center
+                                if (centerPoint != null) {
+                                    centerPoint.latitude = lat
+                                    centerPoint.longitude = lon
+                                } else {
+                                    hsl.center = GeoPoint(lat, lon)
+                                }
+                                hsl.heading = headingDeg
+                                hsl.speedKts = speedKts
+                            }
+                            (mapState.rangeRingsOverlay as? RangeRingsOverlay)?.let { rr ->
+                                val centerPoint = rr.center
+                                if (centerPoint != null) {
+                                    centerPoint.latitude = lat
+                                    centerPoint.longitude = lon
+                                } else {
+                                    rr.center = GeoPoint(lat, lon)
+                                }
+                                rr.heading = headingDeg
+                                rr.speedKts = speedKts
+                            }
+                        } catch (e: Exception) {
+                            // ignore
                         }
-                        (mapState.headingSpeedLineOverlay as? HeadingSpeedLineOverlay)?.let { hsl ->
-                            hsl.center = GeoPoint(lat, lon)
-                            hsl.heading = headingDeg
-                            hsl.speedKts = speedKts
-                        }
-                        (mapState.rangeRingsOverlay as? RangeRingsOverlay)?.let { rr ->
-                            rr.center = GeoPoint(lat, lon)
-                            rr.heading = headingDeg
-                            rr.speedKts = speedKts
-                        }
-                    } catch (e: Exception) {
-                        // ignore
                     }
 
-                    // Single invalidate call after all updates
-                    map.postInvalidate()
+                    // NOTE: No invalidate() needed here - interpolation job handles it with throttling
 
                     // Persist marker position as last known if user hasn't moved map
                     if (prefsManager.getMapCenter() == null) {
