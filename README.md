@@ -131,7 +131,7 @@ to activate the export script.
 
 ### Important Note – Python Requirement
 
-The Python forwarder (**DataPad Server**) requires a **local Python installation (3.8 or newer)**.
+The Python forwarder (**DataPad Server**) requires a **local Python installation
 
 - On Windows, installing Python via the **Microsoft Store** (Python 3.12) is recommended for simplicity.
 - The included `install.bat`:
