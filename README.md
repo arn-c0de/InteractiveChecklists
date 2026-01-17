@@ -1,13 +1,28 @@
-
 <!-- Badges -->
 <p align="left">
-	<a href="https://github.com/arn-c0de/InteractiveChecklists"><img src="https://img.shields.io/badge/GitHub-arn--c0de%2FInteractiveChecklists-181717?logo=github" alt="GitHub" /></a>
-	<a href="https://deepwiki.com/arn-c0de/InteractiveChecklists"><img src="https://img.shields.io/badge/DeepWiki-Project%20Docs-blueviolet?logo=book" alt="DeepWiki" /></a>
-	<img src="https://img.shields.io/badge/version-1.0-blue.svg" alt="Version" />
-	<img src="https://img.shields.io/badge/platform-Android-green.svg" alt="Platform" />
-	<img src="https://img.shields.io/badge/built_with-Jetpack%20Compose-orange.svg" alt="Jetpack Compose" />
-	<img src="https://img.shields.io/badge/license-CC--BY--NC--SA%204.0-lightgrey.svg" alt="License: CC BY-NC-SA 4.0" />
+  <img src="https://img.shields.io/badge/license-CC--BY--NC--SA%204.0-lightgrey.svg" alt="License: CC BY-NC-SA 4.0" />
+
+  <a href="https://github.com/arn-c0de/InteractiveChecklists">
+    <img src="https://img.shields.io/badge/GitHub-arn--c0de%2FInteractiveChecklists-181717?logo=github" alt="GitHub" />
+  </a>
+
+  <a href="https://deepwiki.com/arn-c0de/InteractiveChecklists">
+    <img src="https://img.shields.io/badge/DeepWiki-Project%20Docs-blueviolet?logo=book" alt="DeepWiki" />
+  </a>
+
+  <strong>APP</strong>
+  <img src="https://img.shields.io/badge/version-1.0-blue.svg" alt="Version" />
+  <img src="https://img.shields.io/badge/platform-Android-green.svg" alt="Platform: Android" />
+  <img src="https://img.shields.io/badge/built_with-Jetpack%20Compose-orange.svg" alt="Jetpack Compose" />
+
+  <br/>
+
+  <strong>PYTHON TOOLS</strong>
+  <img src="https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white" alt="Platform: Windows" />
+  <img src="https://img.shields.io/badge/language-Python-3776AB?logo=python&logoColor=white" alt="Python" />
 </p>
+
+
 
 <div align="center">
 	<a href="README.md">English</a> |
@@ -68,9 +83,9 @@ InteractiveChecklists is an Android application for viewing and interacting with
 - **Tagging System:** Assign tags to files for filtering and organization.
 - **QuickNotes:** Persistent notes powered by Room, with search, autosave, and markdown support.
 - **Data Persistence:** Stores user preferences, annotations, shortcuts, tags, and open tabs locally.
+- **Aviation Map (experimental):** OpenStreetMap-based map viewer with live aircraft position tracking from the DataPad stream. Adds a `MapViewer` tab showing aircraft position, heading, altitude and basic overlays — see [docs/EN/features/AVIATION_MAP_FEATURE.md](docs/EN/features/AVIATION_MAP_FEATURE.md) for details and configuration.
 - **DataPad (experimental):** Live flight telemetry display (UDP) for DCS World. Streams aircraft telemetry to the app for realtime status and popup details — see [docs/EN/features/DATAPAD_FEATURE.md](docs/EN/features/DATAPAD_FEATURE.md) for full details and setup instructions.
 - **Tactical Units Tracking (experimental):** Live tactical unit markers (aircraft, helicopter, ground, ship) on the map with real-time updates. Marker popups include **"Last seen"** timestamps and refresh snippets with speed/altitude. A **"Live Units Only"** filter (shows units seen in the last 10s) is synchronized between the list and the map. See [docs/EN/features/TACTICAL_UNITS_TRACKING.md](docs/EN/features/TACTICAL_UNITS_TRACKING.md) and [scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md](scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md) for setup and details.
-- **Aviation Map (experimental):** OpenStreetMap-based map viewer with live aircraft position tracking from the DataPad stream. Adds a `MapViewer` tab showing aircraft position, heading, altitude and basic overlays — see [docs/EN/features/AVIATION_MAP_FEATURE.md](docs/EN/features/AVIATION_MAP_FEATURE.md) for details and configuration.
 - **MapDatabaseTools (Python):** A collection of Python utilities for receiving, decrypting (AES-GCM), and visualizing DCS flight telemetry. Includes a PySide6 GUI with an embedded OpenStreetMap/Leaflet map for live aircraft tracking, a marker database, and helper scripts to manage map assets. See `scripts/MapDatabaseTools/README.md` for usage and configuration.
 
 - **Supported maps (marker DB):**
