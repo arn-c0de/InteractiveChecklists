@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import com.example.checklist_interactive.data.tactical.TacticalDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 import java.io.File
 
 /**
@@ -47,6 +48,31 @@ data class DatabaseStats(
  * Repository for database statistics
  */
 class DatabaseStatisticsRepository(private val context: Context) {
+
+    /**
+     * Optimize database by running VACUUM (reclaim unused space)
+     * This can significantly reduce database file size after large deletions
+     */
+    suspend fun optimizeDatabase(): Result<Double> = withContext(Dispatchers.IO) {
+        try {
+            val db = TacticalDatabase.getInstance(context, useExternalPath = false, allowDestructiveMigration = false)
+            val dbFile = context.getDatabasePath("map_data.db")
+            val sizeBefore = if (dbFile.exists()) dbFile.length() / (1024.0 * 1024.0) else 0.0
+
+            // Run VACUUM to reclaim space
+            val sqlite = db.openHelper.writableDatabase
+            sqlite.execSQL("VACUUM")
+
+            val sizeAfter = if (dbFile.exists()) dbFile.length() / (1024.0 * 1024.0) else 0.0
+            val savedSpace = sizeBefore - sizeAfter
+
+            android.util.Log.i("DatabaseStats", "VACUUM completed: ${String.format("%.2f", sizeBefore)} MB -> ${String.format("%.2f", sizeAfter)} MB (saved ${String.format("%.2f", savedSpace)} MB)")
+            Result.success(savedSpace)
+        } catch (e: Exception) {
+            android.util.Log.e("DatabaseStats", "Failed to optimize database", e)
+            Result.failure(e)
+        }
+    }
 
     /**
      * Get statistics from internal database
@@ -179,6 +205,8 @@ fun MapDatabaseStatistics(
     var internalStats by remember { mutableStateOf(DatabaseStats()) }
     var assetStats by remember { mutableStateOf(DatabaseStats()) }
     var isLoading by remember { mutableStateOf(false) }
+    var isOptimizing by remember { mutableStateOf(false) }
+    var optimizeMessage by remember { mutableStateOf<String?>(null) }
 
     // Load statistics when database selection changes
     LaunchedEffect(selectedDatabase) {
@@ -190,6 +218,8 @@ fun MapDatabaseStatistics(
         }
         isLoading = false
     }
+
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
 
     val currentStats = if (selectedDatabase == 0) internalStats else assetStats
 
@@ -231,32 +261,93 @@ fun MapDatabaseStatistics(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Database path
+        // Database path and optimize button - compact design
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant
             )
         ) {
-            Column(modifier = Modifier.padding(12.dp)) {
+            Column(modifier = Modifier.padding(8.dp)) {
                 Text(
                     text = "Database Path",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = currentStats.databasePath,
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.Medium
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Size: ${String.format("%.2f", currentStats.databaseSizeMB)} MB",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Size: ${String.format("%.2f", currentStats.databaseSizeMB)} MB",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        // Show optimization result message inline
+                        optimizeMessage?.let { message ->
+                            Text(
+                                text = message,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.tertiary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    // Optimize button (only for internal DB)
+                    if (selectedDatabase == 0) {
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    isOptimizing = true
+                                    optimizeMessage = null
+                                    val result = repository.optimizeDatabase()
+                                    result.onSuccess { savedMB ->
+                                        optimizeMessage = if (savedMB > 0.01) {
+                                            "Saved ${String.format("%.2f", savedMB)} MB"
+                                        } else {
+                                            "Already optimized"
+                                        }
+                                        // Reload stats to show new size
+                                        internalStats = repository.getInternalDatabaseStats()
+                                    }.onFailure {
+                                        optimizeMessage = "Optimization failed"
+                                    }
+                                    isOptimizing = false
+                                }
+                            },
+                            enabled = !isOptimizing && !isLoading,
+                            modifier = Modifier.height(32.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
+                            if (isOptimizing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(14.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Storage,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Optimize", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+                }
             }
         }
 
