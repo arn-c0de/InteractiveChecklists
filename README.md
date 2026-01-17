@@ -120,15 +120,54 @@ To remove the installed packages, delete the created `venv` directory.
    `run.bat`  
    → A small window/menu will open
 
-4. In the window:  
-   - Press **B** within 5 seconds → a QR code appears automatically  
+### 4. Server Setup
+
+- Enter the **Server IP address**, **Target IP(s)**, and enable **PoW** *(recommended)*  
+  - Configure this in the **Settings menu** by pressing the **[S]** button  
+  - Alternatively, edit the auto-generated **`server_config.json`** located in the same folder as **`start.bat`**
+
+**Notes:**
+- The **Server IP address** is the IP of your **PC where DCS is running**
+- **Target IPs** are the devices in your Wi-Fi network  
+  *(Android tablet or smartphone where the app is installed)*
+- You can:
+  - Enter each target IP individually, **or**
+  - Allow all devices in your network by using `.*` at the end of the IP address  
+    - Example: `192.168.1.*`
+
+- Press **Enter** to confirm the settings  
+- Select the **server mode** using the **arrow keys**  
+  - **Recommended:** **ECDH with App + PoW**  
+    - This mode is the **easiest to set up** and provides **secure communication**
+- Press **Enter** to start the server
+
+
+
+6. In the window:  
+   - Press **B** within 5 seconds → a QR code appears automatically
    - (or configure IP/port manually if you prefer)
 
-5. In the Android app:  
-   → Go to **Settings → DataPad**  
-   → Turn DataPad **ON**  
-   → Scan the QR code from your PC screen  
-   (First time only – it registers your device securely)
+7. Android App Setup
+
+1. Open the Android app  
+2. Go to **Settings → DataPad**  
+3. Turn **DataPad** **ON**  
+4. Open the **DataPad Popup** using the **FAB button**  
+5. Tap **Settings** in the **DataPad Popup**  
+6. Tap **Scan QR Code**  
+7. Scan the QR code shown on your PC screen  
+   - *(First time only – securely registers your device)*  
+8. Enable the **toggle button** in the **DataPad Popup**  
+   - If the correct server is selected, a **heartbeat is sent every 30 seconds**
+
+### Data Status & Indicators
+
+- When a **DCS mission starts** and you are **seated in an aircraft**, the **forwarder (DataPadServer)** begins sending live data to the **DataPad app**
+- The current status is shown in the **top info bar**:
+  - 🔴 **Red** – No incoming data / No mission running  
+  - 🟡 **Yellow** – Mission running, but not in an aircraft / No active live data  
+  - 🟢 **Green** – In an aircraft and receiving **telemetry and/or tactical unit live data**
+
 
 Done! The app should now receive live telemetry.
 
