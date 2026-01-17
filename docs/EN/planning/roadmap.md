@@ -4,13 +4,6 @@
 
 This roadmap outlines the planned development phases and features for the app in the exact priority order requested. All items are listed sequentially, reflecting the intended implementation sequence. The focus is on iterative progression: completing earlier items before moving to the next.
 
----
-
-### First-run Setup Popup (Initial Aircraft & Settings)
-- Add a first-start popup shown on initial app launch to set up aircraft and primary settings on a single page.
-- Allow users to select their default aircraft, loadout, and critical settings (units, map preferences, telemetry options) for a clearer first-time experience.
-- Provide a concise overview and confirm defaults with a prominent "Get started" button and an option to skip for experienced users.
-- Ensure the setup can be reopened from Settings and supports re-running to change defaults later.
 
 ---
 
@@ -27,20 +20,6 @@ This roadmap outlines the planned development phases and features for the app in
 - Implement customizable order icons on the map.
 - Add standard airport symbols with proper scaling and layering.
 - Ensure icons are clear, distinguishable, and support different zoom levels.
-
----
-
-### AA Icon Range Circles
-- Add range circles around anti-aircraft (AA) icons.
-- Display configurable threat ranges (e.g., engagement zones, detection radii).
-- Support multiple circle layers (e.g., radar, missile range) with color coding.
-
----
-
-### Handshake and AES Implementation with Security Tests
-- Implement secure handshake protocol for connections.
-- Integrate AES encryption for all data in transit.
-- Conduct comprehensive security tests (penetration testing, vulnerability checks, encryption validation).
 
 ---
 
@@ -64,7 +43,7 @@ This roadmap outlines the planned development phases and features for the app in
 
 ---
 
-### Extreme Security Hardening
+### Security Hardening
 - Apply advanced security hardening across the entire app.
 - Include measures such as:
   - Code obfuscation
