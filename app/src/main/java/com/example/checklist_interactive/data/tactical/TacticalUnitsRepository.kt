@@ -242,6 +242,22 @@ class TacticalUnitsRepository(private val context: Context) {
         historyDao.deleteAllHistory()
         // Step 3: Delete all units
         unitsDao.deleteAllUnits()
+        // Step 4: VACUUM to reclaim disk space
+        vacuumDatabase()
+    }
+
+    /**
+     * Optimize database by reclaiming unused space (VACUUM)
+     * Call this after large delete operations to reduce database file size
+     */
+    suspend fun vacuumDatabase() {
+        try {
+            val sqlite = db.openHelper.writableDatabase
+            sqlite.execSQL("VACUUM")
+            android.util.Log.i("TacticalUnitsRepository", "Database VACUUM completed successfully")
+        } catch (e: Exception) {
+            android.util.Log.e("TacticalUnitsRepository", "Failed to VACUUM database", e)
+        }
     }    
     /**
      * Toggle highlight status for a unit
