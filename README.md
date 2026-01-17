@@ -97,79 +97,171 @@ InteractiveChecklists is an Android application for viewing and interacting with
 | Germany (CW) | mostly Supported | Marker addition in progress |
 
 
-## DataPad – Live Flight Telemetry (Experimental)
-
-DataPad shows real-time aircraft data from DCS World (speed, altitude, heading, etc.) directly in the app on your phone or tablet.
-
-### Quick Start – Windows (Recommended & Easiest)
+Here is the **integrated, cleaned-up, and consistent Markdown version**, with the **“Unblocking Files in DCS World”** section properly embedded in a logical place. Language is corrected and suitable for a README / manual.
 
 
-**Install the DCS export script (required):** Copy `export.lua` from `scripts/DCS-SCRIPTS-FOLDER-Experimental` into your DCS Export scripts folder (for example: `%USERPROFILE%\Saved Games\DCS\Scripts\Export\`). This script causes DCS to write entity batches and player telemetry files into the subfolder the Python forwarder reads. After copying, start or reload your mission (or restart DCS) so the export script is activated.
+## Quick Start – Windows (Recommended & Easiest)
 
-**Note:** The Python forwarder (Datapad-Server) requires a local Python installation (3.8 or newer). On Windows you can install Python via the Microsoft Store (recommended for simplicity). The included `install.bat` creates a virtual environment and installs all required Python packages into that venv — this keeps dependencies isolated and is the cleanest solution. To update or reinstall packages, re-run `install.bat`.
-To remove the installed packages, delete the created `venv` directory.
+### Install the DCS Export Script (Required)
 
-1. Go to this folder:  
+Copy `export.lua` from  
+`scripts/DCS-SCRIPTS-FOLDER-Experimental`  
+
+into your DCS scripts folder, for example:  
+`%USERPROFILE%\Saved Games\DCS\Scripts\`
+
+This script enables DCS to write **entity batches** and **player telemetry files** into a subfolder that the Python forwarder reads.
+
+After copying:
+- Start or reload your mission, **or**
+- Restart DCS  
+
+to activate the export script.
+
+---
+
+### Important Note – Python Requirement
+
+The Python forwarder (**DataPad Server**) requires a **local Python installation (3.8 or newer)**.
+
+- On Windows, installing Python via the **Microsoft Store** is recommended for simplicity.
+- The included `install.bat`:
+  - Creates a **virtual environment (venv)**
+  - Installs all required Python packages into that environment
+
+This keeps dependencies isolated and clean.
+
+- To update or reinstall packages: re-run `install.bat`
+- To remove everything: delete the created `venv` folder
+
+---
+
+### Initial Setup
+
+1. Navigate to the folder:  
    `/DCS-SCRIPTS-FOLDER-Experimental`
 
 2. **One-time setup** – double-click:  
    `install.bat`  
-   → Wait 1–2 minutes while it installs Python packages in virtual environment (only needed once or for package updates)
+   → Wait **1–2 minutes** while required packages are installed  
+   *(only needed once or when updating packages)*
 
 3. Start the server – double-click:  
    `run.bat`  
-   → A small window/menu will open
+   → A small console window / menu will open
 
-### 4. Server Setup
+---
+<p align="center">
+	<img src="images/datapad-server-udp_forwarder.png" alt="DataPad server (launcher)" width="360" /><br/>
+	<em>DataPad server launcher with configuration menu</em>
+</p>
+
+## 4. Server Setup
 
 - Enter the **Server IP address**, **Target IP(s)**, and enable **PoW** *(recommended)*  
-  - Configure this in the **Settings menu** by pressing the **[S]** button  
-  - Alternatively, edit the auto-generated **`server_config.json`** located in the same folder as **`start.bat`**
+  - Configure this via the **Settings menu** by pressing **[S]**
+  - Or edit the auto-generated **`server_config.json`** located next to `start.bat`
 
-**Notes:**
-- The **Server IP address** is the IP of your **PC where DCS is running**
-- **Target IPs** are the devices in your Wi-Fi network  
-  *(Android tablet or smartphone where the app is installed)*
+### Notes
+
+- **Server IP address**  
+  → IP of the **PC where DCS is running**
+- **Target IPs**  
+  → Android devices (tablet or smartphone) in your Wi-Fi network
 - You can:
   - Enter each target IP individually, **or**
-  - Allow all devices in your network by using `.*` at the end of the IP address  
+  - Allow all devices in your network using `.*` at the end of the IP address  
     - Example: `192.168.1.*`
 
-- Press **Enter** to confirm the settings  
-- Select the **server mode** using the **arrow keys**  
-  - **Recommended:** **ECDH with App + PoW**  
-    - This mode is the **easiest to set up** and provides **secure communication**
+### Start the Server
+
+- Press **Enter** to confirm the settings
+- Select the **server mode** using the **arrow keys**
+  - **Recommended:** **ECDH with App + PoW**
+    - Easiest to set up
+    - Secure and safe for automatic pairing
 - Press **Enter** to start the server
 
+---
 
+### QR Code Pairing
 
-6. In the window:  
-   - Press **B** within 5 seconds → a QR code appears automatically
-   - (or configure IP/port manually if you prefer)
+6. In the server window:
+   - Press **B** within **5 seconds**
+     → A **QR code** will be displayed automatically
+   - *(Optional)* You can also configure IP/port manually
 
-7. Android App Setup
+---
 
-1. Open the Android app  
-2. Go to **Settings → DataPad**  
-3. Turn **DataPad** **ON**  
-4. Open the **DataPad Popup** using the **FAB button**  
-5. Tap **Settings** in the **DataPad Popup**  
-6. Tap **Scan QR Code**  
-7. Scan the QR code shown on your PC screen  
-   - *(First time only – securely registers your device)*  
-8. Enable the **toggle button** in the **DataPad Popup**  
+## 5. Android App Setup
+
+1. Open the Android app
+2. Go to **Settings → DataPad**
+3. Turn **DataPad ON**
+4. Open the **DataPad Popup** using the **FAB button**
+5. Tap **Settings** in the **DataPad Popup**
+6. Tap **Scan QR Code**
+7. Scan the QR code displayed on your PC screen  
+   - *(First time only – securely registers your device)*
+8. Enable the **toggle button** in the **DataPad Popup**
    - If the correct server is selected, a **heartbeat is sent every 30 seconds**
 
-### Data Status & Indicators
+---
 
-- When a **DCS mission starts** and you are **seated in an aircraft**, the **forwarder (DataPadServer)** begins sending live data to the **DataPad app**
+## Data Status & Indicators
+
+- When a **DCS mission starts** and you are **seated in an aircraft**, the **forwarder (DataPad Server)** begins sending live data to the app
 - The current status is shown in the **top info bar**:
+
   - 🔴 **Red** – No incoming data / No mission running  
   - 🟡 **Yellow** – Mission running, but not in an aircraft / No active live data  
   - 🟢 **Green** – In an aircraft and receiving **telemetry and/or tactical unit live data**
 
+---
 
-Done! The app should now receive live telemetry.
+## Unblocking Files in DCS World (Important)
+
+Some DCS files may be blocked by **Group Policy** or **antivirus software**.  
+This can prevent correct operation.
+
+### Using PowerShell (Recommended)
+
+1. Press the **Windows key** and type `PowerShell`
+2. Right-click **Windows PowerShell** → **Run as Administrator**
+3. To unblock a single file, enter:
+
+```powershell
+Unblock-File "C:\Program Files\Eagle Dynamics\DCS World\bin\lua-dxgui.dll"
+
+
+4. Press **Enter**
+
+### To Unblock All DLL Files at Once
+
+```powershell
+Get-ChildItem "C:\Program Files\Eagle Dynamics\DCS World\bin\*.dll" | Unblock-File
+```
+
+Press **Enter**.
+
+---
+
+### Alternative: Repair DCS
+
+If unblocking does not help:
+
+1. Open **DCS Launcher**
+2. Go to **Settings** (gear icon)
+3. Click **Repair**
+4. Wait for the process to complete
+
+This will restore and unblock all affected files.
+
+---
+
+✅ **Done!**
+The app should now receive **live telemetry and tactical data** from DCS.
+
 
 ### Security – Quick Summary (2025/2026)
 
@@ -275,10 +367,7 @@ See [docs/EN/features/DATAPAD_FEATURE.md](docs/EN/features/DATAPAD_FEATURE.md) f
 	<em>Application settings and configuration panel</em>
 </p>
 
-<p align="center">
-	<img src="images/datapad-server-udp_forwarder.png" alt="DataPad server (launcher)" width="360" /><br/>
-	<em>DataPad server launcher with configuration menu</em>
-</p>
+
 
 
 <a name="demo-videos"></a>
