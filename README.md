@@ -51,6 +51,9 @@
 # InteractiveChecklists
 
 InteractiveChecklists is an Android application for viewing and interacting with Markdown and PDF checklists. It is built with Jetpack Compose and follows an MVVM-style architecture.
+It is designed to be extensible with an interactive aviation map featuring live DCS data integration, tactical markers, and dynamic route and pattern calculation.
+Runway heading–based approach visualization and real-time map updates enable enhanced situational awareness during flight operations.
+
 
 > **Development status:** This repository is a development version and not an official release. The app is functional but under active development and may contain experimental features.
 
