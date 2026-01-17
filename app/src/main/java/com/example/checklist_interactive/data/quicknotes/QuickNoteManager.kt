@@ -38,6 +38,11 @@ class QuickNoteManager(private val context: Context) {
     private lateinit var database: QuickNoteDatabase
     private lateinit var repository: QuickNoteRepository
 
+    // Track initialization state for better error handling
+    private var isInitialized = false
+    private var initializationAttempts = 0
+    private val maxInitAttempts = 3
+
     // StateFlows for reactive UI updates
     private val _notes = MutableStateFlow<List<QuickNote>>(emptyList())
     val notes: StateFlow<List<QuickNote>> = _notes.asStateFlow()
@@ -103,10 +108,35 @@ class QuickNoteManager(private val context: Context) {
 
         // Start coroutine to initialize data
         scope.launch {
-            // Initialize Room database and repository on IO
-            database = QuickNoteDatabase.getDatabase(context)
-            repository = QuickNoteRepository(database.quickNoteDao())
+            initializeDatabase()
+        }
+
+        // Load callsign/com preferences and other small settings
+        scope.launch {
+            // load callsign/coms
+            _callsign.value = prefs.getString(CALLSIGN_KEY, "") ?: ""
+            _com1.value = prefs.getString(COM1_KEY, "") ?: ""
+            _com1Mode.value = prefs.getString(COM1_MODE_KEY, "FM") ?: "FM"
+            _com2.value = prefs.getString(COM2_KEY, "") ?: ""
+            _com2Mode.value = prefs.getString(COM2_MODE_KEY, "FM") ?: "FM"
+            _flightInfoExpanded.value = prefs.getBoolean(FLIGHT_INFO_EXPANDED_KEY, false)
+            _flightStatus.value = prefs.getString(FLIGHT_STATUS_KEY, context.getString(com.example.checklist_interactive.R.string.flight_status_idle)) ?: context.getString(com.example.checklist_interactive.R.string.flight_status_idle)
+        }
+    }
+
+    /**
+     * Initialize database with retry logic for better reliability
+     */
+    private suspend fun initializeDatabase() {
+        while (initializationAttempts < maxInitAttempts && !isInitialized) {
             try {
+                initializationAttempts++
+                Log.d(TAG, "Initializing database (attempt $initializationAttempts/$maxInitAttempts)")
+
+                // Initialize Room database and repository on IO
+                database = QuickNoteDatabase.getDatabase(context)
+                repository = QuickNoteRepository(database.quickNoteDao())
+
                 // Check if migration is needed
                 val notesCount = repository.getNotesCount()
                 if (notesCount == 0) {
@@ -133,21 +163,35 @@ class QuickNoteManager(private val context: Context) {
                         }
                     }
                 }
+
+                isInitialized = true
+                Log.d(TAG, "Database initialized successfully")
             } catch (e: Exception) {
-                Log.e(TAG, "Error initializing QuickNoteManager", e)
+                Log.e(TAG, "Error initializing QuickNoteManager (attempt $initializationAttempts/$maxInitAttempts)", e)
+
+                // If this was a migration error and we've exhausted retries, clear the database
+                if (initializationAttempts >= maxInitAttempts && e.message?.contains("Migration didn't properly handle") == true) {
+                    Log.e(TAG, "Migration failed after $maxInitAttempts attempts. Clearing database.")
+                    try {
+                        // Clear the database instance and file to force recreation
+                        QuickNoteDatabase.destroyInstance()
+                        context.deleteDatabase("quick_notes_database")
+
+                        // Reset attempts and try one more time
+                        initializationAttempts = 0
+                        initializeDatabase()
+                    } catch (clearException: Exception) {
+                        Log.e(TAG, "Failed to clear database", clearException)
+                    }
+                } else if (initializationAttempts < maxInitAttempts) {
+                    // Wait before retrying
+                    kotlinx.coroutines.delay(1000L * initializationAttempts)
+                }
             }
         }
 
-        // Load callsign/com preferences and other small settings
-        scope.launch {
-            // load callsign/coms
-            _callsign.value = prefs.getString(CALLSIGN_KEY, "") ?: ""
-            _com1.value = prefs.getString(COM1_KEY, "") ?: ""
-            _com1Mode.value = prefs.getString(COM1_MODE_KEY, "FM") ?: "FM"
-            _com2.value = prefs.getString(COM2_KEY, "") ?: ""
-            _com2Mode.value = prefs.getString(COM2_MODE_KEY, "FM") ?: "FM"
-            _flightInfoExpanded.value = prefs.getBoolean(FLIGHT_INFO_EXPANDED_KEY, false)
-            _flightStatus.value = prefs.getString(FLIGHT_STATUS_KEY, context.getString(com.example.checklist_interactive.R.string.flight_status_idle)) ?: context.getString(com.example.checklist_interactive.R.string.flight_status_idle)
+        if (!isInitialized) {
+            Log.e(TAG, "Failed to initialize database after $maxInitAttempts attempts")
         }
     }
 
@@ -168,13 +212,15 @@ class QuickNoteManager(private val context: Context) {
     fun warmUp() {
         scope.launch {
             try {
-                // Trigger database initialization if not already done
-                if (!::database.isInitialized) {
-                    database = QuickNoteDatabase.getDatabase(context)
-                    repository = QuickNoteRepository(database.quickNoteDao())
+                if (!isInitialized) {
+                    Log.d(TAG, "Warmup: Database not initialized, initializing now")
+                    initializeDatabase()
+                } else {
+                    // Preload summaries to warm up cache
+                    if (::repository.isInitialized) {
+                        repository.getNotesCount()
+                    }
                 }
-                // Preload summaries to warm up cache
-                repository.getNotesCount()
             } catch (e: Exception) {
                 Log.e(TAG, "Error during warmup", e)
             }
@@ -263,6 +309,10 @@ class QuickNoteManager(private val context: Context) {
     fun saveNoteContent(noteId: String? = null, content: String) {
         scope.launch {
             try {
+                if (!isInitialized || !::repository.isInitialized) {
+                    Log.w(TAG, "Repository not initialized, cannot save note content")
+                    return@launch
+                }
                 val id = noteId ?: _activeNoteId.value
                 if (id != null) {
                     repository.updateNoteContent(id, content)
@@ -279,6 +329,16 @@ class QuickNoteManager(private val context: Context) {
     fun saveDrawing(noteId: String? = null, drawingJson: String?) {
         scope.launch {
             try {
+                if (!isInitialized || !::repository.isInitialized) {
+                    Log.w(TAG, "Repository not initialized, cannot save drawing")
+                    // Still save backup to SharedPreferences
+                    val id = noteId ?: _activeNoteId.value
+                    if (id != null) {
+                        prefs.edit().putString("drawing_$id", drawingJson).apply()
+                        Log.d(TAG, "Saved drawing backup to SharedPreferences for $id")
+                    }
+                    return@launch
+                }
                 val id = noteId ?: _activeNoteId.value
                 if (id != null) {
                     val res = repository.updateNoteDrawing(id, drawingJson)
@@ -446,6 +506,10 @@ class QuickNoteManager(private val context: Context) {
         val id = "note_${System.currentTimeMillis()}"
         scope.launch {
             try {
+                if (!isInitialized || !::repository.isInitialized) {
+                    Log.w(TAG, "Repository not initialized, cannot add note")
+                    return@launch
+                }
                 val note = QuickNote(id = id, title = title, content = content)
                 repository.insertNote(note)
                 if (setActive) {
@@ -464,6 +528,10 @@ class QuickNoteManager(private val context: Context) {
     fun removeNote(id: String) {
         scope.launch {
             try {
+                if (!isInitialized || !::repository.isInitialized) {
+                    Log.w(TAG, "Repository not initialized, cannot remove note")
+                    return@launch
+                }
                 if (_activeNoteId.value == id) {
                     // Get current notes list before deletion
                     val notes = repository.getAllNotes().first()
@@ -518,6 +586,10 @@ class QuickNoteManager(private val context: Context) {
     fun setActiveNote(id: String?) {
         scope.launch {
             try {
+                if (!isInitialized || !::repository.isInitialized) {
+                    Log.w(TAG, "Repository not initialized, cannot set active note")
+                    return@launch
+                }
                 if (id == null) {
                     val notes = repository.getAllNotes().first()
                     _activeNoteId.value = notes.firstOrNull()?.id
