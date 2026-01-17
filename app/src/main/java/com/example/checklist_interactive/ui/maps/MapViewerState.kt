@@ -15,6 +15,9 @@ import com.example.checklist_interactive.ui.maps.marker.SymbolAffiliation
 import com.example.checklist_interactive.ui.maps.navigation.PatternDirection
 import com.example.checklist_interactive.ui.maps.navigation.PatternLabelOverlay
 import com.example.checklist_interactive.ui.maps.navigation.PatternSize
+import com.example.checklist_interactive.ui.maps.overlays.AARangeRingsOverlay
+import com.example.checklist_interactive.ui.maps.overlays.AirportMarkerLabelsOverlay
+import com.example.checklist_interactive.ui.maps.overlays.AirspaceCirclesOverlay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay

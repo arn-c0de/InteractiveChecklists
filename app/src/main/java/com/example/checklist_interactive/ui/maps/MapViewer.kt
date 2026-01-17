@@ -65,7 +65,15 @@ import com.example.checklist_interactive.data.tactical.RunwayEntity
 import com.example.checklist_interactive.ui.maps.ui.MapNavigationDisplay
 import com.example.checklist_interactive.ui.maps.ui.MapRadialMenuDisplay
 import com.example.checklist_interactive.ui.maps.ui.OverlaySelectionDialog
-import com.example.checklist_interactive.ui.maps.MapFlightInstruments
+import com.example.checklist_interactive.ui.maps.overlays.MapFlightInstruments
+import com.example.checklist_interactive.ui.maps.overlays.TacticalUnitsMapOverlay
+import com.example.checklist_interactive.ui.maps.overlays.AARangeRingsOverlay
+import com.example.checklist_interactive.ui.maps.overlays.AirportMarkerLabelsOverlay
+import com.example.checklist_interactive.ui.maps.overlays.AirspaceCirclesOverlay
+import com.example.checklist_interactive.ui.maps.overlays.CompassOverlay
+import com.example.checklist_interactive.ui.maps.overlays.HeadingSpeedLineOverlay
+import com.example.checklist_interactive.ui.maps.overlays.RangeRingsOverlay
+import com.example.checklist_interactive.ui.maps.overlays.MgrsGridOverlay
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
