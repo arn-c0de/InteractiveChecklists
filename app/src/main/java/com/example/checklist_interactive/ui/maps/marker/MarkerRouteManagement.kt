@@ -235,7 +235,7 @@ fun MarkerRouteManagementSheet(
     val allRoutes by viewModel.allRoutes.collectAsState()
     val visibleRouteIds by viewModel.visibleRouteIds.collectAsState()
 
-    // New tab order: 0=Details, 1=Markers (default), 2=Routes, 3=Tactical Units
+    // New tab order: 0=Details, 1=Markers (default), 2=Routes, 3=Tactical Units, 4=Statistics
     var selectedTab by remember {
         mutableStateOf(
             initialTab ?: if (selectedMarker != null) 0 else 1
@@ -491,7 +491,7 @@ fun MarkerRouteManagementSheet(
 
                 Spacer(modifier = Modifier.height(8.dp))
             
-            // Tabs (reordered: Details | Markers | Routes | Tactical Units)
+            // Tabs (reordered: Details | Markers | Routes | Tactical Units | Statistics)
             TabRow(selectedTabIndex = selectedTab) {
                 Tab(
                     selected = selectedTab == 0,
@@ -517,6 +517,12 @@ fun MarkerRouteManagementSheet(
                     onClick = { selectedTab = 3 },
                     text = { Text(stringResource(R.string.tactical_title)) }
                 )
+
+                Tab(
+                    selected = selectedTab == 4,
+                    onClick = { selectedTab = 4 },
+                    text = { Text("Statistics") }
+                )
             }
             
             Spacer(modifier = Modifier.height(8.dp))
@@ -525,7 +531,7 @@ fun MarkerRouteManagementSheet(
             val autoDesc = stringResource(R.string.map_route_auto_generated_description)
 
             when (selectedTab) {
-                // New mapping: 0=Details, 1=Markers, 2=Routes
+                // New mapping: 0=Details, 1=Markers, 2=Routes, 3=Tactical Units, 4=Statistics
                 0 -> {
                     if (selectedMarker != null) {
                         MarkerDetailsContent(
@@ -684,6 +690,13 @@ fun MarkerRouteManagementSheet(
                         onUnitClick = null,
                         onCenterOnMap = onCenterOnMap,
                         onShowDetails = { unit -> scope.launch { com.example.checklist_interactive.ui.maps.MapActionBus.showTacticalUnitDetails(unit) } },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                4 -> {
+                    // Database Statistics Tab
+                    com.example.checklist_interactive.ui.maps.MapDatabaseStatistics(
                         modifier = Modifier.fillMaxSize()
                     )
                 }
