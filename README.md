@@ -51,6 +51,9 @@
 # InteractiveChecklists
 
 InteractiveChecklists is an Android application for viewing and interacting with Markdown and PDF checklists. It is built with Jetpack Compose and follows an MVVM-style architecture.
+It is designed to be extensible with an interactive aviation map featuring live DCS data integration, tactical markers, and dynamic route and pattern calculation.
+Runway heading–based approach visualization and real-time map updates enable enhanced situational awareness during flight operations.
+
 
 > **Development status:** This repository is a development version and not an official release. The app is functional but under active development and may contain experimental features.
 
@@ -71,6 +74,7 @@ InteractiveChecklists is an Android application for viewing and interacting with
 - [FAQ](#faq)
 - [Acknowledgements & Credits](#acknowledgements--credits)
 - [License](#license)
+
 
 
 ## Features
@@ -98,6 +102,11 @@ InteractiveChecklists is an Android application for viewing and interacting with
 
 
 Here is the **integrated, cleaned-up, and consistent Markdown version**, with the **“Unblocking Files in DCS World”** section properly embedded in a logical place. Language is corrected and suitable for a README / manual.
+
+## Roadmap
+
+Planned features and long-term improvements are tracked in the [Roadmap](docs/EN/planning/roadmap.md) document.
+
 
 
 ## Quick Start – Windows (Recommended & Easiest)
@@ -414,7 +423,7 @@ See [docs/EN/features/DATAPAD_FEATURE.md](docs/EN/features/DATAPAD_FEATURE.md) f
 > 📝 **NOTE**  
 > This is a test recording to evaluate recording performance, tablet capture workflow, resolution settings, and overall system stability during DCS gameplay. Mission content and pacing are deliberately simple and functional.
 
-## Installation
+## Installation for Developer
 
 Step-by-step instructions to get the project running locally.
 
@@ -457,15 +466,6 @@ cd InteractiveChecklists
 - From the command line: `./gradlew assembleDebug` builds an APK; use `./gradlew installDebug` to install on a connected device.
 
 
-## Key Components
-
-- `MainActivity.kt`: App entry point and navigation orchestration.
-- `data/files/InternalFileManager.kt`: Unified file management.
-- `ui/files/InternalFilesScreen.kt`: File browser and tagging UI.
-- `ui/checklist/MarkdownViewer.kt`: Interactive markdown checklist viewer.
-- `ui/checklist/PdfViewer.kt`: PDF viewer and annotation tools.
-- `data/quicknotes/QuickNoteManager.kt`: QuickNotes data layer.
-
 
 ## Contributing
 
@@ -479,11 +479,6 @@ Quick contribution ideas:
 For larger or breaking changes, please open an issue first to discuss design and scope.
 
 
-## Roadmap
-
-Planned features and long-term improvements are tracked in the [Roadmap](docs/EN/planning/roadmap.md) document.
-
-
 ## Support & Contact
 
 If you encounter issues or have questions:
@@ -491,6 +486,11 @@ If you encounter issues or have questions:
 - Open an issue in this repository.
 - For security-sensitive issues, please follow the instructions in [SECURITY.md](SECURITY.md).
 - For contribution coordination and discussions, see [COLLABORATORS.md](COLLABORATORS.md).
+
+### Bug Reports
+
+When reporting a bug, please include a **screenshot** if possible.  
+Use the screenshot to **mark or highlight the exact area** where the issue occurs, and briefly **describe what is shown and what is wrong** in that location.
 
 
 ## FAQ
