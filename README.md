@@ -101,13 +101,13 @@ InteractiveChecklists is an Android application for viewing and interacting with
 
 DataPad shows real-time aircraft data from DCS World (speed, altitude, heading, etc.) directly in the app on your phone or tablet.
 
-**You need a small Python helper (called the Forwarder)** running on your PC to send the data from DCS to the app.
-
 ### Quick Start – Windows (Recommended & Easiest)
 
 
 **Install the DCS export script (required):** Copy `export.lua` from `scripts/DCS-SCRIPTS-FOLDER-Experimental` into your DCS Export scripts folder (for example: `%USERPROFILE%\Saved Games\DCS\Scripts\Export\`). This script causes DCS to write entity batches and player telemetry files into the subfolder the Python forwarder reads. After copying, start or reload your mission (or restart DCS) so the export script is activated.
 
+**Note:** The Python forwarder (Datapad-Server) requires a local Python installation (3.8 or newer). On Windows you can install Python via the Microsoft Store (recommended for simplicity). The included `install.bat` creates a virtual environment and installs all required Python packages into that venv — this keeps dependencies isolated and is the cleanest solution. To update or reinstall packages, re-run `install.bat`.
+To remove the installed packages, delete the created `venv` directory.
 
 1. Go to this folder:  
    `/DCS-SCRIPTS-FOLDER-Experimental`
