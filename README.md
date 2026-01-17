@@ -203,6 +203,7 @@ This keeps dependencies isolated and clean.
 	<img src="images/setup_datapad_settings_activate.png" alt="APP DataPad Activate Toggle" width="360" /><br/>
 	<em>Activates the in App datapad functions</em>
 </p>
+
 1. Open the Android app
 2. Go to **Settings → DataPad**
 3. Turn **DataPad ON**
@@ -211,17 +212,22 @@ This keeps dependencies isolated and clean.
 	<img src="images/setup_datapad_settings.png" alt="APP DataPad Settings button" width="360" /><br/>
 	<em>Settings Menu for datapad</em>
 </p>
+
 4. Open the **DataPad Popup** using the **FAB button**
 5. Tap **Settings** in the **DataPad Popup**
+
 <p align="center">
 	<img src="images/setup_datapad_setup_devicename.png" alt="APP DataPad Device Name" width="360" /><br/>
 	<em>Enter your Device Name</em>
 </p>
-6. Enter a Device name 
+
+6. Enter a Device name
+   
 <p align="center">
 	<img src="images/setup_datapad_setup_ip-server.png" alt="APP DataPad Setup Ip and QR-code" width="360" /><br/>
 	<em>Enter your Server IP and Scan QR-Code</em>
 </p>
+
 7. Scroll down set your **ServerIP** (recommend) then to **QR-Code setup** | or for Manual adding, copy Device Name, ID and Public Key and enter as new entry in authorized_devices.json
 8. Tap **Scan QR Code**
 9. Scan the QR code displayed on your PC screen  
