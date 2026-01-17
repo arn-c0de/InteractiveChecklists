@@ -1,4 +1,18 @@
 pcall(function()
+	-- ============================================================================
+	-- USER CUSTOM CODE SECTION
+	-- ============================================================================
+	-- Insert your existing Export.lua code here (e.g., Tacview, other exports)
+	-- This section is executed BEFORE the Interactive Checklists export code.
+	--
+	-- Example:
+	-- local Tacview = require('Tacview')
+	-- Tacview.init()
+	--
+	-- ============================================================================
+	-- END USER CUSTOM CODE SECTION
+	-- ============================================================================
+
 	local lfs = require('lfs')
 	local writeDir = lfs.writedir()
 
