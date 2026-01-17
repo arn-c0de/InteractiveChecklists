@@ -6,6 +6,8 @@
 	<img src="https://img.shields.io/badge/version-1.0-blue.svg" alt="Version" />
 	<img src="https://img.shields.io/badge/platform-Android-green.svg" alt="Platform" />
 	<img src="https://img.shields.io/badge/built_with-Jetpack%20Compose-orange.svg" alt="Jetpack Compose" />
+	<img src="https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white" alt="Platform: Windows" />
+	<img src="https://img.shields.io/badge/language-Python-3776AB?logo=python&logoColor=white" />
 	<img src="https://img.shields.io/badge/license-CC--BY--NC--SA%204.0-lightgrey.svg" alt="License: CC BY-NC-SA 4.0" />
 </p>
 
