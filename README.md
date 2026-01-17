@@ -81,95 +81,60 @@ InteractiveChecklists is an Android application for viewing and interacting with
 | Marianas | Supported | Marker set available in DB |
 | Germany (CW) | mostly Supported | Marker addition in progress |
 
-## Responsive Design & Device Compatibility
 
-InteractiveChecklists is designed to work seamlessly across multiple device form factors and orientations:
+## DataPad – Live Flight Telemetry (Experimental)
 
-### Supported Devices
-- ✅ **Phones** (320-599dp width) - Portrait and landscape
-- ✅ **Tablets** (600dp+ width) - Portrait and landscape
-- ✅ **Foldables** - Adaptive layouts for folded/unfolded states
-- ✅ **Multi-window Mode** - Split-screen and picture-in-picture support
+DataPad shows real-time aircraft data from DCS World (speed, altitude, heading, etc.) directly in the app on your phone or tablet.
 
-### Key Responsive Features
-- **Adaptive Layouts:** UI automatically adjusts to screen size using Material 3 WindowSizeClass
-- **Touch Target Optimization:** Minimum 48dp touch targets for all interactive elements
-- **Responsive Grids:** Military symbol picker, tactical units, and other grids adapt column count based on available space
-- **Smart Dialog Sizing:** Dialogs scale appropriately for phones (320-400dp) to tablets (600dp+)
-- **Map Overlay Scaling:** Markers, labels, and flight instruments scale based on screen density
-- **State Preservation:** Full state persistence across orientation changes and configuration updates
+**You need a small Python helper (called the Forwarder)** running on your PC to send the data from DCS to the app.
 
-### Testing & Quality Assurance
-For detailed device compatibility information and QA procedures, see:
-- **[Device Compatibility Matrix](DEVICE_COMPATIBILITY_MATRIX.md)** - Supported devices, testing matrix, and known limitations
-- **[Responsive Design QA Checklist](RESPONSIVE_DESIGN_QA.md)** - Comprehensive testing scenarios and procedures
-- **[Responsive Design Inventory](RESPONSIVE_DESIGN_INVENTORY.md)** - Implementation status and component inventory
+### Quick Start – Windows (Recommended & Easiest)
 
-### Minimum Requirements
-- **Screen Size:** 320dp width minimum (small phones supported with optimized layouts)
-- **Android Version:** 8.0 (API 26) or higher
-- **Orientation:** Both portrait and landscape fully supported
+1. Go to this folder:  
+   `scripts/DCS-SCRIPTS-FOLDER-Experimental`
 
-## Experimental: DataPad (Live Flight Telemetry)
+2. **One-time setup** – double-click:  
+   `install.bat`  
+   → Wait 1–2 minutes while it installs Python packages in virtual enviroment (only needed once or for package updates)
 
-DataPad is an experimental feature that receives real-time aircraft telemetry from DCS World via UDP (default port **5010**). It is intended for advanced users and requires running the `forward_parsed_udp.py` script to forward telemetry to your device.
+3. Start the server – double-click:  
+   `run.bat`  
+   → A small window/menu will open
 
-### Security Features (NEW - December 2025)
+4. In the window:  
+   - Press **B** within 5 seconds → a QR code appears automatically  
+   - (or configure IP/port manually if you prefer)
 
-**✅ ECDH Handshake Mode** - Production-ready secure communication with AES-256-GCM encryption, device authentication via `authorized_devices.json`, forward secrecy, replay attack protection, and mutual authentication (client ↔ server).
+5. In the Android app:  
+   → Go to **Settings → DataPad**  
+   → Turn DataPad **ON**  
+   → Scan the QR code from your PC screen  
+   (First time only – it registers your device securely)
 
-**🔒 Server Key Pinning (TOFU)** - Trust-On-First-Use server key pinning detects man-in-the-middle attacks after first connection.
+Done! The app should now receive live telemetry.
 
-**🔑 PSK Handshake Manager (optional)** - Pre-shared key mode for compatibility and scripted deployments. See docs for 32-byte key generation and distribution.
+### Security – Quick Summary (2025/2026)
 
-**🛡️ Optional Proof-of-Work (PoW)** - Configurable anti-DoS protection for handshake requests using `--enable-pow` and `--pow-difficulty`.
+- Connection is encrypted (AES-256 + ECDH handshake) – similar to secure websites  
+- Only registered devices can connect (via QR code or manual list)  
+- First connection is remembered (Trust on First Use) → protects against fake servers later  
+- Optional extra protection: Proof-of-Work (anti-spam) – can be turned on in `run.bat` menu if needed  
 
-**Quick Start (Handshake & PoW):**
-```bash
-# Python: Enable handshake mode (ECDH + TOFU)
-python forward_parsed_udp.py --interval 10 --host 192.168.178.132 --port 5010 --verbose --authorized-devices authorized_devices.json --bind-ip 192.168.178.100
+For most users the **QR code method** is secure enough and very simple.
 
-# Python: Enable Proof-of-Work (anti-DoS)
-python forward_parsed_udp.py --enable-pow --pow-difficulty 16 --interval 10 --host 192.168.178.132 --port 5010 --verbose --authorized-devices authorized_devices.json --bind-ip 192.168.178.100
+### For Linux/macOS or advanced users (manual start)
 
-# Python: Same-PC testing with handshake port
-python forward_parsed_udp.py --repeat-last --interval 3 --host 127.0.0.1 --port 5010 --handshake-port 5011 --use-handshake --authorized-devices authorized_devices.json
-
-# Single wildcard (entire subnet)
-python forward_parsed_udp.py --host 192.168.178.* --port 5010
-
-# Multiple specific hosts
-python forward_parsed_udp.py --host 192.168.178.100 --host 192.168.178.101 --port 5010
-
-# Mix of specific and wildcard
-python forward_parsed_udp.py --host 192.168.178.50 --host 192.168.178.* --port 5010
-
-# Android: Settings → DataPad → Enable "ECDH Handshake Mode" (optional: enable Server Key Pinning / configure Pre-Shared Key)
-# Add your device ID to authorized_devices.json on the server
-```
-
-See [docs/EN/technical/ECDH_USAGE_GUIDE.md](docs/EN/technical/ECDH_USAGE_GUIDE.md) and [docs/EN/technical/DATA_FLOW_ANALYSIS.md](docs/EN/technical/DATA_FLOW_ANALYSIS.md) for setup, PSK guidance, and PoW tuning.
-
-Device registration (recommended options):
-
-- **Recommended (easiest): QR-based registration** — generate a short-lived token on the server and scan it with the Android DataPad app. Example token generation:
+If you don't use Windows or want full control:
 
 ```bash
-python scripts/DCS-SCRIPTS-FOLDER-Experimental/registration_token.py generate --server-ip <IP> --port 5010
+cd scripts/DCS-SCRIPTS-FOLDER-Experimental
+python -m venv venv
+source venv/bin/activate          # Linux/macOS
+# or on Windows: venv\Scripts\activate
+pip install -r requirements.txt
+python forward_parsed_udp.py --authorized-devices authorized_devices.json --host YOUR_PC_IP --port 5010
 ```
 
-On Windows you can also use the launcher to avoid running the command manually: start `scripts/DCS-SCRIPTS-FOLDER-Experimental\run.bat` and when the forwarder starts you'll see a short interactive prompt — press **B** within 5 seconds to automatically generate the registration token and display the QR code (this runs the same `registration_token.py generate` command inside the virtual environment). This makes registration much simpler: you do not need to open a separate shell and run the Python command manually. Use `--skip-qr-prompt` to disable the interactive prompt. A successful registration will automatically add the device to `scripts/DCS-SCRIPTS-FOLDER-Experimental/authorized_devices.json`. 
-
-- **Manual:** Alternatively, add your device entry directly to `scripts/DCS-SCRIPTS-FOLDER-Experimental/authorized_devices.json`. Manual edits are useful for scripted deployments, headless servers, or environments without QR scanning.
-
-Windows convenience scripts:
-
-For Windows servers we provide helper scripts that set up a Python virtual environment and launch the server with a configuration menu:
-
-- Run `scripts/DCS-SCRIPTS-FOLDER-Experimental\install.bat` to create and populate a venv and install dependencies.
-- Run `scripts/DCS-SCRIPTS-FOLDER-Experimental\run.bat` to open the configuration menu and start the forwarder inside the venv.
-
-The launcher exposes configuration options and can be integrated with Task Scheduler or run as a service to start at boot, which makes the server easier to run and more accessible.
 
 Entity Contacts (tactical units): Enable **Entity Tracking** and run the forwarder with entity tracking enabled to receive live markers; see [scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md](scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md) and [docs/EN/features/TACTICAL_UNITS_TRACKING.md](docs/EN/features/TACTICAL_UNITS_TRACKING.md).
 
