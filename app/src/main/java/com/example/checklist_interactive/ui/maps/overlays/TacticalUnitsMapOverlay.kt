@@ -122,8 +122,11 @@ class TacticalUnitsMapOverlay(
 
         var lastUnits: List<TacticalUnitEntity> = emptyList()
 
-        // Job 1: Collect latest units from database
+        // Job 1: Collect latest units from database with additional throttling
         dataCollectorJob = scope.launch {
+            var lastProcessTime = 0L
+            val minProcessIntervalMs = 100L // Process DB updates max 10x/sec to reduce CPU load
+
             combine(
                 showLiveOnlyFlow,
                 showHiddenUnitsFlow,
@@ -138,7 +141,7 @@ class TacticalUnitsMapOverlay(
                 val activeUnits = values[3] as List<TacticalUnitEntity>
                 val allActiveUnits = values[4] as List<TacticalUnitEntity>
                 val liveUnits = values[5] as List<TacticalUnitEntity>
-                
+
                 if (!isTrackingEnabled) {
                     if (showHidden) allActiveUnits else activeUnits
                 } else if (showLiveOnly) {
@@ -147,9 +150,15 @@ class TacticalUnitsMapOverlay(
                     if (showHidden) allActiveUnits else activeUnits
                 }
             }.collect { newUnits: List<TacticalUnitEntity> ->
+                // Throttle DB update processing to reduce CPU load
+                val now = System.currentTimeMillis()
+                if (now - lastProcessTime < minProcessIntervalMs) {
+                    return@collect // Skip this update
+                }
+                lastProcessTime = now
+
                 // Increment counter instead of logging each update
                 dbUpdateCount++
-                val now = System.currentTimeMillis()
                 if (now - lastLogTime >= LOG_INTERVAL_MS) {
                     Log.d(TAG, "📊 5s Summary: DB updates=${dbUpdateCount}, Units=${newUnits.size}")
                     dbUpdateCount = 0
