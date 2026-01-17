@@ -417,7 +417,7 @@ See [docs/EN/features/DATAPAD_FEATURE.md](docs/EN/features/DATAPAD_FEATURE.md) f
 > 📝 **NOTE**  
 > This is a test recording to evaluate recording performance, tablet capture workflow, resolution settings, and overall system stability during DCS gameplay. Mission content and pacing are deliberately simple and functional.
 
-## Installation
+## Installation for Developer
 
 Step-by-step instructions to get the project running locally.
 
@@ -459,15 +459,6 @@ cd InteractiveChecklists
 - From Android Studio: Open the project, wait for Gradle to finish syncing, then select a target device and click **Run**.
 - From the command line: `./gradlew assembleDebug` builds an APK; use `./gradlew installDebug` to install on a connected device.
 
-
-## Key Components
-
-- `MainActivity.kt`: App entry point and navigation orchestration.
-- `data/files/InternalFileManager.kt`: Unified file management.
-- `ui/files/InternalFilesScreen.kt`: File browser and tagging UI.
-- `ui/checklist/MarkdownViewer.kt`: Interactive markdown checklist viewer.
-- `ui/checklist/PdfViewer.kt`: PDF viewer and annotation tools.
-- `data/quicknotes/QuickNoteManager.kt`: QuickNotes data layer.
 
 
 ## Contributing
