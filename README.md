@@ -105,8 +105,12 @@ DataPad shows real-time aircraft data from DCS World (speed, altitude, heading, 
 
 ### Quick Start – Windows (Recommended & Easiest)
 
+
+**Install the DCS export script (required):** Copy `export.lua` from `scripts/DCS-SCRIPTS-FOLDER-Experimental` into your DCS Export scripts folder (for example: `%USERPROFILE%\Saved Games\DCS\Scripts\Export\`). This script causes DCS to write entity batches and player telemetry files into the subfolder the Python forwarder reads. After copying, start or reload your mission (or restart DCS) so the export script is activated.
+
+
 1. Go to this folder:  
-   `scripts/DCS-SCRIPTS-FOLDER-Experimental`
+   `/DCS-SCRIPTS-FOLDER-Experimental`
 
 2. **One-time setup** – double-click:  
    `install.bat`  
@@ -137,7 +141,6 @@ Done! The app should now receive live telemetry.
 
 For most users the **QR code method** is secure enough and very simple.
 
-**Install the DCS export script (required):** Copy `export.lua` from `scripts/DCS-SCRIPTS-FOLDER-Experimental` into your DCS Export scripts folder (for example: `%USERPROFILE%\Saved Games\DCS\Scripts\Export\`). This script causes DCS to write entity batches and player telemetry files into the subfolder the Python forwarder reads. After copying, start or reload your mission (or restart DCS) so the export script is activated.
 
 ### For Linux/macOS or advanced users (manual start)
 
