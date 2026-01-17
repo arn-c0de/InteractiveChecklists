@@ -110,7 +110,7 @@ DataPad shows real-time aircraft data from DCS World (speed, altitude, heading, 
 
 2. **One-time setup** – double-click:  
    `install.bat`  
-   → Wait 1–2 minutes while it installs Python packages in virtual enviroment (only needed once or for package updates)
+   → Wait 1–2 minutes while it installs Python packages in virtual environment (only needed once or for package updates)
 
 3. Start the server – double-click:  
    `run.bat`  
@@ -136,6 +136,8 @@ Done! The app should now receive live telemetry.
 - Optional extra protection: Proof-of-Work (anti-spam) – can be turned on in `run.bat` menu if needed  
 
 For most users the **QR code method** is secure enough and very simple.
+
+**Install the DCS export script (required):** Copy `export.lua` from `scripts/DCS-SCRIPTS-FOLDER-Experimental` into your DCS Export scripts folder (for example: `%USERPROFILE%\Saved Games\DCS\Scripts\Export\`). This script causes DCS to write entity batches and player telemetry files into the subfolder the Python forwarder reads. After copying, start or reload your mission (or restart DCS) so the export script is activated.
 
 ### For Linux/macOS or advanced users (manual start)
 
