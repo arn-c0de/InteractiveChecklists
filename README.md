@@ -1,15 +1,28 @@
-
 <!-- Badges -->
 <p align="left">
-	<a href="https://github.com/arn-c0de/InteractiveChecklists"><img src="https://img.shields.io/badge/GitHub-arn--c0de%2FInteractiveChecklists-181717?logo=github" alt="GitHub" /></a>
-	<a href="https://deepwiki.com/arn-c0de/InteractiveChecklists"><img src="https://img.shields.io/badge/DeepWiki-Project%20Docs-blueviolet?logo=book" alt="DeepWiki" /></a>
-	<img src="https://img.shields.io/badge/version-1.0-blue.svg" alt="Version" />
-	<img src="https://img.shields.io/badge/platform-Android-green.svg" alt="Platform" />
-	<img src="https://img.shields.io/badge/built_with-Jetpack%20Compose-orange.svg" alt="Jetpack Compose" />
-	<img src="https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white" alt="Platform: Windows" />
-	<img src="https://img.shields.io/badge/language-Python-3776AB?logo=python&logoColor=white" />
-	<img src="https://img.shields.io/badge/license-CC--BY--NC--SA%204.0-lightgrey.svg" alt="License: CC BY-NC-SA 4.0" />
+  <img src="https://img.shields.io/badge/license-CC--BY--NC--SA%204.0-lightgrey.svg" alt="License: CC BY-NC-SA 4.0" />
+
+  <a href="https://github.com/arn-c0de/InteractiveChecklists">
+    <img src="https://img.shields.io/badge/GitHub-arn--c0de%2FInteractiveChecklists-181717?logo=github" alt="GitHub" />
+  </a>
+
+  <a href="https://deepwiki.com/arn-c0de/InteractiveChecklists">
+    <img src="https://img.shields.io/badge/DeepWiki-Project%20Docs-blueviolet?logo=book" alt="DeepWiki" />
+  </a>
+
+  <strong>APP</strong>
+  <img src="https://img.shields.io/badge/version-1.0-blue.svg" alt="Version" />
+  <img src="https://img.shields.io/badge/platform-Android-green.svg" alt="Platform: Android" />
+  <img src="https://img.shields.io/badge/built_with-Jetpack%20Compose-orange.svg" alt="Jetpack Compose" />
+
+  <br/>
+
+  <strong>PYTHON TOOLS</strong>
+  <img src="https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white" alt="Platform: Windows" />
+  <img src="https://img.shields.io/badge/language-Python-3776AB?logo=python&logoColor=white" alt="Python" />
 </p>
+
+
 
 <div align="center">
 	<a href="README.md">English</a> |
