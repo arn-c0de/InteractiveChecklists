@@ -1,4 +1,4 @@
-package com.example.checklist_interactive.ui.maps
+package com.example.checklist_interactive.ui.maps.overlays
 
 import android.content.Context
 import android.graphics.*
@@ -6,6 +6,9 @@ import android.util.Log
 import com.example.checklist_interactive.data.tactical.TacticalUnitEntity
 import com.example.checklist_interactive.ui.common.getScaledTextSize
 import com.example.checklist_interactive.ui.common.getScaledStrokeWidth
+import com.example.checklist_interactive.ui.maps.AASystemSpec
+import com.example.checklist_interactive.ui.maps.AARangeRing
+import com.example.checklist_interactive.ui.maps.AARangeDatabase
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Overlay
