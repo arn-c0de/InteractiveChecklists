@@ -5,6 +5,17 @@ All relevant changes are summarized here by version.
 
 ## [1.0.24] - 2026-01-15
 
+### Summary
+- **Map performance & stability:** Reduced GC pressure and improved map panning smoothness by reusing GeoPoint instances and mutable collections; implemented viewport culling, invalidate throttling and recomposition detection to prevent redraw storms; AA system caching and removal of blocking DB queries from draw loops.
+- **Map features:** Added **AA-range visualization (phase 1)** and historical `MapBorders` overlays; improved airspace/ring rendering at navigation targets and ensured rings draw correctly behind labels; added per-marker traffic pattern support and multiple fixes for runway/label rendering and MGRS/grid layering.
+- **UI & Flight instruments:** Implemented responsive instrument layouts for phones/tablets, added heading display to the attitude HUD, removed instrument background on small screens, and fixed FAB positioning & behavior across orientations.
+- **Forwarder & Launcher:** Updated server launcher and install/run scripts; added resilient file tailing, dynamic reconnection, `forwarder_status.json` reporting, and multi-host/wildcard send support for the forwarder with client IP/session tracking.
+- **Exports & detection:** Improved weapon detection in export scripts and added export Lua detections (e.g., SA-11 / SA-5).
+- **Docs & polish:** Updated documentation and screenshots (launcher, AA range), consolidated recent changes from previous releases, and applied various small fixes and warnings cleanups.
+
+### Files of note
+- Modified/Added: `app/src/.../ui/maps/overlays/*`, `MapViewer.kt`, `forward_parsed_udp.py`, launcher/install scripts, various docs and screenshots.
+
 
 ## [1.0.23] - 2026-01-08
 
