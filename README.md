@@ -186,6 +186,11 @@ This keeps dependencies isolated and clean.
 
 ### QR Code Pairing
 
+<p align="center">
+	<img src="images/datapad-server-device-registration.png" alt="DataPad server (registration launcher)" width="360" /><br/>
+	<em>DataPad server launcher with device registration via [B]</em>
+</p>
+
 6. In the server window:
    - Press **B** within **5 seconds**
      → A **QR code** will be displayed automatically
