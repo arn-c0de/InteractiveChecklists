@@ -76,6 +76,7 @@ Runway heading–based approach visualization and real-time map updates enable e
 - [License](#license)
 
 
+
 ## Features
 
 - **Unified File System:** Manage files from bundled assets and internal storage in a single hierarchical view.
@@ -101,6 +102,11 @@ Runway heading–based approach visualization and real-time map updates enable e
 
 
 Here is the **integrated, cleaned-up, and consistent Markdown version**, with the **“Unblocking Files in DCS World”** section properly embedded in a logical place. Language is corrected and suitable for a README / manual.
+
+## Roadmap
+
+Planned features and long-term improvements are tracked in the [Roadmap](docs/EN/planning/roadmap.md) document.
+
 
 
 ## Quick Start – Windows (Recommended & Easiest)
@@ -473,11 +479,6 @@ Quick contribution ideas:
 For larger or breaking changes, please open an issue first to discuss design and scope.
 
 
-## Roadmap
-
-Planned features and long-term improvements are tracked in the [Roadmap](docs/EN/planning/roadmap.md) document.
-
-
 ## Support & Contact
 
 If you encounter issues or have questions:
@@ -485,6 +486,11 @@ If you encounter issues or have questions:
 - Open an issue in this repository.
 - For security-sensitive issues, please follow the instructions in [SECURITY.md](SECURITY.md).
 - For contribution coordination and discussions, see [COLLABORATORS.md](COLLABORATORS.md).
+
+### Bug Reports
+
+When reporting a bug, please include a **screenshot** if possible.  
+Use the screenshot to **mark or highlight the exact area** where the issue occurs, and briefly **describe what is shown and what is wrong** in that location.
 
 
 ## FAQ
