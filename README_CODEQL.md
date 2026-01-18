@@ -48,7 +48,8 @@ This will:
 
 **Java/Kotlin (Android):**
 ```bash
-codeql database create codeql-db-java --language=java-kotlin --command="gradlew.bat assemble --no-daemon"
+# Use Debug build (Release build may have compilation errors)
+codeql database create codeql-db-java --language=java-kotlin --command="gradlew.bat assembleDebug --no-daemon"
 codeql database analyze codeql-db-java --format=sarif-latest --output=java-analysis.sarif
 ```
 
@@ -99,8 +100,10 @@ Install CodeQL CLI: https://github.com/github/codeql-cli-binaries/releases
 ### Java/Kotlin build fails
 Make sure you can build the project with:
 ```bash
-gradlew.bat assemble
+gradlew.bat assembleDebug
 ```
+
+If Release build fails, CodeQL analysis uses Debug build by default (which is sufficient for security analysis).
 
 ### Python analysis empty
 Ensure Python files exist in `scripts/` directory.

@@ -28,7 +28,8 @@ echo.
 
 echo [2/6] Creating Java/Kotlin database (Android)...
 echo This may take several minutes...
-codeql database create codeql-db-java --language=java-kotlin --command="gradlew.bat clean assemble --no-daemon" --overwrite
+echo Using Debug build (Release build has compilation errors)...
+codeql database create codeql-db-java --language=java-kotlin --command="gradlew.bat clean assembleDebug --no-daemon" --overwrite
 if %errorlevel% neq 0 (
     echo ERROR: Failed to create Java/Kotlin database
     pause

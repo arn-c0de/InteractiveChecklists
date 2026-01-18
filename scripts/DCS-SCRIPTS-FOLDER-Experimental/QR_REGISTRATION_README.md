@@ -303,3 +303,9 @@ For questions or problems:
 ## License
 
 Same as parent project (see [LICENSE](../../LICENSE))
+
+
+---
+App Version: v1.0.23
+Last Updated: 2026-01-1
+---
