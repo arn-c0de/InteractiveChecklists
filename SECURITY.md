@@ -60,3 +60,9 @@ We follow **coordinated vulnerability disclosure**:
 ---
 
 Thank you for helping keep InteractiveChecklists secure!
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026-01-18
+---
