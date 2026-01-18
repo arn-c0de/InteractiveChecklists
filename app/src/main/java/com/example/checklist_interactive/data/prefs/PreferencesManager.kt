@@ -723,10 +723,10 @@ class PreferencesManager(context: Context) {
     }
 
     /**
-     * Sets the FAB size preference: "small", "medium", or "large"
+     * Sets the FAB size preference: "tiny", "small", "medium", or "large"
      */
     fun setFabSize(size: String) {
-        val validSizes = listOf("small", "medium", "large")
+        val validSizes = listOf("tiny", "small", "medium", "large")
         val normalizedSize = size.lowercase().trim()
         if (normalizedSize in validSizes) {
             prefs.edit().putString(KEY_FAB_SIZE, normalizedSize).apply()
@@ -735,7 +735,7 @@ class PreferencesManager(context: Context) {
 
     /**
      * Gets the FAB size preference (default: "medium")
-     * Returns one of: "small", "medium", "large"
+     * Returns one of: "tiny", "small", "medium", "large"
      */
     fun getFabSize(): String {
         return prefs.getString(KEY_FAB_SIZE, DEFAULT_FAB_SIZE) ?: DEFAULT_FAB_SIZE
@@ -746,8 +746,9 @@ class PreferencesManager(context: Context) {
      */
     fun getFabSizeDp(): Int {
         return when (getFabSize()) {
+            "tiny" -> 32
             "small" -> 40
-            "large" -> 72
+            "large" -> 56 // Changed from 72 to match medium
             else -> 56 // medium (default Material3 FAB size)
         }
     }

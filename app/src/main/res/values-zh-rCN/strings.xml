@@ -640,6 +640,7 @@
     <string name="settings_fab_positions_explain">重置悬浮操作按钮(FAB)位置为默认值</string>
     <string name="settings_fab_size">FAB大小</string>
     <string name="settings_fab_size_explain">更改所有FAB的大小</string>
+    <string name="settings_fab_size_tiny">极小</string>
     <string name="settings_fab_size_small">小</string>
     <string name="settings_fab_size_medium">中</string>
     <string name="settings_fab_size_large">大</string>
