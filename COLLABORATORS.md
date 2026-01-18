@@ -9,6 +9,12 @@ Welcome to the InteractiveChecklists project! Below you'll find the current main
 
 ---
 
+## 💰 Unpaid Contributions
+
+All contributions are currently **unpaid and voluntary**. This is a **non-commercial** project without donation functionality or sponsorship options at this time.
+
+---
+
 **Repository:**  
 [github.com/arn-c0de/InteractiveChecklists](https://github.com/arn-c0de/InteractiveChecklists)
 
