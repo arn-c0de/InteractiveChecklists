@@ -645,6 +645,7 @@
     <string name="settings_fab_positions_explain">Reset floating action button positions to defaults</string>
     <string name="settings_fab_size">FAB Size</string>
     <string name="settings_fab_size_explain">Change the size of all floating action buttons</string>
+    <string name="settings_fab_size_tiny">Tiny</string>
     <string name="settings_fab_size_small">Small</string>
     <string name="settings_fab_size_medium">Medium</string>
     <string name="settings_fab_size_large">Large</string>

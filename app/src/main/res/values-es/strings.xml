@@ -730,6 +730,7 @@
     <string name="settings_fab_positions_explain">Restablecer posiciones de botones flotantes a predeterminados</string>
     <string name="settings_fab_size">Tamaño FAB</string>
     <string name="settings_fab_size_explain">Cambiar tamaño de todos los botones flotantes</string>
+    <string name="settings_fab_size_tiny">Diminuto</string>
     <string name="settings_fab_size_small">Pequeño</string>
     <string name="settings_fab_size_medium">Mediano</string>
     <string name="settings_fab_size_large">Grande</string>
