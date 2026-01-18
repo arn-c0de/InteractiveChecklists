@@ -71,7 +71,7 @@ codeql-py-analysis.sarif
 .vscode
 .claude
 
-scripts\MapDatabaseTools\ecdh_device.json
+scripts/MapDatabaseTools/ecdh_device.json
 
 security_audit.jsonl
 security_audit.key
@@ -80,3 +80,4 @@ scripts/DCS-SCRIPTS-FOLDER-Experimental/authorized_devices.json.bak
 
 scripts/DCS-SCRIPTS-FOLDER-Experimental/forwarder_status.json
 scripts/DCS-SCRIPTS-FOLDER-Experimental/server_config.json
+scripts/DCS-SCRIPTS-FOLDER-Experimental/custom_commands.json
