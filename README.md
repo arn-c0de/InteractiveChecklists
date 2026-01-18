@@ -582,8 +582,8 @@ Thanks to all contributors and to the Jetpack Compose and Android open-source ec
 This project is licensed under the terms in the `LICENSE` file (CC BY-NC-SA 4.0).
 
 
----
-App Version: v1.0.25
-Last Updated: 2026-01-18
----
+> ---
+> App Version: v1.0.25
+> Last Updated: 2026-01-18
+> ---
 
