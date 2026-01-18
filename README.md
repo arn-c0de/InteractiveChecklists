@@ -128,79 +128,119 @@ to activate the export script.
 
 ### Important Note – Python Requirement
 
-The Python forwarder (**DataPad Server**) requires a **local Python installation
+The Python forwarder (**DataPad Server**) requires a **local Python installation**.
 
-- On Windows, installing Python via the **Microsoft Store** (Python 3.12) is recommended for simplicity.
-- The included `install.bat`:
-  - Creates a **virtual environment (venv)**
+- On Windows, installing Python via the **Microsoft Store** (Python 3.12+) is recommended for simplicity.
+- The GUI installer automatically:
+  - Creates a **virtual environment (venv)** if not present
   - Installs all required Python packages into that environment
+  - Detects your DCS installation and Saved Games folder
+  - Configures network settings and firewall rules (optional)
 
 This keeps dependencies isolated and clean.
 
-- To update or reinstall packages: re-run `install.bat`
+- To update packages: re-run `run_installer.bat`
 - To remove everything: delete the created `venv` folder
 
 ---
 
-### Initial Setup
+### Initial Setup (GUI Installer)
 
-1. Navigate to the folder:  
-   `/DCS-SCRIPTS-FOLDER-Experimental`
+1. Navigate to the folder:
+   `/scripts/DCS-SCRIPTS-FOLDER-Experimental`
 
-2. **One-time setup** – double-click:  
-   `install.bat`  
-   → Wait **1–2 minutes** while required packages are installed  
-   *(only needed once or when updating packages)*
+2. **Start the GUI installer** – double-click:
+   `run_installer.bat`
+   → The GUI will automatically install dependencies and open the installer window
+   *(first run takes 1–2 minutes to install packages)*
 
-3. Start the server – double-click:  
-   `run.bat`  
-   → A small console window / menu will open
+3. **First-Time Setup Wizard** (appears on first run):
+   - The wizard will guide you through:
+     - **DCS Installation Detection** – Auto-detects your DCS installation
+     - **Dependency Installation** – Installs required Python packages
+     - **Server Configuration** – Configure network settings (bind IP, ports, etc.)
+     - **Firewall Setup** (optional) – Add Windows Firewall rules for server ports
+
+4. **After setup is complete**, the main installer window opens with tabs:
+   - **Dashboard** – Server status and control (Start/Stop server)
+   - **Device Management** – Manage authorized devices and generate QR codes
+   - **Server Configuration** – Network and security settings
+   - **Installation Settings** – DCS paths and file locations
+   - **Health Checks** – System diagnostics and firewall configuration
+   - **Logs** – Real-time server log viewer
 
 ---
+
+<!-- TODO: Add GUI screenshot here
 <p align="center">
-	<img src="images/datapad-server-udp_forwarder.png" alt="DataPad server (launcher)" width="360" /><br/>
-	<em>DataPad server launcher with configuration menu</em>
+	<img src="images/datapad-server-gui-main.png" alt="DataPad Server GUI" width="720" /><br/>
+	<em>DataPad Server GUI - Main Dashboard</em>
 </p>
+-->
 
-## 4. Server Setup
+## 4. Server Setup (GUI)
 
-- Enter the **Server IP address**, **Target IP(s)**, and enable **PoW** *(recommended)*  
-  - Configure this via the **Settings menu** by pressing **[S]**
-  - Or edit the auto-generated **`server_config.json`** located next to `start.bat`
+### Configure Server Settings
+
+1. Open the **Server Configuration** tab
+2. Configure the following settings:
+   - **Bind IP** – IP address of the PC where DCS is running
+     *(Example: `192.168.1.100`)*
+   - **Target IP** – Android devices in your Wi-Fi network
+     *(Example: `192.168.1.255` for broadcast, or `192.168.1.*` for all devices in subnet)*
+   - **Data Port** – UDP port for telemetry data *(default: `5010`)*
+   - **Handshake Port** – UDP port for device handshakes *(default: `5011`)*
+   - **Update Interval** – How often to send data *(default: `100 ms`)*
+   - **Enable Proof-of-Work (PoW)** – Recommended for security *(default: disabled)*
+   - **PoW Difficulty** – Difficulty level *(default: `16 bits`)*
+
+3. Click **"Save Configuration"**
 
 ### Notes
 
-- **Server IP address**  
-  → IP of the **PC where DCS is running**
-- **Target IPs**  
+- **Server Bind IP**
+  → IP address of the **PC where DCS is running**
+- **Target IPs**
   → Android devices (tablet or smartphone) in your Wi-Fi network
 - You can:
-  - Enter each target IP individually, **or**
-  - Allow all devices in your network using `.*` at the end of the IP address  
-    - Example: `192.168.1.*`
+  - Enter specific IPs individually, **or**
+  - Use broadcast: `192.168.1.255`, **or**
+  - Use wildcard pattern: `192.168.1.*` to target all devices in the subnet
 
 ### Start the Server
 
-- Press **Enter** to confirm the settings
-- Select the **server mode** using the **arrow keys**
-  - **Recommended:** **ECDH with App + PoW**
-    - Easiest to set up
-    - Secure and safe for automatic pairing
-- Press **Enter** to start the server
+1. Go to the **Dashboard** tab
+2. Click **"Start Server"** button
+3. Server status will show **"● Server Running"** (green) when active
+4. The **Logs** tab shows real-time server output
+
+**Tip:** You can minimize the GUI to system tray – the server continues running in the background.
 
 ---
 
-### QR Code Pairing
+### QR Code Pairing (GUI Method)
 
-<p align="center">
-	<img src="images/datapad-server-QR-Gen.png" alt="DataPad server (QR-Generation)" width="360" /><br/>
-	<em>DataPad server QR-code generation for authorized_devices.json </em>
-</p>
+The GUI provides an easy way to register devices via QR code:
 
-6. In the server window:
-   - Press **B** within **5 seconds**
-     → A **QR code** will be displayed automatically
-   - *(Optional)* You can also configure IP/port manually
+1. **Start the server** from the Dashboard tab *(if not already running)*
+2. Go to the **Device Management** tab
+3. Click **"Generate Token"** button
+   - If server is not running, you'll be prompted to start it
+   - The GUI generates a secure registration token valid for 10 minutes
+4. A dialog appears showing:
+   - **QR Code** – Scan this with your Android app
+   - **Token Details** – Server IP, port, expiration time
+   - **Registration Status** – Shows when a device successfully registers
+
+5. **The GUI automatically detects** when your device scans the QR code and registers
+   - Registration confirmation appears in the dialog
+   - The device is automatically added to the authorized devices list
+   - **No server restart needed** – registration happens in real-time
+
+6. *(Optional)* You can manually add devices by clicking **"Add Device"** and entering:
+   - Device Name
+   - Device ID
+   - Public Key (Base64)
 
 ---
 
@@ -300,17 +340,24 @@ The app should now receive **live telemetry and tactical data** from DCS.
 
 ### Security – Quick Summary (2025/2026)
 
-- Connection is encrypted (AES-256 + ECDH handshake) – similar to secure websites  
-- Only registered devices can connect (via QR code or manual list)  
-- First connection is remembered (Trust on First Use) → protects against fake servers later  
-- Optional extra protection: Proof-of-Work (anti-spam) – can be turned on in `run.bat` menu if needed  
+- Connection is encrypted (AES-256 + ECDH handshake) – similar to secure websites
+- Only registered devices can connect (via QR code or manual list)
+- First connection is remembered (Trust on First Use) → protects against fake servers later
+- Optional extra protection: Proof-of-Work (anti-spam) – can be enabled in the GUI's **Server Configuration** tab
 
 For most users the **QR code method** is secure enough and very simple.
 
 
-### For Linux/macOS or advanced users (manual start)
+### For Linux/macOS or advanced users (CLI/manual start)
 
-If you don't use Windows or want full control:
+The GUI installer is **Windows-only**. For Linux/macOS or if you prefer command-line control:
+
+**Option 1: Windows TUI (Text-based menu)**
+- Still available for users who prefer the classic text-based interface
+- Run `install.bat` followed by `run.bat` for the interactive menu
+- See previous documentation for TUI usage
+
+**Option 2: Manual command-line start (all platforms)**
 
 ```bash
 cd scripts/DCS-SCRIPTS-FOLDER-Experimental
@@ -318,8 +365,10 @@ python -m venv venv
 source venv/bin/activate          # Linux/macOS
 # or on Windows: venv\Scripts\activate
 pip install -r requirements.txt
-python forward_parsed_udp.py --authorized-devices authorized_devices.json --host YOUR_PC_IP --port 5010
+python forward_parsed_udp.py --authorized-devices authorized_devices.json --host YOUR_PC_IP --port 5010 --skip-qr-prompt
 ```
+
+**Important:** Use `--skip-qr-prompt` to disable the interactive QR prompt when starting the server. The GUI generates tokens separately.
 
 
 Entity Contacts (tactical units): Enable **Entity Tracking** and run the forwarder with entity tracking enabled to receive live markers; see [scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md](scripts/DCS-SCRIPTS-FOLDER-Experimental/README_ENTITY_TRACKING.md) and [docs/EN/features/TACTICAL_UNITS_TRACKING.md](docs/EN/features/TACTICAL_UNITS_TRACKING.md).
