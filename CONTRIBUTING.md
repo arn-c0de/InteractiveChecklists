@@ -40,7 +40,7 @@ For meaningful contributions (e.g. features, UI/UX, translations, accessibility,
 
 ```bash
 # 1. Fork and clone the repository
-git clone https://github.com/YOUR_GITHUB_USERNAME/InteractiveChecklists.git
+git clone https://github.com/arn-c0de/InteractiveChecklists.git
 cd InteractiveChecklists
 
 # 2. Create a feature branch (see naming convention below)
