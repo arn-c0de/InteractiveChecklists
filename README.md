@@ -468,6 +468,14 @@ cd InteractiveChecklists
 
 We welcome contributions. For guidelines, issue workflow, and coding standards, see [COLLABORATORS.md](COLLABORATORS.md).
 
+---
+
+## 💰 Unpaid Contributions
+
+All contributions are currently **unpaid and voluntary**. This is a **non-commercial** project without donation functionality or sponsorship options at this time.
+
+---
+
 Quick contribution ideas:
 - Improve documentation or add examples.
 - Add or extend tests.
