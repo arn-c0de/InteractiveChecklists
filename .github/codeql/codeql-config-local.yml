@@ -1,0 +1,21 @@
+name: "CodeQL Local Config"
+
+# Local CodeQL configuration for inline analysis
+# Run separate analyses for each language:
+#   codeql database create --language=java-kotlin ...
+#   codeql database create --language=python ...
+
+paths-ignore:
+  - '**/build/**'
+  - '**/codeql-db*/**'
+  - '**/venv/**'
+  - '**/.gradle/**'
+  - '**/node_modules/**'
+
+# Java/Kotlin specific settings
+java:
+  version: 17
+
+# Python specific settings
+python:
+  version: '3.12'
