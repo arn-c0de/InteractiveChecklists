@@ -154,12 +154,22 @@ This keeps dependencies isolated and clean.
    → The GUI will automatically install dependencies and open the installer window
    *(first run takes 1–2 minutes to install packages)*
 
+<p align="center">
+	<img src="images/datapadserver_gui_wizard.png" alt="Server First Installation Wizard" width="360" /><br/>
+	<em>Server first installation Wizard</em>
+</p>
+
 3. **First-Time Setup Wizard** (appears on first run):
    - The wizard will guide you through:
      - **DCS Installation Detection** – Auto-detects your DCS installation
      - **Dependency Installation** – Installs required Python packages
      - **Server Configuration** – Configure network settings (bind IP, ports, etc.)
      - **Firewall Setup** (optional) – Add Windows Firewall rules for server ports
+
+<p align="center">
+	<img src="images/datapadserver_gui_main.png" alt="Server main window" width="360" /><br/>
+	<em>Server main window</em>
+</p>
 
 4. **After setup is complete**, the main installer window opens with tabs:
    - **Dashboard** – Server status and control (Start/Stop server)
@@ -168,6 +178,11 @@ This keeps dependencies isolated and clean.
    - **Installation Settings** – DCS paths and file locations
    - **Health Checks** – System diagnostics and firewall configuration
    - **Logs** – Real-time server log viewer
+
+<p align="center">
+	<img src="images/datapadserver_gui_healthcheck.png" alt="Server health-checks" width="360" /><br/>
+	<em>Server health window</em>
+</p>
 
 ---
 
