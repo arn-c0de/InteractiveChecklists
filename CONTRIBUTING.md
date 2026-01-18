@@ -6,6 +6,12 @@ Thanks for helping improve InteractiveChecklists! This guide covers everything y
 
 ---
 
+## 💰 Unpaid Contributions
+
+All contributions are currently **unpaid and voluntary**. This is a **non-commercial** project without donation functionality or sponsorship options at this time.
+
+---
+
 ## 🚀 Quick Start
 
 ```bash
