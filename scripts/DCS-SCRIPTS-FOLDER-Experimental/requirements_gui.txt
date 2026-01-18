@@ -1,0 +1,16 @@
+# DCS DataPad Server - Auto-Installer & Launcher Requirements
+#
+# Install with: pip install -r requirements_gui.txt
+#
+
+# Core GUI Framework
+PyQt6>=6.6.0
+
+# Cryptography (for ECDH handshake and encryption)
+cryptography>=41.0.0
+
+# QR Code generation and parsing
+qrcode[pil]>=7.4.2
+
+# Optional but recommended
+Pillow>=10.0.0  # For QR code image generation

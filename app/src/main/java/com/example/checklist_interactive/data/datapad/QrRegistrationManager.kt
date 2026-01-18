@@ -222,11 +222,11 @@ class QrRegistrationManager(
      */
     fun applyTokenSettings(token: RegistrationTokenPayload, dataPadManager: DataPadManager) {
         Log.i(TAG, "⚙️ Applying token settings to DataPadManager")
-        
+
         // Update server IP and port
         dataPadManager.updateServerIp(token.server)
         dataPadManager.updatePort(token.port)
-        
+
         Log.i(TAG, "✅ Settings applied: ${token.server}:${token.port}")
     }
     
