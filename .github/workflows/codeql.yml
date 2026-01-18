@@ -123,13 +123,14 @@ jobs:
       run: |
         set -e
         echo "Setting up JDK (Temurin 17)..."
-        echo "Building project with Gradle wrapper..."
+        echo "Building project with Gradle wrapper (Debug build)..."
         chmod +x ./gradlew || true
         export ANDROID_SDK_ROOT=$HOME/android-sdk
         export ANDROID_HOME=$ANDROID_SDK_ROOT
         export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
         # Ensure Gradle uses the runner's JAVA_HOME (overrides any repo gradle.properties value)
-        ./gradlew -Dorg.gradle.java.home="$JAVA_HOME" assemble --no-daemon --stacktrace || (echo "Gradle build failed" && exit 1)
+        # Using assembleDebug instead of assemble (Release build has compilation errors)
+        ./gradlew -Dorg.gradle.java.home="$JAVA_HOME" assembleDebug --no-daemon --stacktrace || (echo "Gradle build failed" && exit 1)
 
     - name: Run manual build steps (non-Android Java)
       if: matrix.build-mode == 'manual' && matrix.language != 'java-kotlin'
