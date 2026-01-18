@@ -352,12 +352,9 @@ For most users the **QR code method** is secure enough and very simple.
 
 The GUI installer is **Windows-only**. For Linux/macOS or if you prefer command-line control:
 
-**Option 1: Windows TUI (Text-based menu)**
-- Still available for users who prefer the classic text-based interface
-- Run `install.bat` followed by `run.bat` for the interactive menu
-- See previous documentation for TUI usage
+**Note:** The Windows TUI (Text-based menu with `install.bat`/`run.bat`) has been replaced by the GUI installer in version 1.0.25+. For the legacy TUI, use branch `1.0.24`.
 
-**Option 2: Manual command-line start (all platforms)**
+**Manual command-line start (all platforms)**
 
 ```bash
 cd scripts/DCS-SCRIPTS-FOLDER-Experimental
