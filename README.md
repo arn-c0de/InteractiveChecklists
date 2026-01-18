@@ -100,9 +100,6 @@ Runway heading–based approach visualization and real-time map updates enable e
 | Marianas | Supported | Marker set available in DB |
 | Germany (CW) | mostly Supported | Marker addition in progress |
 
-
-Here is the **integrated, cleaned-up, and consistent Markdown version**, with the **“Unblocking Files in DCS World”** section properly embedded in a logical place. Language is corrected and suitable for a README / manual.
-
 ## Roadmap
 
 Planned features and long-term improvements are tracked in the [Roadmap](docs/EN/planning/roadmap.md) document.
