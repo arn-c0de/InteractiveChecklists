@@ -98,30 +98,31 @@ Runway heading–based approach visualization and real-time map updates enable e
 | --- | --- | --- |
 | Caucasus | Supported | Marker set available in DB |
 | Marianas | Supported | Marker set available in DB |
-| Germany (CW) | mostly Supported | Marker addition in progress |
+| Germany (CW) | Mostly Supported | Marker addition in progress |
 
-<<<<<<< HEAD
+---
+
 ## Roadmap
 
 Planned features and long-term improvements are tracked in the [Roadmap](docs/EN/planning/roadmap.md) document.
 
-
+---
 
 ## Quick Start – Windows (Recommended & Easiest)
 
 ### Install the DCS Export Script (Required)
 
-Copy `export.lua` from  
-`scripts/DCS-SCRIPTS-FOLDER-Experimental`  
+Copy `export.lua` from
+`scripts/DCS-SCRIPTS-FOLDER-Experimental`
 
-into your DCS scripts folder, for example:  
+into your DCS scripts folder, for example:
 `%USERPROFILE%\Saved Games\DCS\Scripts\`
 
 This script enables DCS to write **entity batches** and **player telemetry files** into a subfolder that the Python forwarder reads.
 
 After copying:
 - Start or reload your mission, **or**
-- Restart DCS  
+- Restart DCS
 
 to activate the export script.
 
@@ -137,46 +138,6 @@ The Python forwarder (**DataPad Server**) requires a **local Python installation
   - Installs all required Python packages into that environment
   - Detects your DCS installation and Saved Games folder
   - Configures network settings and firewall rules (optional)
-
-=======
----
-## Roadmap
-Planned features and long-term improvements are tracked in the [Roadmap](docs/EN/planning/roadmap.md) document.
----
-
-
-## Quick Start – Windows (Recommended & Easiest)
-
-### Install the DCS Export Script (Required)
-
-Copy `export.lua` from  
-`scripts/DCS-SCRIPTS-FOLDER-Experimental`  
-
-into your DCS scripts folder, for example:  
-`%USERPROFILE%\Saved Games\DCS\Scripts\`
-
-This script enables DCS to write **entity batches** and **player telemetry files** into a subfolder that the Python forwarder reads.
-
-After copying:
-- Start or reload your mission, **or**
-- Restart DCS  
-
-to activate the export script.
-
----
-
-### Important Note – Python Requirement
-
-The Python forwarder (**DataPad Server**) requires a **local Python installation**.
-
-- On Windows, installing Python via the **Microsoft Store** (Python 3.12+) is recommended for simplicity.
-- The GUI installer automatically:
-  - Creates a **virtual environment (venv)** if not present
-  - Installs all required Python packages into that environment
-  - Detects your DCS installation and Saved Games folder
-  - Configures network settings and firewall rules (optional)
-
->>>>>>> cce78ee7b760967bb8e938c8a42e5c46c7d9cdd3
 This keeps dependencies isolated and clean.
 
 - To update packages: re-run `run_installer.bat`
@@ -226,12 +187,6 @@ This keeps dependencies isolated and clean.
 
 ---
 
-<!-- TODO: Add GUI screenshot here
-<p align="center">
-	<img src="images/datapad-server-gui-main.png" alt="DataPad Server GUI" width="720" /><br/>
-	<em>DataPad Server GUI - Main Dashboard</em>
-</p>
--->
 
 ## 4. Server Setup (GUI)
 
@@ -367,7 +322,7 @@ This can prevent correct operation.
 
 ```powershell
 Unblock-File "C:\Program Files\Eagle Dynamics\DCS World\bin\lua-dxgui.dll"
-
+```
 
 4. Press **Enter**
 
