@@ -252,7 +252,7 @@ The GUI provides an easy way to register devices via QR code:
    - The device is automatically added to the authorized devices list
    - **No server restart needed** – registration happens in real-time
 
-6. *(Optional)* You can manually add devices by clicking **"Add Device"** and entering:
+6. *(Optional)* You can manually add devices by clicking **"Add Device"** and entering data from App datapad settings popup:
    - Device Name
    - Device ID
    - Public Key (Base64)
