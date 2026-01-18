@@ -100,6 +100,7 @@ Runway heading–based approach visualization and real-time map updates enable e
 | Marianas | Supported | Marker set available in DB |
 | Germany (CW) | mostly Supported | Marker addition in progress |
 
+<<<<<<< HEAD
 ## Roadmap
 
 Planned features and long-term improvements are tracked in the [Roadmap](docs/EN/planning/roadmap.md) document.
@@ -137,6 +138,45 @@ The Python forwarder (**DataPad Server**) requires a **local Python installation
   - Detects your DCS installation and Saved Games folder
   - Configures network settings and firewall rules (optional)
 
+=======
+---
+## Roadmap
+Planned features and long-term improvements are tracked in the [Roadmap](docs/EN/planning/roadmap.md) document.
+---
+
+
+## Quick Start – Windows (Recommended & Easiest)
+
+### Install the DCS Export Script (Required)
+
+Copy `export.lua` from  
+`scripts/DCS-SCRIPTS-FOLDER-Experimental`  
+
+into your DCS scripts folder, for example:  
+`%USERPROFILE%\Saved Games\DCS\Scripts\`
+
+This script enables DCS to write **entity batches** and **player telemetry files** into a subfolder that the Python forwarder reads.
+
+After copying:
+- Start or reload your mission, **or**
+- Restart DCS  
+
+to activate the export script.
+
+---
+
+### Important Note – Python Requirement
+
+The Python forwarder (**DataPad Server**) requires a **local Python installation**.
+
+- On Windows, installing Python via the **Microsoft Store** (Python 3.12+) is recommended for simplicity.
+- The GUI installer automatically:
+  - Creates a **virtual environment (venv)** if not present
+  - Installs all required Python packages into that environment
+  - Detects your DCS installation and Saved Games folder
+  - Configures network settings and firewall rules (optional)
+
+>>>>>>> cce78ee7b760967bb8e938c8a42e5c46c7d9cdd3
 This keeps dependencies isolated and clean.
 
 - To update packages: re-run `run_installer.bat`
