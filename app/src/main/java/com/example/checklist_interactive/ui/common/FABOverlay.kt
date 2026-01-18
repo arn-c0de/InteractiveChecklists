@@ -285,8 +285,8 @@ object MapViewerFABs {
             containerColor = if (rotationGestureEnabled) containerColorPrimary else containerColorSurface,
             defaultX = 0.95f,
             defaultY = 0.45f,
-            defaultLandscapeX = 0.92f,
-            defaultLandscapeY = 0.60f,
+            defaultLandscapeX = 0.88f,
+            defaultLandscapeY = 0.15f,
             scope = "map"
         ),
         FABConfig(
@@ -297,8 +297,8 @@ object MapViewerFABs {
             containerColor = if (isDrawingMode) containerColorPrimary else containerColorTertiary,
             defaultX = 0.95f,
             defaultY = 0.50f,
-            defaultLandscapeX = 0.92f,
-            defaultLandscapeY = 0.70f,
+            defaultLandscapeX = 0.88f,
+            defaultLandscapeY = 0.25f,
             scope = "map"
         ),
         FABConfig(
@@ -310,8 +310,8 @@ object MapViewerFABs {
             containerColor = containerColorTertiary,
             defaultX = 0.95f,
             defaultY = datapadY,
-            defaultLandscapeX = 0.95f,
-            defaultLandscapeY = 0.05f,
+            defaultLandscapeX = 0.88f,
+            defaultLandscapeY = 0.35f,
             scope = "map"
         ),
         FABConfig(
@@ -322,8 +322,8 @@ object MapViewerFABs {
             containerColor = containerColorPrimary,
             defaultX = 0.95f,
             defaultY = quickAccessY,
-            defaultLandscapeX = 0.92f,
-            defaultLandscapeY = 0.80f,
+            defaultLandscapeX = 0.88f,
+            defaultLandscapeY = 0.45f,
             scope = "map"
         )
         )
