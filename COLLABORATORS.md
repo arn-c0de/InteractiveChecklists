@@ -1,15 +1,12 @@
-
 [← Back to README](README.md)
 
-# 🤝 Collaborators
-
-
+# Collaborators
 
 Welcome to the InteractiveChecklists project! Below you'll find the current maintainers and ways to get involved.
 
 ---
 
-## 💰 Unpaid Contributions
+## Unpaid Contributions
 
 All contributions are currently **unpaid and voluntary**. This is a **non-commercial** project without donation functionality or sponsorship options at this time.
 
@@ -20,15 +17,15 @@ All contributions are currently **unpaid and voluntary**. This is a **non-commer
 
 ---
 
-## 👤 Maintainer
+## Maintainer
 
 - **arn-c0de**  
-	Project Lead  
-	Contact: [arn-c0de@protonmail.com](mailto:arn-c0de@protonmail.com)
+  Project Lead  
+  Contact: [arn-c0de@protonmail.com](mailto:arn-c0de@protonmail.com)
 
 ---
 
-## 🌟 Contributors
+## Contributors
 
 ### Translation
 - **Ferinjoque** — Spanish language support — [https://github.com/Ferinjoque](https://github.com/Ferinjoque) (2025-12-23)
@@ -37,7 +34,16 @@ All contributions are currently **unpaid and voluntary**. This is a **non-commer
 ### Development
 - _No entries yet_
 
+### Design & UX
+- _No entries yet_
+
+### Documentation
+- _No entries yet_
+
 ### DevOps & Infrastructure
+- _No entries yet_
+
+### Testing & QA
 - _No entries yet_
 
 ### Support
@@ -45,7 +51,7 @@ All contributions are currently **unpaid and voluntary**. This is a **non-commer
 
 ---
 
-## 🚀 Contributing
+## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to get involved.
 
