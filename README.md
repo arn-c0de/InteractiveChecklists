@@ -197,6 +197,11 @@ This keeps dependencies isolated and clean.
 
 ### Configure Server Settings
 
+<p align="center">
+	<img src="images/datapadserver_gui_settings.png" alt="Server settings page" width="360" /><br/>
+	<em>Server settings window</em>
+</p>
+
 1. Open the **Server Configuration** tab
 2. Configure the following settings:
    - **Bind IP** – IP address of the PC where DCS is running
