@@ -633,10 +633,10 @@ class ServerConfigPage(QWizardPage):
         self.target_ip_edit = QLineEdit("192.168.1.255")
         layout.addRow("Target IP (broadcast):", self.target_ip_edit)
 
-        # Port
+        # Port (Android app uses same port for both handshake and data)
         self.port_spin = QSpinBox()
         self.port_spin.setRange(1024, 65535)
-        self.port_spin.setValue(5010)
+        self.port_spin.setValue(5011)  # Changed to 5011 to match handshake port
         layout.addRow("Data Port:", self.port_spin)
 
         # Handshake port
@@ -740,7 +740,7 @@ class MainWindow(QMainWindow):
             "saved_games_path": "",
             "bind_ip": "192.168.1.100",
             "target_ip": "192.168.1.255",
-            "port": 5010,
+            "port": 5011,  # Changed to 5011 to match Android app (uses same port for handshake AND data)
             "handshake_port": 5011,
             "interval": 100,
             "enable_pow": False,
@@ -950,7 +950,7 @@ class MainWindow(QMainWindow):
 
         self.port_input = QSpinBox()
         self.port_input.setRange(1024, 65535)
-        self.port_input.setValue(self.config.get("port", 5010))
+        self.port_input.setValue(self.config.get("port", 5011))  # Default 5011 to match handshake
         network_layout.addRow("Data Port:", self.port_input)
 
         self.handshake_port_input = QSpinBox()
@@ -1304,11 +1304,15 @@ class MainWindow(QMainWindow):
         """Build the server command from configuration"""
         cmd_parts = [f'"{sys.executable}"', '"forward_parsed_udp.py"']
 
+        # IMPORTANT: Android app uses same port for handshake AND data reception
+        # So we use handshake_port for BOTH --port and --handshake-port
+        unified_port = self.config.get("handshake_port", 5011)
+
         # Add command line arguments
         cmd_parts.append(f'--host "{self.config.get("target_ip", "192.168.1.255")}"')
-        cmd_parts.append(f'--port {self.config.get("port", 5010)}')
+        cmd_parts.append(f'--port {unified_port}')  # Use same port as handshake
         cmd_parts.append(f'--bind-ip "{self.config.get("bind_ip", "192.168.1.100")}"')
-        cmd_parts.append(f'--handshake-port {self.config.get("handshake_port", 5011)}')
+        cmd_parts.append(f'--handshake-port {unified_port}')  # Same port for consistency
         cmd_parts.append(f'--interval {self.config.get("interval", 100)}')
         cmd_parts.append(f'--authorized-devices "{self.config.get("authorized_devices_path", "authorized_devices.json")}"')
         cmd_parts.append("--verbose")
