@@ -706,6 +706,7 @@
     <string name="settings_fab_positions_explain">Setzt die benutzerdefinierten Floating-Button-Positionen in allen Viewern (PDF, Markdown, interner Viewer) zurück. Zum Verschieben lange auf einen FAB drücken.</string>
     <string name="settings_fab_size">FAB-Größe</string>
     <string name="settings_fab_size_explain">Ändert die Größe aller Floating Action Buttons</string>
+    <string name="settings_fab_size_tiny">Winzig</string>
     <string name="settings_fab_size_small">Klein</string>
     <string name="settings_fab_size_medium">Mittel</string>
     <string name="settings_fab_size_large">Groß</string>

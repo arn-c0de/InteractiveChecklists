@@ -263,6 +263,308 @@ fun SettingsScreen(
                 }
             }
 
+            // === Contributors ===
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = stringResource(R.string.contributors_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+
+            item {
+                var contributorsExpanded by remember { mutableStateOf(false) }
+                val contributorsRotation by animateFloatAsState(targetValue = if (contributorsExpanded) 180f else 0f)
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { contributorsExpanded = !contributorsExpanded },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = stringResource(R.string.contributors_title),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = if (contributorsExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
+                                modifier = Modifier.rotate(contributorsRotation)
+                            )
+                        }
+                        AnimatedVisibility(
+                            visible = contributorsExpanded,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            Column {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = stringResource(R.string.contributors_explain),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    contributors.forEachIndexed { idx, entry ->
+                                        Surface(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = MaterialTheme.shapes.medium,
+                                            color = MaterialTheme.colorScheme.surface,
+                                            tonalElevation = 1.dp
+                                        ) {
+                                            Column(modifier = Modifier.padding(16.dp)) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Person,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(20.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Text(
+                                                        text = entry.name,
+                                                        style = MaterialTheme.typography.titleSmall,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                                if (!entry.website.isNullOrBlank()) {
+                                                    Spacer(modifier = Modifier.height(8.dp))
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Language,
+                                                            contentDescription = null,
+                                                            tint = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text(
+                                                            text = entry.website,
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.clickable {
+                                                                try {
+                                                                    val intent = Intent(Intent.ACTION_VIEW)
+                                                                    intent.data = android.net.Uri.parse(entry.website)
+                                                                    context.startActivity(intent)
+                                                                } catch (_: Exception) { }
+                                                            }
+                                                        )
+                                                    }
+                                                }
+                                                if (!entry.role.isNullOrBlank()) {
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Text(
+                                                        text = stringResource(R.string.role_label, entry.role),
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                                if (!entry.date.isNullOrBlank()) {
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Text(
+                                                        text = stringResource(R.string.contributor_date, entry.date),
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // === Document Sources ===
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = stringResource(R.string.document_sources_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+
+            item {
+                var sourcesExpanded by remember { mutableStateOf(false) }
+                val sourcesRotation by animateFloatAsState(targetValue = if (sourcesExpanded) 180f else 0f)
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { sourcesExpanded = !sourcesExpanded },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Description,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = stringResource(R.string.document_sources_title),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = if (sourcesExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
+                                modifier = Modifier.rotate(sourcesRotation)
+                            )
+                        }
+                        AnimatedVisibility(
+                            visible = sourcesExpanded,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            Column {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = stringResource(R.string.document_sources_explain),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    sources.forEachIndexed { idx, entry ->
+                                        Surface(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = MaterialTheme.shapes.medium,
+                                            color = MaterialTheme.colorScheme.surface,
+                                            tonalElevation = 1.dp
+                                        ) {
+                                            Column(modifier = Modifier.padding(16.dp)) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Article,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(20.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Text(
+                                                        text = entry.name,
+                                                        style = MaterialTheme.typography.titleSmall,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                                if (!entry.website.isNullOrBlank()) {
+                                                    Spacer(modifier = Modifier.height(8.dp))
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Language,
+                                                            contentDescription = null,
+                                                            tint = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text(
+                                                            text = entry.website,
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.clickable {
+                                                                try {
+                                                                    val intent = Intent(Intent.ACTION_VIEW)
+                                                                    intent.data = android.net.Uri.parse(entry.website)
+                                                                    context.startActivity(intent)
+                                                                } catch (_: Exception) { }
+                                                            }
+                                                        )
+                                                    }
+                                                }
+                                                if (!entry.license.isNullOrBlank()) {
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Gavel,
+                                                            contentDescription = null,
+                                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text(
+                                                            text = stringResource(R.string.license_label, entry.license),
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                }
+                                                if (!entry.usage.isNullOrBlank()) {
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Build,
+                                                            contentDescription = null,
+                                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text(
+                                                            text = entry.usage,
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                                                        )
+                                                    }
+                                                }
+                                                if (!entry.notes.isNullOrBlank()) {
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Info,
+                                                            contentDescription = null,
+                                                            tint = MaterialTheme.colorScheme.secondary,
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text(
+                                                            text = entry.notes,
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.secondary
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // === Import Settings Section ===
             item {
                 Spacer(modifier = Modifier.height(12.dp))
@@ -334,6 +636,7 @@ fun SettingsScreen(
                         
                         var currentFabSize by remember { mutableStateOf(prefsManager.getFabSize()) }
                         val fabSizes = listOf(
+                            "tiny" to stringResource(R.string.settings_fab_size_tiny),
                             "small" to stringResource(R.string.settings_fab_size_small),
                             "medium" to stringResource(R.string.settings_fab_size_medium),
                             "large" to stringResource(R.string.settings_fab_size_large)
@@ -728,204 +1031,6 @@ fun SettingsScreen(
                                             }
                                         }
                                     )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // === Contributors ===
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = stringResource(R.string.contributors_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-            }
-
-            item {
-                var contributorsExpanded by remember { mutableStateOf(false) }
-                val contributorsRotation by animateFloatAsState(targetValue = if (contributorsExpanded) 180f else 0f)
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { contributorsExpanded = !contributorsExpanded },
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = stringResource(R.string.contributors_title),
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowDown,
-                                contentDescription = if (contributorsExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
-                                modifier = Modifier.rotate(contributorsRotation)
-                            )
-                        }
-                        AnimatedVisibility(
-                            visible = contributorsExpanded,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut()
-                        ) {
-                            Column {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = stringResource(R.string.contributors_explain),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    Button(onClick = {
-                                        try {
-                                            val jsonString = json.encodeToString(
-                                                kotlinx.serialization.builtins.ListSerializer(ContributorEntry.serializer()),
-                                                contributors
-                                            )
-                                            contributorsJsonContent = jsonString
-                                        } catch (e: Exception) {
-                                            contributorsJsonContent = context.getString(R.string.error_encoding_contributors, e.message ?: "")
-                                        }
-                                        showContributorsJsonDialog = true
-                                    }) {
-                                        Text(stringResource(R.string.settings_view_contributors_json))
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Column {
-                                    contributors.forEachIndexed { idx, entry ->
-                                        Column(modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 8.dp)) {
-                                            Column(modifier = Modifier.fillMaxWidth()) {
-                                                Text(entry.name, fontWeight = FontWeight.Bold)
-                                                if (!entry.website.isNullOrBlank()) {
-                                                    Text(
-                                                        text = entry.website,
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.clickable {
-                                                            try {
-                                                                val intent = Intent(Intent.ACTION_VIEW)
-                                                                intent.data = android.net.Uri.parse(entry.website)
-                                                                context.startActivity(intent)
-                                                            } catch (_: Exception) { }
-                                                        }
-                                                    )
-                                                }
-                                                if (!entry.role.isNullOrBlank()) {
-                                                    Text(
-                                                        text = stringResource(R.string.role_label, entry.role),
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
-                                                }
-
-                                                if (!entry.date.isNullOrBlank()) {
-                                                    Text(
-                                                        text = stringResource(R.string.contributor_date, entry.date),
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
-                                                }
-                                            }
-                                        }
-                                        HorizontalDivider()
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // === Document Sources ===
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = stringResource(R.string.document_sources_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-            }
-
-            item {
-                var sourcesExpanded by remember { mutableStateOf(false) }
-                val sourcesRotation by animateFloatAsState(targetValue = if (sourcesExpanded) 180f else 0f)
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { sourcesExpanded = !sourcesExpanded },
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = stringResource(R.string.document_sources_title),
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowDown,
-                                contentDescription = if (sourcesExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
-                                modifier = Modifier.rotate(sourcesRotation)
-                            )
-                        }
-                        AnimatedVisibility(
-                            visible = sourcesExpanded,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut()
-                        ) {
-                            Column {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = stringResource(R.string.document_sources_explain),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Column {
-                                    sources.forEachIndexed { idx, entry ->
-                                        Column(modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 8.dp)) {
-                                            Column(modifier = Modifier.fillMaxWidth()) {
-                                                Text(entry.name, fontWeight = FontWeight.Bold)
-                                                if (!entry.website.isNullOrBlank()) {
-                                                    Text(
-                                                        text = entry.website,
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.clickable {
-                                                            try {
-                                                                val intent = Intent(Intent.ACTION_VIEW)
-                                                                intent.data = android.net.Uri.parse(entry.website)
-                                                                context.startActivity(intent)
-                                                            } catch (_: Exception) { }
-                                                        }
-                                                    )
-                                                }
-                                                if (!entry.license.isNullOrBlank()) {
-                                                    Text(
-                                                        text = stringResource(R.string.license_label, entry.license),
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
-                                                }
-                                            }
-                                        }
-                                        HorizontalDivider()
-                                    }
                                 }
                             }
                         }
