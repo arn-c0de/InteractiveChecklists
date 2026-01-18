@@ -41,8 +41,9 @@ This will:
 1. Clean previous databases
 2. Create Java/Kotlin database (compiles Android app)
 3. Create Python database (scans scripts folder)
-4. Analyze both databases
-5. Generate SARIF reports
+4. Download CodeQL query packs (first run only)
+5. Analyze both databases
+6. Generate SARIF reports
 
 ### Option 2: Manual Commands
 
@@ -50,13 +51,23 @@ This will:
 ```bash
 # Use Debug build (Release build may have compilation errors)
 codeql database create codeql-db-java --language=java-kotlin --command="gradlew.bat assembleDebug --no-daemon"
-codeql database analyze codeql-db-java --format=sarif-latest --output=java-analysis.sarif
+
+# Download query pack (first time only)
+codeql pack download codeql/java-queries
+
+# Analyze with explicit query pack
+codeql database analyze codeql-db-java codeql/java-queries --format=sarif-latest --output=java-analysis.sarif
 ```
 
 **Python (Scripts):**
 ```bash
 codeql database create codeql-db-python --language=python --source-root=scripts
-codeql database analyze codeql-db-python --format=sarif-latest --output=python-analysis.sarif
+
+# Download query pack (first time only)
+codeql pack download codeql/python-queries
+
+# Analyze with explicit query pack
+codeql database analyze codeql-db-python codeql/python-queries --format=sarif-latest --output=python-analysis.sarif
 ```
 
 ## IDE Integration
@@ -96,6 +107,13 @@ All output files are git-ignored (see `.gitignore` lines 57-66).
 
 ### "CodeQL not found"
 Install CodeQL CLI: https://github.com/github/codeql-cli-binaries/releases
+
+### "Query pack cannot be found"
+The query packs are downloaded automatically by the script. If manual download is needed:
+```bash
+codeql pack download codeql/java-queries
+codeql pack download codeql/python-queries
+```
 
 ### Java/Kotlin build fails
 Make sure you can build the project with:

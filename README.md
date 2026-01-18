@@ -235,6 +235,11 @@ This keeps dependencies isolated and clean.
 
 ### QR Code Pairing (GUI Method)
 
+<p align="center">
+	<img src="images/datapadserver_gui_devicelist.png" alt="Datapad device list and qr registration" width="360" /><br/>
+	<em>Datapad device list and qr-code registration</em>
+</p>
+
 The GUI provides an easy way to register devices via QR code:
 
 1. **Start the server** from the Dashboard tab *(if not already running)*
@@ -247,12 +252,17 @@ The GUI provides an easy way to register devices via QR code:
    - **Token Details** – Server IP, port, expiration time
    - **Registration Status** – Shows when a device successfully registers
 
+<p align="center">
+	<img src="images/datapadserver_gui_qrcode.png" alt="Datapad QR-Code Registration" width="360" /><br/>
+	<em>Datapad QR-code registration</em>
+</p>
+
 5. **The GUI automatically detects** when your device scans the QR code and registers
    - Registration confirmation appears in the dialog
    - The device is automatically added to the authorized devices list
    - **No server restart needed** – registration happens in real-time
 
-6. *(Optional)* You can manually add devices by clicking **"Add Device"** and entering data from App datapad settings popup:
+6. *(Optional)* You can manually add devices by clicking **"Add Device"** and entering:
    - Device Name
    - Device ID
    - Public Key (Base64)
