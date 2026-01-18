@@ -100,10 +100,10 @@ Runway heading–based approach visualization and real-time map updates enable e
 | Marianas | Supported | Marker set available in DB |
 | Germany (CW) | mostly Supported | Marker addition in progress |
 
+---
 ## Roadmap
-
 Planned features and long-term improvements are tracked in the [Roadmap](docs/EN/planning/roadmap.md) document.
-
+---
 
 
 ## Quick Start – Windows (Recommended & Easiest)
