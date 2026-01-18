@@ -161,23 +161,27 @@ class RegistrationTokenManager:
     
     def verify_token(self, token_id: str) -> Optional[RegistrationToken]:
         """Verify and retrieve a token
-        
+
         Args:
             token_id: Token ID to verify
-        
+
         Returns:
             RegistrationToken if valid, None otherwise
         """
+        # Reload tokens from file to pick up newly generated tokens
+        # (Important when GUI generates tokens while server is running)
+        self._load_tokens()
+
         token = self.tokens.get(token_id)
-        
+
         if not token:
             logger.warning(f"❌ Unknown token: {token_id[:16]}...")
             return None
-        
+
         if not token.is_valid():
             logger.warning(f"❌ Invalid token (expired={token.is_expired()}, used={token.used})")
             return None
-        
+
         logger.info(f"✅ Token verified: {token_id[:16]}...")
         return token
     
