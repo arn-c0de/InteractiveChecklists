@@ -1,11 +1,11 @@
 @echo off
 REM =====================================================================
-REM Installation Script - Sets up virtual environment and dependencies
+REM DCS DataPad Server - GUI Installer Launcher (with venv)
 REM =====================================================================
 
 echo.
 echo ========================================
-echo  DCS DataPad Server - Installation
+echo  DCS DataPad Server - GUI Installer
 echo ========================================
 echo.
 
@@ -43,8 +43,8 @@ if errorlevel 1 (
 
 echo.
 echo [3/3] Installing/updating dependencies...
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install --upgrade pip >nul
+python -m pip install -r requirements_gui.txt
 if errorlevel 1 (
     echo ERROR: Failed to install dependencies
     pause
@@ -53,9 +53,19 @@ if errorlevel 1 (
 
 echo.
 echo ========================================
-echo  Installation completed successfully!
+echo  Starting GUI Installer...
 echo ========================================
 echo.
-echo You can now run the server with: run.bat
-echo.
-pause
+
+REM Launch GUI installer
+python dcs_datapad_installer.py
+
+if errorlevel 1 (
+    echo.
+    echo Application exited with error
+    pause
+    exit /b 1
+)
+
+REM Deactivate virtual environment
+call venv\Scripts\deactivate.bat
