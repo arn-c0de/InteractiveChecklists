@@ -31,6 +31,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import kotlinx.coroutines.flow.combine
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -226,6 +227,9 @@ fun MapViewer(
 
     // Combined ready state: DB AND repositories must be initialized
     val repositoriesReady = dbReady && locationRepository != null && routeRepository != null
+
+    // Nearest Airports state
+    var nearestAirports by remember { mutableStateOf<List<AirportWithDistance>>(emptyList()) }
 
     // Load and restore visible routes from SharedPreferences when MarkerRouteViewModel becomes available
     LaunchedEffect(markerRouteViewModel) {
@@ -589,6 +593,39 @@ fun MapViewer(
     // Flight path: Process incoming flight data for recording
     LaunchedEffect(flightPathRepository, flightData) {
         flightPathRepository?.processFlightData(flightData)
+    }
+
+    // Calculate nearest airports when position changes or when overlay is opened
+    // Calculate nearest airports when overlay opens or position changes significantly
+    // Only key on showNearestAirports and locationRepository to avoid constant cancellations
+    LaunchedEffect(mapState.showNearestAirports, locationRepository) {
+        if (!mapState.showNearestAirports) {
+            // Clear list when overlay is closed
+            nearestAirports = emptyList()
+            return@LaunchedEffect
+        }
+
+        // Only proceed if repositories are ready
+        if (locationRepository == null || mapState.tacticalDb == null) {
+            return@LaunchedEffect
+        }
+
+        // Determine center: prefer live flightData, then last known player pos, then map center, then saved prefs
+        val centerPair = flightData?.let { Pair(it.latitude, it.longitude) }
+            ?: mapState.lastValidPlayerPosition?.let { Pair(it.latitude, it.longitude) }
+            ?: mapState.mapView?.mapCenter?.let { Pair(it.latitude, it.longitude) }
+            ?: prefsManager.getMapCenter()
+
+        if (centerPair != null) {
+            try {
+                val airports = mapState.loadNearestAirports(centerPair.first, centerPair.second, locationRepository)
+                nearestAirports = airports
+            } catch (e: Exception) {
+                if (e !is kotlinx.coroutines.CancellationException) {
+                    Log.e(TAG, "Error calculating nearest airports", e)
+                }
+            }
+        }
     }
 
     // Save map settings when they change
@@ -2347,6 +2384,12 @@ fun MapViewer(
                     mapState.markerRouteManagementInitialTab = 3
                     mapState.showMarkerRouteManagement = true
                 },
+                onNearestAirportsOpen = {
+                    val newState = !mapState.showNearestAirports
+                    Log.d(TAG, "🛬 Nearest Airports FAB clicked - changing from ${mapState.showNearestAirports} to $newState")
+                    mapState.showNearestAirports = newState
+                    Log.d(TAG, "🛬 State after change: ${mapState.showNearestAirports}, enabled=${prefsManager.isNearestAirportsEnabled()}")
+                },
                 isConnected = isConnected,
                 isScreenLocked = isScreenLocked,
                 mapRotationMode = mapState.mapRotationMode,
@@ -2354,6 +2397,7 @@ fun MapViewer(
                 isDrawingMode = drawingState.isDrawingMode,
                 repositoriesReady = repositoriesReady,
                 pendingSymbolPlacement = mapState.pendingSymbolPlacement,
+                nearestAirportsEnabled = prefsManager.isNearestAirportsEnabled(),
                 datapadEnabled = datapadEnabled,
                 containerColorConnected = MaterialTheme.colorScheme.primaryContainer,
                 containerColorDisconnected = MaterialTheme.colorScheme.surfaceVariant,
@@ -3047,6 +3091,46 @@ fun MapViewer(
             currentDocumentName = stringResource(R.string.map_aviation_map)
         )
     }
+
+    // Nearest Airports Overlay
+    // Note: Overlay must always be in composition for state changes to work properly
+    // Its internal AnimatedVisibility handles the actual show/hide animation
+    // zIndex ensures it appears above map content
+    val nearestAirportsIsLoading = mapState.showNearestAirports && nearestAirports.isEmpty() && (
+        flightData != null || mapState.lastValidPlayerPosition != null || mapState.mapView != null || savedCenter != null
+    )
+    val nearestAirportsVisible = mapState.showNearestAirports && prefsManager.isNearestAirportsEnabled()
+    
+    LaunchedEffect(nearestAirportsVisible, nearestAirports.size) {
+        Log.d(TAG, "🛬 Overlay state: visible=$nearestAirportsVisible, show=${mapState.showNearestAirports}, enabled=${prefsManager.isNearestAirportsEnabled()}, airports=${nearestAirports.size}")
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(200f) // Above FABs (which are at 100f)
+    ) {
+        NearestAirportsOverlay(
+            visible = nearestAirportsVisible,
+            airports = nearestAirports,
+            useNauticalMiles = true,
+            isLoading = nearestAirportsIsLoading,
+            onClose = { mapState.showNearestAirports = false },
+            onAirportClick = { location ->
+                // Center map on airport, close overlay and log
+                android.util.Log.d(TAG, "🛬 Airport selected: ${location.name} (${location.id}) - centering and closing overlay")
+                mapState.mapView?.controller?.animateTo(GeoPoint(location.latitude, location.longitude))
+                mapState.showNearestAirports = false
+            },
+            onCenterOnAirport = { location ->
+                // Center map on airport and close overlay
+                android.util.Log.d(TAG, "🛬 Center button pressed for: ${location.name} (${location.id}) - centering and closing overlay")
+                mapState.mapView?.controller?.animateTo(GeoPoint(location.latitude, location.longitude))
+                mapState.showNearestAirports = false
+            }
+        )
+    }
+
     // DataPad Popup
     if (mapState.showDataPad && datapadEnabled) {
         DataPadPopup(onDismiss = { mapState.showDataPad = false })

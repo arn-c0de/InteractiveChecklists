@@ -152,6 +152,7 @@ object MapViewerFABs {
         onDataPadOpen: () -> Unit,
         onQuickAccessOpen: () -> Unit,
         onTacticalUnitsOpen: () -> Unit = {},
+        onNearestAirportsOpen: () -> Unit = {},
         isConnected: Boolean = false,
         isScreenLocked: Boolean = false,
         mapRotationMode: Int = 0,
@@ -160,6 +161,7 @@ object MapViewerFABs {
         repositoriesReady: Boolean = false,
         pendingSymbolPlacement: Any? = null,
         datapadEnabled: Boolean = false,
+        nearestAirportsEnabled: Boolean = false,
         containerColorConnected: Color,
         containerColorDisconnected: Color,
         containerColorSecondary: Color,
@@ -213,6 +215,19 @@ object MapViewerFABs {
             scope = "map"
         ),
         FABConfig(
+            id = "nearest_airports",
+            icon = Icons.Default.FlightLand,
+            contentDescription = stringResource(R.string.fab_cd_nearest_airports),
+            onClick = onNearestAirportsOpen,
+            visible = nearestAirportsEnabled,
+            containerColor = containerColorSecondary,
+            defaultX = 0.95f,
+            defaultY = 0.20f,
+            defaultLandscapeX = 0.95f,
+            defaultLandscapeY = 0.30f,
+            scope = "map"
+        ),
+        FABConfig(
             id = "tactical_units",
             icon = Icons.Default.TrackChanges,
             contentDescription = "Tactical Units",
@@ -220,9 +235,9 @@ object MapViewerFABs {
             visible = datapadEnabled,
             containerColor = if (isConnected) containerColorConnected else containerColorTertiary,
             defaultX = 0.95f,
-            defaultY = 0.20f,
+            defaultY = 0.25f,
             defaultLandscapeX = 0.95f,
-            defaultLandscapeY = 0.35f,
+            defaultLandscapeY = 0.40f,
             scope = "map"
         ),
         FABConfig(
@@ -235,9 +250,9 @@ object MapViewerFABs {
                          else containerColorSurface,
             enabled = repositoriesReady,
             defaultX = 0.95f,
-            defaultY = 0.25f,
+            defaultY = 0.30f,
             defaultLandscapeX = 0.95f,
-            defaultLandscapeY = 0.45f,
+            defaultLandscapeY = 0.50f,
             scope = "map"
         ),
         FABConfig(
@@ -248,9 +263,9 @@ object MapViewerFABs {
             containerColor = if (repositoriesReady) containerColorTertiary else containerColorSurface,
             enabled = repositoriesReady,
             defaultX = 0.95f,
-            defaultY = 0.30f,
+            defaultY = 0.35f,
             defaultLandscapeX = 0.95f,
-            defaultLandscapeY = 0.55f,
+            defaultLandscapeY = 0.60f,
             scope = "map"
         ),
         FABConfig(
@@ -260,9 +275,9 @@ object MapViewerFABs {
             onClick = onLockScreen,
             containerColor = if (isScreenLocked) containerColorPrimary else containerColorSurface,
             defaultX = 0.95f,
-            defaultY = 0.35f,
+            defaultY = 0.40f,
             defaultLandscapeX = 0.95f,
-            defaultLandscapeY = 0.65f,
+            defaultLandscapeY = 0.70f,
             scope = "map"
         ),
         FABConfig(
@@ -272,9 +287,9 @@ object MapViewerFABs {
             onClick = onToggleMapRotation,
             containerColor = if (mapRotationMode == 1) containerColorPrimary else containerColorSurface,
             defaultX = 0.95f,
-            defaultY = 0.40f,
+            defaultY = 0.45f,
             defaultLandscapeX = 0.95f,
-            defaultLandscapeY = 0.75f,
+            defaultLandscapeY = 0.80f,
             scope = "map"
         ),
         FABConfig(
@@ -284,7 +299,7 @@ object MapViewerFABs {
             onClick = onToggleRotationGesture,
             containerColor = if (rotationGestureEnabled) containerColorPrimary else containerColorSurface,
             defaultX = 0.95f,
-            defaultY = 0.45f,
+            defaultY = 0.50f,
             defaultLandscapeX = 0.88f,
             defaultLandscapeY = 0.15f,
             scope = "map"
@@ -296,7 +311,7 @@ object MapViewerFABs {
             onClick = onDrawingTools,
             containerColor = if (isDrawingMode) containerColorPrimary else containerColorTertiary,
             defaultX = 0.95f,
-            defaultY = 0.50f,
+            defaultY = 0.55f,
             defaultLandscapeX = 0.88f,
             defaultLandscapeY = 0.25f,
             scope = "map"

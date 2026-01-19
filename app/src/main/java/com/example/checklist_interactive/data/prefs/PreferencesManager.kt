@@ -55,6 +55,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_MAP_OVERLAY_BORDER_EPOCH = "map_overlay_border_epoch"
         private const val KEY_MAP_OVERLAY_FLIGHT_INSTRUMENTS = "map_overlay_flight_instruments"
         private const val KEY_MAP_MARKER_LABELS = "map_marker_labels"
+        private const val KEY_MAP_NEAREST_AIRPORTS_ENABLED = "map_nearest_airports_enabled"
         private const val KEY_FLIGHT_PATH_INTERVAL_SECONDS = "flight_path_interval_seconds"
         private const val KEY_FLIGHT_PATH_ENABLED = "flight_path_enabled"
         private const val KEY_MAP_ROTATION_GESTURE = "map_rotation_gesture"
@@ -475,6 +476,17 @@ class PreferencesManager(context: Context) {
 
     fun isMapMarkerLabelsEnabled(): Boolean {
         return prefs.getBoolean(KEY_MAP_MARKER_LABELS, false)
+    }
+
+    /**
+     * Nearest Airports list feature (default: enabled)
+     */
+    fun setNearestAirportsEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_MAP_NEAREST_AIRPORTS_ENABLED, enabled).apply()
+    }
+
+    fun isNearestAirportsEnabled(): Boolean {
+        return prefs.getBoolean(KEY_MAP_NEAREST_AIRPORTS_ENABLED, true)
     }
 
     fun setFlightPathIntervalSeconds(seconds: Int) {
