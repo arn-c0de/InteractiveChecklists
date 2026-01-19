@@ -345,8 +345,6 @@ Get-ChildItem "C:\Program Files\Eagle Dynamics\DCS World\bin\*.dll" | Unblock-Fi
 
 Press **Enter**.
 
----
-
 ### Alternative: Repair DCS
 
 If unblocking does not help:
@@ -360,9 +358,19 @@ This will restore and unblock all affected files.
 
 ---
 
+7. After successful registration, switch to the **Device Management → Devices** tab
+   - Your newly registered device now appears in the device list
+   - The device status is shown as **Authorized / Connected**
+
+8. Go back to the **Dashboard** tab
+9. Click **"Start Server"** to **finalize and run the server**
+   - The server now starts with the registered device active
+   - Live connections are accepted immediately
+
 ✅ **Done!**
 The app should now receive **live telemetry and tactical data** from DCS.
 
+---
 
 ### Security – Quick Summary (2025/2026)
 
