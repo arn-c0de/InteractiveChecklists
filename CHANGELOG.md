@@ -1,4 +1,9 @@
 # Changelog
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---
+
 
 
 All relevant changes are summarized here by version.
@@ -402,3 +407,5 @@ Feature: Implement  Map View - **Nearest Airports List** with FAB button and pop
 - Basic PDF and Markdown viewer functionality
 - Tagging system
 - Data persistence
+
+
