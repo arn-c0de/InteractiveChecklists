@@ -4,6 +4,9 @@
 All relevant changes are summarized here by version.
 
 ## [1.0.25] - 2026-01-18
+- Merge **pull request** #30 from **arn-c0de/1.0.25-Feature-nearest-airports**
+Feature: Implement  Map View - **Nearest Airports List** with FAB button and popup marker selection #26
+
 
 ### Summary
 - **GUI Installer (Windows):** Introduced a full PyQt6-based GUI installer (`dcs_datapad_installer.py` / `run_installer.bat`) replacing the legacy TUI (text-based menu). The GUI provides:
