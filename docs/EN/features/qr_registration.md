@@ -305,3 +305,9 @@ Use a virtual environment (`python -m venv .venv` + `source .venv/bin/activate` 
 - Check authorized_devices.json
 - Remove device ID from whitelist if necessary
 - Or: Reset device key: `keyManager.resetDeviceKey()`
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

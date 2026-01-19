@@ -58,3 +58,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to get involved.
 ---
 
 *Want to join? Open a pull request to add yourself as a contributor!*
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

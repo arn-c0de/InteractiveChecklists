@@ -190,3 +190,8 @@ FABOverlay(
 - [DraggableFab.kt](../../app/src/main/java/com/example/checklist_interactive/ui/common/DraggableFab.kt)
 - [PreferencesManager.kt](../../app/src/main/java/com/example/checklist_interactive/data/prefs/PreferencesManager.kt)
 - [SettingsScreen.kt](../../app/src/main/java/com/example/checklist_interactive/ui/settings/SettingsScreen.kt)
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

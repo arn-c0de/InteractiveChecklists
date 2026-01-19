@@ -387,3 +387,9 @@ implementation("androidx.compose.material3:material3:1.1.2")
 ## Lizenz
 
 Same license as the main project.
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

@@ -287,3 +287,9 @@ This feature was developed for the Interactive Checklists project and uses:
 - OpenStreetMap data (ODbL License)
 - Room Database (Android Jetpack)
 - Jetpack Compose (Material 3)
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

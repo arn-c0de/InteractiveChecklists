@@ -370,3 +370,8 @@ drawRouteOnMap(
 **Last Updated**: December 21, 2025
 **Version**: 1.0
 **Authors**: Architecture refactoring by GitHub Copilot
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

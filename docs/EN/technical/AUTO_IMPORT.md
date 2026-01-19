@@ -79,3 +79,9 @@ Imports/
 - Default categories (Checklists, Comms, Charts, Procedures, Manuals) are preserved
 - New categories can be added simply by creating subfolders in the `Imports/` folder
 - Duplicate filenames are **not** overwritten
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

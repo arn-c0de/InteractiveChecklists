@@ -76,3 +76,9 @@ A simple singleton object that acts as an event bus for map-related actions that
 7.  The user decides the order is inefficient. They tap "Plan Fastest Route." The `RouteCreationViewModel` runs its TSP algorithm, and the waypoints in the list re-order themselves to form the shortest path.
 8.  The user names the route and taps "Finish Route." The `RouteCreationViewModel` saves the new `RouteEntity` and its associated `WaypointEntity`s to the database.
 9.  The `RouteCreationSheet` closes. The new route is now visible in the `MarkerRouteManagementSheet`, and the user can toggle its visibility on the main map.
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

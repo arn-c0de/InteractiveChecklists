@@ -142,3 +142,9 @@ Additional symbols can be added by converting NATO APP-6 SVGs to Android Vector 
 - [ ] Unit size modifier display
 - [ ] Mobility / status modifiers
 - [ ] Combat effectiveness indicator
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---
