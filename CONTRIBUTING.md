@@ -4,11 +4,20 @@
 
 Thank you for wanting to help make InteractiveChecklists better!  
 This guide explains how to get started quickly and contribute effectively.
+## 💰 Important: Unpaid Contributions (for now)
 
-## 💰 Important: Unpaid Contributions
+All contributions are currently **voluntary and completely unpaid**.  
+This is a **non-commercial, hobby/side-project** at the moment — there are **no donation or sponsorship options** active yet.
 
-All contributions are currently **voluntary and unpaid**.  
-This is a **non-commercial** project — there are no donation or sponsorship options at this time.
+> **However**, if the project gains enough traction in the future and stable **sponsoring and/or donation** channels become available (e.g. GitHub Sponsors, Buy Me a Coffee, Patreon, etc.), I plan to open **paid developer slots** for recurring or high-impact contributors.
+> 
+> That means:  
+> → **Right now → 100 % voluntary**
+> 
+> → Potentially later → possibility of getting **paid** for meaningful work
+> 
+> I want to be very upfront about this so nobody has wrong expectations.
+
 
 ##  Contributor Recognition & Credits
 
