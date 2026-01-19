@@ -134,7 +134,7 @@ to activate the export script.
 The Python forwarder (**DataPad Server**) requires a **local Python installation**.
 
 - On Windows, installing Python via the **Microsoft Store** (Python 3.12+) is recommended for simplicity.
-- The GUI installer automatically:
+- The GUI installer (run_installer.bat) automatically:
   - Creates a **virtual environment (venv)** if not present
   - Installs all required Python packages into that environment
   - Detects your DCS installation and Saved Games folder
