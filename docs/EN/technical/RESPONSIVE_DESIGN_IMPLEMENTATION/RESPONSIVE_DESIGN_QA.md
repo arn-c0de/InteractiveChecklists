@@ -291,3 +291,9 @@ Before release, verify:
 ### Future Improvements
 - Document planned improvements for future releases
 - Example: "Consider adaptive two-pane layout for tablets in landscape"
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

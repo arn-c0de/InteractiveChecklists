@@ -175,3 +175,9 @@ fun NewInstrument(
 - [ ] Lock/unlock individual instruments
 - [ ] Reset to default positions button
 - [ ] Import/export layout configurations
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

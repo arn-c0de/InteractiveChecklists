@@ -227,3 +227,9 @@ composable("tactical_units") {
 
 Part of ChecklistInteractive — see the main LICENSE
 
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

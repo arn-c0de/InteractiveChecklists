@@ -150,3 +150,9 @@ A default `file_tags.json` is included in the app assets (`app/src/main/assets/f
 - Export/import tag configurations
 - Tag suggestions based on file content
 - Tag synonyms/aliases
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

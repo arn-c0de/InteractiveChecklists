@@ -480,3 +480,8 @@ with MarkersDatabase() as db:
 **Version:** 1.0  
 **Datum:** 2024-12-18  
 **Autor:** System Architecture
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

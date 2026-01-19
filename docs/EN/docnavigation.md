@@ -45,3 +45,8 @@
 ---
 
 <sub>For more details, see each section or return to the <a href="../../README.md">project home</a>.</sub>
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---
