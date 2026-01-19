@@ -38,7 +38,7 @@ All contributions are currently **unpaid and voluntary**. This is a **non-commer
 - _No entries yet_
 
 ### Documentation
-- _No entries yet_
+- **drkaio7** — document maintainer — [https://github.com/drkaio7](https://github.com/drkaio7) (2026-01-19)
 
 ### DevOps & Infrastructure
 - _No entries yet_
