@@ -168,10 +168,6 @@ This keeps dependencies isolated and clean.
      - **Server Configuration** – Configure network settings (bind IP, ports, etc.)
      - **Firewall Setup** (optional) – Add Windows Firewall rules for server ports
 
-<p align="center">
-	<img src="images/datapadserver_gui_main.png" alt="Server main window" width="360" /><br/>
-	<em>Server main window</em>
-</p>
 
 4. **After setup is complete**, the main installer window opens with tabs:
    - **Dashboard** – Server status and control (Start/Stop server)
@@ -357,6 +353,11 @@ If unblocking does not help:
 This will restore and unblock all affected files.
 
 ---
+
+<p align="center">
+	<img src="images/datapadserver_gui_main.png" alt="Server main window" width="360" /><br/>
+	<em>Server main window</em>
+</p>
 
 7. After successful registration, switch to the **Device Management → Devices** tab
    - Your newly registered device now appears in the device list
