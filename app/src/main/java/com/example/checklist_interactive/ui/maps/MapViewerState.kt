@@ -23,6 +23,7 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.flow.first
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
@@ -57,6 +58,7 @@ class MapViewerState(
     var markerRouteManagementInitialTab by mutableStateOf<Int?>(null)
     var showRouteCreation by mutableStateOf(false)
     var showMilitarySymbolPicker by mutableStateOf(false)
+    var showNearestAirports by mutableStateOf(false)
     
     // Overlay states
     var compassEnabled by mutableStateOf(prefsManager.isMapOverlayCompassEnabled())
@@ -235,6 +237,40 @@ class MapViewerState(
         patternPolylines = patternPolylines - markerId
         patternLabelOverlays = patternLabelOverlays - markerId
         saveMarkerPatternState(markerId)
+    }
+
+    /**
+     * Load nearest airports for a given center location (suspend).
+     * Extracted to reduce MapViewer composable size and to provide a
+     * fallback center when live player data is unavailable.
+     */
+    suspend fun loadNearestAirports(
+        centerLat: Double,
+        centerLon: Double,
+        locationRepository: LocationRepository?
+    ): List<AirportWithDistance> {
+        if (locationRepository == null || tacticalDb == null) return emptyList()
+        return try {
+            // Run DB queries on IO dispatcher
+            withContext(Dispatchers.IO) {
+                val allLocations = locationRepository.getAllLocations().first()
+                val airportLocations = allLocations.filter { it.markerType == "airport" }
+                val runwaysMap = airportLocations.associate { loc ->
+                    loc.id to (tacticalDb?.runwayDao()?.getRunwaysByLocationSync(loc.id) ?: emptyList())
+                }
+                NearestAirportsCalculator.calculateNearestAirports(
+                    allLocations = allLocations,
+                    playerLat = centerLat,
+                    playerLon = centerLon,
+                    maxResults = 10,
+                    maxDistanceKm = null,
+                    runwaysMap = runwaysMap
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error loading nearest airports in state helper", e)
+            emptyList()
+        }
     }
 
     /**

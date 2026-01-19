@@ -1198,6 +1198,15 @@
     <string name="map_marker_elevation_m">%s m</string>
     <string name="map_marker_labels_toggle">Show Airport Labels</string>
     <string name="map_marker_labels_desc">Display airport names and runways on map</string>
+
+    <!-- Nearest Airports -->
+    <string name="nearest_airports_title">Nearest Airports</string>
+    <string name="nearest_airports_count">%1$d airports</string>
+    <string name="nearest_airports_empty">No airports found in the current area</string>
+    <string name="nearest_airports_distance_label">Dist:</string>
+    <string name="nearest_airports_bearing_label">Brg:</string>
+    <string name="nearest_airports_elevation">Elev: %1$dm (%2$dft)</string>
+    <string name="fab_cd_nearest_airports">Show nearest airports list</string>
     <string name="map_marker_hdg_format">HDG: %s</string>
     <string name="map_marker_ils_format">ILS %s</string>
     <string name="map_marker_lighting">Lighting</string>
