@@ -35,6 +35,7 @@
 	<a href="docs/EN/planning/roadmap.md">Roadmap</a> |
 	<a href="SECURITY.md">Security Policy</a> |
 	<a href="LICENSE">License</a> |
+	<a href="CONTRIBUTING.md">Contributing</a>
 	<a href="COLLABORATORS.md">Collaborators</a>
 </div>
 
