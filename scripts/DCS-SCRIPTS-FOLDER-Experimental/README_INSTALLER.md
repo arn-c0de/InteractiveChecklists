@@ -278,8 +278,9 @@ Same as parent project - see [LICENSE](../../LICENSE)
 - Integrates with existing DCS DataPad server infrastructure
 - Part of the **DCS Interactive Checklists** project
 
----
 
-**Version**: 1.0.0
-**Author**: arn-c0de
-**Last Updated**: January 2026
+
+---
+App Version: v1.0.25
+Last Updated: 2026-01-18
+---
