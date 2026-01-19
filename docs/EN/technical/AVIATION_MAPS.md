@@ -365,3 +365,9 @@ implementation("org.osmdroid:osmdroid-android:6.1.20")
 ## License
 
 Same license as the main project (see root LICENSE file).
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

@@ -327,3 +327,9 @@ When experiencing problems:
 2. Check security audit: `security_audit.jsonl`
 3. Check token status: `python registration_token.py list`
 4. Check Android log: `adb logcat | grep QrRegistration`
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

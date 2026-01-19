@@ -131,3 +131,9 @@ Ensure Python files exist in `scripts/` directory.
 - [CodeQL Documentation](https://codeql.github.com/docs/)
 - [Multi-language analysis](https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/customizing-your-advanced-setup-for-code-scanning)
 - [CodeQL CLI](https://codeql.github.com/docs/codeql-cli/)
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

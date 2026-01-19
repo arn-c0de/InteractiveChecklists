@@ -594,8 +594,9 @@ Planned features for future versions:
 - [Material Design 3](https://m3.material.io/)
 - [Repository Pattern](https://developer.android.com/topic/architecture/data-layer)
 
----
 
-**Last Updated:** 2025-12-12
-**Version:** 1.0.4
-**Author:** Development Team
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

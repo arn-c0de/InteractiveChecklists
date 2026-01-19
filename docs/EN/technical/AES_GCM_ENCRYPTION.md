@@ -52,3 +52,9 @@ If you were previously using PSK mode:
 4. Restart both server and Android app
 
 See [ECDH Usage Guide](ECDH_USAGE_GUIDE.md) for detailed migration instructions.
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

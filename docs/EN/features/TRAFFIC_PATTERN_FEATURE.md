@@ -118,3 +118,9 @@ The modular design allows easy additions:
 2. Pattern requires stored runways (won't generate from ad-hoc points)
 3. No dynamic wind adjustment yet (planned for v2.0)
 4. No vertical / altitude visualization (2D display only)
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

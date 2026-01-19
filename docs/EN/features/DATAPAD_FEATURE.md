@@ -469,3 +469,9 @@ A comprehensive list of fields the DataPad will receive from the UDP JSON stream
 - [ ] Live animated aircraft visualization showing orientation (pitch/roll/heading) and movement
 - [ ] Dedicated DataPad UI/UX redesign and controls
 - ✅ Implemented: AES-GCM encrypted UDP telemetry (see `docs/technical/AES_GCM_ENCRYPTION.md`) 
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

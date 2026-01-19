@@ -250,3 +250,9 @@ See DEVICE_COMPATIBILITY_MATRIX.md (to be created)
 - Recent updates to MapNavigationDisplay and MapFlightInstruments show good responsive patterns
 - FABOverlay has landscape-specific positioning logic already
 - Need to verify if main navigation exists and how it's structured
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

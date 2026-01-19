@@ -165,3 +165,9 @@ By contributing, you agree that your contributions will be licensed under the pr
 ---
 
 **Thanks a lot for contributing — every bit helps!** 🎉
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

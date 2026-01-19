@@ -23,3 +23,9 @@ Only for player-controlled aircraft, some actions are system-protected, multipla
 
 **Conclusion:**
 Secure, auditable two-way command channel between app and DCS.
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

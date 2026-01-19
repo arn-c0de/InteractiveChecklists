@@ -37,3 +37,9 @@ Stay in 2D but enhance altitude perception using vertical lines from ground to a
 - Very low complexity
 - Clear altitude perception
 - No 3D terrain required
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

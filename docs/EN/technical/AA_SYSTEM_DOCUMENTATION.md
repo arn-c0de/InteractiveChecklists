@@ -1003,3 +1003,9 @@ MapViewer.kt (Orchestration)
 ```
 
 This documentation provides a complete understanding of how AA units are detected, classified, and displayed in the ChecklistInteractive tactical map system.
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---
