@@ -487,7 +487,7 @@ See [docs/EN/features/DATAPAD_FEATURE.md](docs/EN/features/DATAPAD_FEATURE.md) f
 
 
 <a name="demo-videos"></a>
-## Demo Videos 🎬
+## Demo Videos 
 
 <p align="center">
 <a href="https://youtu.be/ecE6bdzyNwA"><img src="https://img.youtube.com/vi/ecE6bdzyNwA/0.jpg" alt="Carrier Landing Pattern – Live Tracking & Pattern Calculation Test (STATE App 1.0.19)" width="360" /></a> &nbsp;
