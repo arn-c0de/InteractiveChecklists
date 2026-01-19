@@ -4,7 +4,7 @@
   "target_ip": "192.168.178.*",
   "port": 5010,
   "handshake_port": 5011,
-  "interval": 100,
+  "interval": 10,
   "authorized_devices": "authorized_devices.json",
   "enable_pow": true,
   "pow_difficulty": 16,
