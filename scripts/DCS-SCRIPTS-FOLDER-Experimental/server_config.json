@@ -11,5 +11,6 @@
   "custom_args": "",
   "bind_ip": "192.168.178.100",
   "dcs_path": "C:\\Program Files\\Eagle Dynamics\\DCS World",
-  "saved_games_path": "C:\\Users\\arn\\Saved Games\\DCS"
+  "saved_games_path": "C:\\Users\\arn\\Saved Games\\DCS",
+  "authorized_devices_path": "authorized_devices.json"
 }
