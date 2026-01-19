@@ -304,3 +304,9 @@ If you have a specific device you'd like us to test, please reach out with:
 **Last Updated:** [To be filled with implementation date]
 **Document Version:** 1.0
 **App Version:** [Current version]
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

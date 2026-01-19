@@ -204,3 +204,8 @@ assert(maps.contains("Caucasus"))
 - [Database Structure](structure.md)
 - [Marker System](../features/TAG_SYSTEM.md)
 - [Aviation Maps](AVIATION_MAPS.md)
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

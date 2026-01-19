@@ -146,3 +146,9 @@ To verify DCS API functions are working:
 - [DCS World Export Lua Documentation](https://wiki.hoggitworld.com/view/DCS_Export_Script)
 - [DCS-BIOS](https://github.com/DCS-Skunkworks/dcs-bios) - Advanced cockpit data extraction
 - [Tacview Export](https://www.tacview.net/documentation/dcs/en/) - Similar export framework
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

@@ -70,3 +70,8 @@ device_fp = hmac.new(fp_key, device_id.encode('utf-8'), hashlib.sha256).hexdiges
 - HMAC (RFC 2104): https://tools.ietf.org/html/rfc2104
 - NIST FIPS 198-1: https://csrc.nist.gov/publications/detail/fips/198/1/final
 - OWASP: Don't use fast hashes for sensitive data
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

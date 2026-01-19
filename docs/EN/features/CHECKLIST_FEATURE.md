@@ -43,3 +43,9 @@ Example:
 - Add a small editor or store checklists in external storage for sharing between devices.
 
 *** Implementation details and further improvements added in the app code comments. ***
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

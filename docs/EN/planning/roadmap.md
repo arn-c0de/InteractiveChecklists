@@ -79,3 +79,9 @@ This roadmap outlines the planned development phases and features for the app in
 - Backend infrastructure (where needed) should prioritize privacy, encryption, and optional self-hosting.
 - Regular testing on target devices and simulators is required at each milestone.
 
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

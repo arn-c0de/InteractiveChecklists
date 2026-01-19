@@ -48,3 +48,9 @@ This file implements a custom `Overlay` for the `osmdroid` map library, responsi
     -   Includes error handling and logging for robustness.
 
 In essence, `AARangeData.kt` provides the static and dynamic data required for AA systems and their visual representation, while `AARangeRingsOverlay.kt` consumes this data to draw interactive and informative range rings directly onto the map interface.
+
+
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---

@@ -418,3 +418,7 @@
 
 **Package:** com.example.checklist_interactive.ui.theme
 
+---
+App Version: v1.0.25
+Last Updated: 2026.01.19
+---
