@@ -65,3 +65,8 @@
 ### Leaflet.RotatedMarker
 - **License:** [MIT](https://opensource.org/licenses/MIT)
 - **Source:** https://github.com/bbecquet/Leaflet.RotatedMarker
+
+---
+App Version: v1.0.25
+Last Updated: 2026-01-18
+---

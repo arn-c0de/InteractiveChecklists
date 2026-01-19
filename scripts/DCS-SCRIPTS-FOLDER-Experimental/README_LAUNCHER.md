@@ -128,3 +128,8 @@ Just run `install.bat` again to update all dependencies to the latest versions.
 - Bind to `127.0.0.1` for localhost-only (most secure)
 - Bind to specific local IP (e.g., `192.168.x.x`) for LAN access
 - Never bind to `0.0.0.0` unless you understand the security implications
+
+---
+App Version: v1.0.25
+Last Updated: 2026-01-18
+---
