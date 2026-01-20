@@ -479,7 +479,7 @@
     <string name="datapad_ecdh_description_secure">基于会话的安全加密现已始终启用。</string>
     <string name="datapad_device_name_label">设备名称</string>
     <string name="datapad_device_name_placeholder">Android 平板</string>
-    <string name="datapad_device_name_support">用于在握手过程识别此设备</string>
+    <string name="datapad_device_name_support">用于在握手过程识别此设备。扫描二维码时，该名称将记录到服务器并显示在已认证的设备列表中。</string>
     <string name="datapad_device_id_label">设备 ID（从密钥派生）</string>
     <string name="datapad_server_ip_label">服务器 IP（单播）</string>
     <string name="datapad_server_ip_placeholder">192.168.178.100</string>

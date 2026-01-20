@@ -126,7 +126,7 @@ fun SetupWizardScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Welcome message
+            // Welcome message (smaller banner with app name)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
@@ -134,34 +134,42 @@ fun SetupWizardScreen(
                 )
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.RocketLaunch,
                         contentDescription = null,
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(36.dp)
                             .align(Alignment.CenterHorizontally),
                         tint = MaterialTheme.colorScheme.primary
                     )
                     Text(
                         text = stringResource(R.string.setup_wizard_welcome),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    // App name line (smaller)
+                    Text(
+                        text = stringResource(R.string.app_name),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
                     )
                     Text(
                         text = stringResource(R.string.setup_wizard_description),
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = stringResource(R.string.settings_version, softwareVersion),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
@@ -277,10 +285,20 @@ fun SetupWizardScreen(
                     // Compute recommended size based on screen width
                     val configuration = LocalConfiguration.current
                     val screenWidthDp = configuration.screenWidthDp
-                    val recommended = if (screenWidthDp >= 600) "medium" else "small"
+                    // Recommend tiny for small screens, small for medium, medium for larger screens
+                    val recommended = when {
+                        screenWidthDp >= 900 -> "medium"
+                        screenWidthDp >= 600 -> "small"
+                        else -> "tiny"
+                    }
+                    val recommendedLabel = when (recommended) {
+                        "tiny" -> stringResource(R.string.settings_fab_size_tiny)
+                        "small" -> stringResource(R.string.settings_fab_size_small)
+                        else -> stringResource(R.string.settings_fab_size_medium)
+                    }
 
                     Text(
-                        text = stringResource(R.string.setup_fab_size_recommendation, if (recommended == "medium") stringResource(R.string.settings_fab_size_medium) else stringResource(R.string.settings_fab_size_small)),
+                        text = stringResource(R.string.setup_fab_size_recommendation, recommendedLabel),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -289,6 +307,7 @@ fun SetupWizardScreen(
 
                     var currentFabSize by remember { mutableStateOf(prefsManager.getFabSize()) }
                     val fabSizes = listOf(
+                        "tiny" to stringResource(R.string.settings_fab_size_tiny),
                         "small" to stringResource(R.string.settings_fab_size_small),
                         "medium" to stringResource(R.string.settings_fab_size_medium),
                         "large" to stringResource(R.string.settings_fab_size_large)
