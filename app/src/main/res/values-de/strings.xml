@@ -500,7 +500,7 @@
     <string name="datapad_ecdh_description_secure">Sichere, sitzungsbasierte Verschlüsselung (empfohlen)</string>
     <string name="datapad_device_name_label">Gerätename</string>
     <string name="datapad_device_name_placeholder">Android-Tablet</string>
-    <string name="datapad_device_name_support">Wird zur Identifikation dieses Geräts während des Handshakes verwendet</string>
+    <string name="datapad_device_name_support">Wird zur Identifikation dieses Geräts während des Handshakes verwendet. Beim Scannen eines QR-Codes wird dieser Name auf dem Server in der Liste der authentifizierten Geräte übernommen.</string>
     <string name="datapad_device_id_label">Geräte-ID (vom Schlüssel abgeleitet)</string>
     <string name="datapad_server_ip_label">Server-IP (Unicast)</string>
     <string name="datapad_server_ip_placeholder">192.168.178.100</string>

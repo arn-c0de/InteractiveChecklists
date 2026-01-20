@@ -188,12 +188,67 @@ fun DataPadSettingsDialog(
                             Text(stringResource(R.string.datapad_device_name_support))
                         }
                     )
-                    
-                        val clipboard = LocalClipboardManager.current
-                        var copiedDeviceId by remember { mutableStateOf(false) }
-                        var copiedPublicKey by remember { mutableStateOf(false) }
-                        var copiedBoth by remember { mutableStateOf(false) }
-                        val publicKey = try { manager.getPublicKey() } catch (_: Throwable) { "" }
+
+                    // Quick Setup - moved here to be directly under Device Name for visibility
+                    var showQrScannerDialog by remember { mutableStateOf(false) }
+                    var registrationMessage by remember { mutableStateOf<String?>(null) }
+
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp)
+                        ) {
+                            Text(
+                                text = "Quick Setup",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Scan QR code from server to auto-configure",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Button(
+                                onClick = { showQrScannerDialog = true },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CameraAlt,
+                                    contentDescription = "Scan QR Code"
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Scan QR Code")
+                            }
+
+                            registrationMessage?.let { msg ->
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = msg,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (msg.contains("success", ignoreCase = true)) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.error
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    val clipboard = LocalClipboardManager.current
+                    var copiedDeviceId by remember { mutableStateOf(false) }
+                    var copiedPublicKey by remember { mutableStateOf(false) }
+                    var copiedBoth by remember { mutableStateOf(false) }
+                    val publicKey = try { manager.getPublicKey() } catch (_: Throwable) { "" }
 
                         // Show Device ID (copyable)
                         Card(
@@ -375,60 +430,8 @@ fun DataPadSettingsDialog(
 
                 HorizontalDivider()
                 
-                // QR Code Registration Section
-                var showQrScannerDialog by remember { mutableStateOf(false) }
-                var registrationMessage by remember { mutableStateOf<String?>(null) }
-                
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
-                        Text(
-                            text = "Quick Setup",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Scan QR code from server to auto-configure",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        
-                        Button(
-                            onClick = { showQrScannerDialog = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CameraAlt,
-                                contentDescription = "Scan QR Code"
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Scan QR Code")
-                        }
-                        
-                        registrationMessage?.let { msg ->
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = msg,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (msg.contains("success", ignoreCase = true)) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.error
-                                }
-                            )
-                        }
-                    }
-                }
+                // QR Code Registration Section (handled near Device Name)
+                // (moved earlier for visibility)
                 
                 if (showQrScannerDialog) {
                     // Full-screen camera QR scanner
