@@ -14,8 +14,8 @@ android {
         applicationId = "com.example.checklist_interactive"
         minSdk = 34
         targetSdk = 36
-        versionCode = 4
-        versionName = "1.0.4"
+        versionCode = 25
+        versionName = "1.0.25"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

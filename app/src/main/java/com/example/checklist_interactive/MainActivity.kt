@@ -61,10 +61,19 @@ import com.example.checklist_interactive.ui.setup.SetupWizardScreen
 
 class MainActivity : ComponentActivity() {
         companion object {
-            const val SOFTWARE_VERSION = "1.0.25"
+            fun getSoftwareVersion(context: Context): String {
+                return try {
+                    val pm = context.packageManager
+                    val info = pm.getPackageInfo(context.packageName, 0)
+                    info.versionName ?: "0.0.0"
+                } catch (e: Exception) {
+                    "0.0.0"
+                }
+            }
         }
 
-        val softwareVersion = SOFTWARE_VERSION
+        val softwareVersion: String
+            get() = getSoftwareVersion(this)
 
     // Singletons used by Compose and lifecycle methods so we can persist state reliably
     private val globalPrefsManager by lazy { com.example.checklist_interactive.data.prefs.PreferencesManager(this) }
@@ -315,7 +324,7 @@ class MainActivity : ComponentActivity() {
                         
                         // 2. Check if app was updated and import new assets automatically
                         val lastImportedVersion = prefsManager.getLastImportedVersion()
-                        val currentVersion = SOFTWARE_VERSION
+                        val currentVersion = softwareVersion
                         
                         if (lastImportedVersion != currentVersion) {
                             // App was updated or first launch - import all bundled assets
