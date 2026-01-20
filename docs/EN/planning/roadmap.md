@@ -5,14 +5,6 @@
 This roadmap outlines the planned development phases and features for the app in the exact priority order requested. All items are listed sequentially, reflecting the intended implementation sequence. The focus is on iterative progression: completing earlier items before moving to the next.
 
 
----
-
-
-### Map View Nearest Airport List
-- Add a nearest airport list feature to the map view.
-- Display airports sorted by distance from the player's current position.
-- Include details such as airport name, ICAO code, distance, and bearing.
-- Make the list easily accessible (e.g., via sidebar or overlay toggle).
 
 ---
 
