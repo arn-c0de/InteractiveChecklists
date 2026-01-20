@@ -266,6 +266,23 @@ The GUI provides an easy way to register devices via QR code:
 
 ---
 
+### Troubleshooting QR Registration ✅
+If QR-code registration fails, try the checks below (quick and common fixes):
+
+- **Check Android app network permissions**: ensure the app has the `INTERNET` permission and is allowed to use networks (no restrictive work profile or denied network access).
+- **Check Android firewall / antivirus / VPN**: some devices ship with an app firewall or VPN that blocks UDP traffic; disable or allow the app temporarily and retry.
+- **Ensure both devices are on the same Wi‑Fi**: your phone/tablet must be on the same local network (same subnet) as the server – mobile data or a different Wi‑Fi will not reach a local server.
+- **Verify the Server IP is correct**: confirm the server IP shown in the QR code matches the server bind IP (and that the server is running on that interface).
+- **Verify the Handshake / Registration port**: make sure the port in the QR payload (e.g., `5011`) matches the server handshake port and any firewall rules on the server/PC allow incoming UDP on that port.
+- **Confirm the server is running and listening**: check the server logs for "Listening for handshakes on" and ensure it reports the expected IP:port.
+- **Check token validity**: registration tokens are time-limited and single-use — regenerate and try again if expired or already used.
+- **Look for specific errors**: Example: `sendto failed: EPERM` on Android usually means the app is blocked from sending network packets (firewall, VPN, or missing permissions).
+
+- **Ask on GitHub Discussions**: Prefer posting in the project's Discussions (https://github.com/arn-c0de/InteractiveChecklists/discussions) — include app logs (`adb logcat`) and server logs so we can reproduce and diagnose quickly.
+- **Or open a GitHub issue using the built-in template**: Click **New issue** on the repo and select **"QR Registration problem"** — this pre-fills the required fields and helps us triage faster.
+
+---
+
 ## 5. Android App Setup
 <p align="center">
 	<img src="images/setup_datapad_settings_activate.png" alt="APP DataPad Activate Toggle" width="360" /><br/>
