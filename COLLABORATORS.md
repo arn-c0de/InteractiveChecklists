@@ -12,15 +12,18 @@ All contributions are currently **unpaid and voluntary**. This is a **non-commer
 
 ---
 
-**Repository:**  
+**Repository:**
 [github.com/arn-c0de/InteractiveChecklists](https://github.com/arn-c0de/InteractiveChecklists)
 
 ---
 
 ## Maintainer
 
-- **arn-c0de**  
-  Project Lead  
+* **arn-c0de**
+  Project Lead & Core Maintainer
+
+  **Responsibilities:** Architecture, Backend, Integration, DevOps, Documentation
+
   Contact: [arn-c0de@protonmail.com](mailto:arn-c0de@protonmail.com)
 
 ---
@@ -28,26 +31,47 @@ All contributions are currently **unpaid and voluntary**. This is a **non-commer
 ## Contributors
 
 ### Translation
-- **Ferinjoque** — Spanish language support — [https://github.com/Ferinjoque](https://github.com/Ferinjoque) (2025-12-23)
-- **Dawn3901** — Simplified Chinese language support — [https://github.com/Dawn3901](https://github.com/Dawn3901) (2025-12-26)
+
+*Language localization and internationalization support.*
+
+* **Ferinjoque** — Spanish language support — [https://github.com/Ferinjoque](https://github.com/Ferinjoque) (2025-12-23)
+* **Dawn3901** — Simplified Chinese language support — [https://github.com/Dawn3901](https://github.com/Dawn3901) (2025-12-26)
 
 ### Development
-- _No entries yet_
+
+*Feature implementation, bug fixes, and core logic.*
+
+* *No entries yet*
 
 ### Design & UX
-- _No entries yet_
+
+*User interface, usability, and visual experience.*
+
+* *No entries yet*
 
 ### Documentation
-- **drkaio7** — document maintainer — [https://github.com/drkaio7](https://github.com/drkaio7) (2026-01-19)
+
+*Project documentation, guides, and references.*
+
+* **drkaio7** — document maintainer — [https://github.com/drkaio7](https://github.com/drkaio7) (2026-01-19)
 
 ### DevOps & Infrastructure
-- _No entries yet_
+
+*CI/CD, deployments, and infrastructure management.*
+
+* *No entries yet*
 
 ### Testing & QA
-- _No entries yet_
+
+*Testing, quality assurance, and validation.*
+
+* *No entries yet*
 
 ### Support
-- _No entries yet_
+
+*User support, issue triage, and community help.*
+
+* *No entries yet*
 
 ---
 
@@ -60,6 +84,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to get involved.
 *Want to join? Open a pull request to add yourself as a contributor!*
 
 ---
+
 App Version: v1.0.25
 Last Updated: 2026.01.19
----
+------------------------
