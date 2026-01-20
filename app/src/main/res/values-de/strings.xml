@@ -3,6 +3,7 @@
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <!-- APP METADATA -->
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <string name="app_name">InteractiveChecklists</string>
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <!-- COMMON ACTIONS -->
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
@@ -1193,7 +1194,6 @@
     <string name="fab_positions_reset">FAB positions reset</string>
     <string name="map_drawing_saved">Drawings saved</string>
     <string name="map_db_not_ready_retry">Map database not ready — please tap again to retry.</string>
-<string name="app_name">Checklist-Interactive</string>
 
     
     
