@@ -111,17 +111,27 @@ Planned features and long-term improvements are tracked in the [Roadmap](docs/EN
 
 ## Quick Start – Windows (Recommended & Easiest)
 
-### Install the DCS Export Script (Required)
+### Install the DCS Export Script (Automatic via GUI Installer)
 
-Copy `export.lua` from
-`scripts/DCS-SCRIPTS-FOLDER-Experimental`
+The **GUI installer** now automatically installs `Export.lua` to your DCS Scripts folder during the setup wizard.
 
-into your DCS scripts folder, for example:
-`%USERPROFILE%\Saved Games\DCS\Scripts\`
+**Features:**
+- **Auto-detection** of DCS Saved Games folder
+- **Version detection** - Shows current and new version
+- **Backup creation** - Automatically backs up existing Export.lua
+- **Version comparison** - Prompts before overwriting if Export.lua already exists
+- **Optional skip** - Can skip installation if you prefer manual installation
+
+**Manual Installation (Alternative):**
+
+If you prefer to install manually or skipped the wizard step:
+
+1. Copy `Export.lua` from `scripts/DCS-SCRIPTS-FOLDER-Experimental`
+2. Paste into your DCS Scripts folder: `%USERPROFILE%\Saved Games\DCS\Scripts\`
 
 This script enables DCS to write **entity batches** and **player telemetry files** into a subfolder that the Python forwarder reads.
 
-After copying:
+After installation (automatic or manual):
 - Start or reload your mission, **or**
 - Restart DCS
 
@@ -164,6 +174,7 @@ This keeps dependencies isolated and clean.
 3. **First-Time Setup Wizard** (appears on first run):
    - The wizard will guide you through:
      - **DCS Installation Detection** – Auto-detects your DCS installation
+     - **Export.lua Installation** – Automatically copies Export.lua to DCS Scripts folder with version detection
      - **Dependency Installation** – Installs required Python packages
      - **Server Configuration** – Configure network settings (bind IP, ports, etc.)
      - **Firewall Setup** (optional) – Add Windows Firewall rules for server ports
