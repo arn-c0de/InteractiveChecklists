@@ -388,7 +388,7 @@ class HealthChecker:
 
     @staticmethod
     def check_export_scripts(saved_games_path: str) -> Tuple[bool, str]:
-        """Check if export scripts are installed"""
+        """Check if export scripts are installed and show version info"""
         scripts_path = Path(saved_games_path) / "Scripts"
         export_lua = scripts_path / "Export.lua"
 
@@ -398,7 +398,21 @@ class HealthChecker:
         if not export_lua.exists():
             return False, "Export.lua not installed"
 
-        return True, "Export scripts installed"
+        # Get installed version
+        installed_version = ExportLuaInstaller.extract_version(export_lua)
+        installed_version_str = installed_version if installed_version else "Unknown"
+
+        # Get available version from repo (current directory)
+        current_dir = Path.cwd()
+        repo_export_lua = current_dir / "Export.lua"
+
+        if repo_export_lua.exists():
+            available_version = ExportLuaInstaller.extract_version(repo_export_lua)
+            available_version_str = available_version if available_version else "Unknown"
+
+            return True, f"Installed: v{installed_version_str} | Available: v{available_version_str}"
+        else:
+            return True, f"Installed: v{installed_version_str} | Source file not found in installer directory"
 
     @staticmethod
     def check_network_connectivity(host: str, port: int) -> Tuple[bool, str]:
@@ -1297,6 +1311,58 @@ class MainWindow(QMainWindow):
         dcs_group.setLayout(dcs_layout)
         layout.addWidget(dcs_group)
 
+        # Export.lua Installation
+        export_group = QGroupBox("Export.lua Installation")
+        export_layout = QVBoxLayout()
+
+        # Info section
+        info_label = QLabel(
+            "<p>The Export.lua file is required for DCS to send flight data to the DataPad server.</p>"
+            "<p>This will copy Export.lua from the installation folder to your DCS Scripts folder.</p>"
+        )
+        info_label.setWordWrap(True)
+        export_layout.addWidget(info_label)
+
+        # Source and destination info in a horizontal layout
+        info_grid = QFormLayout()
+
+        self.export_source_path_label = QLabel("Not checked")
+        info_grid.addRow("Source File:", self.export_source_path_label)
+
+        self.export_source_version_label = QLabel("Unknown")
+        info_grid.addRow("Source Version:", self.export_source_version_label)
+
+        self.export_dest_path_label = QLabel("Not configured")
+        info_grid.addRow("Destination Folder:", self.export_dest_path_label)
+
+        self.export_existing_version_label = QLabel("Not installed")
+        info_grid.addRow("Installed Version:", self.export_existing_version_label)
+
+        export_layout.addLayout(info_grid)
+
+        # Buttons
+        button_layout = QHBoxLayout()
+
+        self.install_export_btn = QPushButton("📄 Install Export.lua")
+        self.install_export_btn.setMinimumHeight(40)
+        self.install_export_btn.clicked.connect(self.install_export_lua_from_tab)
+        button_layout.addWidget(self.install_export_btn)
+
+        refresh_export_info_btn = QPushButton("🔄 Refresh Info")
+        refresh_export_info_btn.setMinimumHeight(40)
+        refresh_export_info_btn.clicked.connect(self.refresh_export_lua_info)
+        button_layout.addWidget(refresh_export_info_btn)
+
+        export_layout.addLayout(button_layout)
+
+        # Status label
+        self.export_status_label = QLabel("")
+        self.export_status_label.setWordWrap(True)
+        export_layout.addWidget(self.export_status_label)
+
+        export_group.setLayout(export_layout)
+        layout.addWidget(export_group)
+
         # Files and paths
         files_group = QGroupBox("Server Files")
         files_layout = QFormLayout()
@@ -1317,6 +1383,9 @@ class MainWindow(QMainWindow):
 
         widget.setLayout(layout)
         self.tabs.addTab(widget, "Installation Settings")
+
+        # Initial check for Export.lua
+        self.refresh_export_lua_info()
 
     def browse_dcs_installation(self):
         """Browse for DCS installation folder"""
@@ -1383,6 +1452,96 @@ class MainWindow(QMainWindow):
 
         self.save_config()
         QMessageBox.information(self, "Success", "Installation settings saved successfully!")
+
+    def refresh_export_lua_info(self):
+        """Refresh Export.lua source and destination information"""
+        # Check source file
+        current_dir = Path.cwd()
+        export_lua_path = current_dir / "Export.lua"
+
+        if export_lua_path.exists():
+            self.export_source_path_label.setText(str(export_lua_path))
+            version = ExportLuaInstaller.extract_version(export_lua_path)
+            self.export_source_version_label.setText(version if version else "Unknown")
+            self.export_source_version_label.setStyleSheet("color: green; font-weight: bold;")
+            self.install_export_btn.setEnabled(True)
+        else:
+            self.export_source_path_label.setText("❌ Not found in current directory")
+            self.export_source_path_label.setStyleSheet("color: red;")
+            self.export_source_version_label.setText("N/A")
+            self.install_export_btn.setEnabled(False)
+            self.export_status_label.setText(
+                "⚠ Warning: Export.lua not found in the current directory.\n"
+                "Please make sure Export.lua is in the same folder as this installer."
+            )
+            self.export_status_label.setStyleSheet("color: orange; font-weight: bold;")
+
+        # Check destination
+        saved_games_path = self.saved_games_input.text()
+        if saved_games_path and os.path.exists(saved_games_path):
+            scripts_folder = Path(saved_games_path) / "Scripts"
+            self.export_dest_path_label.setText(str(scripts_folder))
+
+            # Check if Export.lua already exists
+            existing_export = scripts_folder / "Export.lua"
+            if existing_export.exists():
+                existing_version = ExportLuaInstaller.extract_version(existing_export)
+                self.export_existing_version_label.setText(existing_version if existing_version else "Unknown")
+                self.export_existing_version_label.setStyleSheet("color: blue; font-weight: bold;")
+            else:
+                self.export_existing_version_label.setText("Not installed")
+                self.export_existing_version_label.setStyleSheet("color: gray;")
+        else:
+            self.export_dest_path_label.setText("⚠ DCS Saved Games folder not configured")
+            self.export_dest_path_label.setStyleSheet("color: orange;")
+            self.export_existing_version_label.setText("N/A")
+
+    def install_export_lua_from_tab(self):
+        """Install Export.lua to DCS Scripts folder from Installation Settings tab"""
+        try:
+            # Get paths
+            source_path = Path.cwd() / "Export.lua"
+            if not source_path.exists():
+                self.export_status_label.setText("❌ Error: Export.lua not found in current directory")
+                self.export_status_label.setStyleSheet("color: red; font-weight: bold;")
+                return
+
+            saved_games_path = self.saved_games_input.text()
+            if not saved_games_path or not os.path.exists(saved_games_path):
+                self.export_status_label.setText("❌ Error: DCS Saved Games folder not configured or does not exist")
+                self.export_status_label.setStyleSheet("color: red; font-weight: bold;")
+                QMessageBox.warning(
+                    self,
+                    "Saved Games Not Found",
+                    "DCS Saved Games folder not configured.\n\n"
+                    "Please set the Saved Games path first using the Auto-Detect or Browse button."
+                )
+                return
+
+            scripts_folder = Path(saved_games_path) / "Scripts"
+
+            # Perform installation
+            success, message = ExportLuaInstaller.copy_export_lua(
+                source_path,
+                scripts_folder,
+                parent_widget=self
+            )
+
+            if success:
+                self.export_status_label.setText(f"✅ {message}")
+                self.export_status_label.setStyleSheet("color: green; font-weight: bold;")
+                # Refresh info to show updated version
+                self.refresh_export_lua_info()
+                QMessageBox.information(self, "Success", message)
+            else:
+                self.export_status_label.setText(f"ℹ {message}")
+                self.export_status_label.setStyleSheet("color: gray; font-weight: bold;")
+
+        except Exception as e:
+            logger.error(f"Error in install_export_lua_from_tab: {e}")
+            self.export_status_label.setText(f"❌ Error: {str(e)}")
+            self.export_status_label.setStyleSheet("color: red; font-weight: bold;")
+            QMessageBox.critical(self, "Installation Error", f"Failed to install Export.lua:\n\n{str(e)}")
 
     def create_health_check_tab(self):
         """Create health check and diagnostics tab"""
@@ -2071,11 +2230,19 @@ class MainWindow(QMainWindow):
         return HealthChecker.check_dcs_installation(dcs_path)
 
     def check_export_scripts(self) -> Tuple[bool, str]:
-        """Check export scripts"""
+        """Check export scripts with version information"""
         saved_games = self.config.get('saved_games_path', '')
         if not saved_games:
             return False, "Saved Games path not configured"
-        return HealthChecker.check_export_scripts(saved_games)
+
+        # Get detailed version info from HealthChecker
+        success, message = HealthChecker.check_export_scripts(saved_games)
+
+        # If not installed, suggest using the Installation Settings tab
+        if not success and "not installed" in message:
+            return False, f"{message} - Use 'Installation Settings' tab to install"
+
+        return success, message
 
     def check_dependencies(self) -> Tuple[bool, str]:
         """Check Python dependencies"""
