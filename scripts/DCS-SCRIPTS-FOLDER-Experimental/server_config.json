@@ -2,7 +2,7 @@
   "last_mode": 1,
   "ip_address": "192.168.178.100",
   "target_ip": "192.168.178.*",
-  "port": 5010,
+  "port": 5011,
   "handshake_port": 5011,
   "interval": 10,
   "authorized_devices": "authorized_devices.json",
