@@ -1,0 +1,142 @@
+name: Translation Coverage Check
+
+on:
+  push:
+    branches: [ main, develop, 1.0.* ]
+    paths:
+      - 'app/src/main/res/values*/**'
+  pull_request:
+    branches: [ main, develop, 1.0.* ]
+    paths:
+      - 'app/src/main/res/values*/**'
+  workflow_dispatch:  # Allows manual trigger
+
+jobs:
+  check-translations:
+    name: Check Translation Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Run translation check
+        id: check
+        run: |
+          cd scripts/TranslationStringTools
+          python check_translations.py --no-color > check_output.txt 2>&1 || true
+          cat check_output.txt
+
+          # Save for artifact
+          cp check_output.txt ../../translation_check.txt
+
+      - name: Generate Markdown Report
+        if: always()
+        run: |
+          cd scripts/TranslationStringTools
+          python check_translations.py --format markdown --output translation_report.md
+
+          # Add to GitHub Step Summary
+          cat translation_report.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate JSON Report
+        if: always()
+        run: |
+          cd scripts/TranslationStringTools
+          python check_translations.py --format json --output translation_report.json
+
+      - name: Upload Reports as Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: translation-reports
+          path: |
+            scripts/TranslationStringTools/translation_report.md
+            scripts/TranslationStringTools/translation_report.json
+            translation_check.txt
+          retention-days: 30
+
+      - name: Check Coverage Threshold
+        run: |
+          cd scripts/TranslationStringTools
+          python check_translations.py --ci --threshold 90
+
+      - name: Comment on PR (if applicable)
+        if: github.event_name == 'pull_request' && failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = 'scripts/TranslationStringTools/translation_report.md';
+
+            if (fs.existsSync(reportPath)) {
+              const report = fs.readFileSync(reportPath, 'utf8');
+
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `## ⚠️ Translation Coverage Below Threshold\n\n${report}\n\n---\n*Automated check by Translation Checker*`
+              });
+            }
+
+  # Optional: Check for specific languages
+  check-german:
+    name: Check German Translation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check German
+        run: |
+          cd scripts/TranslationStringTools
+          python check_translations.py --lang de --ci --threshold 95
+
+  check-spanish:
+    name: Check Spanish Translation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check Spanish
+        run: |
+          cd scripts/TranslationStringTools
+          python check_translations.py --lang es --ci --threshold 95
+
+  check-chinese:
+    name: Check Chinese Translation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check Chinese
+        run: |
+          cd scripts/TranslationStringTools
+          python check_translations.py --lang zh-rCN --ci --threshold 95
