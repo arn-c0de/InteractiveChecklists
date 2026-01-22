@@ -1,0 +1,9 @@
+# Android Translation Checker
+# No external dependencies required - uses Python standard library only
+
+# Python version requirement
+# python>=3.7
+
+# Optional: For development and testing
+# pytest>=9.0.2  # For unit tests (if added later)
+# black>=26.1.0  # For code formatting (if needed)
