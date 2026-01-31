@@ -43,6 +43,20 @@ class AirportMarkerLabelsOverlay(
     // Calculate overlay scale once during initialization
     private val overlayScale = calculateMapOverlayScale(context)
 
+    // Device scale factor based on screen width (helps small phones show larger labels)
+    private fun deviceScale(): Float {
+        val metrics = context.resources.displayMetrics
+        val widthDp = metrics.widthPixels / metrics.density
+        return when {
+            // Stronger scaling for very small phones
+            widthDp <= 360f -> 1.40f
+            // Moderate scaling for medium-small phones
+            widthDp <= 420f -> 1.25f
+            // Slight increase for others to keep labels comfortably readable
+            else -> 1.05f
+        }
+    }
+
     // Paint for label background
     private val labelBackgroundPaint = Paint().apply {
         isAntiAlias = true
@@ -150,9 +164,25 @@ class AirportMarkerLabelsOverlay(
 
         val airportCount = airports.size
         if (airportCount == 0) {
-            // Log occasionally to help debug
             return
         }
+
+        // Compute device-based scale so small phones get slightly larger labels
+        val rawScaleFactor = overlayScale * deviceScale()
+
+        // Enforce a stronger minimum scale on phones so small devices show significantly larger text
+        val metrics = context.resources.displayMetrics
+        val widthDp = metrics.widthPixels / metrics.density
+        val minScaleForPhone = if (widthDp <= 360f) 1.6f else if (widthDp <= 420f) 1.4f else 1.05f
+        val scaleFactor = maxOf(rawScaleFactor, minScaleForPhone)
+
+        // Debug logging to help verify scale on device (remove after verification)
+        Log.d(TAG, "scaleFactor=$scaleFactor raw=$rawScaleFactor overlayScale=$overlayScale widthDp=$widthDp")
+
+        // Apply scale to paints dynamically (keeps initial paint configs but adjusts sizes for current device)
+        labelTextPaint.textSize = getScaledTextSize(16f, context) * scaleFactor
+        runwayTextPaint.textSize = getScaledTextSize(13f, context) * scaleFactor
+        labelBorderPaint.strokeWidth = getScaledStrokeWidth(2f, context) * scaleFactor
 
         canvas.save()
 
@@ -166,7 +196,7 @@ class AirportMarkerLabelsOverlay(
 
             for (airportLabel in airports) {
                 val location = airportLabel.location
-                
+
                 // Skip if outside visible bounds
                 if (location.latitude < minLat || location.latitude > maxLat ||
                     location.longitude < minLon || location.longitude > maxLon) {
@@ -179,38 +209,40 @@ class AirportMarkerLabelsOverlay(
                 // Calculate label dimensions
                 val nameText = location.name
                 val runwayText = airportLabel.runwayNames
-                
+
                 labelTextPaint.getTextBounds(nameText, 0, nameText.length, textBounds)
                 val nameWidth = textBounds.width().toFloat()
                 val nameHeight = textBounds.height().toFloat()
-                
+
                 var maxWidth = nameWidth
-                var totalHeight = nameHeight + 8f // 8f padding
-                
+                // vertical measurements include scaled inner spacing
+                var totalHeight = nameHeight + (8f * scaleFactor)
+
                 val hasRunways = runwayText.isNotEmpty()
                 var runwayWidth = 0f
                 var runwayHeight = 0f
-                
+
                 if (hasRunways) {
                     runwayTextPaint.getTextBounds(runwayText, 0, runwayText.length, textBounds)
                     runwayWidth = textBounds.width().toFloat()
                     runwayHeight = textBounds.height().toFloat()
                     maxWidth = maxOf(maxWidth, runwayWidth)
-                    totalHeight += runwayHeight + 4f // Additional height + spacing
+                    totalHeight += runwayHeight + (4f * scaleFactor)
                 }
 
                 // Position label below and to the right of the marker (with responsive offset)
-                val labelX = screenPoint.x.toFloat() + getScaledLabelOffset(20f, context)
-                val labelY = screenPoint.y.toFloat() + getScaledLabelOffset(10f, context)
-                
-                val padding = 8f
+                val labelX = screenPoint.x.toFloat() + (getScaledLabelOffset(20f, context) * scaleFactor)
+                val labelY = screenPoint.y.toFloat() + (getScaledLabelOffset(10f, context) * scaleFactor)
+
+                val padding = 8f * scaleFactor
                 val labelWidth = maxWidth + (padding * 2)
                 val labelHeight = totalHeight + (padding * 2)
 
                 // Draw background with border
+                val cornerRadius = 6f * scaleFactor
                 val rectF = RectF(labelX, labelY, labelX + labelWidth, labelY + labelHeight)
-                canvas.drawRoundRect(rectF, 6f, 6f, labelBackgroundPaint)
-                canvas.drawRoundRect(rectF, 6f, 6f, labelBorderPaint)
+                canvas.drawRoundRect(rectF, cornerRadius, cornerRadius, labelBackgroundPaint)
+                canvas.drawRoundRect(rectF, cornerRadius, cornerRadius, labelBorderPaint)
 
                 // Draw airport name (top line)
                 var textY = labelY + padding + nameHeight
@@ -218,7 +250,7 @@ class AirportMarkerLabelsOverlay(
 
                 // Draw runway names (bottom line) if available
                 if (hasRunways) {
-                    textY += runwayHeight + 4f
+                    textY += runwayHeight + (4f * scaleFactor)
                     canvas.drawText(runwayText, labelX + padding, textY, runwayTextPaint)
                 }
             }
