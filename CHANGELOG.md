@@ -3,7 +3,7 @@
 App Version: v1.0.25
 Last Updated: 2026.01.19
 ---
-
+## [1.0.26] - 2026-01-31
 
 
 All relevant changes are summarized here by version.
