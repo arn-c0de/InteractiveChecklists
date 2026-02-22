@@ -22,6 +22,19 @@
   <img src="https://img.shields.io/badge/language-Python-3776AB?logo=python&logoColor=white" alt="Python" />
 </p>
 
+**Current Development Status – Aviation Map & DataPad Features**  
+(February 2026)
+
+I'm currently **not actively working** on the Aviation Map, live DataPad / telemetry, or tactical units features, because I do **not have DCS World installed** right now and cannot verify / test whether changes still work or break functionality.
+
+The topic will **definitely be continued** in the future once I have a proper DCS test environment again.
+
+If anyone is interested in actively contributing, testing, or submitting pull requests in the meantime → very welcome!  
+I will happily look at everything, review code / changes, and give feedback in English.
+
+Thanks for your understanding and patience 🙏  
+o7
+
 
 
 <div align="center">
