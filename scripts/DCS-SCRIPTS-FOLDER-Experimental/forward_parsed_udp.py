@@ -168,6 +168,42 @@ def find_export_file(scripts_dir: str) -> str | None:
     return matches[0]
 
 
+# Addresses that request a listener on every network interface.
+_WILDCARD_BIND_TOKENS = frozenset({'', '*', 'any'})
+
+
+def is_wildcard_bind_address(ip) -> bool:
+    """Return True if ip means "listen on all network interfaces"."""
+    candidate = (ip or '').strip().strip('[]').lower()
+    if candidate in _WILDCARD_BIND_TOKENS:
+        return True
+    try:
+        import ipaddress
+        return ipaddress.ip_address(candidate).is_unspecified
+    except ValueError:
+        return False
+
+
+def resolve_specific_bind_address(ip) -> str:
+    """Validate ip and return a concrete, interface-specific address literal.
+
+    Hostnames are resolved first. Wildcard addresses raise ValueError so a
+    socket can never end up listening on every interface.
+    """
+    import ipaddress
+    candidate = (ip or '').strip().strip('[]')
+    if is_wildcard_bind_address(candidate):
+        raise ValueError(f"refusing to bind to all network interfaces ({ip!r})")
+    try:
+        address = ipaddress.ip_address(candidate)
+    except ValueError:
+        resolved = socket.gethostbyname(candidate)
+        address = ipaddress.ip_address(resolved)
+    if address.is_unspecified:
+        raise ValueError(f"refusing to bind to all network interfaces ({ip!r})")
+    return str(address)
+
+
 def check_bind_security(bind_ip: str):
     """Enhanced bind security check.
 
@@ -175,7 +211,7 @@ def check_bind_security(bind_ip: str):
     - Warn (and require confirmation) for public IPs.
     - Recommend using 127.0.0.1 for maximum safety.
     """
-    if bind_ip == '0.0.0.0':
+    if is_wildcard_bind_address(bind_ip):
         sys.stderr.write("\n" + "="*70 + "\n")
         sys.stderr.write("🚨 CRITICAL SECURITY WARNING: Binding to ALL network interfaces is BLOCKED!\n")
         sys.stderr.write("="*70 + "\n")
@@ -2237,12 +2273,20 @@ def _perform_qr_registration(server_ip: str, port: int) -> bool:
         
         # Start temporary UDP listener for registration
         # We need to listen on the actual port to receive DeviceRegistration message
+        # SECURITY: never listen on every interface - resolve to a concrete IP
+        try:
+            listen_ip = resolve_specific_bind_address(server_ip)
+        except (ValueError, OSError) as exc:
+            print(f"\n❌ Registration listener not started: {exc}")
+            logger.error(f"Registration listener not started: {exc}")
+            return False
+
         temp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         temp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        temp_sock.bind((server_ip, port))
+        temp_sock.bind((listen_ip, port))
         temp_sock.settimeout(1.0)  # 1 second timeout for checking
         
-        print(f"🔊 Listening on {server_ip}:{port} for registration...")
+        print(f"🔊 Listening on {listen_ip}:{port} for registration...")
         
         # Create temporary SessionManager to handle registration
         temp_session_mgr = SessionManager(
@@ -2445,7 +2489,7 @@ def main(argv=None):
     if not args.skip_qr_prompt:
         try:
             # Determine bind IP for registration (use first target host if bind is 0.0.0.0)
-            registration_ip = target_hosts[0] if args.bind_ip == '0.0.0.0' else args.bind_ip
+            registration_ip = target_hosts[0] if is_wildcard_bind_address(args.bind_ip) else args.bind_ip
             interactive_qr_registration(registration_ip, args.port, timeout_seconds=5)
         except Exception as e:
             logger.warning(f"QR registration prompt failed: {e}")
